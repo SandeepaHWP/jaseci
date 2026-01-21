@@ -26,8 +26,7 @@ impl start_cli -> None {
     try {
         import argcomplete;
         argcomplete.autocomplete(parser);
-    } except Exception {
-    }
+    } except Exception { }
     # Handle implicit 'run' command for .jac files
     raw_argv = sys.argv[1:];
     if (
