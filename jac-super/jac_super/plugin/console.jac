@@ -6,6 +6,7 @@ colorful terminal output with themes, panels, tables, and spinners.
 """
 import from jaclang.pycore.runtime { hookimpl, plugin_manager }
 import from jaclang.cli.console { JacConsole as BaseJacConsole }
+import from argparse { ArgumentParser }
 
 """Jac Super Plugin for console enhancement."""
 class JacSuperPlugin {
@@ -16,7 +17,7 @@ class JacSuperPlugin {
     }
 
     @hookimpl
-    static def setup_argcomplete(parser: Any) -> None {
+    static def setup_argcomplete(parser: ArgumentParser) -> None {
         try {
             import argcomplete;
             argcomplete.autocomplete(parser);

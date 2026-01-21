@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import fnmatch
 import html
 import inspect
@@ -1689,7 +1690,7 @@ class JacConsole:
         return JacConsole()
 
     @staticmethod
-    def setup_argcomplete(parser: Any) -> None:
+    def setup_argcomplete(parser: argparse.ArgumentParser) -> None:
         """Setup argument completion for CLI.
 
         Plugins can override this hook to provide CLI argument completion.
