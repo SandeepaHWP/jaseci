@@ -85,20 +85,23 @@ class TestJacScaleServe:
         jac_executable = Path(sys.executable).parent / "jac"
 
         # Build the command to start the server
+        # Use just the filename and set cwd to fixtures directory
+        # This is required for proper bytecode caching and module resolution
         cmd = [
             str(jac_executable),
             "start",
-            str(cls.test_file),
+            cls.test_file.name,
             "--port",
             str(cls.port),
         ]
 
-        # Start the server process
+        # Start the server process with cwd set to fixtures directory
         cls.server_process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
+            cwd=str(cls.fixtures_dir),
         )
 
         # Wait for server to be ready
