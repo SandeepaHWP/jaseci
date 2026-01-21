@@ -1688,6 +1688,15 @@ class JacConsole:
 
         return JacConsole()
 
+    @staticmethod
+    def setup_argcomplete(parser: Any) -> None:
+        """Setup argument completion for CLI.
+
+        Plugins can override this hook to provide CLI argument completion.
+        Called after the argument parser is finalized but before arguments are parsed.
+        """
+        pass
+
 
 class JacAPIServer:
     """Jac API Server Operations - Generic interface for API server."""

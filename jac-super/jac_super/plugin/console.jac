@@ -14,6 +14,14 @@ class JacSuperPlugin {
     static def get_console -> BaseJacConsole {
         return JacSuperConsole();
     }
+
+    @hookimpl
+    static def setup_argcomplete(parser: Any) -> None {
+        try {
+            import argcomplete;
+            argcomplete.autocomplete(parser);
+        } except Exception { }
+    }
 }
 
 # Register the plugin

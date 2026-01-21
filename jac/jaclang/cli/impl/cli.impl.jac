@@ -22,14 +22,8 @@ impl start_cli -> None {
     # Get the registry and finalize it (builds argparse parser)
     registry = get_registry();
     parser = registry.finalize();
-    # Setup argcomplete for shell completion if available (via plugin)
-    try {
-        import argcomplete;
-        argcomplete.autocomplete(parser);
-    } except ImportError {
-        # argcomplete not installed - OK if jac-super not installed
-        pass;
-    } except Exception {}
+    # Let plugins setup argcomplete if available
+    _setup_argcomplete_via_plugin(parser);
     # Handle implicit 'run' command for .jac files
     raw_argv = sys.argv[1:];
     if (

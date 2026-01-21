@@ -28,7 +28,6 @@ Documentation = "https://jac-lang.org"
 
 [project.entry-points."jac"]
 console = "jac_super.plugin.console:JacSuperPlugin"
-argcomplete = "jac_super.plugin.argcomplete_plugin:JacArgcompletePlugin"
 
 [tool.setuptools.packages.find]
 include = ["jac_super*"]
