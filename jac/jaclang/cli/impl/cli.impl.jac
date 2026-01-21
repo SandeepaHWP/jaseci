@@ -154,7 +154,7 @@ def _apply_env_profile(args_dict: dict) -> None {
 
 def _setup_argcomplete_via_plugin(parser: Any) -> None {
     import from jaclang.pycore.runtime { plugin_manager }
-    
+
     # Call plugin hook if implemented
     results = plugin_manager.hook.setup_argcomplete(parser=parser);
     # results will be empty if no plugin implements it
