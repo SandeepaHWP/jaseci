@@ -22,8 +22,8 @@ impl start_cli -> None {
     # Get the registry and finalize it (builds argparse parser)
     registry = get_registry();
     parser = registry.finalize();
-    # Let plugins setup argcomplete if available
-    _setup_argcomplete_via_plugin(parser);
+    
+    Jac.setup_argcomplete(parser);
     # Handle implicit 'run' command for .jac files
     raw_argv = sys.argv[1:];
     if (
@@ -144,12 +144,4 @@ def _apply_env_profile(args_dict: dict) -> None {
     } except Exception {
     # Silently ignore profile loading errors
     }
-}
-
-def _setup_argcomplete_via_plugin(parser: Any) -> None {
-    import from jaclang.pycore.runtime { plugin_manager }
-
-    # Call plugin hook if implemented
-    results = plugin_manager.hook.setup_argcomplete(parser=parser);
-    # results will be empty if no plugin implements it
 }
