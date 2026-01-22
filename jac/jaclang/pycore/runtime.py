@@ -61,7 +61,6 @@ if TYPE_CHECKING:
     from http.server import BaseHTTPRequestHandler
 
     from jaclang.cli.console import JacConsole as ConsoleImpl
-    from jaclang.cli.registry import CommandRegistry
     from jaclang.pycore.compiler import JacCompiler
     from jaclang.pycore.program import JacProgram
     from jaclang.runtimelib.client_bundle import ClientBundle, ClientBundleBuilder
@@ -1698,6 +1697,7 @@ class JacConsole:
         Called after the argument parser is finalized but before arguments are parsed.
         """
         pass
+
 
 class JacAPIServer:
     """Jac API Server Operations - Generic interface for API server."""
