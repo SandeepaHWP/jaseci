@@ -7,7 +7,7 @@ offering elegant, colorful terminal output with themes, panels, tables, and spin
 __version__ = "0.1.0"
 
 
-def _setup_completion_override() -> None:
+def completion_override() -> None:
     """Override the completion command handler with jac-super's implementation.
 
     This is called when the plugin module is loaded to inject the actual
@@ -26,5 +26,5 @@ def _setup_completion_override() -> None:
         pass
 
 
-# Set up completion handler override when module loads
-_setup_completion_override()
+# Set up completion handler override at initialization
+completion_override()

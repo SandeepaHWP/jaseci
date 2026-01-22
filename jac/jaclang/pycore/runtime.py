@@ -1699,17 +1699,6 @@ class JacConsole:
         """
         pass
 
-    @staticmethod
-    def register_plugin_commands(registry: CommandRegistry) -> None:
-        """Register plugin-provided commands in the CLI registry.
-
-        Plugins can override this hook to register their own commands.
-        Called after core commands are registered but before the registry is finalized.
-        The registry parameter is the CommandRegistry instance from jaclang.cli.registry.
-        """
-        pass
-
-
 class JacAPIServer:
     """Jac API Server Operations - Generic interface for API server."""
 

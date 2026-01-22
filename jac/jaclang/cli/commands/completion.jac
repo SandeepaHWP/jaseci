@@ -21,6 +21,4 @@ glob registry = get_registry();
     ],
     group="tools"
 )
-def completion(shell: str) -> int {
-    return 1;
-}
+def completion(shell: str) -> int { }
