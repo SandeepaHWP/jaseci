@@ -1,7 +1,6 @@
 """Shell completion setup command.
 
-This command provides shell completion setup for jac.
-The implementation is provided by plugins (e.g., jac-super).
+Allows users to easily register shell completions for jac.
 """
 
 import from jaclang.cli.command { Arg, ArgKind }
@@ -19,8 +18,7 @@ glob registry = get_registry();
         ),
 
     ],
-    group="tools"
+    group="tools",
+    source="jac-super"
 )
-def completion(shell: str) -> int {
-    return 1;
-}
+def completion(shell: str) -> int;

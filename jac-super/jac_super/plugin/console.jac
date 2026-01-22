@@ -17,7 +17,7 @@ class JacSuperPlugin {
     }
 
     @hookimpl
-    static def setup_argcomplete(parser: ArgumentParser) -> None {
+    static def cli_completion(parser: ArgumentParser) -> None {
         try {
             import argcomplete;
             argcomplete.autocomplete(parser);
@@ -25,7 +25,7 @@ class JacSuperPlugin {
     }
 }
 
-# Register the plugin
+# Register the plugin during module load
 with entry {
     plugin_manager.register(JacSuperPlugin());
 }

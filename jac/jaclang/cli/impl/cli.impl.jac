@@ -22,7 +22,7 @@ impl start_cli -> None {
     # Get the registry and finalize it (builds argparse parser)
     registry = get_registry();
     parser = registry.finalize();
-    Jac.setup_argcomplete(parser);
+    Jac.cli_completion(parser);
     # Handle implicit 'run' command for .jac files
     raw_argv = sys.argv[1:];
     if (

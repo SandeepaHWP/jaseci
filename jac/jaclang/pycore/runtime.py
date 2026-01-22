@@ -61,6 +61,7 @@ if TYPE_CHECKING:
     from http.server import BaseHTTPRequestHandler
 
     from jaclang.cli.console import JacConsole as ConsoleImpl
+    from jaclang.cli.registry import CommandRegistry
     from jaclang.pycore.compiler import JacCompiler
     from jaclang.pycore.program import JacProgram
     from jaclang.runtimelib.client_bundle import ClientBundle, ClientBundleBuilder
@@ -1690,11 +1691,21 @@ class JacConsole:
         return JacConsole()
 
     @staticmethod
-    def setup_argcomplete(parser: argparse.ArgumentParser) -> None:
-        """Setup argument completion for CLI.
+    def cli_completion(parser: argparse.ArgumentParser) -> None:
+        """Setup CLI completion for argument parser.
 
         Plugins can override this hook to provide CLI argument completion.
         Called after the argument parser is finalized but before arguments are parsed.
+        """
+        pass
+
+    @staticmethod
+    def register_plugin_commands(registry: CommandRegistry) -> None:
+        """Register plugin-provided commands in the CLI registry.
+
+        Plugins can override this hook to register their own commands.
+        Called after core commands are registered but before the registry is finalized.
+        The registry parameter is the CommandRegistry instance from jaclang.cli.registry.
         """
         pass
 
