@@ -10,6 +10,14 @@ import from argparse { ArgumentParser }
 
 """Jac Super Plugin for console enhancement."""
 class JacSuperPlugin {
+    """Register jac-super commands (including overriding core stubs)."""
+    @hookimpl
+    static def create_cmd -> None {
+        # Importing this package triggers registration of its commands via
+        # @registry.command decorators (e.g., completion).
+        import from jac_super.commands { completion }
+    }
+
     """Get the Rich-enhanced console instance."""
     @hookimpl
     static def get_console -> BaseJacConsole {

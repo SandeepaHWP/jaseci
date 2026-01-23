@@ -3,12 +3,11 @@
 Allows users to easily register shell completions for jac.
 """
 
-import from jaclang.cli.command { Arg, ArgKind }
+import from jaclang.cli.command { Arg, ArgKind, CommandPriority }
 import from jaclang.cli.registry { get_registry }
 
 glob registry = get_registry();
 
-"""Register shell completion for jac."""
 @registry.command(
     name="completion",
     help="Setup shell completion for jac",
@@ -19,6 +18,7 @@ glob registry = get_registry();
 
     ],
     group="tools",
-    source="jac-super"
+    source="jac-super",
+    priority=CommandPriority.PLUGIN
 )
 def completion(shell: str) -> int;
