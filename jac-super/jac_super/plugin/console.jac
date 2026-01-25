@@ -42,7 +42,7 @@ class JacSuperPlugin {
 
             if shell_name not in rc_map {
                 print(f"Could not auto-install for detected shell: {shell_name}");
-                print("Invalid shell Type")
+                print("Invalid shell Type");
                 return 1;
             }
 
