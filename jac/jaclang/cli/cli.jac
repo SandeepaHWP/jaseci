@@ -22,18 +22,18 @@ def run_standard_cli -> None;
 
 """Main CLI entry point with optional Typer delegation."""
 def start_cli -> None {
-     import sys;
+    import sys;
     # Try to launch Typer-based CLI from jac-super if available
     try {
         import from jac_super.cli.main { start_cli as super_start_cli }
         super_start_cli();
         return;
     } except ImportError {
-        # Fallback to standard CLI
+    # Fallback to standard CLI
     } except Exception {
-        # Fallback to standard CLI
+    # Fallback to standard CLI
     }
-    
+
     run_standard_cli();
 }
 
