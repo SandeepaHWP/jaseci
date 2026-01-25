@@ -29,7 +29,6 @@ jac completion
 source ~/.bashrc  # or ~/.zshrc
 ```
 
-
 ## Environment Variables
 
 | Variable | Effect |
