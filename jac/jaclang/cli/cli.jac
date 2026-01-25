@@ -16,7 +16,26 @@ import from jaclang.cli {
 #===============================================================================
 # ENTRY POINT
 #===============================================================================
-def start_cli -> None;
+
+# Declaration for the standard CLI implementation (in impl/cli.impl.jac)
+def run_standard_cli -> None;
+
+"""Main CLI entry point with optional Typer delegation."""
+def start_cli -> None {
+     import sys;
+    # Try to launch Typer-based CLI from jac-super if available
+    try {
+        import from jac_super.cli.main { start_cli as super_start_cli }
+        super_start_cli();
+        return;
+    } except ImportError {
+        # Fallback to standard CLI
+    } except Exception {
+        # Fallback to standard CLI
+    }
+    
+    run_standard_cli();
+}
 
 with entry:__main__ {
     start_cli();

@@ -9,12 +9,14 @@ import sys;
 import from importlib.metadata { version as pkg_version }
 import from pathlib { Path }
 
-impl start_cli -> None {
+impl run_standard_cli -> None {
     import from jaclang.pycore.runtime { JacRuntime as Jac }
     import from jaclang.cli.registry { get_registry }
     import from jaclang.cli.executor { get_executor }
     import from jaclang.cli.help { get_help_formatter }
+    import from jaclang.cli.help { get_help_formatter }
     import from jaclang.cli.console { console }
+    import sys;
     # Auto-discover and load jac.toml project configuration
     _load_project_config();
     # Load plugins which may register additional commands
