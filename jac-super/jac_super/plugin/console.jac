@@ -5,7 +5,6 @@ It overrides the base console implementation to provide elegant,
 colorful terminal output with themes, panels, tables, and spinners.
 """
 import os;
-import subprocess;
 import from jaclang.pycore.runtime { hookimpl, plugin_manager }
 import from jaclang.cli.console { JacConsole as BaseJacConsole }
 import from argparse { ArgumentParser }
@@ -74,7 +73,7 @@ class JacSuperPlugin {
     }
 }
 
-# Register the plugin during module load
+# Register the plugin
 with entry {
     plugin_manager.register(JacSuperPlugin());
 }
