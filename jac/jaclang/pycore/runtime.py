@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import argparse
+
 import fnmatch
 import html
 import inspect
@@ -58,6 +58,7 @@ from jaclang.pycore.mtp import MTIR, MTRuntime
 from jaclang.vendor import pluggy
 
 if TYPE_CHECKING:
+    import argparse
     from http.server import BaseHTTPRequestHandler
 
     from jaclang.cli.console import JacConsole as ConsoleImpl
