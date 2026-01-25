@@ -32,7 +32,7 @@ class JacSuperPlugin {
             source="jac-super",
             priority=CommandPriority.PLUGIN
         )
-        def completion() -> int {
+        def completion -> int {
             # 1. Get the shell path (e.g., '/bin/zsh') and extract the name ('zsh')
             shell_path = os.environ.get("SHELL", "/bin/bash");
             shell_name = os.path.basename(shell_path);
@@ -50,7 +50,9 @@ class JacSuperPlugin {
 
             # 3. Append the completion logic to the config file
             print(f"Detected {shell_name}. Installing to {target_file}...");
-            os.system(f"register-python-argcomplete --shell={shell_name} jac >> {target_file}");
+            os.system(
+                f"register-python-argcomplete --shell={shell_name} jac >> {target_file}"
+            );
 
             print(f"Done! Restart your shell or run: source {target_file}");
             return 0;
