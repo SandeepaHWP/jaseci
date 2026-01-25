@@ -47,11 +47,11 @@ class JacSuperPlugin {
             }
 
             target_file = rc_map[shell_name];
-            
+
             # 3. Append the completion logic to the config file
             print(f"Detected {shell_name}. Installing to {target_file}...");
             os.system(f"register-python-argcomplete --shell={shell_name} jac >> {target_file}");
-            
+
             print(f"Done! Restart your shell or run: source {target_file}");
             return 0;
         }
