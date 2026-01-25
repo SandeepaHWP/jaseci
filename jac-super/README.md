@@ -18,6 +18,17 @@ No configuration required. After installation, jac-super automatically enhances 
 - `jac start` - Server startup and status messages
 - `jac run` - Formatted execution output
 - `jac config` - Styled configuration display
+- `jac completion` - Shell autocompletion setup
+
+## Shell Completion
+
+To enable shell autocompletion for `bash` or `zsh`:
+
+```bash
+jac completion
+source ~/.bashrc  # or ~/.zshrc
+```
+
 
 ## Environment Variables
 

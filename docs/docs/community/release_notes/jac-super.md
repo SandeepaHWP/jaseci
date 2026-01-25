@@ -4,9 +4,7 @@ This document provides a summary of new features, improvements, and bug fixes in
 
 ## jac-super 0.1.1 (Unreleased)
 
-- **CLI Autocompletion**: Enabled shell autocompletion support for the Jac CLI. Users can now press `TAB` to auto-complete commands, subcommands, flags, and file paths, significantly improving productivity and ease of use.
-- **Auto-Installation**: Added a `completion` command to easily install completion scripts for `bash` and `zsh` shells.
-- **Dynamic Suggestions**: Provides context-aware suggestions for all available CLI commands and options.
+- **CLI Autocompletion**: Enabled shell autocompletion support for the Jac CLI (`bash`/`zsh`). Users can now press `TAB` to auto-complete commands and options after running `jac completion` to set it up.
 
 ## jac-super 0.1.0 (Latest Release)
 
