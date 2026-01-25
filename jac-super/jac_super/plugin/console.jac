@@ -17,7 +17,6 @@ class JacSuperPlugin {
     """Register jac-super commands (including overriding core stubs)."""
     @hookimpl
     static def create_cmd -> None {
-
         registry = get_registry();
 
         @registry.command(
@@ -27,6 +26,7 @@ class JacSuperPlugin {
                 Arg.create(
                     "shell", kind=ArgKind.POSITIONAL, help="Shell type (bash, zsh)"
                 ),
+
             ],
             group="tools",
             source="jac-super",
@@ -35,17 +35,19 @@ class JacSuperPlugin {
         def completion(shell: str) -> int {
             # Map shell to config file
             rc_map = {"bash": "~/.bashrc", "zsh": "~/.zshrc"};
-            if shell not in rc_map { return 1; }
-            
+            if shell not in rc_map {
+                return 1;
+            }
+
             target_file = rc_map[shell];
 
             # 1. Use os.system to run the command AND append (>>) to the file in one go
             # 2. We use '>>' so it adds to the end of the file automatically
             cmd = f"register-python-argcomplete --shell={shell} jac >> {target_file}";
-            
+
             print(f"Installing completion to {target_file}...");
             os.system(cmd);
-            
+
             print(f"Done! Run this to activate: source {target_file}");
             return 0;
         }
