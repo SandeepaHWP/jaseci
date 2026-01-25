@@ -32,23 +32,27 @@ class JacSuperPlugin {
             source="jac-super",
             priority=CommandPriority.PLUGIN
         )
-        def completion(shell: str) -> int {
-            # Map shell to config file
+        def completion() -> int {
+            # 1. Get the shell path (e.g., '/bin/zsh') and extract the name ('zsh')
+            shell_path = os.environ.get("SHELL", "/bin/bash");
+            shell_name = os.path.basename(shell_path);
+
+            # 2. Map shell names to their config files
             rc_map = {"bash": "~/.bashrc", "zsh": "~/.zshrc"};
-            if shell not in rc_map {
+
+            if shell_name not in rc_map {
+                print(f"Could not auto-install for detected shell: {shell_name}");
+                print("Invalid shell Type")
                 return 1;
             }
 
-            target_file = rc_map[shell];
-
-            # 1. Use os.system to run the command AND append (>>) to the file in one go
-            # 2. We use '>>' so it adds to the end of the file automatically
-            cmd = f"register-python-argcomplete --shell={shell} jac >> {target_file}";
-
-            print(f"Installing completion to {target_file}...");
-            os.system(cmd);
-
-            print(f"Done! Run this to activate: source {target_file}");
+            target_file = rc_map[shell_name];
+            
+            # 3. Append the completion logic to the config file
+            print(f"Detected {shell_name}. Installing to {target_file}...");
+            os.system(f"register-python-argcomplete --shell={shell_name} jac >> {target_file}");
+            
+            print(f"Done! Restart your shell or run: source {target_file}");
             return 0;
         }
     }
