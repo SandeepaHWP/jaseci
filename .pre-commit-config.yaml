@@ -7,7 +7,6 @@ exclude: |
     )
 
 
-
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
@@ -52,7 +51,6 @@ repos:
         files: \.jac$
         require_serial: true
         exclude: (/fixtures/|_err\.jac$|_syntax_err\.jac$)
-
   - repo: local
     hooks:
       - id: check-no-binary-files
