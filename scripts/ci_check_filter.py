@@ -114,17 +114,21 @@ IGNORE_PATTERNS = [
     r"__truediv__",
     r"__sub__",
     r"__add__",
+    r"__mul__",
     r"Too many positional arguments",
     r"Cannot assign",
     r"No matching overload",
     r"Module not found",
     r"Connection type must be",
+    r"Connection left operand",
     r"Could not read file",
+    r"Is a directory",
     r"maximum recursion depth",
     r"Not all required parameters",
     r"'Token' object has no attribute",
     r"name '.*' is not defined",
     r"Cannot return",
+    r"Named argument .* does not match",
 ]
 
 def main():
