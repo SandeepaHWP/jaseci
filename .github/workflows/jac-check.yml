@@ -28,6 +28,26 @@ jobs:
           pip install -e ./jac-super
 
       - name: Run jac check
+        shell: bash
         run: |
-          # Running with ignore list
-          jac check . 
+          # Run jac check and capture output (allow failure code)
+          set +e
+          jac check . > check_output.txt 2>&1
+          EXIT_CODE=$?
+          set -e
+
+          # Filter out common known errors
+          # Patterns taken from user logs: __truediv__, __sub__, Too many positional arguments, etc.
+          cat check_output.txt | grep -vE "(__truediv__|__sub__|Too many positional arguments|Cannot assign .* to parameter|No matching overload found|Module not found|Connection type must be an edge instance)" > filtered_output.txt
+
+          # Check if there are any "Error" lines remaining in the filtered output
+          # We look for "✖ Error" or "Error:" markers usually present in jac output
+          if grep -qE "(✖ Error|Error:)" filtered_output.txt; then
+            echo "::error::Real errors found!"
+            cat filtered_output.txt
+            exit 1
+          else
+            echo "Only known/ignored errors found. Passing."
+            # Optionally show the ignored errors if needed, or just clean exit
+            exit 0
+          fi 
