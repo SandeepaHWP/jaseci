@@ -29,4 +29,4 @@ jobs:
 
       - name: Run jac check (with filter)
         run: |
-          python3 scripts/ci_check_filter.py
+          jac check . --ignore "jac-byllm/byllm/,jac-byllm/examples/,jac-byllm/tests/fixtures/,jac-client/jac_client/examples/,jac-client/jac_client/plugin/,jac-client/jac_client/tests/fixtures/,jac-core/,jac/examples/,jac/jaclang/,jac-scale/jac_scale/,jac-super/jac_super/,jac/tests/"
