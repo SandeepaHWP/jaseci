@@ -46,15 +46,50 @@ impl check(
             prog.compile(file_path=file_path, type_check=not parse_only, no_cgen=True);
             new_errors = prog.errors_had[err_start:];
             new_warnings = prog.warnings_had[warn_start:];
+            # Filter out errors/warnings from ignored files
+            filtered_errors = [];
+            for e in new_errors {
+                should_ignore = False;
+                if e.loc and e.loc.mod_path {
+                    for pattern in ignore_list {
+                        if str(pattern).strip() in e.loc.mod_path {
+                            should_ignore = True;
+                            break;
+                        }
+                    }
+                }
+                if not should_ignore {
+                    filtered_errors.append(e);
+                }
+            }
+            filtered_warnings = [];
+            for w in new_warnings {
+                should_ignore = False;
+                if w.loc and w.loc.mod_path {
+                    for pattern in ignore_list {
+                        if str(pattern).strip() in w.loc.mod_path {
+                            should_ignore = True;
+                            break;
+                        }
+                    }
+                }
+                if not should_ignore {
+                    filtered_warnings.append(w);
+                }
+            }
             if print_errs {
-                for e in new_errors {
+                for e in filtered_errors {
                     console.error(f"{e}");
                 }
-                for w in new_warnings {
+                for w in filtered_warnings {
                     console.warning(f"{w}");
                 }
             }
-            return ((len(new_errors) == 0), len(new_errors), len(new_warnings));
+            return (
+                (len(filtered_errors) == 0),
+                len(filtered_errors),
+                len(filtered_warnings)
+            );
         } except Exception as e {
             console.error(f"Error checking '{file_path}': {e}");
             return (False, 1, 0);
