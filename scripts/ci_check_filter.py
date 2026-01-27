@@ -1,6 +1,6 @@
+import re
 import subprocess
 import sys
-import re
 
 # Files to ignore (intentional syntax errors)
 IGNORE_FILES = [
@@ -106,7 +106,7 @@ IGNORE_FILES = [
     "jac/tests/language/fixtures/with_context.jac",
     "jac/tests/runtimelib/fixtures/other_root_access.jac",
     "jac/tests/runtimelib/fixtures/serve_api.jac",
-    "jac/tests/runtimelib/fixtures/test_reactive_signals.jac"
+    "jac/tests/runtimelib/fixtures/test_reactive_signals.jac",
 ]
 
 # Patterns to filter out (Common type errors to ignore)
@@ -131,45 +131,46 @@ IGNORE_PATTERNS = [
     r"Named argument .* does not match",
 ]
 
+
 def main():
     print("Starting CI Jac Check...")
-    
+
     # Construct command with ignore list
     cmd = ["jac", "check", ".", "--ignore", ",".join(IGNORE_FILES)]
-    
+
     # Run command and capture output
     # We DO NOT check=True because we expect failure and want to handle it manually
     result = subprocess.run(
         cmd,
         stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT, # Capture all output to stdout stream
+        stderr=subprocess.STDOUT,  # Capture all output to stdout stream
         text=True,
-        encoding='utf-8',
-        errors='replace'
+        encoding="utf-8",
+        errors="replace",
     )
-    
+
     # Process output
     lines = result.stdout.splitlines()
     filtered_lines = []
     real_errors_found = False
-    
+
     print(f"Original output has {len(lines)} lines. Filtering...")
-    
+
     for line in lines:
         # 1. Skip warnings
         if "⚠" in line:
             continue
-            
+
         # 2. Skip known error patterns
         is_ignored = False
         for pattern in IGNORE_PATTERNS:
             if re.search(pattern, line):
                 is_ignored = True
                 break
-        
+
         if is_ignored:
             continue
-            
+
         # 3. If it's an error line and NOT ignored, track it
         if "✖ Error" in line or "Error:" in line:
             real_errors_found = True
@@ -178,7 +179,7 @@ def main():
             # Keep other lines (summary, info) but don't count as errors
             # Optional: could suppress non-error lines too if super strict
             filtered_lines.append(line)
-            
+
     # Print filtered output
     if real_errors_found:
         print("::error::Real errors found!")
@@ -188,6 +189,7 @@ def main():
     else:
         print("Success: Only known/ignored errors found.")
         sys.exit(0)
+
 
 if __name__ == "__main__":
     main()
