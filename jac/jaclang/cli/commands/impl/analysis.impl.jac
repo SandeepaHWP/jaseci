@@ -48,36 +48,19 @@ impl check(
             new_errors = prog.errors_had[err_start:];
             new_warnings = prog.warnings_had[warn_start:];
             # Filter out errors/warnings from ignored files
-            filtered_errors = [];
-            for e in new_errors {
-                should_ignore = False;
-                if e.loc and e.loc.mod_path {
-                    for pattern in ignore_list {
-                        if str(pattern).strip() in e.loc.mod_path {
-                            should_ignore = True;
-                            break;
-                        }
-                    }
-                }
-                if not should_ignore {
-                    filtered_errors.append(e);
-                }
+            def filter_issues(issues: list) -> list {
+                return [
+                    i
+                    for i in issues
+                    if not (
+                        i.loc
+                        and i.loc.mod_path
+                        and any(p in i.loc.mod_path for p in ignore_list)
+                    )
+                ];
             }
-            filtered_warnings = [];
-            for w in new_warnings {
-                should_ignore = False;
-                if w.loc and w.loc.mod_path {
-                    for pattern in ignore_list {
-                        if str(pattern).strip() in w.loc.mod_path {
-                            should_ignore = True;
-                            break;
-                        }
-                    }
-                }
-                if not should_ignore {
-                    filtered_warnings.append(w);
-                }
-            }
+            filtered_errors = filter_issues(new_errors);
+            filtered_warnings = filter_issues(new_warnings);
 
             if print_errs {
                 for e in filtered_errors {
