@@ -31,15 +31,13 @@ impl start_cli -> None {
     ) {
         sys.argv = [sys.argv[0], 'run'] + raw_argv;
     }
-    
     # Enable tab completion
     try {
         import from jaclang.vendor { jaccomplete }
         jaccomplete.autocomplete(parser);
     } except Exception {
-        # Pass silently if completion fails
+    # Pass silently if completion fails
     }
-
     # Parse arguments
     args = parser.parse_args();
     # Handle --version flag
