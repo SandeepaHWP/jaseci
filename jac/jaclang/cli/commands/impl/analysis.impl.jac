@@ -13,7 +13,8 @@ impl check(
     print_errs: bool = True,
     warnonly: bool = False,
     ignore: str = "",
-    parse_only: bool = False
+    parse_only: bool = False,
+    nowarn: bool = False
 ) -> int {
     import from jaclang.pycore.program { JacProgram }
     if isinstance(paths, str) {
@@ -82,8 +83,10 @@ impl check(
                 for e in filtered_errors {
                     console.error(f"{e}");
                 }
-                for w in filtered_warnings {
-                    console.warning(f"{w}");
+                if not nowarn {
+                    for w in filtered_warnings {
+                        console.warning(f"{w}");
+                    }
                 }
             }
 
