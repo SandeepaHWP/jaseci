@@ -47,8 +47,7 @@ glob registry = get_registry();
             "nowarn",
             typ=bool,
             default=False,
-            help="Suppress warning output (warnings are still counted)",
-            short="nw"
+            help="Suppress warning output (warnings are still counted)"
         ),
 
     ],
