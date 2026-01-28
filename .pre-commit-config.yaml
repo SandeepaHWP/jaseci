@@ -51,6 +51,7 @@ repos:
         files: \.jac$
         require_serial: true
         exclude: (/fixtures/|_err\.jac$|_syntax_err\.jac$)
+        additional_dependencies: [llvmlite>=0.43.0]
   - repo: local
     hooks:
       - id: check-no-binary-files
