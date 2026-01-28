@@ -92,7 +92,6 @@ impl check(
                 len(filtered_errors),
                 len(filtered_warnings)
             );
-
         } except Exception as e {
             console.error(f"Error checking '{file_path}': {e}");
             return (False, 1, 0);
