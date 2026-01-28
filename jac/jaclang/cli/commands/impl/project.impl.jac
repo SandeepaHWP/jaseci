@@ -146,7 +146,7 @@ impl create(
         steps.append(f"cd {name}");
     }
     steps.append("jac install         Install dependencies");
-    steps.append("jac run main.jac    Start development");
+    steps.append("jac start main.jac    Start development");
     console.print_next_steps(steps);
     console.print("\n🚀 Happy coding!\n", style="bold green");
     return 0;
@@ -380,7 +380,7 @@ impl install(dev: bool = False, verbose: bool = False) -> int {
         f"\n📦 Installing dependencies for [cyan]{config.project.name}[/cyan]",
         style="bold"
     );
-    console.print(f"  Packages directory: {config.get_packages_dir()}", style="muted");
+    console.print(f"  Virtual environment: {config.get_venv_dir()}", style="muted");
     console.print();
     installer = DependencyInstaller(config=config, verbose=verbose);
     with console.status("[cyan]Installing packages...[/cyan]", spinner="dots") as status {
@@ -531,7 +531,7 @@ impl script(name: str = '', list_scripts: bool = False) -> int {
                 style="muted"
             );
             console.print('  [scripts]', style="muted");
-            console.print('  dev = "jac run main.jac"', style="muted");
+            console.print('  dev = "jac start main.jac"', style="muted");
             console.print('  test = "jac test"', style="muted");
             return 0;
         }
@@ -587,7 +587,7 @@ impl clean(
     if all {
         dirs_to_clean.append(("data", config.get_data_dir()));
         dirs_to_clean.append(("cache", config.get_cache_dir()));
-        dirs_to_clean.append(("packages", config.get_packages_dir()));
+        dirs_to_clean.append(("venv", config.get_venv_dir()));
         dirs_to_clean.append(("client", config.get_client_dir()));
     } else {
         # If specific flags are set, use them
@@ -598,7 +598,7 @@ impl clean(
             dirs_to_clean.append(("cache", config.get_cache_dir()));
         }
         if packages {
-            dirs_to_clean.append(("packages", config.get_packages_dir()));
+            dirs_to_clean.append(("venv", config.get_venv_dir()));
         }
         # If no specific flags, default to cleaning data directory
         if not dirs_to_clean {
