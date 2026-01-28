@@ -47,36 +47,15 @@ impl check(
             new_errors = prog.errors_had[err_start:];
             new_warnings = prog.warnings_had[warn_start:];
             # Filter out errors/warnings from ignored files
-            filtered_errors = [];
-            for e in new_errors {
-                should_ignore = False;
-                if e.loc and e.loc.mod_path {
-                    for pattern in ignore_list {
-                        if str(pattern).strip() in e.loc.mod_path {
-                            should_ignore = True;
-                            break;
-                        }
-                    }
-                }
-                if not should_ignore {
-                    filtered_errors.append(e);
-                }
-            }
-            filtered_warnings = [];
-            for w in new_warnings {
-                should_ignore = False;
-                if w.loc and w.loc.mod_path {
-                    for pattern in ignore_list {
-                        if str(pattern).strip() in w.loc.mod_path {
-                            should_ignore = True;
-                            break;
-                        }
-                    }
-                }
-                if not should_ignore {
-                    filtered_warnings.append(w);
-                }
-            }
+            def should_keep_item(item, ignore_list):
+                """Check if item should be kept (not ignored)."""
+                if not (item.loc and item.loc.mod_path):
+                    return True;
+                return not any(str(pattern).strip() in item.loc.mod_path for pattern in ignore_list);
+
+            filtered_errors = [e for e in new_errors if should_keep_item(e, ignore_list)];
+            filtered_warnings = [w for w in new_warnings if should_keep_item(w, ignore_list)];
+
             if print_errs {
                 for e in filtered_errors {
                     console.error(f"{e}");
@@ -85,11 +64,9 @@ impl check(
                     console.warning(f"{w}");
                 }
             }
-            return (
-                (len(filtered_errors) == 0),
-                len(filtered_errors),
-                len(filtered_warnings)
-            );
+
+            return (len(filtered_errors) == 0, len(filtered_errors), len(filtered_warnings));
+            
         } except Exception as e {
             console.error(f"Error checking '{file_path}': {e}");
             return (False, 1, 0);

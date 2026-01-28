@@ -303,3 +303,6 @@ es_unparse.impl.jac
 command.impl.jac
 cli.impl.jac
 tools.impl.jac
+na_compile_pass.impl.jac
+tool_method.jac
+tool_function.jac
