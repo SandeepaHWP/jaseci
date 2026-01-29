@@ -32,7 +32,7 @@ impl start_cli -> None {
     ) {
         sys.argv = [sys.argv[0], 'run'] + raw_argv;
     }
-    # Enable tab completion   
+    # Enable tab completion
     jaccomplete.autocomplete(parser);
     # Parse arguments
     args = parser.parse_args();
