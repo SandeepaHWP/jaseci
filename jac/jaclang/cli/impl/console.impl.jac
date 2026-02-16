@@ -1,8 +1,15 @@
 """Implementation of console utilities for terminal output."""
+
 import os;
 import sys;
 import from contextlib { contextmanager }
 import from typing { Any }
+
+import from rich.console { Console }
+import from rich.theme { Theme }
+import from rich.padding { Padding }
+import from rich.panel { Panel }
+import from rich.table { Table }
 
 # ===============================================================================
 # JacConsole Implementation
@@ -11,6 +18,39 @@ import from typing { Any }
 impl JacConsole.init -> None {
     self.use_emoji = JacConsole._should_use_emoji();
     self.use_color = JacConsole._should_use_color();
+    
+    # Initialize Rich Console
+    _theme = Theme({
+        "info": "bold blue",
+        "warning": "bold yellow",
+        "error": "bold red",
+        "success": "bold green",
+        "header": "bold cyan",
+    });
+    self._console = Console(
+        theme=_theme,
+        force_terminal=True if self.use_color else False,
+        no_color=not self.use_color,
+    );
+    self._stderr_console = Console(
+        theme=_theme,
+        stderr=True,
+        force_terminal=True if self.use_color else False,
+        no_color=not self.use_color,
+    );
+}
+# ... (keeping existing implementation of _should_use_emoji and _should_use_color) ...
+
+"""Print to stdout using Rich console.
+
+Supports Rich markup and styling.
+"""
+impl JacConsole.print(*args: Any, **kwargs: Any) -> None {
+     # If no console, initialize it (shouldn't really happen if init called)
+    if not hasattr(self, '_console') {
+        self.init();
+    }
+    self._console.print(*args, **kwargs);
 }
 
 """Check if emoji should be used based on environment.
@@ -88,25 +128,32 @@ impl JacConsole.print(*args: Any, **kwargs: Any) -> None {
 }
 
 """Context manager for status during long operations (basic implementation)."""
+"""Context manager for status spinner."""
 impl JacConsole.status(*args: Any, **kwargs: Any) -> object {
-    # Basic implementation - just print the message
-    if args {
-        print(args[0] if isinstance(args[0], str) else str(args[0]));
+    if not hasattr(self, '_console') {
+        self.init();
     }
-    # Return a no-op context manager
-    @contextmanager
-    def _noop_status -> object {
-        yield None;
-    }
-    return _noop_status();
+    # Return Rich's status context manager
+    return self._console.status(*args, **kwargs);
 }
 
 """Print a success message with checkmark."""
+"""Print a success message with checkmark."""
 impl JacConsole.success(message: str, emoji: bool = True) -> None {
+    if not hasattr(self, '_console') {
+        self.init();
+    }
     prefix = '✔' if emoji and self.use_emoji else '[SUCCESS]';
-    print(f"{prefix} {message}");
+    self._console.print(f"[{'success' if self.use_color else ''}]{prefix} {message}[/]");
 }
 
+"""Print an error message with optional hint.
+
+Args:
+    message: The error message
+    hint: Optional hint or suggestion
+    emoji: Whether to use emoji (✖) or text ([ERROR])
+"""
 """Print an error message with optional hint.
 
 Args:
@@ -117,24 +164,57 @@ Args:
 impl JacConsole.error(
     message: str, hint: str | None = None, emoji: bool = True
 ) -> None {
-    prefix = '✖' if emoji and self.use_emoji else '[ERROR]';
-    print(f"{prefix} Error: {message}", file=sys.stderr);
-    if hint {
-        hint_prefix = '💡' if self.use_emoji else 'HINT:';
-        print(f"{hint_prefix} {hint}", file=sys.stderr);
+    if not hasattr(self, '_console') {
+        self.init();
     }
+    
+    import from rich.panel { Panel }
+    import from rich { box }
+    import from rich.text { Text }
+    
+    prefix = '✖' if emoji and self.use_emoji else '[ERROR]';
+    
+    # Create error message text
+    error_text = Text();
+    error_text.append(f"{prefix} Error: ", style="bold red");
+    error_text.append(message);
+    
+    if hint {
+        error_text.append("\n\n");
+        hint_prefix = '💡' if self.use_emoji else 'HINT:';
+        error_text.append(f"{hint_prefix} ", style="bold yellow");
+        error_text.append(hint, style="yellow");
+    }
+    
+    # Wrap in red panel
+    panel = Panel(
+        error_text,
+        border_style="bold red",
+        box=box.ROUNDED,
+        padding=(0, 1),
+    );
+    
+    self._stderr_console.print(panel);
 }
 
 """Print a warning message."""
+"""Print a warning message."""
 impl JacConsole.warning(message: str, emoji: bool = True) -> None {
+    if not hasattr(self, '_console') {
+        self.init();
+    }
     prefix = '⚠' if emoji and self.use_emoji else '[WARNING]';
-    print(f"{prefix} {message}");
+    self._console.print(f"[warning]{prefix} {message}[/warning]");
 }
 
 """Print an info message."""
+"""Print an info message."""
 impl JacConsole.info(message: str, emoji: bool = True) -> None {
+    if not hasattr(self, '_console') {
+        self.init();
+    }
     prefix = 'ℹ' if emoji and self.use_emoji else '[INFO]';
-    print(f"{prefix} {message}");
+    self._console.print(f"[info]{prefix} {message}[/info]");
 }
 
 """Print a header with optional version.
@@ -300,6 +380,10 @@ impl _get_console -> JacConsole {
     if _console_instance is None {
         import from jaclang.jac0core.runtime { JacRuntime as Jac }
         _console_instance = Jac.get_console();
+        # If runtime doesn't provide a console, create our own
+        if _console_instance is None {
+            _console_instance = JacConsole();
+        }
         _console_instance.init();
     }
     return _console_instance;

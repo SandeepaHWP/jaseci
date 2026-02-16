@@ -35,7 +35,8 @@ impl CommandExecutor.execute(
         # Print error for user visibility
         console.error(f"Error executing '{spec.name}': {e}");
         if sys?.exc_info {
-            traceback.print_exc();
+            import from rich.console { Console }
+            Console(stderr=True).print_exception(show_locals=False);
         }
     }
     # Run post-hooks (they can modify return code)

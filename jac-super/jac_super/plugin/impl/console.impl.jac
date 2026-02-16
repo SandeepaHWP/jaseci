@@ -64,19 +64,38 @@ class JacSuperConsole(BaseJacConsole) {
         self._console.print(f"{prefix} {message}", style='success');
     }
 
-    """Override error to use Rich styling with stderr."""
+    """Override error to use a Rich rounded red Panel with optional hint."""
     def error(
         self: JacSuperConsole,
         message: str,
         hint: (str | None) = None,
         emoji: bool = True
     ) -> None {
+        import from rich import box;
+        import from rich.text { Text }
+        import from rich.panel { Panel }
+
         prefix = '✖' if (emoji and self.use_emoji) else '[ERROR]';
-        self._console_stderr.print(f"{prefix} Error: {message}", style='error');
+
+        error_text = Text();
+        error_text.append(f"{prefix} Error: ", style='bold red');
+        error_text.append(message);
+
         if hint {
+            error_text.append('\n\n');
             hint_prefix = '💡' if self.use_emoji else 'HINT:';
-            self._console_stderr.print(f"{hint_prefix} {hint}", style='info');
+            error_text.append(f"{hint_prefix} ", style='bold yellow');
+            error_text.append(hint, style='yellow');
         }
+
+        self._console_stderr.print(
+            Panel(
+                error_text,
+                border_style='bold red',
+                box=box.ROUNDED,
+                padding=(0, 1),
+            )
+        );
     }
 
     """Override warning to use Rich styling."""

@@ -8,6 +8,8 @@ import sys;
 import types;
 import from threading { Event }
 import from typing { TYPE_CHECKING }
+import from rich.console { Console }
+import from rich.theme { Theme }
 import jaclang.jac0core.unitree as uni;
 import from jaclang.jac0core.bccache {
     BytecodeCache,
@@ -125,6 +127,14 @@ class _SetupProgress {
         self._compile_count = 0;
         self._seen_files: set[str] = `set();
         self._jaclang_root: (str | None) = None;
+        self._console = Console(
+            stderr=True,
+            theme=Theme({
+                "info": "bold blue",
+                "success": "bold green",
+            })
+        );
+        self._status = None;
     }
 
     def _get_jaclang_root(self: _SetupProgress) -> str {
@@ -137,10 +147,12 @@ class _SetupProgress {
     """Print the completion summary when the process exits."""
     def _atexit_handler(self: _SetupProgress) -> None {
         if (self._banner_shown and (self._compile_count > 0)) {
-            sys.stderr.write(
-                f"Jac setup complete! ({self._compile_count} modules compiled and cached)\n"
+            if self._status {
+                self._status.stop();
+            }
+            self._console.print(
+                f"[success]Jac setup complete![/success] ({self._compile_count} modules compiled and cached)"
             );
-            sys.stderr.flush();
         }
     }
 
@@ -154,10 +166,11 @@ class _SetupProgress {
         if not self._banner_shown {
             self._banner_shown = True;
             atexit.register(self._atexit_handler);
-            sys.stderr.write(
-                '\nSetting up Jac for first use (compiling and caching compiler)...\n'
+            self._console.print(
+                '\n[info]Setting up Jac for first use (compiling and caching compiler)...[/info]'
             );
-            sys.stderr.flush();
+            self._status = self._console.status("Starting compilation...");
+            self._status.start();
         }
         jaclang_root = self._get_jaclang_root();
         rel_path = file_path;
@@ -165,8 +178,12 @@ class _SetupProgress {
             rel_path = os.path.relpath(normalized, os.path.dirname(jaclang_root));
         }
         self._compile_count += 1;
-        sys.stderr.write(f"  Compiling {rel_path}...\n");
-        sys.stderr.flush();
+        if self._status {
+            self._status.update(f"Compiling [bold]{rel_path}[/bold]...");
+        } else {
+             # Fallback if status somehow failed to init or was stopped
+             self._console.print(f"  Compiling {rel_path}...");
+        }
     }
 
     """Whether we're currently in a first-run setup."""

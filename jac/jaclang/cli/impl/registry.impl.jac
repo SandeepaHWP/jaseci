@@ -2,6 +2,7 @@
 
 import argparse;
 import from jaclang.cli.banners { JAC_GITHUB_URL }
+import from jaclang.vendor.jacstyle { JacArgumentParser }
 
 # ===============================================================================
 # CommandRegistry Implementation
@@ -11,7 +12,7 @@ impl CommandRegistry.init -> None {
     self.commands = {};
     self._pending_extensions = {};
     self._finalized = False;
-    self.parser = argparse.ArgumentParser(
+    self.parser = JacArgumentParser(
         prog='jac',
         description='Jac Programming Language CLI',
         epilog=f'For more information, visit: {JAC_GITHUB_URL}',
@@ -27,7 +28,8 @@ impl CommandRegistry.init -> None {
         title='commands',
         dest='command',
         description='Available commands:',
-        metavar='COMMAND'
+        metavar='COMMAND',
+        parser_class=JacArgumentParser
     );
 }
 
@@ -143,7 +145,7 @@ impl CommandRegistry.get_groups -> list[str] {
 }
 
 """Finalize the registry and build argparse parser."""
-impl CommandRegistry.finalize -> argparse.ArgumentParser {
+impl CommandRegistry.finalize -> JacArgumentParser {
     if self._finalized {
         return self.parser;
     }
@@ -184,7 +186,7 @@ impl CommandRegistry._apply_pending_extensions(name: str) -> None {
 """Build argparse subparser for a command."""
 impl CommandRegistry._build_subparser(
     subparsers: Any, spec: CommandSpec
-) -> argparse.ArgumentParser {
+) -> JacArgumentParser {
     import from jaclang.cli.command { CommandSpec }
     # Build description with examples
     description = spec.description or spec.help;
@@ -229,7 +231,7 @@ impl CommandRegistry._build_subparser(
 }
 
 """Add an argument to an argparse parser."""
-impl CommandRegistry._add_argument(parser: argparse.ArgumentParser, arg: Arg) -> None {
+impl CommandRegistry._add_argument(parser: JacArgumentParser, arg: Arg) -> None {
     import from jaclang.cli.command { Arg, ArgKind }
     kwargs: dict = {"help": arg.help};
     if arg.choices {

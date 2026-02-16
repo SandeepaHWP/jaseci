@@ -18,6 +18,7 @@ keywords = [
 requires-python = ">=3.11"
 dependencies = [
     "llvmlite>=0.43.0",
+    "rich>=13.0.0",
 ]
 # Note: lark, interegular, pluggy, pygls are vendored
 

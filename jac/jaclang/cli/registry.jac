@@ -9,6 +9,7 @@ It supports:
 """
 
 import argparse;
+import from jaclang.vendor.jacstyle { JacArgumentParser }
 import from typing { Any, Callable }
 import from jaclang.cli.command {
     Arg,
@@ -23,7 +24,7 @@ obj CommandRegistry {
     has commands: dict[str, CommandSpec] = {},
         _pending_extensions: dict[str, list[tuple]] = {},
         _finalized: bool = False,
-        parser: argparse.ArgumentParser | None = None,
+        parser: JacArgumentParser | None = None,
         sub_parsers: Any = None;
 
     """Initialize the command registry."""
@@ -86,16 +87,16 @@ obj CommandRegistry {
     This should be called after all plugins have registered their commands
     and extensions. After finalization, the registry is read-only.
     """
-    def finalize -> argparse.ArgumentParser;
+    def finalize -> JacArgumentParser;
 
     """Apply any pending extensions to a command."""
     def _apply_pending_extensions(name: str) -> None;
 
     """Build argparse subparser for a command."""
-    def _build_subparser(subparsers: Any, spec: CommandSpec) -> argparse.ArgumentParser;
+    def _build_subparser(subparsers: Any, spec: CommandSpec) -> JacArgumentParser;
 
     """Add an argument to an argparse parser."""
-    def _add_argument(parser: argparse.ArgumentParser, arg: Arg) -> None;
+    def _add_argument(parser: JacArgumentParser, arg: Arg) -> None;
 }
 
 # Global singleton instance
