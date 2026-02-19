@@ -91,7 +91,7 @@ impl CoalesceBBPass.printgraph_cfg -> str {
 
 """Enter BasicBlockStmt nodes."""
 impl CoalesceBBPass.enter_node(nd: uni.UniNode) -> None {
-    if (isinstance(nd, uni.UniCFGNode) and not isinstance(nd, uni.Semi)) {
+    if (isinstance(nd, uni.UniCFGNode) and not isinstance(nd, (uni.Semi, uni.ArchHas))) {
         tail = nd.get_tail();
         bb = self.get_bb(nd);
         for bbs in self.basic_blocks.values() {
@@ -118,6 +118,8 @@ impl CoalesceBBPass.get_bb(nd: uni.UniCFGNode) -> list[uni.UniCFGNode] {
 
             if cur_node.bb_out {
                 cur_node = cur_node.bb_out[0];
+            } else {
+                break;
             }
         }
         bb_list.append(tail) if (tail not in bb_list) else None;
@@ -137,23 +139,18 @@ impl CFGBuildPass.init(ir_in: uni.Module, prog: Any, cancel_token: Any = None) -
 
 """After pass."""
 impl CFGBuildPass.after_pass -> None {
-    if self.to_connect {
-        for nd in self.to_connect {
-            if isinstance(nd, uni.UniCFGNode) {
-                parent_bb = self.get_parent_bb_stmt(nd);
-                if parent_bb {
-                    self.link_bbs(parent_bb, nd);
-                }
-            }
-        }
-    }
+    # Nodes remaining in to_connect after all enter/exit processing are
+    # branch-end nodes (end of if/elif/else arms) that have no successor
+    # yet. Do NOT link them back to their AST parent (that produces
+    # spurious back-edges like BB7->BB0). Leave them unconnected here;
+    # a join/exit block would be the right target, handled separately.
 }
 
 """Exit BasicBlockStmt nodes."""
 impl CFGBuildPass.exit_node(nd: uni.UniNode) -> None {
     if (isinstance(nd, uni.UniCFGNode) and not isinstance(nd, uni.Semi)) {
         self.first_exit = True;
-        if (not nd.bb_out and not isinstance(nd, (uni.ReturnStmt, uni.ArchHas))) {
+        if (not nd.bb_out and not isinstance(nd, (uni.ReturnStmt, uni.ArchHas, uni.Archetype))) {
             self.to_connect.append(nd);
         }
         if (isinstance(nd, (uni.InForStmt, uni.IterForStmt)) and self.for_loop_stack) {
@@ -191,7 +188,7 @@ impl CFGBuildPass.exit_node(nd: uni.UniNode) -> None {
 
 """Enter BasicBlockStmt nodes."""
 impl CFGBuildPass.enter_node(nd: uni.UniNode) -> None {
-    if (isinstance(nd, uni.UniCFGNode) and not isinstance(nd, uni.Semi)) {
+    if (isinstance(nd, uni.UniCFGNode) and not isinstance(nd, (uni.Semi, uni.ArchHas))) {
         bb_stmts = self.get_code_block_sequence(nd.parent);
         if (
             isinstance(nd, uni.CodeBlockStmt)
@@ -200,17 +197,18 @@ impl CFGBuildPass.enter_node(nd: uni.UniNode) -> None {
             and bb_stmts
             and self.first_exit
         ) {
-            if (nd.parent and isinstance(nd.parent, uni.Archetype)) {
+            if (nd.parent and isinstance(nd.parent, uni.Archetype) and not isinstance(nd, uni.ArchHas)) {
                 parent_obj = nd.parent;
                 if parent_obj {
                     self.link_bbs(parent_obj, nd);
                 }
-            } elif (bb_stmts[0] == nd) {
+            } elif (bb_stmts[0] == nd and not isinstance(nd, uni.ArchHas)) {
                 if (isinstance(nd.parent, uni.ModuleCode) and self.to_connect) {
-                    for bb in self.to_connect {
+                    to_remove = list(self.to_connect);
+                    for bb in to_remove {
                         self.link_bbs(bb, nd);
-                        self.to_connect.remove(bb);
                     }
+                    self.to_connect.clear();
                 } else {
                     parent_bb = self.get_parent_bb_stmt(nd);
                     if parent_bb {
@@ -220,7 +218,10 @@ impl CFGBuildPass.enter_node(nd: uni.UniNode) -> None {
             } elif (self.to_connect and not isinstance(nd, (uni.ElseIf, uni.ElseStmt))) {
                 to_remove = [];
                 for parent in self.to_connect {
-                    if isinstance(parent, uni.UniCFGNode) {
+                    if (
+                        isinstance(parent, uni.UniCFGNode)
+                        and not self._is_in_sibling_branch(parent, nd)
+                    ) {
                         self.link_bbs(parent, nd);
                         to_remove.append(parent);
                     }
@@ -330,6 +331,67 @@ impl CFGBuildPass.push_loop_stack(loop_header: uni.UniCFGNode) -> None {
     } elif isinstance(loop_header, (uni.InForStmt, uni.IterForStmt)) {
         self.for_loop_stack.append([loop_header]);
     }
+}
+
+"""Get the root IfStmt of an if/elif/else chain by walking up else_body links."""
+impl CFGBuildPass._get_if_chain_root(nd: uni.UniNode) -> (uni.UniNode | None) {
+    # Walk up: if nd is an ElseIf, its parent is the IfStmt (or ElseIf) that
+    # contains it as else_body. Keep walking until we find the top-level IfStmt.
+    cur = nd;
+    while (isinstance(cur, uni.ElseIf) and cur.parent and isinstance(cur.parent, (uni.IfStmt, uni.ElseIf))) {
+        cur = cur.parent;
+    }
+    return cur;
+}
+
+"""Check if source and target are in sibling branches of the same if/elif/else chain."""
+impl CFGBuildPass._is_in_sibling_branch(
+    source: uni.UniCFGNode, target: uni.UniCFGNode
+) -> bool {
+    branch_types = (uni.IfStmt, uni.ElseIf, uni.ElseStmt);
+    source_branch: (uni.UniNode | None) = None;
+    target_branch: (uni.UniNode | None) = None;
+    cur = source.parent;
+    while cur is not None {
+        if isinstance(cur, branch_types) {
+            source_branch = cur;
+            break;
+        }
+        cur = cur.parent if hasattr(cur, 'parent') else None;
+    }
+    cur = target.parent;
+    while cur is not None {
+        if isinstance(cur, branch_types) {
+            target_branch = cur;
+            break;
+        }
+        cur = cur.parent if hasattr(cur, 'parent') else None;
+    }
+    if (source_branch is None or target_branch is None) {
+        return False;
+    }
+    if (source_branch == target_branch) {
+        return False;
+    }
+    # Normalize ElseIf/ElseStmt up to the root IfStmt of the chain
+    # so that if/elif/else arms all share the same chain root.
+    source_root = self._get_if_chain_root(source_branch);
+    target_root = self._get_if_chain_root(target_branch);
+    # ElseStmt: walk its parent to find the if/elif that owns it
+    if isinstance(source_branch, uni.ElseStmt) {
+        source_root = self._get_if_chain_root(source_branch.parent) if source_branch.parent else source_branch;
+    }
+    if isinstance(target_branch, uni.ElseStmt) {
+        target_root = self._get_if_chain_root(target_branch.parent) if target_branch.parent else target_branch;
+    }
+    if source_root == target_root {
+        # Same chain root means they are sibling branches
+        return True;
+    }
+    # Fallback: same direct parent
+    source_parent = source_branch.parent if hasattr(source_branch, 'parent') else None;
+    target_parent = target_branch.parent if hasattr(target_branch, 'parent') else None;
+    return source_parent == target_parent;
 }
 
 """Before pass."""

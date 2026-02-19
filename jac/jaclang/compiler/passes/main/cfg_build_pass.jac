@@ -27,6 +27,8 @@ obj CFGBuildPass(UniPass) {
     def enter_node(nd: uni.UniNode) -> None;
     def exit_node(nd: uni.UniNode) -> None;
     def after_pass -> None;
+    def _is_in_sibling_branch(source: uni.UniCFGNode, target: uni.UniCFGNode) -> bool;
+    def _get_if_chain_root(nd: uni.UniNode) -> (uni.UniNode | None);
 }
 
 """Fetch basic blocks."""
