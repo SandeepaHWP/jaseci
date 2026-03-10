@@ -9,6 +9,7 @@ Generates well-formatted help output with:
 
 import from typing { Any }
 import from jaclang.cli.command { CommandSpec, Arg }
+import from jaclang.cli.jacpretty { Panel, get_console }
 
 """Groups for organizing commands in help output.
 

@@ -93,16 +93,17 @@ impl HelpFormatter.format_main_help(
             display_name += f"  [{list(sources)[0]}]";
         }
 
-        lines.append(f"{display_name}:");
-
         # Sort commands alphabetically within group
         cmds.sort(key=lambda c: str : c.name);
+        content_lines = [];
         for cmd in cmds {
-            # Format: "  name        description"
             padding = " " * (12 - len(cmd.name));
-            lines.append(f"  {cmd.name}{padding}{cmd.help}");
+            content_lines.append(f"[bold]{cmd.name}[/]{padding}{cmd.help}");
         }
-
+        content = "\n".join(content_lines);
+        width = get_console().width;
+        panel = Panel(content, title=display_name, border_style="cyan", padding=(0, 1));
+        lines.append(panel.render(width));
         lines.append("");
     }
     # Handle any ungrouped commands (shouldn't happen but be safe)
