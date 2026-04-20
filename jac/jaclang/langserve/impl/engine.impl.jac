@@ -160,8 +160,14 @@ impl JacLangServer.dispatcher -> None {
         # allowing readers (hover, completion, etc.) to proceed concurrently.
         self.debug("Dispatching task id: " + str(task.task_id));
         try {
-            self.type_check_file(task.file_uri, cancel_token=task.cancel_token);
-            self.lsp.send_request(lspt.WORKSPACE_SEMANTIC_TOKENS_REFRESH);
+            if task.file_uri.endswith("jac.toml") or task.file_uri.endswith("jac.local.toml") {
+                document = self.workspace.get_text_document(task.file_uri);
+                diags = validate_jac_toml(document.source);
+                self.publish_diagnostics(task.file_uri, diags);
+            } else {
+                self.type_check_file(task.file_uri, cancel_token=task.cancel_token);
+                self.lsp.send_request(lspt.WORKSPACE_SEMANTIC_TOKENS_REFRESH);
+            }
         } finally { }
         if task.cancel_token.is_set() {
             self.debug(

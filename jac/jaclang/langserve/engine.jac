@@ -33,6 +33,7 @@ import jaclang.lsp.types as lspt;
 import from . { utils }
 import from .module_manager { ModuleManager }
 import from .rwlock { ReadWriteLock }
+import from .toml_validator { validate_jac_toml }
 
 obj Task {
     has file_uri: str,
