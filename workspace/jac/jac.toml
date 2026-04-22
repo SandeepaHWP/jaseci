@@ -1,0 +1,16 @@
+[project]
+name = "jaclang"
+
+[run]
+diagnostics = "error"
+
+[check.lint]
+select = ["all"]
+
+exclude = [
+    "docs/*",
+    "*/examples/*",
+    "*/tests/*",
+    "console.impl.jac",
+    "cli_boot.jac"
+]

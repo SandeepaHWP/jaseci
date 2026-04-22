@@ -1,74 +1,9 @@
-"""Implementation of jac.toml validation."""
-
-impl find_section_line(lines: list[str], section: str) -> int {
-    target = f"[{section}]";
-    for (i, line) in enumerate(lines) {
-        if line.strip() == target {
-            return i;
-        }
-    }
-    return 0;
-}
-
-impl find_key_line(lines: list[str], section: str, key: str) -> int {
-    in_section = False;
-    for (i, line) in enumerate(lines) {
-        stripped = line.strip();
-        if stripped == f"[{section}]" {
-            in_section = True;
-            continue;
-        }
-        if in_section and stripped.startswith("[") and not stripped.startswith(f"[{section}.") {
-            in_section = False;
-        }
-        if in_section {
-            if (
-                stripped.startswith(f"{key} ")
-                or stripped.startswith(f"{key}=")
-                or stripped.startswith(f"{key}\t")
-            ) {
-                return i;
-            }
-        }
-    }
-    return find_section_line(lines, section);
-}
+"""Implementation of jac.toml validation using custom RD parser."""
 
 impl validate_jac_toml(content: str) -> list[lspt.Diagnostic] {
-    import tomllib;
-    import re;
+    import from jaclang.langserve.toml_parser { toml_parse };
 
-    diags: list[lspt.Diagnostic] = [];
-
-    def make_diag(
-        line: int, col: int, col_end: int, msg: str, sev: lspt.DiagnosticSeverity
-    ) -> lspt.Diagnostic {
-        return lspt.Diagnostic(
-            range=lspt.Range(
-                start=lspt.Position(line=line, character=col),
-                end=lspt.Position(line=line, character=col_end)
-            ),
-            message=msg,
-            severity=sev,
-            source="jac-toml"
-        );
-    }
-
-    data: dict = {};
-    try {
-        data = tomllib.loads(content);
-    } except Exception as e {
-        # TOMLDecodeError message format: "... (at line N, column M)"
-        m = re.search(r'at line (\d+), column (\d+)', str(e));
-        lineno = int(m.group(1)) if m else 1;
-        colno = int(m.group(2)) if m else 1;
-        line = max(0, lineno - 1);
-        col = max(0, colno - 1);
-        diags.append(make_diag(line, col, col + 1, str(e), lspt.DiagnosticSeverity.Error));
-        return diags;
-    }
-
-    lines = content.splitlines();
+    (doc, diags) = toml_parse(content);
 
     known_sections = {
         "project", "run", "build", "test", "serve", "format", "check",
@@ -138,87 +73,114 @@ impl validate_jac_toml(content: str) -> list[lspt.Diagnostic] {
         ("build.native", "opt_level"): (0, 3)
     };
 
-    for key in data {
-        if key not in known_sections {
-            line = find_section_line(lines, key);
-            col = lines[line].find(key) if line < len(lines) else 0;
+    open_sections = {
+        "plugins", "dependencies", "dev-dependencies",
+        "scripts", "environments", "jacpack"
+    };
+
+    # Python type → TOML value kind string
+    type_kind: dict = {
+        str: "string",
+        int: "integer",
+        bool: "bool",
+        list: "array",
+        dict: "inline_table"
+    };
+
+    def make_diag(tok: object, msg: str, sev: object) -> lspt.Diagnostic {
+        return lspt.Diagnostic(
+            range=lspt.Range(
+                start=lspt.Position(
+                    line=tok.loc.line - 1,
+                    character=tok.loc.col_start - 1
+                ),
+                end=lspt.Position(
+                    line=tok.loc.line - 1,
+                    character=max(tok.loc.col_end - 1, tok.loc.col_start)
+                )
+            ),
+            message=msg,
+            severity=sev,
+            source="jac-toml"
+        );
+    }
+
+    # Pass 1 - unknown top-level sections
+    for (sec_name, sec) in doc.sections.items() {
+        top = sec_name.split(".")[0];
+        if top not in known_sections {
             diags.append(make_diag(
-                line, col, col + len(key),
-                f"Unknown section '[{key}]'. Did you mean one of: {', '.join(sorted(known_sections))}?",
+                sec.tok,
+                f"Unknown section '[{sec_name}]'. Known: {', '.join(sorted(known_sections))}",
                 lspt.DiagnosticSeverity.Warning
             ));
         }
     }
 
+    # Pass 2 - per-section field validation
     for (section, fields) in section_fields.items() {
-        parts = section.split(".");
-        sec_data: dict = data;
-        valid = True;
-        for part in parts {
-            if isinstance(sec_data, dict) and part in sec_data {
-                sec_data = sec_data[part];
-            } else {
-                valid = False;
-                break;
-            }
-        }
-        if not valid or not isinstance(sec_data, dict) {
+        sec = doc.sections.get(section);
+        if sec is None {
             continue;
         }
+        top_section = section.split(".")[0];
 
-        for (field, expected_type) in fields.items() {
-            if field not in sec_data {
+        for kv in sec.kv_pairs {
+            if kv.value.kind == "error" {
+                continue;  # parse error already emitted
+            }
+
+            if kv.key not in fields {
+                if top_section not in open_sections {
+                    diags.append(make_diag(
+                        kv.key_tok,
+                        f"Unknown field '{kv.key}' in [{section}].",
+                        lspt.DiagnosticSeverity.Warning
+                    ));
+                }
                 continue;
             }
-            value = sec_data[field];
-            line = find_key_line(lines, section, field);
-            col = lines[line].find(field) if line < len(lines) else 0;
-            col_end = col + len(field);
 
-            if not isinstance(value, expected_type) {
+            expected_type = fields[kv.key];
+            expected_kind = type_kind.get(expected_type, "string");
+
+            # bool is a subtype of int in Python - handle explicitly
+            if expected_type == bool {
+                if kv.value.kind != "bool" {
+                    diags.append(make_diag(
+                        kv.key_tok,
+                        f"'{kv.key}' in [{section}] must be a bool, got {kv.value.kind}.",
+                        lspt.DiagnosticSeverity.Error
+                    ));
+                    continue;
+                }
+            } elif kv.value.kind != expected_kind {
                 type_name = expected_type.__name__;
                 diags.append(make_diag(
-                    line, col, col_end,
-                    f"'{field}' in [{section}] must be a {type_name}, got {type(value).__name__}.",
+                    kv.key_tok,
+                    f"'{kv.key}' in [{section}] must be a {type_name}, got {kv.value.kind}.",
                     lspt.DiagnosticSeverity.Error
                 ));
                 continue;
             }
 
-            key_pair = (section, field);
-            if key_pair in enum_values and value not in enum_values[key_pair] {
+            key_pair = (section, kv.key);
+            if key_pair in enum_values and kv.value.raw not in enum_values[key_pair] {
                 allowed = enum_values[key_pair];
                 diags.append(make_diag(
-                    line, col, col_end,
-                    f"'{field}' in [{section}] must be one of: {allowed}. Got '{value}'.",
+                    kv.key_tok,
+                    f"'{kv.key}' in [{section}] must be one of: {allowed}. Got '{kv.value.raw}'.",
                     lspt.DiagnosticSeverity.Error
                 ));
             }
 
             if key_pair in int_ranges {
                 (lo, hi) = int_ranges[key_pair];
-                if not (lo <= value <= hi) {
+                if not (lo <= kv.value.raw <= hi) {
                     diags.append(make_diag(
-                        line, col, col_end,
-                        f"'{field}' in [{section}] must be between {lo} and {hi}. Got {value}.",
+                        kv.key_tok,
+                        f"'{kv.key}' in [{section}] must be between {lo} and {hi}. Got {kv.value.raw}.",
                         lspt.DiagnosticSeverity.Error
-                    ));
-                }
-            }
-        }
-
-        open_sections = {"plugins", "dependencies", "dev-dependencies",
-                         "scripts", "environments", "jacpack"};
-        top_section = parts[0];
-        if top_section not in open_sections {
-            for field in sec_data {
-                if field not in fields {
-                    line = find_key_line(lines, section, field);
-                    col = lines[line].find(field) if line < len(lines) else 0;
-                    diags.append(make_diag(
-                        line, col, col + len(field),
-                        f"Unknown field '{field}' in [{section}].",
-                        lspt.DiagnosticSeverity.Warning
                     ));
                 }
             }
