@@ -9,7 +9,7 @@ on:
 
 jobs:
   jac-check:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -44,3 +44,24 @@ jobs:
       - name: Run jac check (using .jacignore)
         run: |
           jac check . --ignore tests checker_*.jac *_err.jac $(grep -v '^#' .jacignore | grep -v '^[[:space:]]*$' | tr '\n' ' ') --nowarn
+
+      - name: Error-code breakdown (whole codebase, pre-#6372 baseline)
+        if: always()
+        run: |
+          set +e
+          echo "Scanning the whole codebase (no ignores) for an error-code breakdown..."
+          jac check . --nowarn > jac-check-full.log 2>&1
+
+          {
+            echo "## jac check error-code breakdown (whole codebase, no ignores)"
+            echo ""
+            echo "| Error code | Count |"
+            echo "| --- | ---: |"
+            grep -oE 'error\[E[0-9]+\]' jac-check-full.log \
+              | grep -oE 'E[0-9]+' \
+              | sort | uniq -c | sort -rn \
+              | awk '{ printf "| %s | %d |\n", $2, $1; total += $1 }
+                     END { printf "| **TOTAL** | **%d** |\n", total }'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          exit 0
