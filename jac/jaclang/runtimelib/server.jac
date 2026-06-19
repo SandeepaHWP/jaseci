@@ -142,6 +142,12 @@ obj ResponseBuilder {
 
     static def send_javascript(handler: BaseHTTPRequestHandler, code: str) -> None;
     static def send_css(handler: BaseHTTPRequestHandler, css: str) -> None;
+    static def send_static_file(
+        handler: BaseHTTPRequestHandler,
+        file_path: Path,
+        content_type: (str | None) = None
+    ) -> None;
+
     static def _add_cors_headers(handler: BaseHTTPRequestHandler) -> None;
     static def _add_custom_headers(handler: BaseHTTPRequestHandler) -> None;
 }

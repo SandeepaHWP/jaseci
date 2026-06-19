@@ -16,6 +16,11 @@ impl JacClient.send_static_file(
                 content_type = 'application/octet-stream';
             }
         }
+        # mimetypes does not reliably know .wasm; force it so the browser will
+        # streaming-compile the module.
+        if str(file_path).endswith('.wasm') {
+            content_type = 'application/wasm';
+        }
         handler.send_response(200);
         handler.send_header('Content-Type', content_type);
         handler.send_header('Content-Length', str(len(file_content)));
