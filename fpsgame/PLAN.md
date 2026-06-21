@@ -42,16 +42,16 @@ fpsgame/
 ├── jac.toml                     # project + npm deps + plugins
 ├── main.jac                     # entry: cl{} app shell + router; mounts screens
 │
-├── sim/                         # na{} core simulation (wasm + native)
-│   ├── types.na.jac             # Vec3, PlayerState, Bullet, Bot, Weapon, World, GameState
-│   ├── mathx.na.jac             # jsin/jcos/sqrt/clamp/lerp, rng (LCG)
-│   ├── physics.na.jac           # gravity, jump, AABB collision, ground check, raycast
-│   ├── weapons.na.jac           # weapon table, fire(), reload(), spread/recoil
-│   ├── combat.na.jac            # bullet step, hit registration, damage, death
-│   ├── bots.na.jac              # bot AI: target select, pathing, aim, shoot
-│   ├── maps.na.jac              # map geometry (AABB boxes), spawn points
-│   ├── world.na.jac             # world init, spawn/respawn, per-tick update
-│   └── api.na.jac               # exported entry points: init/frame/input/get_state
+├── sim/                         # na{} core simulation (wasm + native) -- AS BUILT (8 files)
+│   ├── types.na.jac             # constants + Vec3, Box, Tracer, Ent, World
+│   ├── mathx.na.jac             # jcos/jsin/fsqrt, LCG rand, atan2_deg
+│   ├── physics.na.jac           # resolve, move_and_collide, ray_vs_box/world/ent
+│   ├── maps.na.jac              # add_box, map_load (2 maps), pick_spawn
+│   ├── render.na.jac            # raylib FFI + rlgl wrappers + draw_world
+│   ├── combat.na.jac            # fire (hitscan), damage/death, reload, spawn_ent
+│   ├── bots.na.jac              # patrol AI: assign_route, ping-pong waypoints, shoot-on-LoS
+│   └── world.na.jac             # handle_input, new_round, world_init/frame/set_map
+│   #  (weapons folded into combat+types; api exports live in main.jac's na{})
 │
 ├── client/                      # cl{} browser side
 │   ├── render.cl.jac            # WebGL render of world from exported sim state
@@ -84,27 +84,94 @@ fpsgame/
 
 ---
 
-## PHASE 0 — Setup & Baseline
+## Progress Log & Gotchas (Phase 0–1)
 
-Goal: the stock example runs in the browser; we have a fresh project skeleton that builds.
+Key things learned/fixed while getting Phase 1 playable:
 
-- [ ] P0-001  Install toolkit: `pip install jaseci` (or use repo `.venv`).
-- [ ] P0-002  Run the reference: `cd jac/examples/raylib_shooter/web && jac start`, open `localhost:8000`, confirm it plays.
-- [ ] P0-003  Read `raylib_shooter/web/main.jac` end to end; note the `cl{}`/`na{}` split and the `run_game` handoff.
-- [ ] P0-004  Read `raylib_shooter/web/raylib_shim.cl.jac`; note the rlgl surface it emulates.
-- [ ] P0-005  Read `jac/examples/littleX/social_graph.jac` for `node`/`edge`/`walker` patterns (used Phase 2+).
-- [ ] P0-006  Create `fpsgame/jac.toml`: `[project]` name/version/entry-point=`main.jac`, `[dependencies.npm]` react/react-dom, `[dependencies.npm.dev]` vite/plugin-react/typescript/types, `[plugins.client]`.
-- [ ] P0-007  Copy `raylib_shim.cl.jac` → `fpsgame/client/raylib_shim.cl.jac`.
-- [ ] P0-008  Create minimal `fpsgame/main.jac` with a `cl{}` `def:pub app -> JsxElement` that renders a `<canvas id="glcanvas">`.
-- [ ] P0-009  Add a trivial `na{}` block exporting `init`, `frame`, `get_state` (copy from example, strip to floor + 1 cube).
-- [ ] P0-010  `jac start` in `fpsgame/`; confirm the stripped scene renders. **Phase 0 done.**
+- **jaclang core fix (committed in `5b1164819`):** `jac start` returned `500` on `/static/main.wasm`
+  (`send_static_file method is not implemented`) — a tree-wide bug (the shipped raylib example
+  failed too). Fixed by implementing `ResponseBuilder.send_static_file` and delegating from the
+  base, in 3 files: `jac/jaclang/runtimelib/server.jac`, `…/runtimelib/impl/server.impl.jac`,
+  `…/jac0core/impl/runtime.impl.jac`.
+- **WASD "one-direction" bug:** compound `mvx += …` miscompiled to a constant in the wasm/native
+  backend; fixed by explicit `mvx = mvx + …` in `handle_input`. (Worth reporting upstream.)
+- **Shim hardening (`raylib_shim.cl.jac`):** (1) run-once guard `window.__fps_game_running` to stop
+  React StrictMode's double-mount from starting two game loops; (2) wasm cache-bust
+  `fetch("/static/main.wasm?t="+Date.now(), {cache:"no-store"})` because the URL has no content
+  hash and the browser served stale wasm across rebuilds.
+- **Workflow gotchas:** run `jac start` **from inside `fpsgame/`** (running from the repo root picks
+  up jaclang's own `jac.toml` and pollutes it). If a rebuild doesn't pick up source changes, the
+  build cache is sticky — `rm -rf .jac/client` forces a clean rebuild.
+- **jactastic split:** ✅ DONE — sim is 8 `sim/*.na.jac` modules linking into one `main.wasm`
+  (~56 KB), state threaded via a shared `World` object. `main.jac` is now a thin ~190-line entry.
+- **Bot AI reworked:** bots were also drifting to the corner (they chased the player). Replaced
+  chase with **random per-bot patrol routes** that ping-pong between 2-4 waypoints (a-b-a-b /
+  a-b-c-b-a), with a per-waypoint timeout so they never stick; they still shoot the player on
+  line of sight. (Bot firing is currently commented out in `sim/bots.na.jac` -- uncomment the
+  marked block to re-enable; the supporting imports are kept.)
+- **Jump/gravity dead -> backend constant bug:** jump never worked because gravity was not being
+  applied. Root cause: the imported `GRAV` constant read wrong in the native/wasm arithmetic
+  (`e.vy += GRAV * step`), so `vy` never accumulated -> player never fell -> `on_ground` never set
+  -> the `on_ground`-gated jump never fired. Fix: explicit assignment + **inlined literal**
+  (`e.vy = e.vy - 22.0 * step`) in `sim/physics.na.jac`. `GRAV` stays in `types` as the documented
+  tunable. Same family as the `+=` miscompile (#WASD) -- both worth reporting upstream.
 
 ---
 
-## PHASE 1 — Playable Core (NO persistence, NO menu, NO network)
+## PHASE 0 — Setup & Baseline  ✅ DONE
+
+Goal: the stock example runs in the browser; we have a fresh project skeleton that builds.
+
+- [x] P0-001  Install toolkit (repo `.venv`).
+- [x] P0-002  Run the reference raylib_shooter/web; confirmed it plays.
+- [x] P0-003  Read `raylib_shooter/web/main.jac`; noted the `cl{}`/`na{}` split and `run_game` handoff.
+- [x] P0-004  Read `raylib_shooter/web/raylib_shim.cl.jac`; noted the rlgl surface it emulates.
+- [x] P0-005  Read `littleX/social_graph.jac` for `node`/`edge`/`walker` patterns (Phase 2+).
+- [x] P0-006  Created `fpsgame/jac.toml` (project + npm deps + `[plugins.client]`; the client runtime auto-added react-router-dom/zod/etc).
+- [x] P0-007  Copied shim → `fpsgame/raylib_shim.cl.jac` (kept at project root, not `client/`).
+- [x] P0-008  `cl{}` `def:pub app -> JsxElement` renders `<canvas id="glcanvas">`.
+- [x] P0-009  `na{}` block with `init`/`frame` + HUD getters.
+- [x] P0-010  `jac start` in `fpsgame/` renders the scene. **Phase 0 done.**
+
+---
+
+## PHASE 1 — Playable Core (NO persistence, NO menu, NO network)  ✅ PLAYABLE
 
 Goal: load straight into a round. Move with physics, shoot, fight bots on a real map, die,
 restart, close. Nothing is saved.
+
+> **Status (as built):** ✅ Playable in-browser via `jac start`, and now **split into modules**
+> (the jactastic refactor is DONE). `main.jac` is a thin entry: `cl{}` page + HUD and a small
+> `na{}` block that owns one `glob WORLD: World` and exports `init`/`frame`/HUD getters. All sim
+> logic lives in `sim/*.na.jac` and links into one `main.wasm` (verified ~56 KB).
+>
+> **Actual module layout (8 files under `sim/`):**
+> `types` (constants + `Vec3`/`Box`/`Tracer`/`Ent`/`World`), `mathx` (jcos/jsin/fsqrt, LCG rand,
+> atan2), `physics` (resolve, move_and_collide, ray casts), `maps` (colliders + spawns),
+> `render` (raylib FFI + rlgl wrappers + `draw_world`), `combat` (fire/damage/reload/spawn),
+> `bots` (patrol AI), `world` (input + lifecycle + per-frame step). State is threaded via the
+> shared `World` object (module-global reassignment doesn't cross Jac modules).
+>
+> **Key design note:** all mutable state is on `World`, passed explicitly — this is also the
+> Phase-5 foundation (one authoritative `World` per match, same sim compiled to native).
+>
+> **Bot AI (reworked):** bots no longer chase the player into a corner. Each bot gets a **random
+> patrol route of 2–4 waypoints** and **ping-pongs** along it (a-b-a-b / a-b-c-b-a) with a
+> per-waypoint timeout so it never gets stuck; it still faces movement and **shoots the player on
+> line of sight**. Lives in `sim/bots.na.jac` (`assign_route`, `_next_waypoint`, `bot_update`).
+>
+> **Implemented:** combined `Ent` (player+bot), `Box`/`Vec3`/`Tracer`; jcos/jsin/fsqrt + LCG
+> rand; 2 maps (open + cover) with perimeter walls; gravity/jump/AABB collision; ray-vs-AABB
+> **hitscan** + per-shot tracer; damage/death/respawn; **patrol bot AI** (above); full HUD
+> (HP/ammo/score/K-D/fps, crosshair, hit marker, death overlay); `set_map`/`restart`.
+>
+> **Deferred (not blocking Phase 1):** projectile `Bullet`s (using hitscan), multi-weapon
+> `Weapon` table (single rifle via constants), headshot zone, weapon viewmodel, window-resize
+> aspect handling, vec/clamp/lerp math helpers, per-`World.rng` seed (currently module-global LCG).
+>
+> The detailed `sim/*` checklist below is the original target outline; the **actual** layout is
+> the 8 modules listed above (no separate `weapons`/`api` files — weapons fold into `combat` +
+> `types` constants, the `api` exports live in `main.jac`; `render` was added for the FFI).
 
 ### 1A. Sim data model — `sim/types.na.jac`
 - [ ] P1-001  `obj Vec3 { has x: float, y: float, z: float; }`
@@ -193,12 +260,12 @@ restart, close. Nothing is saved.
 - [ ] P1-062  Death → brief "you died" overlay → auto respawn or restart key.
 - [ ] P1-063  Round/score display via HUD readouts.
 - [ ] P1-064  Manual playtest checklist: collide with walls, can't fall through floor, can't leave bounds, jump works, bots chase + shoot, you can die and kill.
-- [ ] **P1-DONE**  Playable round vs bots on 2 maps, restartable, no persistence. Commit-less (folder is git-ignored) but snapshot/zip a backup.
+- [x] **P1-DONE**  Playable round vs bots on 2 maps, restartable, no persistence. (Committed in `5b1164819`; folder is git-ignored but force-added.)
 
-**Risks (track):**
-- [ ] P1-RISK-1  Multi-file `na{}` imports: if broken, collapse `sim/*` into one `sim.na.jac`.
-- [ ] P1-RISK-2  Float/struct-by-value FFI quirks (see example's `_quad` param-count note).
-- [ ] P1-RISK-3  rlgl shim missing a call we need → extend `raylib_shim.cl.jac`.
+**Risks (resolved):**
+- [x] P1-RISK-1  Multi-file `na{}` imports → **RESOLVED**: spike + full split both linked into one `main.wasm`. (Split currently reverted/deferred.)
+- [x] P1-RISK-2  Float/FFI quirks → hit two real ones: `_quad` 12-param clib note, and **compound `+=` miscompiling to a constant in the wasm backend** (the WASD "one-direction" bug — fixed by using explicit `mvx = mvx + ...`).
+- [x] P1-RISK-3  rlgl shim extended: added `KeyR` to keymap + `IsMouseButtonDown` (full-auto fire).
 
 ---
 
