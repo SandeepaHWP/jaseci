@@ -71,6 +71,29 @@ cl {
                    pointer-events: none; transition: opacity 0.08s; }
         #hint { position: absolute; left: 50%; top: -26px; transform: translateX(-50%);
                 white-space: nowrap; opacity: 0.6; }
+        #hud-root { position: absolute; inset: 0; pointer-events: none; overflow: hidden;
+                    border-radius: 6px; }
+        #cross.hot::before, #cross.hot::after { background: #ff5a5a; opacity: 1; }
+        #feed { position: absolute; left: 12px; top: 36px; display: flex;
+                flex-direction: column; gap: 3px; align-items: flex-start; }
+        .feeditem { background: rgba(0,0,0,0.45); padding: 2px 9px; border-radius: 4px;
+                    font-size: 12px; color: #e8f0ff; animation: feedin 0.15s ease-out; }
+        @keyframes feedin { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; } }
+        #hpbar { width: 170px; height: 11px; background: rgba(255,255,255,0.14);
+                 border-radius: 6px; overflow: hidden; margin-bottom: 5px; }
+        #hpfill { height: 100%; background: linear-gradient(90deg, #ff5a5a, #f5c451, #6ee7a8);
+                  transition: width 0.12s linear; }
+        #ammo { font-size: 18px; font-weight: 700; color: #e8f0ff;
+                text-shadow: 0 1px 2px #000; }
+        #ammo.low { color: #ff6b6b; }
+        #vignette { position: absolute; inset: 0;
+                    box-shadow: inset 0 0 120px 36px rgba(190,20,20,0.6);
+                    animation: vignflash 0.45s ease-out forwards; }
+        @keyframes vignflash { from { opacity: 1; } to { opacity: 0; } }
+        #death { position: absolute; inset: 0; display: flex; align-items: center;
+                 justify-content: center; flex-direction: column; gap: 6px;
+                 background: rgba(120,12,12,0.32); color: #ffd7d7; font-size: 26px;
+                 font-weight: 700; }
         """;
         st: any = document.createElement("style");
         st.id = "fps-styles";
@@ -210,7 +233,85 @@ cl {
             </div>;
     }
 
-    # ── In-game view: canvas + HUD overlay; owns the game lifecycle ────────────
+    # ── React HUD overlay (driven by the shim each frame via window.__fps_hud) ──
+    def:pub Hud -> JsxElement {
+        has hp: int = 100,
+            mag: int = 30,
+            ammo: int = 90,
+            kills: int = 0,
+            deaths: int = 0,
+            fps: int = 0,
+            hit: bool = False,
+            alive: bool = True,
+            reloading: bool = False,
+            low: bool = False,
+            vig: int = 0,
+            feed: list = [];
+
+        can with entry {
+            w: any = window;
+            # The shim's on_tick pushes already-converted values here each frame.
+            # This lambda only WRITES state (never reads it), so there is no React
+            # stale-closure hazard; the diff logic lives in on_tick instead.
+            w.__fps_hud = lambda nhp: int , nmag: int , nammo: int , nkills: int , ndeaths:
+                int , nfps: int , nhit: bool , nalive: bool , nreload: bool , nlow:
+                bool , nvig: int , nfeed: list {
+                hp = nhp;
+                mag = nmag;
+                ammo = nammo;
+                kills = nkills;
+                deaths = ndeaths;
+                fps = nfps;
+                hit = nhit;
+                alive = nalive;
+                reloading = nreload;
+                low = nlow;
+                vig = nvig;
+                feed = nfeed;
+            };
+        }
+        hpw: str = f"{hp}%";
+        ammo_txt: str = "RELOADING" if reloading else f"{mag} / {ammo}";
+        return
+            <div id="hud-root">
+                <div id="cross" className={"hot" if hit else ""}></div>
+                {(<div id="hitmark">✕</div>) if hit else None}
+                {(<div id="vignette" key={f"v{vig}"}></div>) if vig > 0 else None}
+                <div id="feed">
+                    {for item in feed {
+                        <div className="feeditem" key={item}>{item}</div>
+                    }}
+                </div>
+                <div id="stat">
+                    {"score "}
+                    <b>{kills}</b>
+                    {" · K/D "}
+                    <b>{kills}</b>
+                    {" / "}
+                    <b>{deaths}</b>
+                    {" · "}
+                    <b>{fps}</b>
+                    {" fps"}
+                </div>
+                <div id="hud">
+                    <div id="hpbar">
+                        <div id="hpfill" style={{"width": hpw}}></div>
+                    </div>
+                    <div id="ammo" className={"low" if (low or reloading) else ""}>
+                        {ammo_txt}
+                    </div>
+                </div>
+                {(
+                    <div id="death">
+                        <div>You Died</div>
+                    </div>
+                )
+                    if not alive
+                    else None}
+            </div>;
+    }
+
+    # ── In-game view: canvas + React HUD; owns the game lifecycle ──────────────
     def:pub GameView(
         mapId: int, target: int, onExit: any, onGameOver: any
     ) -> JsxElement {
@@ -218,32 +319,67 @@ cl {
             _ensure_styles();
             w: any = window;
             w.__fps_ending = False;
+            w.__fps_prev_hp = 100;
+            w.__fps_prev_kills = 0;
+            w.__fps_prev_deaths = 0;
+            w.__fps_feed = [];
+            w.__fps_vig = 0;
             start_ms: float = float(f"{Date.now()}");
             canvas: any = document.getElementById("glcanvas");
-            # HUD update + win/lose detection, called by the shim every frame.
+            # Per-frame: convert sim state (Any) to ints, diff against window-stored
+            # prev values for HUD effects (damage vignette + kill feed), push to the
+            # React HUD, then check win/lose.
             on_tick = lambda exports: any , fps: int {
-                hp: any = document.getElementById("hud-hp");
-                am: any = document.getElementById("hud-ammo");
-                sc: any = document.getElementById("stat-score");
-                kd: any = document.getElementById("stat-kd");
-                fp: any = document.getElementById("stat-fps");
-                hitm: any = document.getElementById("hitmark");
-                if hp {
-                    hp.textContent = exports.get_health();
-                    am.textContent = f"{exports.get_mag()} / {exports.get_ammo()}";
-                    sc.textContent = exports.get_score();
-                    kd.textContent = f"{exports.get_kills()} / {exports.get_deaths()}";
-                    fp.textContent = fps;
-                    hitm.style.opacity = "1" if exports.get_hit() == 1 else "0";
-                }
                 w2: any = window;
-                if w2.__fps_ending {
-                    return;
-                }
-                # exports.* are Any; round-trip through int() so we can compare.
+                hp: int = int(f"{exports.get_health()}");
+                mag: int = int(f"{exports.get_mag()}");
+                ammo: int = int(f"{exports.get_ammo()}");
                 kills: int = int(f"{exports.get_kills()}");
                 deaths: int = int(f"{exports.get_deaths()}");
                 alive: int = int(f"{exports.get_alive()}");
+                hit: int = int(f"{exports.get_hit()}");
+                reload: int = int(f"{exports.get_reloading()}");
+                prev_hp: int = int(f"{w2.__fps_prev_hp}");
+                prev_kills: int = int(f"{w2.__fps_prev_kills}");
+                prev_deaths: int = int(f"{w2.__fps_prev_deaths}");
+                vig: int = int(f"{w2.__fps_vig}");
+                feed: any = w2.__fps_feed;
+                if hp < prev_hp {
+                    vig = vig + 1;
+                }
+                if kills > prev_kills {
+                    feed.push(f"Eliminated bot #{kills}");
+                }
+                if deaths > prev_deaths {
+                    feed.push(f"You were eliminated #{deaths}");
+                }
+                while int(f"{feed.length}") > 5 {
+                    feed.shift();
+                }
+                w2.__fps_prev_hp = hp;
+                w2.__fps_prev_kills = kills;
+                w2.__fps_prev_deaths = deaths;
+                w2.__fps_vig = vig;
+                low: bool = mag <= 5;
+                if w2.__fps_hud is not None {
+                    w2.__fps_hud(
+                        hp,
+                        mag,
+                        ammo,
+                        kills,
+                        deaths,
+                        fps,
+                        hit == 1,
+                        alive == 1,
+                        reload == 1,
+                        low,
+                        vig,
+                        feed
+                    );
+                }
+                if w2.__fps_ending {
+                    return;
+                }
                 won: bool = kills >= target;
                 if alive == 0 or won {
                     w2.__fps_ending = True;
@@ -267,23 +403,7 @@ cl {
                     {"WASD move · Space jump · mouse aim · click fire · R reload · Tab release · Esc menu"}
                 </div>
                 <canvas id="glcanvas" width={960} height={600}></canvas>
-                <div id="cross"></div>
-                <div id="hitmark">✕</div>
-                <div id="stat">
-                    {"score "}
-                    <b id="stat-score">0</b>
-                    {" · K/D "}
-                    <b id="stat-kd">0 / 0</b>
-                    {" · "}
-                    <b id="stat-fps">0</b>
-                    {" fps"}
-                </div>
-                <div id="hud">
-                    {"HP "}
-                    <b id="hud-hp">100</b>
-                    {"   AMMO "}
-                    <b id="hud-ammo">30 / 90</b>
-                </div>
+                <Hud/>
             </div>;
     }
 
@@ -458,6 +578,10 @@ na {
 
     def get_hit -> int {
         return 1 if WORLD.hit_flash > 0.0 else 0;
+    }
+
+    def get_reloading -> int {
+        return 1 if WORLD.player.reloading else 0;
     }
 
     """Switch map and restart the round (0 or 1)."""
