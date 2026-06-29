@@ -14,6 +14,108 @@
 #     f-string -> int() round-trip before comparing.
 #   * sensitivity is carried as a 1..60 percentage; the sim wiring in the next
 #     step divides by 100. No float math lives in the UI.
+
+# ─── Persistence (Phase 2C) ──────────────────────────────────────────────────
+# Server-side graph: one Profile node per browser, keyed by an anonymous
+# client_id (a localStorage UUID -- no login yet, that's Phase 3). Walkers are
+# spawned from cl{} via `root spawn <walker>(...)`. The graph is in-memory
+# unless MongoDB is configured, so it survives reloads but not server restarts.
+"""A player's saved settings + stats, one per anonymous browser client_id."""
+node Profile {
+    has client_id: str,
+        high_score: int = 0,
+        total_kills: int = 0,
+        sens: int = 12,
+        fov: int = 90,
+        bots: int = 5,
+        map_id: int = 0,
+        target: int = 5;
+}
+
+"""Find this client's Profile under root, or create it; visit it."""
+walker:pub load_profile {
+    has client_id: str;
+
+    can run with Root entry {
+        existing = [
+            p
+            for p in [-->[?:Profile]]
+            if p.client_id == self.client_id
+        ];
+        if existing {
+            visit existing[0];
+        } else {
+            fresh = here ++> Profile(client_id=self.client_id);
+            visit fresh;
+        }
+    }
+
+    can give with Profile entry {
+        report here;
+    }
+}
+
+"""Persist the settings for this client's Profile."""
+walker:pub persist_settings {
+    has client_id: str,
+        sens: int,
+        fov: int,
+        bots: int,
+        map_id: int,
+        target: int;
+
+    can run with Root entry {
+        existing = [
+            p
+            for p in [-->[?:Profile]]
+            if p.client_id == self.client_id
+        ];
+        if existing {
+            visit existing[0];
+        } else {
+            fresh = here ++> Profile(client_id=self.client_id);
+            visit fresh;
+        }
+    }
+
+    can apply with Profile entry {
+        here.sens = self.sens;
+        here.fov = self.fov;
+        here.bots = self.bots;
+        here.map_id = self.map_id;
+        here.target = self.target;
+        report here;
+    }
+}
+
+"""Record a round result: bump total kills, keep the best as high score."""
+walker:pub submit_score {
+    has client_id: str,
+        kills: int;
+
+    can run with Root entry {
+        existing = [
+            p
+            for p in [-->[?:Profile]]
+            if p.client_id == self.client_id
+        ];
+        if existing {
+            visit existing[0];
+        } else {
+            fresh = here ++> Profile(client_id=self.client_id);
+            visit fresh;
+        }
+    }
+
+    can apply with Profile entry {
+        here.total_kills += self.kills;
+        if self.kills > here.high_score {
+            here.high_score = self.kills;
+        }
+        report here;
+    }
+}
+
 cl {
     import from .raylib_shim { run_game, stop_game }
     import from .render3d { make_renderer, draw, dispose_renderer }
@@ -508,10 +610,41 @@ cl {
             statKills: int = 0,
             statDeaths: int = 0,
             statTime: int = 0,
-            highScore: int = 0;
+            highScore: int = 0,
+            clientId: str = "";
 
-        can with entry {
+        # Boot: ensure an anonymous client_id, then load this browser's saved
+        # Profile (settings + high score) from the server graph.
+        async can with entry {
             _ensure_styles();
+            win: any = window;
+            ls: any = win.localStorage;
+            existing_cid: any = ls.getItem("fps_cid");
+            cid: str = f"{existing_cid}"
+                if existing_cid
+                else f"{win.crypto.randomUUID()}";
+            if not existing_cid {
+                ls.setItem("fps_cid", cid);
+            }
+            clientId = cid;
+            result: any = root spawn load_profile(client_id=cid);
+            p: any = None;
+            if result and result.reports and result.reports.length {
+                p = result.reports[0];
+                # a single `report here` may arrive as the node or as [node];
+                # unwrap one list level if present (arrays have .length, nodes don't)
+                if p and p.length {
+                    p = p[0];
+                }
+            }
+            if p {
+                sens = int(f"{p.sens}");
+                fov = int(f"{p.fov}");
+                bots = int(f"{p.bots}");
+                mapId = int(f"{p.map_id}");
+                target = int(f"{p.target}");
+                highScore = int(f"{p.high_score}");
+            }
         }
         def go_play {
             screen = "game";
@@ -522,15 +655,18 @@ cl {
         def go_menu {
             screen = "menu";
         }
-        def save_settings(ns: int, nf: int, nb: int, nm: int, nt: int) {
+        async def save_settings(ns: int, nf: int, nb: int, nm: int, nt: int) {
             sens = ns;
             fov = nf;
             bots = nb;
             mapId = nm;
             target = nt;
             screen = "menu";
+            root spawn persist_settings(
+                client_id=clientId, sens=ns, fov=nf, bots=nb, map_id=nm, target=nt
+            );
         }
-        def end_game(won: bool, kills: int, deaths: int, secs: int) {
+        async def end_game(won: bool, kills: int, deaths: int, secs: int) {
             statWon = won;
             statKills = kills;
             statDeaths = deaths;
@@ -539,6 +675,7 @@ cl {
                 highScore = kills;
             }
             screen = "gameover";
+            root spawn submit_score(client_id=clientId, kills=kills);
         }
         return
             <div id="page">

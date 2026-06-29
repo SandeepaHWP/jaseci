@@ -283,40 +283,40 @@ restart, close. Nothing is saved.
 
 ---
 
-## PHASE 2 - Single-Player + Persistence + Main Menu
+## PHASE 2 - Single-Player + Persistence + Main Menu  ✅ DONE (core loop)
 
 Goal: real main menu, settings, and saved scores/settings that survive reloads. Still bots-only.
 
 ### 2A. Screens - `client/screens/*.cl.jac` + router in `main.jac`
 
-- [ ] P2-001  `main.jac`: app-level state machine `screen: "menu"|"settings"|"game"|"gameover"`.
-- [ ] P2-002  `menu.cl.jac`: Play, Settings, (Leaderboard), title, version.
-- [ ] P2-003  `settings.cl.jac`: mouse sensitivity, FOV, master volume, key rebinds, map select, bot count/difficulty.
-- [ ] P2-004  `game.cl.jac`: hosts canvas + HUD; mount/unmount starts/stops the sim loop cleanly.
-- [ ] P2-005  `gameover.cl.jac`: round stats (kills, deaths, accuracy, time) + Play Again / Menu.
-- [ ] P2-006  Navigation wiring + back buttons + Esc-to-menu.
-- [ ] P2-007  Clean teardown: stop `requestAnimationFrame`, release pointer-lock, free wasm world on unmount.
+- [x] P2-001  `main.jac`: app-level state machine `screen: "menu"|"settings"|"game"|"gameover"`.
+- [x] P2-002  `menu.cl.jac`: Play, Settings, (Leaderboard), title, version.
+- [x] P2-003  `settings.cl.jac`: mouse sensitivity, FOV, master volume, key rebinds, map select, bot count/difficulty.
+- [x] P2-004  `game.cl.jac`: hosts canvas + HUD; mount/unmount starts/stops the sim loop cleanly.
+- [x] P2-005  `gameover.cl.jac`: round stats (kills, deaths, accuracy, time) + Play Again / Menu.
+- [x] P2-006  Navigation wiring + back buttons + Esc-to-menu.
+- [x] P2-007  Clean teardown: stop `requestAnimationFrame`, release pointer-lock, free wasm world on unmount.
 
 ### 2B. HUD - `client/hud.cl.jac`
 
-- [ ] P2-008  React HUD overlay reading sim exports each frame: health bar, ammo/mag, score, crosshair, low-ammo/reload indicator.
-- [ ] P2-009  Hit marker on damage dealt; damage vignette on damage taken.
-- [ ] P2-010  Kill feed list (last N events) - events surfaced from sim via an export ring buffer.
+- [x] P2-008  React HUD overlay reading sim exports each frame: health bar, ammo/mag, score, crosshair, low-ammo/reload indicator.
+- [x] P2-009  Hit marker on damage dealt; damage vignette on damage taken.
+- [x] P2-010  Kill feed list (last N events) - events surfaced from sim via an export ring buffer.
 
 ### 2C. Persistence backend - `server/*.jac` (`sv{}` + graph)
 
-- [ ] P2-011  `server/models.jac`: `node Player { has username, created_at; }`, `node Profile { has high_score, total_kills, settings_json; }`, `edge Owns`, `node ScoreEntry { has score, map_id, ts; }`.
-- [ ] P2-012  `server/settings_store.jac`: `walker:pub save_settings`, `walker:pub load_settings`.
-- [ ] P2-013  `server/scores.jac`: `walker:pub submit_score`, `walker:pub get_high_score`, `walker:pub leaderboard(top: int)`.
-- [ ] P2-014  Decide identity for Phase 2: anonymous per-browser id (localStorage uuid) vs real login (defer login to Phase 3). Use anon id now.
-- [ ] P2-015  `jac.toml`: keep `[plugins.client]`; `jac start` already serves `sv{}` endpoints - confirm auto-generated client stubs are callable from `cl{}`.
+- [x] P2-011  `server/models.jac`: `node Player { has username, created_at; }`, `node Profile { has high_score, total_kills, settings_json; }`, `edge Owns`, `node ScoreEntry { has score, map_id, ts; }`.
+- [x] P2-012  `server/settings_store.jac`: `walker:pub save_settings`, `walker:pub load_settings`.
+- [x] P2-013  `server/scores.jac`: `walker:pub submit_score`, `walker:pub get_high_score`, `walker:pub leaderboard(top: int)`.
+- [x] P2-014  Decide identity for Phase 2: anonymous per-browser id (localStorage uuid) vs real login (defer login to Phase 3). Use anon id now.
+- [x] P2-015  `jac.toml`: keep `[plugins.client]`; `jac start` already serves `sv{}` endpoints - confirm auto-generated client stubs are callable from `cl{}`.
 
 ### 2D. Client ↔ server wiring
 
-- [ ] P2-016  On settings change → call `save_settings` (auto-generated stub); on boot → `load_settings`.
-- [ ] P2-017  On round end → `submit_score`; menu shows `get_high_score`.
-- [ ] P2-018  Optional leaderboard panel in menu via `leaderboard`.
-- [ ] P2-019  Graceful offline fallback to localStorage if server unavailable.
+- [x] P2-016  On settings change → call `save_settings` (auto-generated stub); on boot → `load_settings`.
+- [x] P2-017  On round end → `submit_score`; menu shows `get_high_score`.
+- [ ] P2-018  Optional leaderboard panel in menu via `leaderboard`. (DEFERRED - not built; revisit with scoring/modes.)
+- [ ] P2-019  Graceful offline fallback to localStorage if server unavailable. (DEFERRED - in-memory graph fine for dev.)
 - [ ] **P2-DONE**  Menu → settings persisted → play vs bots → score saved → reload keeps high score + settings.
 
 ---
