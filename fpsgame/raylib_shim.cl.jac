@@ -336,6 +336,14 @@ def _build_env(sh: any) -> dict {
         "getenv": lambda p: int { return 0; },
         "fflush": lambda p: int { return 0; },
         "abort": lambda { },
+        "longjmp": lambda env_ptr: int , val: int {
+        # Upstream's wasm codegen (na_ir_gen_pass exceptions) lowers
+        # exception unwinding through setjmp/longjmp, so the module now
+        # imports env.longjmp. A true non-local jump back into wasm isn't
+        # possible from JS, but the sim takes no exception path in normal
+        # play -- this is emitted-but-unreached scaffolding that only needs
+        # to be callable to link. Throw loudly if it ever actually fires.
+        raise Error(f"wasm longjmp(val={val}): unhandled sim exception"); },
         "__multi3": lambda res: int , al: int , ah: int , bl: int , bh: int {
             k = (BigInt(1) << BigInt(64)) - BigInt(1);
             a = (BigInt.asUintN(64, ah) << BigInt(64)) | BigInt.asUintN(64, al);
