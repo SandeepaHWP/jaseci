@@ -35,6 +35,7 @@ that now lowers Jac's exception / unwind handling through C-style
 ```jac
 longjmp_fn = self._get_or_declare_extern("longjmp", ir.VoidType(), [i8p, i32]);
 longjmp_fn.attributes.add("noreturn");
+
 ```
 
 So the recompiled `main.wasm` now imports `env.longjmp`. Our shim
