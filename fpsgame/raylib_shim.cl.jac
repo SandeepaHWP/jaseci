@@ -40,6 +40,7 @@ obj Shim {
         alive: bool = False,
         raf: any = None,
         on_exit: any = None,
+        on_render: any = None,
         h_keydown: any = None,
         h_keyup: any = None,
         h_mousedown: any = None,
@@ -492,6 +493,10 @@ def _frame_tick(sh: any, ts: float) {
     }
     sh.time = now;
     closed = sh.exports.frame();
+    # Pull-based render: the sim stepped above; the renderer reads its state.
+    if sh.on_render is not None {
+        sh.on_render(sh.exports);
+    }
     # Optional per-frame hook so a page can drive a HUD (score/fps) without the
     # shim needing to know anything game-specific. on_tick may stop the game
     # (e.g. win/lose), so re-check sh.alive before scheduling the next frame.
@@ -511,7 +516,11 @@ stop the game; on_exit() is called when the player presses Esc. opts carries
 per-round settings (currently {"map_id": int}). Returns nothing -- the live shim
 is parked on window.__fps_shim so on_tick / on_exit can stop it."""
 async def:pub run_game(
-    canvas: any, on_tick: any = None, on_exit: any = None, opts: any = None
+    canvas: any,
+    on_tick: any = None,
+    on_exit: any = None,
+    on_render: any = None,
+    opts: any = None
 ) {
     # Re-entrancy guard, resettable by stop_game (unlike the old permanent flag).
     # Covers React StrictMode's dev double-mount: the second start is a no-op.
@@ -524,11 +533,11 @@ async def:pub run_game(
     sh.alive = True;
     sh.on_tick = on_tick;
     sh.on_exit = on_exit;
+    sh.on_render = on_render;
     sh.canvas = canvas;
-    sh.gl = canvas.getContext("webgl");
-    sh.proj = _m_ident();
-    sh.mv = _m_ident();
-    _init_gl(sh);
+    # Rendering moved out of the sim (Phase 4.5): the shim no longer creates a GL
+    # context -- the Three.js renderer (render3d.cl.jac) owns the canvas now. The
+    # leftover rlgl env entries stay but are never imported by the (pure-state) wasm.
     _install_input(sh);
     env = {"env": _build_env(sh)};
     # Cache-bust: /static/main.wasm has no content hash in its URL, so the

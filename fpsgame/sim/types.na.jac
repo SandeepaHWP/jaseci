@@ -108,6 +108,7 @@ obj World {
         map_id: int = 0,
         world_t: float = 0.0,
         hit_flash: float = 0.0,
+        muzzle_t: float = 0.0,
         prev_mx: float = 0.0,
         prev_my: float = 0.0,
         mouse_warmup: int = 12,

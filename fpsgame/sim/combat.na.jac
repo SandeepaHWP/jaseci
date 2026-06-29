@@ -86,6 +86,10 @@ def:pub try_fire(world: World, shooter: Ent, dx: float, dy: float, dz: float) {
     shooter.mag -= 1;
     shooter.fire_cd = W_FIRE_CD;
     fire(world, shooter, dx, dy, dz);
+    # one-frame muzzle-flash trigger for the (cl{}) renderer; player shots only.
+    if not shooter.is_bot {
+        world.muzzle_t = 0.05;
+    }
 }
 
 """Begin reloading if it makes sense."""

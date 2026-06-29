@@ -380,7 +380,7 @@ Goal: make it feel good. No new architecture.
 
 ---
 
-## PHASE 4.5 - Graphics Upgrade I: Three.js Renderer (primitives)
+## PHASE 4.5 - Graphics Upgrade I: Three.js Renderer (primitives)  ✅ DONE
 
 Goal: replace the rlgl/WebGL box renderer with a real **Three.js** scene driven by
 the sim's state, using built-in primitive geometry dressed up with lighting,
@@ -397,40 +397,40 @@ touches gameplay/physics.
 
 ### 4.5A. Sim becomes pure state - `sim/*.na.jac` + `main.jac` na{}
 
-- [ ] G1-001  Remove the in-sim render path: drop `draw_world` / `set_camera` /
+- [x] G1-001  Remove the in-sim render path: drop `draw_world` / `set_camera` /
   `begin_frame` / `end_frame` calls from `world_frame`; `frame()` now only steps the
   sim (input -> physics -> combat -> bots), no drawing.
-- [ ] G1-002  Camera getters: `get_cam_x/y/z`, `get_cam_yaw`, `get_cam_pitch` (eye
+- [x] G1-002  Camera getters: `get_cam_x/y/z`, `get_cam_yaw`, `get_cam_pitch` (eye
   position + look angles).
-- [ ] G1-003  Bot getters: `get_bot_count`, and per-index `get_bot_x(i)/y(i)/z(i)`,
+- [x] G1-003  Bot getters: `get_bot_count`, and per-index `get_bot_x(i)/y(i)/z(i)`,
   `get_bot_yaw(i)`, `get_bot_alive(i)`. **Index args are wasm i64 -> pass `BigInt(i)`
   from JS** (see `FIX_wasm_i64_bigint.md`).
-- [ ] G1-004  Collider getters (read once per map for static geometry):
+- [x] G1-004  Collider getters (read once per map for static geometry):
   `get_collider_count`, per-index min/max x/y/z.
-- [ ] G1-005  Tracer + muzzle getters: `get_tracer_count`, per-index endpoints +
+- [x] G1-005  Tracer + muzzle getters: `get_tracer_count`, per-index endpoints +
   life; `get_player_fired` (a one-frame muzzle-flash trigger).
-- [ ] G1-006  Keep the rlgl externs out of the sim; the shim can drop the `rl*`
+- [x] G1-006  Keep the rlgl externs out of the sim; the shim can drop the `rl*`
   draw functions (input + libc + `__multi3` + `longjmp` stay).
 
 ### 4.5B. Three.js renderer - `client/render3d.cl.jac`
 
-- [ ] G1-007  Add `three` to `jac.toml` npm deps.
-- [ ] G1-008  Scene bootstrap: `WebGLRenderer` on the canvas, `PerspectiveCamera`,
+- [x] G1-007  Add `three` to `jac.toml` npm deps.
+- [x] G1-008  Scene bootstrap: `WebGLRenderer` on the canvas, `PerspectiveCamera`,
   resize handling, ACES tone mapping, sRGB output.
-- [ ] G1-009  Lighting: directional "sun" with shadow map + hemisphere/ambient fill;
+- [x] G1-009  Lighting: directional "sun" with shadow map + hemisphere/ambient fill;
   fog for depth; sky gradient / skybox.
-- [ ] G1-010  Ground: large textured (grass) plane that receives shadows.
-- [ ] G1-011  Static map geometry: build lit box meshes once from collider getters
+- [x] G1-010  Ground: large textured (grass) plane that receives shadows.
+- [x] G1-011  Static map geometry: build lit box meshes once from collider getters
   (crate / wall material), cast + receive shadows.
-- [ ] G1-012  Bots: pooled capsule body + sphere head meshes (team color), updated
+- [x] G1-012  Bots: pooled capsule body + sphere head meshes (team color), updated
   each frame from getters; hide dead; orient to yaw; cast shadows.
-- [ ] G1-013  Gun viewmodel: box-built gun parented to the camera, bottom-right,
+- [x] G1-013  Gun viewmodel: box-built gun parented to the camera, bottom-right,
   with a recoil kick on fire.
-- [ ] G1-014  FX: muzzle flash sprite, glowing tracer beams, impact sparks.
-- [ ] G1-015  Render loop wiring: shim drives `frame()` (sim step) -> `render3d`
+- [x] G1-014  FX: muzzle flash sprite, glowing tracer beams, impact sparks.
+- [x] G1-015  Render loop wiring: shim drives `frame()` (sim step) -> `render3d`
   reads getters and draws -> HUD `on_tick`. Decide where the loop lives (extend the
   shim, or a small render driver).
-- [ ] G1-016  Perf: instance/pool repeated meshes, cap draw calls, reuse geometries.
+- [x] G1-016  Perf: instance/pool repeated meshes, cap draw calls, reuse geometries.
 - [ ] **G1-DONE**  Lit, shadowed 3D scene: capsule-character bots, gun viewmodel,
   textured ground + skybox, muzzle/tracer FX. Identical gameplay; sim now pure state.
 

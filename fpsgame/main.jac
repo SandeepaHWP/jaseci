@@ -16,9 +16,27 @@
 #     step divides by 100. No float math lives in the UI.
 cl {
     import from .raylib_shim { run_game, stop_game }
+    import from .render3d { make_renderer, draw, dispose_renderer }
 
     """Inject the app stylesheet once (idempotent via the element id)."""
     def _ensure_styles {
+        # Global error hook: the jac runtime's error reporter masks the real
+        # error (it reads .message of an undefined). Capture the genuine error +
+        # stack here, prefixed [fps], before the reporter runs. Installed once.
+        ew: any = window;
+        if not ew.__fps_errhook {
+            ew.__fps_errhook = True;
+            ew.addEventListener(
+                "error",
+                lambda e: any { console.log(
+                    "[fps] ERROR:", e.message, "@", e.filename, e.lineno, e.error
+                ); }
+            );
+            ew.addEventListener(
+                "unhandledrejection",
+                lambda e: any { console.log("[fps] REJECTION:", e.reason); }
+            );
+        }
         existing: any = document.getElementById("fps-styles");
         if existing {
             return;
@@ -326,6 +344,33 @@ cl {
             w.__fps_vig = 0;
             start_ms: float = float(f"{Date.now()}");
             canvas: any = document.getElementById("glcanvas");
+            # Fresh Three.js renderer per round (each round mounts a new canvas);
+            # dispose the previous one first so it doesn't leak GPU resources.
+            # Build + draw the renderer INSIDE the rAF callback (not here in the
+            # effect): errors thrown in requestAnimationFrame go to window.onerror
+            # (captured by our [fps] hook with the real message), whereas effect
+            # errors get swallowed by React's error boundary.
+            # Dispose the previous round's renderer (new canvas each round), then
+            # build the new one lazily on the first rAF frame (see note above).
+            # Truthiness, NOT `is not None`: window props are undefined on the
+            # first round, and `undefined is not None` is true in Jac (None==null),
+            # which would call dispose on undefined and throw.
+            if w.__fps_r3d {
+                dispose_renderer(w.__fps_r3d);
+            }
+            w.__fps_r3d_tried = False;
+            on_render = lambda exports: any {
+                w5: any = window;
+                if not w5.__fps_r3d_tried {
+                    w5.__fps_r3d_tried = True;
+                    rr: any = make_renderer(canvas);
+                    w5.__fps_r3d = rr;
+                }
+                dr: any = w5.__fps_r3d;
+                if dr {
+                    draw(dr, exports);
+                }
+            };
             # Per-frame: convert sim state (Any) to ints, diff against window-stored
             # prev values for HUD effects (damage vignette + kill feed), push to the
             # React HUD, then check win/lose.
@@ -395,7 +440,7 @@ cl {
                 stop_game(w3.__fps_shim);
                 onExit();
             };
-            run_game(canvas, on_tick, on_exit, {"map_id": mapId});
+            run_game(canvas, on_tick, on_exit, on_render, {"map_id": mapId});
         }
         return
             <div id="wrap">
@@ -532,7 +577,7 @@ cl {
 #     The simulation itself lives in sim/*.na.jac; this block is just the thin
 #     wasm interface the shim calls (init / frame / HUD getters) over one World.
 na {
-    import from .sim.types { World }
+    import from .sim.types { World, EYE_H }
     import from .sim.world { world_init, world_frame, new_round, world_set_map }
 
     glob WORLD: World = World();
@@ -582,6 +627,118 @@ na {
 
     def get_reloading -> int {
         return 1 if WORLD.player.reloading else 0;
+    }
+
+    # ── Render state getters (Phase 4.5: the cl{} Three.js renderer reads these) ─
+    #    Floats return as JS numbers directly. Index args (i) are wasm i64, so the
+    #    renderer must call them as fn(BigInt(i)) -- see FIX_wasm_i64_bigint.md.
+
+    # camera (player eye + look angles)
+    def get_cam_x -> float {
+        return WORLD.player.x;
+    }
+
+    def get_cam_y -> float {
+        return WORLD.player.y + EYE_H;
+    }
+
+    def get_cam_z -> float {
+        return WORLD.player.z;
+    }
+
+    def get_cam_yaw -> float {
+        return WORLD.player.yaw;
+    }
+
+    def get_cam_pitch -> float {
+        return WORLD.player.pitch;
+    }
+
+    # bots (per-index transforms)
+    def get_bot_count -> int {
+        return len(WORLD.bots);
+    }
+
+    def get_bot_x(i: int) -> float {
+        return WORLD.bots[i].x;
+    }
+
+    def get_bot_y(i: int) -> float {
+        return WORLD.bots[i].y;
+    }
+
+    def get_bot_z(i: int) -> float {
+        return WORLD.bots[i].z;
+    }
+
+    def get_bot_yaw(i: int) -> float {
+        return WORLD.bots[i].yaw;
+    }
+
+    def get_bot_alive(i: int) -> int {
+        return 1 if WORLD.bots[i].alive else 0;
+    }
+
+    # static map colliders (read once per map for scene geometry)
+    def get_collider_count -> int {
+        return len(WORLD.colliders);
+    }
+
+    def get_collider_minx(i: int) -> float {
+        return WORLD.colliders[i].minx;
+    }
+
+    def get_collider_miny(i: int) -> float {
+        return WORLD.colliders[i].miny;
+    }
+
+    def get_collider_minz(i: int) -> float {
+        return WORLD.colliders[i].minz;
+    }
+
+    def get_collider_maxx(i: int) -> float {
+        return WORLD.colliders[i].maxx;
+    }
+
+    def get_collider_maxy(i: int) -> float {
+        return WORLD.colliders[i].maxy;
+    }
+
+    def get_collider_maxz(i: int) -> float {
+        return WORLD.colliders[i].maxz;
+    }
+
+    # shot tracers (per-index endpoints) + muzzle flash trigger
+    def get_tracer_count -> int {
+        return len(WORLD.tracers);
+    }
+
+    def get_tracer_x0(i: int) -> float {
+        return WORLD.tracers[i].x0;
+    }
+
+    def get_tracer_y0(i: int) -> float {
+        return WORLD.tracers[i].y0;
+    }
+
+    def get_tracer_z0(i: int) -> float {
+        return WORLD.tracers[i].z0;
+    }
+
+    def get_tracer_x1(i: int) -> float {
+        return WORLD.tracers[i].x1;
+    }
+
+    def get_tracer_y1(i: int) -> float {
+        return WORLD.tracers[i].y1;
+    }
+
+    def get_tracer_z1(i: int) -> float {
+        return WORLD.tracers[i].z1;
+    }
+
+    def get_muzzle -> int {
+        return 1 if WORLD.muzzle_t > 0.0 else 0;
     }
 
     """Switch map and restart the round (0 or 1)."""

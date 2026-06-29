@@ -25,7 +25,6 @@ import from .types {
     MOUSE_SENS,
     MOVE_SPD,
     JUMP_V,
-    EYE_H,
     BOT_COUNT
 }
 import from .mathx { jsin, jcos, fsqrt }
@@ -39,13 +38,7 @@ import from .render {
     mouse_pressed,
     mouse_held,
     lock_mouse,
-    unlock_mouse,
-    begin_frame,
-    set_camera,
-    draw_world,
-    end_camera,
-    draw_fps,
-    end_frame
+    unlock_mouse
 }
 import from .physics { move_and_collide }
 import from .combat { tick_weapon, start_reload, try_fire, spawn_ent }
@@ -190,12 +183,16 @@ def:pub world_set_map(world: World, mid: int) {
     new_round(world);
 }
 
-"""Advance and render one frame. Returns True when the game wants to close."""
+"""Advance the sim one frame. Rendering lives in cl{} now (Phase 4.5): this only
+steps the world; the Three.js renderer reads state via the get_* exports."""
 def:pub world_frame(world: World) -> bool {
     step = dt();
     world.world_t += step;
     if world.hit_flash > 0.0 {
         world.hit_flash -= step;
+    }
+    if world.muzzle_t > 0.0 {
+        world.muzzle_t -= step;
     }
     handle_input(world, step);
     tick_weapon(world.player, step);
@@ -222,19 +219,5 @@ def:pub world_frame(world: World) -> bool {
         }
     }
     world.tracers = alive_tr;
-    # render
-    begin_frame(15, 18, 28);
-    set_camera(
-        world.player.x,
-        world.player.y + EYE_H,
-        world.player.z,
-        world.player.yaw,
-        world.player.pitch,
-        1.6
-    );
-    draw_world(world);
-    end_camera(960.0, 600.0);
-    draw_fps(10, 10);
-    end_frame();
     return False;
 }
