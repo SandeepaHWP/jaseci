@@ -112,5 +112,8 @@ obj World {
         prev_mx: float = 0.0,
         prev_my: float = 0.0,
         mouse_warmup: int = 12,
-        mouse_captured: bool = False;
+        mouse_captured: bool = False,
+        # tunables set from the settings screen (defaults match the constants)
+        sens: float = 0.12,
+        bot_count: int = 5;
 }

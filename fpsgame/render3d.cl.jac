@@ -89,13 +89,14 @@ def _make_bot(r: any) -> any {
     return g;
 }
 
-"""Build the scene, camera, renderer, lights, ground and gun on `canvas`."""
-def:pub make_renderer(canvas: any) -> any {
+"""Build the scene, camera, renderer, lights, ground and gun on `canvas`.
+`fov` is the vertical field of view in degrees (from the settings screen)."""
+def:pub make_renderer(canvas: any, fov: any) -> any {
     r = R3D();
     r.scene = new(Scene);
     r.scene.background = new(Color, 0x9fbcd6);
     r.scene.fog = new(Fog, 0x9fbcd6, 35.0, 110.0);
-    r.cam = new(PerspectiveCamera, 75.0, 960.0 / 600.0, 0.05, 400.0);
+    r.cam = new(PerspectiveCamera, fov, 960.0 / 600.0, 0.05, 400.0);
     r.renderer = new(WebGLRenderer, {"canvas": canvas, "antialias": True});
     r.renderer.setSize(960, 600, False);
     r.renderer.shadowMap.enabled = True;

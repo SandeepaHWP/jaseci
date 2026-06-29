@@ -331,7 +331,13 @@ cl {
 
     # ── In-game view: canvas + React HUD; owns the game lifecycle ──────────────
     def:pub GameView(
-        mapId: int, target: int, onExit: any, onGameOver: any
+        mapId: int,
+        target: int,
+        sens: int,
+        fov: int,
+        bots: int,
+        onExit: any,
+        onGameOver: any
     ) -> JsxElement {
         can with entry {
             _ensure_styles();
@@ -363,7 +369,7 @@ cl {
                 w5: any = window;
                 if not w5.__fps_r3d_tried {
                     w5.__fps_r3d_tried = True;
-                    rr: any = make_renderer(canvas);
+                    rr: any = make_renderer(canvas, fov);
                     w5.__fps_r3d = rr;
                 }
                 dr: any = w5.__fps_r3d;
@@ -440,7 +446,13 @@ cl {
                 stop_game(w3.__fps_shim);
                 onExit();
             };
-            run_game(canvas, on_tick, on_exit, on_render, {"map_id": mapId});
+            run_game(
+                canvas,
+                on_tick,
+                on_exit,
+                on_render,
+                {"map_id": mapId, "sens": sens, "bots": bots}
+            );
         }
         return
             <div id="wrap">
@@ -554,6 +566,9 @@ cl {
                             <GameView
                                 mapId={mapId}
                                 target={target}
+                                sens={sens}
+                                fov={fov}
+                                bots={bots}
                                 onExit={go_menu}
                                 onGameOver={end_game}
                             />
@@ -739,6 +754,16 @@ na {
 
     def get_muzzle -> int {
         return 1 if WORLD.muzzle_t > 0.0 else 0;
+    }
+
+    """Set mouse sensitivity from a 1..60 percentage (12 -> 0.12)."""
+    def set_sensitivity(pct: int) {
+        WORLD.sens = float(pct) * 0.01;
+    }
+
+    """Set how many bots spawn each round (applied on the next new_round)."""
+    def set_bots(n: int) {
+        WORLD.bot_count = n;
     }
 
     """Switch map and restart the round (0 or 1)."""

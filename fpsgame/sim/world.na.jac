@@ -22,10 +22,8 @@ import from .types {
     KEY_TAB,
     MOUSE_LEFT,
     DEG2RAD,
-    MOUSE_SENS,
     MOVE_SPD,
-    JUMP_V,
-    BOT_COUNT
+    JUMP_V
 }
 import from .mathx { jsin, jcos, fsqrt }
 import from .render {
@@ -84,8 +82,8 @@ def:pub handle_input(world: World, step: float) {
             ddx = mx - world.prev_mx;
             ddy = my - world.prev_my;
             if ddx < 150.0 and ddx > -150.0 and ddy < 150.0 and ddy > -150.0 {
-                world.player.yaw -= ddx * MOUSE_SENS;
-                world.player.pitch -= ddy * MOUSE_SENS;
+                world.player.yaw -= ddx * world.sens;
+                world.player.pitch -= ddy * world.sens;
             }
         }
         world.prev_mx = mx;
@@ -161,7 +159,7 @@ def:pub new_round(world: World) {
     world.player.kills = 0;
     world.player.deaths = 0;
     world.bots = [];
-    for n in range(BOT_COUNT) {
+    for n in range(world.bot_count) {
         b = Ent(is_bot=True);
         spawn_ent(world, b);
         assign_route(b);

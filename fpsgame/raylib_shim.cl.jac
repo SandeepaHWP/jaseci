@@ -556,9 +556,14 @@ async def:pub run_game(
     # later Play is a silent no-op until a page refresh).
     try {
         inst.exports.__jac_glob_init();
+        # Apply settings BEFORE init so new_round sees the bot count. Jac `int`
+        # params are wasm i64, which cross the JS boundary as BigInt.
+        if opts is not None {
+            inst.exports.set_sensitivity(BigInt(opts.get("sens", 12)));
+            inst.exports.set_bots(BigInt(opts.get("bots", 5)));
+        }
         inst.exports.init();
-        # Apply the chosen map (0 = open, 1 = cover) before the loop starts.
-        # Jac `int` params are wasm i64, which cross the JS boundary as BigInt.
+        # Apply the chosen map (0 = open, 1 = cover) after init.
         if opts is not None and opts.get("map_id", 0) > 0 {
             inst.exports.set_map(BigInt(opts.get("map_id", 0)));
         }
