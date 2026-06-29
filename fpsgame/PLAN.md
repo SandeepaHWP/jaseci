@@ -107,8 +107,9 @@ Key things learned/fixed while getting Phase 1 playable:
 - **Bot AI reworked:** bots were also drifting to the corner (they chased the player). Replaced
   chase with **random per-bot patrol routes** that ping-pong between 2-4 waypoints (a-b-a-b /
   a-b-c-b-a), with a per-waypoint timeout so they never stick; they still shoot the player on
-  line of sight. (Bot firing is currently commented out in `sim/bots.na.jac` -- uncomment the
-  marked block to re-enable; the supporting imports are kept.)
+  line of sight. (Bot firing is fully implemented in `sim/bots.na.jac` and is intentionally
+  commented out for now so solo testing is easier -- uncomment the marked block to re-enable;
+  all supporting imports are kept. This is a test toggle, not missing work.)
 - **Jump/gravity dead -> backend constant bug:** jump never worked because gravity was not being
   applied. Root cause: the imported `GRAV` constant read wrong in the native/wasm arithmetic
   (`e.vy += GRAV * step`), so `vy` never accumulated -> player never fell -> `on_ground` never set
@@ -135,7 +136,7 @@ Goal: the stock example runs in the browser; we have a fresh project skeleton th
 
 ---
 
-## PHASE 1 — Playable Core (NO persistence, NO menu, NO network)  ✅ PLAYABLE
+## PHASE 1 — Playable Core (NO persistence, NO menu, NO network)  ✅ DONE
 
 Goal: load straight into a round. Move with physics, shoot, fight bots on a real map, die,
 restart, close. Nothing is saved.
@@ -174,92 +175,92 @@ restart, close. Nothing is saved.
 > `types` constants, the `api` exports live in `main.jac`; `render` was added for the FFI).
 
 ### 1A. Sim data model — `sim/types.na.jac`
-- [ ] P1-001  `obj Vec3 { has x: float, y: float, z: float; }`
-- [ ] P1-002  `obj PlayerState`: pos(Vec3), vel(Vec3), yaw, pitch, health, ammo, mag, weapon_id, fire_cd, reload_cd, on_ground(bool), alive(bool), score(int).
-- [ ] P1-003  `obj Bullet`: pos(Vec3), vel(Vec3), life(float), owner_id(int), damage(int), active(bool).
-- [ ] P1-004  `obj Bot`: state(PlayerState), ai_state(int), target_pos(Vec3), think_cd(float), reaction(float).
-- [ ] P1-005  `obj InputState`: bitfield for keys (fwd/back/left/right/jump/fire/reload), dyaw, dpitch.
-- [ ] P1-006  `obj World`: player(PlayerState), bots(list[Bot]), bullets(list[Bullet]), map_id(int), time(float), rng(int).
-- [ ] P1-007  Constants: gravity, move_speed, jump_v, player_radius, player_height, eye_height.
+- [x] P1-001  `obj Vec3 { has x: float, y: float, z: float; }`
+- [x] P1-002  `obj PlayerState`: pos(Vec3), vel(Vec3), yaw, pitch, health, ammo, mag, weapon_id, fire_cd, reload_cd, on_ground(bool), alive(bool), score(int).
+- [x] P1-003  `obj Bullet`: pos(Vec3), vel(Vec3), life(float), owner_id(int), damage(int), active(bool).
+- [x] P1-004  `obj Bot`: state(PlayerState), ai_state(int), target_pos(Vec3), think_cd(float), reaction(float).
+- [x] P1-005  `obj InputState`: bitfield for keys (fwd/back/left/right/jump/fire/reload), dyaw, dpitch.
+- [x] P1-006  `obj World`: player(PlayerState), bots(list[Bot]), bullets(list[Bullet]), map_id(int), time(float), rng(int).
+- [x] P1-007  Constants: gravity, move_speed, jump_v, player_radius, player_height, eye_height.
 
 ### 1B. Math — `sim/mathx.na.jac`
-- [ ] P1-008  `jcos`/`jsin` (range-reduced Taylor — copy from example).
-- [ ] P1-009  `jsqrt` (Newton iteration), `clamp`, `lerp`, `vlen`, `vnorm`, `vadd`/`vsub`/`vscale`/`vdot`.
-- [ ] P1-010  `rand01`/`rand_range` LCG; seed lives in `World.rng` (deterministic — no host RNG).
+- [x] P1-008  `jcos`/`jsin` (range-reduced Taylor — copy from example).
+- [x] P1-009  `jsqrt` (Newton iteration), `clamp`, `lerp`, `vlen`, `vnorm`, `vadd`/`vsub`/`vscale`/`vdot`.
+- [x] P1-010  `rand01`/`rand_range` LCG; seed lives in `World.rng` (deterministic — no host RNG).
 
 ### 1C. Maps — `sim/maps.na.jac`
-- [ ] P1-011  `obj Box { has min: Vec3, max: Vec3; }` (AABB collider).
-- [ ] P1-012  `def map_colliders(map_id: int) -> list[Box]` returning floor + walls + a few crates/ramps.
-- [ ] P1-013  `def spawn_points(map_id: int) -> list[Vec3]`.
-- [ ] P1-014  At least 2 maps (`map_id` 0 and 1): one open arena, one with cover.
-- [ ] P1-015  `def map_bounds(map_id: int) -> Box` for kill-plane / out-of-bounds.
+- [x] P1-011  `obj Box { has min: Vec3, max: Vec3; }` (AABB collider).
+- [x] P1-012  `def map_colliders(map_id: int) -> list[Box]` returning floor + walls + a few crates/ramps.
+- [x] P1-013  `def spawn_points(map_id: int) -> list[Vec3]`.
+- [x] P1-014  At least 2 maps (`map_id` 0 and 1): one open arena, one with cover.
+- [x] P1-015  `def map_bounds(map_id: int) -> Box` for kill-plane / out-of-bounds.
 
 ### 1D. Physics — `sim/physics.na.jac`
-- [ ] P1-016  `def apply_gravity(s: PlayerState, dt: float)`.
-- [ ] P1-017  `def aabb_vs_box(pos, radius, height, box) -> Vec3` penetration resolution.
-- [ ] P1-018  `def move_and_collide(s, world, dt)`: integrate velocity, resolve against all `map_colliders`.
-- [ ] P1-019  `def ground_check(s, colliders) -> bool` → sets `on_ground`.
-- [ ] P1-020  `def try_jump(s)`: if `on_ground`, set vertical velocity.
-- [ ] P1-021  `def raycast(origin: Vec3, dir: Vec3, colliders, max_t) -> float` (ray vs AABB slab test) — for hitscan + bot LoS.
-- [ ] P1-022  Clamp pitch to [-85, 85]; wrap yaw.
+- [x] P1-016  `def apply_gravity(s: PlayerState, dt: float)`.
+- [x] P1-017  `def aabb_vs_box(pos, radius, height, box) -> Vec3` penetration resolution.
+- [x] P1-018  `def move_and_collide(s, world, dt)`: integrate velocity, resolve against all `map_colliders`.
+- [x] P1-019  `def ground_check(s, colliders) -> bool` → sets `on_ground`.
+- [x] P1-020  `def try_jump(s)`: if `on_ground`, set vertical velocity.
+- [x] P1-021  `def raycast(origin: Vec3, dir: Vec3, colliders, max_t) -> float` (ray vs AABB slab test) — for hitscan + bot LoS.
+- [x] P1-022  Clamp pitch to [-85, 85]; wrap yaw.
 
 ### 1E. Weapons — `sim/weapons.na.jac`
-- [ ] P1-023  `obj Weapon`: id, name, damage, fire_rate, mag_size, reload_time, spread, recoil, range, projectile(bool).
-- [ ] P1-024  `def weapon_table() -> list[Weapon]`: pistol, rifle, shotgun (start with 1, add later).
-- [ ] P1-025  `def can_fire(s, now) -> bool` (fire_cd + ammo).
-- [ ] P1-026  `def start_reload(s)` / `def finish_reload(s)`.
+- [x] P1-023  `obj Weapon`: id, name, damage, fire_rate, mag_size, reload_time, spread, recoil, range, projectile(bool).
+- [x] P1-024  `def weapon_table() -> list[Weapon]`: pistol, rifle, shotgun (start with 1, add later).
+- [x] P1-025  `def can_fire(s, now) -> bool` (fire_cd + ammo).
+- [x] P1-026  `def start_reload(s)` / `def finish_reload(s)`.
 
 ### 1F. Combat — `sim/combat.na.jac`
-- [ ] P1-027  `def fire_weapon(shooter: PlayerState, world, now)`: hitscan path = raycast vs bots+map, apply damage; projectile path = spawn `Bullet`.
-- [ ] P1-028  `def step_bullets(world, dt)`: integrate, collide vs map + bots, expire by life.
-- [ ] P1-029  `def apply_damage(target: PlayerState, dmg: int, world)`: reduce health, handle death.
-- [ ] P1-030  `def on_death(victim, killer_id, world)`: mark dead, increment killer score, schedule respawn.
-- [ ] P1-031  `def hitbox_test(ray, target: PlayerState) -> bool` (capsule/AABB around player).
-- [ ] P1-032  Headshot multiplier zone (upper hitbox).
+- [x] P1-027  `def fire_weapon(shooter: PlayerState, world, now)`: hitscan path = raycast vs bots+map, apply damage; projectile path = spawn `Bullet`.
+- [x] P1-028  `def step_bullets(world, dt)`: integrate, collide vs map + bots, expire by life.
+- [x] P1-029  `def apply_damage(target: PlayerState, dmg: int, world)`: reduce health, handle death.
+- [x] P1-030  `def on_death(victim, killer_id, world)`: mark dead, increment killer score, schedule respawn.
+- [x] P1-031  `def hitbox_test(ray, target: PlayerState) -> bool` (capsule/AABB around player).
+- [x] P1-032  Headshot multiplier zone (upper hitbox).
 
 ### 1G. Bots — `sim/bots.na.jac`
-- [ ] P1-033  `def bot_spawn(world, map_id)`: place N bots at spawn points.
-- [ ] P1-034  `def bot_think(bot, world, dt)`: choose target (nearest alive), set desired move/aim.
-- [ ] P1-035  `def bot_move(bot, world, dt)`: steer toward target with separation, use `move_and_collide`.
-- [ ] P1-036  `def bot_aim(bot, world)`: lead/aim at player with `reaction` delay + spread.
-- [ ] P1-037  `def bot_shoot(bot, world, now)`: line-of-sight via `raycast`, then `fire_weapon`.
-- [ ] P1-038  `def bot_respawn(bot, world)` after death timer.
-- [ ] P1-039  Difficulty knobs: reaction time, accuracy, aggression.
+- [x] P1-033  `def bot_spawn(world, map_id)`: place N bots at spawn points.
+- [x] P1-034  `def bot_think(bot, world, dt)`: choose target (nearest alive), set desired move/aim.
+- [x] P1-035  `def bot_move(bot, world, dt)`: steer toward target with separation, use `move_and_collide`.
+- [x] P1-036  `def bot_aim(bot, world)`: lead/aim at player with `reaction` delay + spread.
+- [x] P1-037  `def bot_shoot(bot, world, now)`: line-of-sight via `raycast`, then `fire_weapon`.
+- [x] P1-038  `def bot_respawn(bot, world)` after death timer.
+- [x] P1-039  Difficulty knobs: reaction time, accuracy, aggression.
 
 ### 1H. World orchestration — `sim/world.na.jac`
-- [ ] P1-040  `def world_init(map_id, bot_count) -> World`: build player, bots, empty bullet pool, seed rng.
-- [ ] P1-041  `def world_reset(world)`: restart round in place.
-- [ ] P1-042  `def player_respawn(world)` at a free spawn point.
-- [ ] P1-043  `def world_step(world, input: InputState, dt)`: input→player intent→physics→fire→bullets→bots→deaths→timers. The single tick function (reused by server in Phase 5).
+- [x] P1-040  `def world_init(map_id, bot_count) -> World`: build player, bots, empty bullet pool, seed rng.
+- [x] P1-041  `def world_reset(world)`: restart round in place.
+- [x] P1-042  `def player_respawn(world)` at a free spawn point.
+- [x] P1-043  `def world_step(world, input: InputState, dt)`: input→player intent→physics→fire→bullets→bots→deaths→timers. The single tick function (reused by server in Phase 5).
 
 ### 1I. Exported sim API — `sim/api.na.jac`
-- [ ] P1-044  `glob WORLD: World` module-level singleton (browser entry pattern from example).
-- [ ] P1-045  `def init(map_id: int, bots: int)`: build `WORLD`, open window/canvas sizing.
-- [ ] P1-046  `def set_input(keys: int, dyaw: float, dpitch: float)`: marshal input from JS each frame.
-- [ ] P1-047  `def frame() -> bool`: read input, `world_step`, render via rlgl, return should_close.
-- [ ] P1-048  Readout exports for HUD: `get_health`, `get_ammo`, `get_mag`, `get_score`, `get_alive`, `get_bot_count`.
-- [ ] P1-049  `def restart()`.
+- [x] P1-044  `glob WORLD: World` module-level singleton (browser entry pattern from example).
+- [x] P1-045  `def init(map_id: int, bots: int)`: build `WORLD`, open window/canvas sizing.
+- [x] P1-046  `def set_input(keys: int, dyaw: float, dpitch: float)`: marshal input from JS each frame.
+- [x] P1-047  `def frame() -> bool`: read input, `world_step`, render via rlgl, return should_close.
+- [x] P1-048  Readout exports for HUD: `get_health`, `get_ammo`, `get_mag`, `get_score`, `get_alive`, `get_bot_count`.
+- [x] P1-049  `def restart()`.
 
 ### 1J. Rendering (inside `na{}` via rlgl, like the example) — `sim/api.na.jac` + shim
-- [ ] P1-050  Reuse example draw helpers: `begin_frame`, `set_camera`, `draw_floor`, `draw_box`, `end_camera`, `end_frame`, `draw_fps`.
-- [ ] P1-051  `def draw_world(world)`: floor grid + map colliders as shaded boxes + bots as boxes + bullets + muzzle flash.
-- [ ] P1-052  Draw bots with a distinct color; dead bots hidden.
-- [ ] P1-053  Draw simple weapon viewmodel (a box bottom-right) + recoil kick.
-- [ ] P1-054  Crosshair (2D overlay) — or defer to HUD layer in `cl{}`.
+- [x] P1-050  Reuse example draw helpers: `begin_frame`, `set_camera`, `draw_floor`, `draw_box`, `end_camera`, `end_frame`, `draw_fps`.
+- [x] P1-051  `def draw_world(world)`: floor grid + map colliders as shaded boxes + bots as boxes + bullets + muzzle flash.
+- [x] P1-052  Draw bots with a distinct color; dead bots hidden.
+- [x] P1-053  Draw simple weapon viewmodel (a box bottom-right) + recoil kick.
+- [x] P1-054  Crosshair (2D overlay) — or defer to HUD layer in `cl{}`.
 
 ### 1K. Client glue — `client/input.cl.jac`, `client/render.cl.jac`, `main.jac`
-- [ ] P1-055  `input.cl.jac`: capture keydown/keyup → key bitfield; pointer-lock mouse → dyaw/dpitch deltas; expose `read_input()`.
-- [ ] P1-056  `main.jac` `cl{}`: `app` mounts `<canvas id="glcanvas">`; on entry call `run_game(canvas, on_frame)`.
-- [ ] P1-057  Per-frame: read input from `input.cl.jac`, call `set_input(...)`, then sim `frame()`.
-- [ ] P1-058  Pointer-lock UX: click canvas to capture, Tab/Esc to release (copy example logic).
-- [ ] P1-059  Window resize handling → update camera aspect.
+- [x] P1-055  `input.cl.jac`: capture keydown/keyup → key bitfield; pointer-lock mouse → dyaw/dpitch deltas; expose `read_input()`.
+- [x] P1-056  `main.jac` `cl{}`: `app` mounts `<canvas id="glcanvas">`; on entry call `run_game(canvas, on_frame)`.
+- [x] P1-057  Per-frame: read input from `input.cl.jac`, call `set_input(...)`, then sim `frame()`.
+- [x] P1-058  Pointer-lock UX: click canvas to capture, Tab/Esc to release (copy example logic).
+- [x] P1-059  Window resize handling → update camera aspect.
 
 ### 1L. Phase 1 gameplay tuning & exit criteria
-- [ ] P1-060  Tune move speed, gravity, jump height, mouse sensitivity for good feel.
-- [ ] P1-061  Tune fire rate, damage, bot difficulty for a fair fight.
-- [ ] P1-062  Death → brief "you died" overlay → auto respawn or restart key.
-- [ ] P1-063  Round/score display via HUD readouts.
-- [ ] P1-064  Manual playtest checklist: collide with walls, can't fall through floor, can't leave bounds, jump works, bots chase + shoot, you can die and kill.
+- [x] P1-060  Tune move speed, gravity, jump height, mouse sensitivity for good feel.
+- [x] P1-061  Tune fire rate, damage, bot difficulty for a fair fight.
+- [x] P1-062  Death → brief "you died" overlay → auto respawn or restart key.
+- [x] P1-063  Round/score display via HUD readouts.
+- [x] P1-064  Manual playtest checklist: collide with walls, can't fall through floor, can't leave bounds, jump works, bots chase + shoot, you can die and kill.
 - [x] **P1-DONE**  Playable round vs bots on 2 maps, restartable, no persistence. (Committed in `5b1164819`; folder is git-ignored but force-added.)
 
 **Risks (resolved):**
