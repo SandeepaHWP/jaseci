@@ -35,7 +35,17 @@ obj Shim {
         time: float = 0.0,
         t0: float = 0.0,
         draws: int = 0,
-        on_tick: any = None;
+        on_tick: any = None,
+        # --- lifecycle (Phase 2A: start/stop so screens can mount/unmount) ---
+        alive: bool = False,
+        raf: any = None,
+        on_exit: any = None,
+        h_keydown: any = None,
+        h_keyup: any = None,
+        h_mousedown: any = None,
+        h_mouseup: any = None,
+        h_mousemove: any = None,
+        h_plock: any = None;
 }
 
 def _m_ident -> list {
@@ -396,52 +406,82 @@ def _keymap(code: str) -> int {
     return m.get(code, 0);
 }
 
+# Handlers are stored on the shim so _remove_input can detach the exact same
+# references on stop (anonymous listeners can't be removed -> would leak across
+# rounds). Esc fires the on_exit hook (back to menu).
 def _install_input(sh: any) {
-    window.addEventListener(
-        "keydown",
-        lambda e: any {
-            kc = _keymap(e.code);
-            if kc != 0 {
-                e.preventDefault();
-                sh.keys[kc] = 1;
+    sh.h_keydown = lambda e: any {
+        if e.code == "Escape" {
+            if sh.on_exit is not None {
+                sh.on_exit();
+            }
+            return;
+        }
+        kc = _keymap(e.code);
+        if kc != 0 {
+            e.preventDefault();
+            # Only flag a fresh press when the key wasn't already held, so OS
+            # key-repeat doesn't re-trigger IsKeyPressed taps (e.g. Tab, R).
+            if not sh.keys.get(kc, 0) {
                 sh.pressed[kc] = 1;
             }
+            sh.keys[kc] = 1;
         }
-    );
-    window.addEventListener(
-        "keyup",
-        lambda e: any {
-            kc = _keymap(e.code);
-            if kc != 0 {
-                sh.keys[kc] = 0;
-            }
+    };
+    window.addEventListener("keydown", sh.h_keydown);
+    sh.h_keyup = lambda e: any {
+        kc = _keymap(e.code);
+        if kc != 0 {
+            sh.keys[kc] = 0;
         }
-    );
-    sh.canvas.addEventListener(
-        "mousedown",
-        lambda e: any {
-            sh.mpressed[0] = 1;
-            sh.mdown[0] = 1;
-        }
-    );
-    document.addEventListener("mouseup", lambda e: any { sh.mdown[0] = 0; });
-    document.addEventListener(
-        "mousemove",
-        lambda e: any { if sh.locked {
-            sh.mouseX = sh.mouseX + e.movementX;
-            sh.mouseY = sh.mouseY + e.movementY;
-        } else {
-            sh.mouseX = e.offsetX;
-            sh.mouseY = e.offsetY;
-        } }
-    );
-    document.addEventListener(
-        "pointerlockchange",
-        lambda e: any { sh.locked = document.pointerLockElement == sh.canvas; }
-    );
+    };
+    window.addEventListener("keyup", sh.h_keyup);
+    sh.h_mousedown = lambda e: any {
+        sh.mpressed[0] = 1;
+        sh.mdown[0] = 1;
+    };
+    sh.canvas.addEventListener("mousedown", sh.h_mousedown);
+    sh.h_mouseup = lambda e: any { sh.mdown[0] = 0; };
+    document.addEventListener("mouseup", sh.h_mouseup);
+    sh.h_mousemove = lambda e: any { if sh.locked {
+        sh.mouseX = sh.mouseX + e.movementX;
+        sh.mouseY = sh.mouseY + e.movementY;
+    } else {
+        sh.mouseX = e.offsetX;
+        sh.mouseY = e.offsetY;
+    } };
+    document.addEventListener("mousemove", sh.h_mousemove);
+    sh.h_plock = lambda e: any { sh.locked = document.pointerLockElement == sh.canvas; };
+    document.addEventListener("pointerlockchange", sh.h_plock);
+}
+
+"""Detach every listener installed by _install_input (clean teardown)."""
+def _remove_input(sh: any) {
+    if sh.h_keydown is not None {
+        window.removeEventListener("keydown", sh.h_keydown);
+    }
+    if sh.h_keyup is not None {
+        window.removeEventListener("keyup", sh.h_keyup);
+    }
+    if sh.h_mousedown is not None {
+        sh.canvas.removeEventListener("mousedown", sh.h_mousedown);
+    }
+    if sh.h_mouseup is not None {
+        document.removeEventListener("mouseup", sh.h_mouseup);
+    }
+    if sh.h_mousemove is not None {
+        document.removeEventListener("mousemove", sh.h_mousemove);
+    }
+    if sh.h_plock is not None {
+        document.removeEventListener("pointerlockchange", sh.h_plock);
+    }
 }
 
 def _frame_tick(sh: any, ts: float) {
+    # Bail if the game was stopped (screen unmounted) mid-flight.
+    if not sh.alive {
+        return;
+    }
     if sh.t0 == 0.0 {
         sh.t0 = ts;
     }
@@ -453,28 +493,37 @@ def _frame_tick(sh: any, ts: float) {
     sh.time = now;
     closed = sh.exports.frame();
     # Optional per-frame hook so a page can drive a HUD (score/fps) without the
-    # shim needing to know anything game-specific.
+    # shim needing to know anything game-specific. on_tick may stop the game
+    # (e.g. win/lose), so re-check sh.alive before scheduling the next frame.
     if sh.on_tick is not None {
         fps = Math.round(1.0 / sh.dt) if sh.dt > 0.0 else 0;
         sh.on_tick(sh.exports, fps);
     }
     sh.pressed = {};
     sh.mpressed = {};
-    if not closed {
-        requestAnimationFrame(lambda t2: float { _frame_tick(sh, t2); });
+    if sh.alive and not closed {
+        sh.raf = requestAnimationFrame(lambda t2: float { _frame_tick(sh, t2); });
     }
 }
 
-async def:pub run_game(canvas: any, on_tick: any = None) {
-    # Run exactly once: React StrictMode (dev) mounts twice, which would start
-    # two game loops + two input-listener sets fighting over one canvas.
+"""Start a fresh game on `canvas`. on_tick(exports, fps) drives the HUD and may
+stop the game; on_exit() is called when the player presses Esc. opts carries
+per-round settings (currently {"map_id": int}). Returns nothing -- the live shim
+is parked on window.__fps_shim so on_tick / on_exit can stop it."""
+async def:pub run_game(
+    canvas: any, on_tick: any = None, on_exit: any = None, opts: any = None
+) {
+    # Re-entrancy guard, resettable by stop_game (unlike the old permanent flag).
+    # Covers React StrictMode's dev double-mount: the second start is a no-op.
     guard: any = window;
-    if guard.__fps_game_running {
+    if guard.__fps_active {
         return;
     }
-    guard.__fps_game_running = True;
+    guard.__fps_active = True;
     sh = Shim();
+    sh.alive = True;
     sh.on_tick = on_tick;
+    sh.on_exit = on_exit;
     sh.canvas = canvas;
     sh.gl = canvas.getContext("webgl");
     sh.proj = _m_ident();
@@ -483,7 +532,8 @@ async def:pub run_game(canvas: any, on_tick: any = None) {
     _install_input(sh);
     env = {"env": _build_env(sh)};
     # Cache-bust: /static/main.wasm has no content hash in its URL, so the
-    # browser would otherwise serve a stale wasm across rebuilds.
+    # browser would otherwise serve a stale wasm across rebuilds. Re-instantiating
+    # per round also gives a fresh wasm heap each game (resets bump allocator).
     wasm_url = f"/static/main.wasm?t={Date.now()}";
     res: any = await WebAssembly.instantiateStreaming(
         fetch(wasm_url, {"cache": "no-store"}), env
@@ -492,7 +542,46 @@ async def:pub run_game(canvas: any, on_tick: any = None) {
     sh.exports = inst.exports;
     sh.mem = inst.exports.memory;
     sh.heap = inst.exports.__heap_base.value;
-    inst.exports.__jac_glob_init();
-    inst.exports.init();
-    requestAnimationFrame(lambda ts: float { _frame_tick(sh, ts); });
+    # If anything here throws, reset the guard + detach listeners so a failed
+    # start can't wedge the game (otherwise __fps_active stays True and every
+    # later Play is a silent no-op until a page refresh).
+    try {
+        inst.exports.__jac_glob_init();
+        inst.exports.init();
+        # Apply the chosen map (0 = open, 1 = cover) before the loop starts.
+        # Jac `int` params are wasm i64, which cross the JS boundary as BigInt.
+        if opts is not None and opts.get("map_id", 0) > 0 {
+            inst.exports.set_map(BigInt(opts.get("map_id", 0)));
+        }
+    } except Exception as exc {
+        guard.__fps_active = False;
+        _remove_input(sh);
+        raise exc;
+    }
+    # A late stop_game (unmount during the await) must win the race.
+    if not sh.alive {
+        guard.__fps_active = False;
+        return;
+    }
+    guard.__fps_shim = sh;
+    sh.raf = requestAnimationFrame(lambda ts: float { _frame_tick(sh, ts); });
+}
+
+"""Stop the running game: halt the loop, detach listeners, release the pointer.
+Idempotent. Leaves the wasm instance for GC (a fresh one is built next round)."""
+def:pub stop_game(sh: any) {
+    if sh is None or not sh.alive {
+        return;
+    }
+    sh.alive = False;
+    if sh.raf is not None {
+        cancelAnimationFrame(sh.raf);
+    }
+    _remove_input(sh);
+    if document.pointerLockElement {
+        document.exitPointerLock();
+    }
+    win: any = window;
+    win.__fps_active = False;
+    win.__fps_shim = None;
 }
