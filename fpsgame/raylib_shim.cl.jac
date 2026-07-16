@@ -233,33 +233,33 @@ def _flush(sh: any) -> None {
 
 def _build_env(sh: any) -> dict {
     return {
-        "InitWindow": lambda w: int , h: int , t: int { document.title = _read_cstr(
+        "InitWindow": lambda (w: int, h: int, t: int) { document.title = _read_cstr(
             sh, t
         ); },
         "WindowShouldClose": lambda { return 0; },
         "CloseWindow": lambda { },
-        "SetTargetFPS": lambda f: int { },
+        "SetTargetFPS": lambda (f: int) { },
         "BeginDrawing": lambda { sh.gl.viewport(0, 0, 960, 600); },
         "EndDrawing": lambda { },
         "EndMode3D": lambda { _flush(sh); },
         "GetFrameTime": lambda { return sh.dt; },
         "GetTime": lambda { return sh.time; },
-        "DrawFPS": lambda x: int , y: int { },
-        "IsKeyDown": lambda k: int { return sh.keys.get(k, 0); },
-        "IsKeyPressed": lambda k: int { return sh.pressed.get(k, 0); },
+        "DrawFPS": lambda (x: int, y: int) { },
+        "IsKeyDown": lambda (k: int) { return sh.keys.get(k, 0); },
+        "IsKeyPressed": lambda (k: int) { return sh.pressed.get(k, 0); },
         "GetMouseX": lambda { return sh.mouseX; },
         "GetMouseY": lambda { return sh.mouseY; },
-        "IsMouseButtonPressed": lambda b: int { return sh.mpressed.get(b, 0); },
-        "IsMouseButtonDown": lambda b: int { return sh.mdown.get(b, 0); },
+        "IsMouseButtonPressed": lambda (b: int) { return sh.mpressed.get(b, 0); },
+        "IsMouseButtonDown": lambda (b: int) { return sh.mdown.get(b, 0); },
         "DisableCursor": lambda { sh.canvas.requestPointerLock(); },
         "EnableCursor": lambda { document.exitPointerLock(); },
-        "rlClearColor": lambda r: int , g: int , b: int , a: int { sh.gl.clearColor(
+        "rlClearColor": lambda (r: int, g: int, b: int, a: int) { sh.gl.clearColor(
             float(r) / 255.0, float(g) / 255.0, float(b) / 255.0, 1.0
         ); },
         "rlClearScreenBuffers": lambda { sh.gl.clear(16384 | 256); },
         "rlEnableDepthTest": lambda { sh.gl.enable(sh.gl.DEPTH_TEST); },
         "rlDisableDepthTest": lambda { sh.gl.disable(sh.gl.DEPTH_TEST); },
-        "rlMatrixMode": lambda m: int { sh.mode = m; },
+        "rlMatrixMode": lambda (m: int) { sh.mode = m; },
         "rlLoadIdentity": lambda { _setcur(sh, _m_ident()); },
         "rlPushMatrix": lambda { if sh.mode == 0x1701 {
             sh.pstack.append(sh.proj);
@@ -271,22 +271,24 @@ def _build_env(sh: any) -> dict {
         } else {
             sh.mv = sh.mvstack.pop();
         } },
-        "rlTranslatef": lambda x: float , y: float , z: float { _setcur(
+        "rlTranslatef": lambda (x: float, y: float, z: float) { _setcur(
             sh, _m_mul(_cur(sh), _m_translate(x, y, z))
         ); },
-        "rlRotatef": lambda a: float , x: float , y: float , z: float { _setcur(
+        "rlRotatef": lambda (a: float, x: float, y: float, z: float) { _setcur(
             sh, _m_mul(_cur(sh), _m_rotate(a, x, y, z))
         ); },
-        "rlFrustum": lambda l: float , r: float , b: float , t: float , n: float , f:
-            float { _setcur(sh, _m_mul(_cur(sh), _m_frustum(l, r, b, t, n, f))); },
-        "rlOrtho": lambda l: float , r: float , b: float , t: float , n: float , f:
-            float { _setcur(sh, _m_mul(_cur(sh), _m_ortho(l, r, b, t, n, f))); },
-        "rlBegin": lambda m: int {
+        "rlFrustum": lambda (
+            l: float, r: float, b: float, t: float, n: float, f: float
+        ) { _setcur(sh, _m_mul(_cur(sh), _m_frustum(l, r, b, t, n, f))); },
+        "rlOrtho": lambda (
+            l: float, r: float, b: float, t: float, n: float, f: float
+        ) { _setcur(sh, _m_mul(_cur(sh), _m_ortho(l, r, b, t, n, f))); },
+        "rlBegin": lambda (m: int) {
             sh.bmode = m;
             sh.verts = [];
         },
         "rlEnd": lambda { _flush(sh); },
-        "rlVertex3f": lambda x: float , y: float , z: float {
+        "rlVertex3f": lambda (x: float, y: float, z: float) {
             sh.verts.append(x);
             sh.verts.append(y);
             sh.verts.append(z);
@@ -295,18 +297,18 @@ def _build_env(sh: any) -> dict {
             sh.verts.append(sh.color[2]);
             sh.verts.append(sh.color[3]);
         },
-        "rlColor4ub": lambda r: int , g: int , b: int , a: int { sh.color = [
+        "rlColor4ub": lambda (r: int, g: int, b: int, a: int) { sh.color = [
             float(r) / 255.0,
             float(g) / 255.0,
             float(b) / 255.0,
             1.0
         ]; },
-        "rlSetLineWidth": lambda w: float { sh.gl.lineWidth(w); },
-        "FileExists": lambda p: int { return 0; },
-        "LoadFileText": lambda p: int { return 0; },
-        "TextToInteger": lambda p: int { return 0; },
-        "SaveFileText": lambda p: int , t: int { return 0; },
-        "malloc": lambda n: int {
+        "rlSetLineWidth": lambda (w: float) { sh.gl.lineWidth(w); },
+        "FileExists": lambda (p: int) { return 0; },
+        "LoadFileText": lambda (p: int) { return 0; },
+        "TextToInteger": lambda (p: int) { return 0; },
+        "SaveFileText": lambda (p: int, t: int) { return 0; },
+        "malloc": lambda (n: int) {
             # n arrives as an i64 (BigInt at the JS boundary); coerce so the
             # bump-allocator arithmetic stays Number-only (see web shim).
             sz = Number(n);
@@ -314,21 +316,40 @@ def _build_env(sh: any) -> dict {
             sh.heap = (sh.heap + sz + 7) & ~7;
             return p;
         },
-        "calloc": lambda c: int , s: int {
+        "calloc": lambda (c: int, s: int) {
             n = Number(c) * Number(s);
             p = sh.heap;
             sh.heap = (sh.heap + n + 7) & ~7;
             new(Uint8Array, sh.mem.buffer).fill(0, p, p + n);
             return p;
         },
-        "free": lambda p: int { },
-        "malloc_usable_size": lambda p: int { return 0; },
-        "memcpy": lambda d: int , s: int , n: int {
+        "realloc": lambda (p: int, n: int) {
+            # Bump allocator keeps no block sizes, so grow by fresh-alloc +
+            # copy; reading past the old block is harmless (caller reads only
+            # its own prefix). Used by upstream's __rc_push_root to grow roots.
+            sz = Number(n);
+            if sz == 0 {
+                return 0;
+            }
+            np = sh.heap;
+            sh.heap = (sh.heap + sz + 7) & ~7;
+            if p != 0 {
+                # copyWithin clamps its indices, so a short tail is a no-op.
+                new(Uint8Array, sh.mem.buffer).copyWithin(np, p, p + sz);
+            }
+            return np;
+        },
+        "free": lambda (p: int) { },
+        "malloc_usable_size": lambda (p: int) { return 0; },
+        # Direct call always returns 0; the unwind path goes through longjmp,
+        # which raises rather than jumping back in (see longjmp below).
+        "setjmp": lambda (env_ptr: int) { return 0; },
+        "memcpy": lambda (d: int, s: int, n: int) {
             sz = Number(n);
             new(Uint8Array, sh.mem.buffer).copyWithin(d, s, s + sz);
             return d;
         },
-        "memcmp": lambda a: int , b: int , n: int {
+        "memcmp": lambda (a: int, b: int, n: int) {
             u8 = new(Uint8Array, sh.mem.buffer);
             sz = Number(n);
             i = 0;
@@ -341,13 +362,13 @@ def _build_env(sh: any) -> dict {
             }
             return 0;
         },
-        "puts": lambda p: int { return 0; },
-        "printf": lambda a: int { return 0; },
-        "snprintf": lambda a: int , b: int , c: int , d: int { return 0; },
-        "getenv": lambda p: int { return 0; },
-        "fflush": lambda p: int { return 0; },
+        "puts": lambda (p: int) { return 0; },
+        "printf": lambda (a: int) { return 0; },
+        "snprintf": lambda (a: int, b: int, c: int, d: int) { return 0; },
+        "getenv": lambda (p: int) { return 0; },
+        "fflush": lambda (p: int) { return 0; },
         "abort": lambda { },
-        "longjmp": lambda env_ptr: int , val: int {
+        "longjmp": lambda (env_ptr: int, val: int) {
         # Upstream's wasm codegen (na_ir_gen_pass exceptions) lowers
         # exception unwinding through setjmp/longjmp, so the module now
         # imports env.longjmp. A true non-local jump back into wasm isn't
@@ -355,7 +376,7 @@ def _build_env(sh: any) -> dict {
         # play -- this is emitted-but-unreached scaffolding that only needs
         # to be callable to link. Throw loudly if it ever actually fires.
         raise Error(f"wasm longjmp(val={val}): unhandled sim exception"); },
-        "__multi3": lambda res: int , al: int , ah: int , bl: int , bh: int {
+        "__multi3": lambda (res: int, al: int, ah: int, bl: int, bh: int) {
             k = (BigInt(1) << BigInt(64)) - BigInt(1);
             a = (BigInt.asUintN(64, ah) << BigInt(64)) | BigInt.asUintN(64, al);
             b = (BigInt.asUintN(64, bh) << BigInt(64)) | BigInt.asUintN(64, bl);
@@ -411,7 +432,7 @@ def _keymap(code: str) -> int {
 # references on stop (anonymous listeners can't be removed -> would leak across
 # rounds). Esc fires the on_exit hook (back to menu).
 def _install_input(sh: any) {
-    sh.h_keydown = lambda e: any {
+    sh.h_keydown = lambda (e: any) {
         if e.code == "Escape" {
             if sh.on_exit is not None {
                 sh.on_exit();
@@ -430,21 +451,21 @@ def _install_input(sh: any) {
         }
     };
     window.addEventListener("keydown", sh.h_keydown);
-    sh.h_keyup = lambda e: any {
+    sh.h_keyup = lambda (e: any) {
         kc = _keymap(e.code);
         if kc != 0 {
             sh.keys[kc] = 0;
         }
     };
     window.addEventListener("keyup", sh.h_keyup);
-    sh.h_mousedown = lambda e: any {
+    sh.h_mousedown = lambda (e: any) {
         sh.mpressed[0] = 1;
         sh.mdown[0] = 1;
     };
     sh.canvas.addEventListener("mousedown", sh.h_mousedown);
-    sh.h_mouseup = lambda e: any { sh.mdown[0] = 0; };
+    sh.h_mouseup = lambda (e: any) { sh.mdown[0] = 0; };
     document.addEventListener("mouseup", sh.h_mouseup);
-    sh.h_mousemove = lambda e: any { if sh.locked {
+    sh.h_mousemove = lambda (e: any) { if sh.locked {
         sh.mouseX = sh.mouseX + e.movementX;
         sh.mouseY = sh.mouseY + e.movementY;
     } else {
@@ -452,7 +473,7 @@ def _install_input(sh: any) {
         sh.mouseY = e.offsetY;
     } };
     document.addEventListener("mousemove", sh.h_mousemove);
-    sh.h_plock = lambda e: any { sh.locked = document.pointerLockElement == sh.canvas; };
+    sh.h_plock = lambda (e: any) { sh.locked = document.pointerLockElement == sh.canvas; };
     document.addEventListener("pointerlockchange", sh.h_plock);
 }
 
@@ -507,7 +528,7 @@ def _frame_tick(sh: any, ts: float) {
     sh.pressed = {};
     sh.mpressed = {};
     if sh.alive and not closed {
-        sh.raf = requestAnimationFrame(lambda t2: float { _frame_tick(sh, t2); });
+        sh.raf = requestAnimationFrame(lambda (t2: float) { _frame_tick(sh, t2); });
     }
 }
 
@@ -578,7 +599,7 @@ async def:pub run_game(
         return;
     }
     guard.__fps_shim = sh;
-    sh.raf = requestAnimationFrame(lambda ts: float { _frame_tick(sh, ts); });
+    sh.raf = requestAnimationFrame(lambda (ts: float) { _frame_tick(sh, ts); });
 }
 
 """Stop the running game: halt the loop, detach listeners, release the pointer.

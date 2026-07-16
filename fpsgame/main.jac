@@ -130,13 +130,13 @@ cl {
             ew.__fps_errhook = True;
             ew.addEventListener(
                 "error",
-                lambda e: any { console.log(
+                lambda (e: any) { console.log(
                     "[fps] ERROR:", e.message, "@", e.filename, e.lineno, e.error
                 ); }
             );
             ew.addEventListener(
                 "unhandledrejection",
-                lambda e: any { console.log("[fps] REJECTION:", e.reason); }
+                lambda (e: any) { console.log("[fps] REJECTION:", e.reason); }
             );
         }
         existing: any = document.getElementById("fps-styles");
@@ -274,7 +274,7 @@ cl {
                         min="1"
                         max="60"
                         value={str(s)}
-                        onChange={lambda e: ChangeEvent {
+                        onChange={lambda (e: ChangeEvent) {
                             v: str = e.target.value;
                             s = int(v);
                         }}
@@ -288,7 +288,7 @@ cl {
                         min="60"
                         max="110"
                         value={str(f)}
-                        onChange={lambda e: ChangeEvent {
+                        onChange={lambda (e: ChangeEvent) {
                             v: str = e.target.value;
                             f = int(v);
                         }}
@@ -302,7 +302,7 @@ cl {
                         min="1"
                         max="10"
                         value={str(b)}
-                        onChange={lambda e: ChangeEvent {
+                        onChange={lambda (e: ChangeEvent) {
                             v: str = e.target.value;
                             b = int(v);
                         }}
@@ -316,7 +316,7 @@ cl {
                         min="1"
                         max="20"
                         value={str(t)}
-                        onChange={lambda e: ChangeEvent {
+                        onChange={lambda (e: ChangeEvent) {
                             v: str = e.target.value;
                             t = int(v);
                         }}
@@ -373,9 +373,20 @@ cl {
             # The shim's on_tick pushes already-converted values here each frame.
             # This lambda only WRITES state (never reads it), so there is no React
             # stale-closure hazard; the diff logic lives in on_tick instead.
-            w.__fps_hud = lambda nhp: int , nmag: int , nammo: int , nkills: int , ndeaths:
-                int , nfps: int , nhit: bool , nalive: bool , nreload: bool , nlow:
-                bool , nvig: int , nfeed: list {
+            w.__fps_hud = lambda (
+                nhp: int,
+                nmag: int,
+                nammo: int,
+                nkills: int,
+                ndeaths: int,
+                nfps: int,
+                nhit: bool,
+                nalive: bool,
+                nreload: bool,
+                nlow: bool,
+                nvig: int,
+                nfeed: list
+            ) {
                 hp = nhp;
                 mag = nmag;
                 ammo = nammo;
@@ -467,7 +478,7 @@ cl {
                 dispose_renderer(w.__fps_r3d);
             }
             w.__fps_r3d_tried = False;
-            on_render = lambda exports: any {
+            on_render = lambda (exports: any) {
                 w5: any = window;
                 if not w5.__fps_r3d_tried {
                     w5.__fps_r3d_tried = True;
@@ -482,7 +493,7 @@ cl {
             # Per-frame: convert sim state (Any) to ints, diff against window-stored
             # prev values for HUD effects (damage vignette + kill feed), push to the
             # React HUD, then check win/lose.
-            on_tick = lambda exports: any , fps: int {
+            on_tick = lambda (exports: any, fps: int) {
                 w2: any = window;
                 hp: int = int(f"{exports.get_health()}");
                 mag: int = int(f"{exports.get_mag()}");
