@@ -89,8 +89,8 @@ curl -fsSL https://raw.githubusercontent.com/jaseci-labs/jaseci/main/scripts/ins
 
 # Individual plugins
 jac install byllm        # LLM integration
-jac install jac-scale    # Production deployment
-# (full-stack web + native-desktop app building ships with the jac binary)
+# (Production deployment & scaling and full-stack web + native-desktop app
+#  building ship with the jac binary -- no separate install)
 ```
 
 This installs the self-contained `jac` binary -- no Python, pip, or uv required.
@@ -142,7 +142,7 @@ my_project/
 | `.impl.jac` | Implementation file (annex) |
 | `.test.jac` | Test file (annex) |
 
-Files sharing the same base name form a single logical module. For example, `mymod.jac`, `mymod.sv.jac`, `mymod.cl.jac`, `mymod.impl.jac`, and `mymod.test.jac` are all part of the `mymod` module. Variant files (`.sv.jac`, `.cl.jac`, `.na.jac`) are automatically discovered and merged during compilation -- see [Variant Modules](functions-objects.md#variant-modules) for details.
+Files sharing the same base name form a single logical module. For example, `mymod.jac`, `mymod.sv.jac`, `mymod.cl.jac`, `mymod.impl.jac`, and `mymod.test.jac` are all part of the `mymod` module. Variant files (`.sv.jac`, `.cl.jac`, `.na.jac`) are automatically discovered and merged during compilation -- see [Variant Modules](functions-objects.md#4-variant-modules) for details.
 
 ### 4 Editor Setup
 
@@ -452,10 +452,14 @@ with entry {
 }
 ```
 
-Two current limitations to be aware of:
+One current limitation to be aware of:
 
 - **Type-parameter defaults don't apply at subscripted construction.** `Result(value=42)` and `Result[int, ValueError](value=42)` work, but `Result[int](value=42)` -- leaving `E` to its default -- passes `jac check` and raises a `TypeError` at runtime. When in doubt, construct without the subscript.
-- **Type-parameter inference is conservative.** The checker treats a returned `T` opaquely in some positions (e.g. `first([1, 2]) + 1` is rejected with E1010). Recover the concrete type with the [`as` cast operator](#10-the-as-cast-operator): `n = first(nums) as int;`.
+
+Type-parameter inference now flows through: the checker infers the concrete
+return type, so `first([1, 2]) + 1` checks clean and `s = first(["a", "b"]); s.upper()`
+resolves. If you ever need to override the checker's inference, the
+[`as` cast operator](#10-the-as-cast-operator) re-types an expression: `n = first(nums) as int;`.
 
 !!! tip "Remember the backtick"
     If you need to use the built-in function to check if any item is truthy, use `` `any ``:
@@ -1285,29 +1289,37 @@ def example() {
 
 **Atomic Pipes (`:>`, `<:`):**
 
-Atomic pipes are used with spawn operations and affect traversal order:
+Atomic pipes feed a value into a callable, like `|>`/`<|`, but bind more tightly
+(higher precedence). `:>` pipes left-to-right and `<:` right-to-left:
 
 ```jac
-node Item {
-    has value: int = 0;
-}
-
-walker Visitor {
-    can visit with Item entry {
-        print(here.value);
-    }
-}
+def double(x: int) -> int { return x * 2; }
 
 with entry {
-    start = Item(value=1);
-
-    # Atomic pipe forward - depth-first traversal
-    start spawn :> Visitor();
-
-    # Standard pipe with spawn - breadth-first traversal
-    start spawn |> Visitor();
+    r  = 5 :> double;    # 10
+    r2 = double <: 5;    # 10
+    print(r, r2);
 }
 ```
+
+!!! warning "`spawn` combined with a pipe operator does not currently work"
+    Older material documents piping into a spawn to pick a traversal order --
+    `start spawn :> Visitor()` or `start spawn |> Visitor()`. Both forms currently
+    fail at runtime with `'Visitor' object is not callable`. Spawn a walker with
+    the plain form instead (it works and runs the walker's entry abilities):
+
+    ```jac
+    node Item { has value: int = 0; }
+
+    walker Visitor {
+        can visit_item with Item entry { print(here.value); }
+    }
+
+    with entry {
+        start = Item(value=1);
+        start spawn Visitor();   # runs Visitor on `start`
+    }
+    ```
 
 **Dot Pipes (`.>`, `<.`):**
 
@@ -1344,8 +1356,8 @@ def example() {
 
     # Using lambdas in pipe chains
     result = numbers
-        |> (lambda x: list : [i * 2 for i in x])
-        |> (lambda x: list : [i for i in x if i > 10])
+        |> (lambda (x: list) { [i * 2 for i in x]; })
+        |> (lambda (x: list) { [i for i in x if i > 10]; })
         |> sum;
 }
 ```
@@ -1356,8 +1368,8 @@ def example() {
 |----------|------|-----------|----------|
 | `\|>` | Forward pipe | Left to right | Function composition |
 | `<\|` | Backward pipe | Right to left | Reverse composition |
-| `:>` | Atomic forward | Left to right | Depth-first spawn |
-| `<:` | Atomic backward | Right to left | Reverse atomic |
+| `:>` | Atomic forward | Left to right | Tight-binding forward pipe |
+| `<:` | Atomic backward | Right to left | Tight-binding backward pipe |
 | `.>` | Dot forward | Left to right | Method chaining |
 | `<.` | Dot backward | Right to left | Reverse method chain |
 

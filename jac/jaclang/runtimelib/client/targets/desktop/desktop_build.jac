@@ -5,10 +5,10 @@ import hashlib;
 import subprocess;
 import sys;
 import tarfile;
-import platform;
 import from urllib.request { urlopen, urlretrieve }
 import from pathlib { Path }
 import from jaclang.cli.console { console }
+import from jaclang.runtimelib.utils { host_arch }
 import from jaclang.runtimelib.client.targets.desktop._dev_launch { desktop_launch_env }
 
 def _jaclang_src_roots -> list[Path] {
@@ -24,7 +24,7 @@ def _jaclang_src_roots -> list[Path] {
             roots.append(Path(str(jl)).resolve().parent.parent);
         }
     } except Exception {
-        pass;
+        ;
     }
     return roots;
 }
@@ -155,28 +155,23 @@ def _stage_pyembed_shim(out_dir: Path) {
 
 
 def _bundle_runtime(host_binary: Path) {
-    jac_bin = Path(os.path.realpath(os.sys.executable));
-    data = jac_bin.read_bytes();
-    magic = b"JACBIN01";
-    trailer_len = 8 + 8 + 64;
-    if len(data) < trailer_len or data[-trailer_len:-trailer_len + 8] != magic {
+    import subprocess;
+    jac_bin = os.path.realpath(os.sys.executable);
+
+    rc = subprocess.run([jac_bin, "__graftrt", str(host_binary)]).returncode;
+    if rc != 0 {
         raise RuntimeError(
-            "jac-desktop: the running jac binary carries no fused-runtime trailer "
+            "jac-desktop: the running jac binary carries no fused-runtime "
             f"({jac_bin}); a desktop app needs a fused `jac` built via `zig build`. "
             "(A bare pip/source jaclang install has no embeddable runtime.)"
         );
     }
-    payload_len = int.from_bytes(data[-trailer_len + 8:-trailer_len + 16], "little");
-    suffix = data[-(trailer_len + payload_len):];
-    with open(str(host_binary), "ab") as f {
-        f.write(suffix);
-    }
 }
 
 def _jac_bin -> str {
-    cand = Path(os.path.dirname(os.sys.executable)) / "jac";
-    if cand.exists() {
-        return str(cand);
+    exe = os.environ.get("JAC_EXECUTABLE");
+    if exe and os.path.exists(exe) {
+        return exe;
     }
     found = shutil.which("jac");
     if found {
@@ -184,47 +179,6 @@ def _jac_bin -> str {
     }
     raise RuntimeError("jac CLI not found on PATH.");
 }
-
-def _loopback_serve_py(
-    app_name: str,
-    plugin_bootstrap: str = "",
-    dispatch_arg: str = "",
-    threaded: bool = False,
-    sv_arg: str = ""
-) -> str {
-    pref_port = 49152 + (int(hashlib.sha1(app_name.encode()).hexdigest(), 16) % 16000);
-
-    srv_setup = (
-        "_S = socketserver.ThreadingTCPServer\n_S.daemon_threads = True\n"
-            if threaded
-            else "_S = socketserver.TCPServer\n"
-    );
-    return (
-        "import os, sys, socketserver, threading\n" + srv_setup + "if os.path.isfile('/proc/self/exe'):\n"
-        "    _exe = os.path.realpath('/proc/self/exe')\n"
-        "else:\n"
-        "    _exe = os.path.abspath(sys.argv[0])\n"
-        "_root = os.path.dirname(_exe)\n"
-        "_dir = os.path.join(_root, 'dist')\n"
-        "from jaclang.runtimelib.client.targets.desktop.native import oauth_broker as _broker\n" + plugin_bootstrap + "_data = os.environ.get('JAC_DATA_PATH', _root)\n"
-        "_store = _broker.SessionStore("
-        "os.path.join(_data, '.jac', 'desktop', 'session.json'))\n" + "_H = _broker.make_handler(_dir, _store" + dispatch_arg + sv_arg + ")\n" + "_S.allow_reuse_address = True\n"
-        f"_pref = {pref_port}\n"
-        "_srv = None; _port = None\n"
-        "for _i in range(64):\n"
-        "    try:\n"
-        "        _srv = _S(('127.0.0.1', _pref + _i), _H)\n"
-        "        _port = _pref + _i; break\n"
-        "    except OSError:\n"
-        "        continue\n"
-        "if _srv is None:\n"
-        "    _srv = _S(('127.0.0.1', 0), _H)\n"
-        "    _port = _srv.server_address[1]\n"
-        "threading.Thread(target=_srv.serve_forever, daemon=True).start()\n"
-        "print('JAC_DESKTOP_SERVING http://127.0.0.1:' + str(_port) + '/', flush=True)\n"
-    );
-}
-
 
 def _cef_bootstrap_js -> str {
     src = (_find_cef_dir() / "cef_dispatch.na.jac").read_text();
@@ -349,7 +303,7 @@ def _cef_expected_sha1(sums_lock: Path, archive: str) -> str {
 }
 
 def _cef_plat_tag -> str {
-    arch = platform.machine();
+    arch = host_arch();
     if arch == "x86_64" {
         return "linux64";
     }

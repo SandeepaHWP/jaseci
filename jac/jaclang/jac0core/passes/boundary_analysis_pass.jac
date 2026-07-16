@@ -10,6 +10,10 @@ import from jaclang.jac0core.passes.uni_pass { UniPass }
 
 class BoundaryAnalysisPass(UniPass) {
     def before_pass(self: BoundaryAnalysisPass) -> None;
+    def _resolved_native_decl(
+        self: BoundaryAnalysisPass, name_node: (uni.UniNode | None)
+    ) -> (uni.Ability | None);
+
     def _get_context(self: BoundaryAnalysisPass, nd: uni.UniNode) -> InteropContext;
     def _extract_type_name(
         self: BoundaryAnalysisPass, expr: (uni.UniNode | None)
@@ -19,6 +23,7 @@ class BoundaryAnalysisPass(UniPass) {
         self: BoundaryAnalysisPass, module_name: str
     ) -> (str | None);
 
+    def _in_native_module(self: BoundaryAnalysisPass) -> bool;
     def enter_import(self: BoundaryAnalysisPass, nd: uni.Import) -> None;
     def _register_sv_import(
         self: BoundaryAnalysisPass,

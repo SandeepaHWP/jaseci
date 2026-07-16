@@ -146,6 +146,10 @@ impl UniPass.enter_finally_stmt(nd: uni.FinallyStmt) -> None {
     self.default_enter(nd);
 }
 
+impl UniPass.enter_forever_stmt(nd: uni.ForeverStmt) -> None {
+    self.default_enter(nd);
+}
+
 impl UniPass.enter_formatted_value(nd: uni.FormattedValue) -> None {
     self.default_enter(nd);
 }
@@ -343,6 +347,10 @@ impl UniPass.enter_native_block(nd: uni.NativeBlock) -> None {
 }
 
 impl UniPass.enter_non_local_stmt(nd: uni.NonLocalStmt) -> None {
+    self.default_enter(nd);
+}
+
+impl UniPass.enter_open_stmt(nd: uni.OpenStmt) -> None {
     self.default_enter(nd);
 }
 
@@ -618,6 +626,10 @@ impl UniPass.exit_float(nd: uni.Float) -> None {
     self.default_exit(nd);
 }
 
+impl UniPass.exit_forever_stmt(nd: uni.ForeverStmt) -> None {
+    self.default_exit(nd);
+}
+
 impl UniPass.exit_formatted_value(nd: uni.FormattedValue) -> None {
     self.default_exit(nd);
 }
@@ -823,6 +835,10 @@ impl UniPass.exit_non_local_stmt(nd: uni.NonLocalStmt) -> None {
 }
 
 impl UniPass.exit_null(nd: uni.Null) -> None {
+    self.default_exit(nd);
+}
+
+impl UniPass.exit_open_stmt(nd: uni.OpenStmt) -> None {
     self.default_exit(nd);
 }
 

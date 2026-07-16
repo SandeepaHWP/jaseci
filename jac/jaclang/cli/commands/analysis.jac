@@ -6,6 +6,7 @@ glob registry = get_registry();
 @registry.command(
     name="check",
     help="Type check Jac files",
+    tier="core",
     args=[
         Arg.create(
             "paths", kind=ArgKind.MULTI, help="Paths to .jac files or directories"
@@ -42,13 +43,30 @@ glob registry = get_registry();
             default=False,
             help="Suppress warning output (warnings are still counted)"
         ),
+        Arg.create(
+            "lint",
+            dest="lint_only",
+            typ=bool,
+            default=False,
+            short="",
+            help="Report lint violations only (absorbs 'jac lint')"
+        ),
+        Arg.create(
+            "fix",
+            typ=bool,
+            default=False,
+            short="",
+            help="With --lint: auto-fix violations"
+        ),
 
     ],
     examples=[
         ("jac check myprogram.jac", "Check a single file"),
+        ("jac check . --lint", "Report lint violations only"),
+        ("jac check . --lint --fix", "Auto-fix lint violations"),
         ("jac check file1.jac file2.jac", "Check multiple files"),
         ("jac check myproject/", "Check all files in directory"),
-        ("jac check . --ignore jac jac-scale test", "Check excluding directories"),
+        ("jac check . --ignore jac scale test", "Check excluding directories"),
         (
             "jac check myprogram.jac --disable-error-code E1030 W2001",
             "Check while suppressing selected diagnostics"
@@ -68,41 +86,17 @@ def check(
     ignore: (list | None) = None,
     disable_error_code: (list | None) = None,
     parse_only: bool = False,
-    nowarn: bool = False
+    nowarn: bool = False,
+    lint_only: bool = False,
+    fix: bool = False
 ) -> int;
 
-@registry.command(
-    name="lint",
-    help="Lint Jac files and report violations",
-    args=[
-        Arg.create(
-            "paths", kind=ArgKind.MULTI, help="Paths to .jac files or directories"
-        ),
-        Arg.create(
-            "fix", typ=bool, default=False, help="Auto-fix lint violations", short="f"
-        ),
-        Arg.create(
-            "ignore",
-            kind=ArgKind.MULTI,
-            default=[],
-            help="Directories or files to ignore (space separated)"
-        ),
-
-    ],
-    examples=[
-        ("jac lint myfile.jac", "Lint a single file"),
-        ("jac lint myproject/", "Lint all files in directory"),
-        ("jac lint myfile.jac --fix", "Auto-fix lint violations"),
-        ("jac lint . --ignore jac jac-scale test", "Lint excluding directories"),
-
-    ],
-    group="analysis"
-)
 def lint(paths: list, fix: bool = False, ignore: (list | None) = None) -> int;
 
 @registry.command(
-    name="format",
+    name="fmt",
     help="Format Jac source code",
+    tier="core",
     args=[
         Arg.create(
             "paths", kind=ArgKind.MULTI, help="Paths to .jac files or directories"
@@ -131,11 +125,11 @@ def lint(paths: list, fix: bool = False, ignore: (list | None) = None) -> int;
 
     ],
     examples=[
-        ("jac format myfile.jac", "Format a single file"),
-        ("jac format myproject/", "Format all files in directory"),
-        ("jac format myfile.jac --to_screen", "Preview formatted output"),
-        ("jac format . --lintfix", "Format and auto-fix lint violations"),
-        ("jac format . --check", "Check formatting without modifying files"),
+        ("jac fmt myfile.jac", "Format a single file"),
+        ("jac fmt myproject/", "Format all files in directory"),
+        ("jac fmt myfile.jac --to_screen", "Preview formatted output"),
+        ("jac fmt . --lintfix", "Format and auto-fix lint violations"),
+        ("jac fmt . --check", "Check formatting without modifying files"),
 
     ],
     group="analysis"
@@ -146,7 +140,8 @@ def format(
 
 @registry.command(
     name="precommit",
-    help="Run format (--lintfix) + check using jac.toml lint settings; installable as a git hook",
+    help="Run fmt (--lintfix) + check using jac.toml lint settings; installable as a git hook",
+    hidden=True,
     args=[
         Arg.create(
             "paths",
@@ -170,12 +165,22 @@ def format(
             default=False,
             help="Install a git pre-commit hook that runs this command"
         ),
+        Arg.create(
+            "force",
+            typ=bool,
+            default=False,
+            help="With --install: replace an existing foreign hook (a backup is kept)"
+        ),
 
     ],
     examples=[
         ("jac precommit", "Format (lintfix) and check the whole project"),
         ("jac precommit --staged", "Run on staged '.jac' files only"),
         ("jac precommit --install", "Install a .git/hooks/pre-commit hook"),
+        (
+            "jac precommit --install --force",
+            "Replace an existing hook (kept as pre-commit.bak)"
+        ),
 
     ],
     group="analysis"
@@ -184,12 +189,14 @@ def precommit(
     paths: (list | None) = None,
     staged: bool = False,
     verify: bool = False,
-    install: bool = False
+    install: bool = False,
+    force: bool = False
 ) -> int;
 
 @registry.command(
     name="test",
     help="Run Jac test suite",
+    tier="core",
     args=[
         Arg.create(
             "paths",
@@ -252,6 +259,7 @@ def `test(
 
 @registry.command(
     name="gen_parser",
+    hidden=True,
     help="Generate Jac parser (internal use)",
     args=[],
     examples=[("jac gen_parser", "Regenerate the Jac parser"), ],
@@ -259,31 +267,4 @@ def `test(
 )
 def gen_parser -> int;
 
-@registry.command(
-    name="grammar",
-    help="Extract and print the Jac grammar",
-    args=[
-        Arg.create(
-            "lark",
-            typ=bool,
-            default=False,
-            help="Output in Lark format instead of EBNF"
-        ),
-        Arg.create(
-            "output",
-            default="",
-            help="Write output to file instead of stdout",
-            short="o"
-        ),
-
-    ],
-    examples=[
-        ("jac grammar", "Print EBNF grammar to stdout"),
-        ("jac grammar --lark", "Print Lark grammar to stdout"),
-        ("jac grammar -o jac.ebnf", "Write EBNF grammar to file"),
-        ("jac grammar --lark -o jac.lark", "Write Lark grammar to file"),
-
-    ],
-    group="analysis"
-)
-def grammar(lark: bool = False, output: str = "") -> int;
+def grammar(output: str = "", strict: bool = False) -> int;

@@ -146,6 +146,10 @@ impl FinallyStmt.accept_enter(v: UniPass) -> None {
     v.enter_finally_stmt(self);
 }
 
+impl ForeverStmt.accept_enter(v: UniPass) -> None {
+    v.enter_forever_stmt(self);
+}
+
 impl FormattedValue.accept_enter(v: UniPass) -> None {
     v.enter_formatted_value(self);
 }
@@ -344,6 +348,10 @@ impl NativeBlock.accept_enter(v: UniPass) -> None {
 
 impl NonLocalStmt.accept_enter(v: UniPass) -> None {
     v.enter_non_local_stmt(self);
+}
+
+impl OpenStmt.accept_enter(v: UniPass) -> None {
+    v.enter_open_stmt(self);
 }
 
 impl ParamVar.accept_enter(v: UniPass) -> None {
@@ -618,6 +626,10 @@ impl Float.accept_exit(v: UniPass) -> None {
     v.exit_float(self);
 }
 
+impl ForeverStmt.accept_exit(v: UniPass) -> None {
+    v.exit_forever_stmt(self);
+}
+
 impl FormattedValue.accept_exit(v: UniPass) -> None {
     v.exit_formatted_value(self);
 }
@@ -824,6 +836,10 @@ impl NonLocalStmt.accept_exit(v: UniPass) -> None {
 
 impl Null.accept_exit(v: UniPass) -> None {
     v.exit_null(self);
+}
+
+impl OpenStmt.accept_exit(v: UniPass) -> None {
+    v.exit_open_stmt(self);
 }
 
 impl ParamVar.accept_exit(v: UniPass) -> None {

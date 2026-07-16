@@ -27,6 +27,17 @@ obj DiagnosticInfo {
             return f"{self.message_template} (missing key: {e})";
         }
     }
+
+    def format_help(**kwargs: object) -> (str | None) {
+        if self.help_text is None {
+            return None;
+        }
+        try {
+            return self.help_text.format(**kwargs);
+        } except (KeyError, ValueError, IndexError) {
+            return self.help_text;
+        }
+    }
 }
 
 glob DIAGNOSTICS: dict[str, DiagnosticInfo] = {};
@@ -80,11 +91,6 @@ glob E0001 = _err("E0001", Category.SYNTAX, "Expected '{expected}', got '{got}'"
          "'{keyword}' is not supported in Jac",
          help="Jac uses different syntax for this construct."
      ),
-     E0011 = _err(
-         "E0011",
-         Category.SYNTAX,
-         "Jac does not allow this keyword in any syntactic position"
-     ),
      E0012 = _err(
          "E0012",
          Category.SYNTAX,
@@ -105,7 +111,10 @@ glob E0001 = _err("E0001", Category.SYNTAX, "Expected '{expected}', got '{got}'"
          "E0021", Category.SYNTAX, "Expected :<+ or :+> to close connect operator"
      ),
      E0022 = _err(
-         "E0022", Category.SYNTAX, "Expected ':' or '{{' after lambda parameters"
+         "E0022",
+         Category.SYNTAX,
+         "Expected '{{' after lambda parameters",
+         help="Lambda bodies are braced; a single expression statement is the implicit return, e.g. 'lambda (x: int) { x + 1; }'."
      ),
      E0023 = _err(
          "E0023", Category.SYNTAX, "Expected augmented assignment in for...to...by step"
@@ -120,7 +129,7 @@ glob E0001 = _err("E0001", Category.SYNTAX, "Expected '{expected}', got '{got}'"
          "E0025",
          Category.SYNTAX,
          "JavaScript arrow function syntax ('=>') is not supported in Jac",
-         help="Use Jac lambda syntax instead: 'lambda e: ChangeEvent { ... }' or 'lambda x: int : x + 1'."
+         help="Use Jac lambda syntax instead: 'lambda (e: ChangeEvent) { ... }' or 'lambda (x: int) { x + 1; }'."
      ),
      E0026 = _err(
          "E0026",
@@ -148,9 +157,6 @@ glob E0001 = _err("E0001", Category.SYNTAX, "Expected '{expected}', got '{got}'"
          "E0032",
          Category.SYNTAX,
          "Unexpected '{token}' -- must follow its parent statement (if/try/match/switch)"
-     ),
-     E0033 = _err(
-         "E0033", Category.SYNTAX, "'{modifier}' is not a valid prefix modifier"
      ),
      E0034 = _err(
          "E0034",
@@ -495,6 +501,20 @@ glob E0001 = _err("E0001", Category.SYNTAX, "Expected '{expected}', got '{got}'"
          Category.TYPE,
          "Cannot spread type {actual} into '{component}' (expected dict)"
      ),
+     E1105 = _err(
+         "E1105",
+         Category.TYPE,
+         "JSX tag '<{tag}>' is not in scope in a mobUI project;"
+         " use {suggestion} instead",
+         "mobUI projects target React Native as well as the web, where raw"
+         " HTML host elements do not exist. If the tag is meant to be a"
+         " component, make sure it is imported and in scope. Otherwise, replace"
+         " it with a @jac/mobui primitive (View, Text, Pressable, TextInput,"
+         " Image, ScrollView, ...). Lowercase tags that resolve to imported"
+         " components are"
+         " allowed; only unresolved names are rejected.",
+         blocks_codegen=True
+     ),
      E1110 = _err(
          "E1110",
          Category.TYPE,
@@ -546,9 +566,150 @@ glob E0001 = _err("E0001", Category.SYNTAX, "Expected '{expected}', got '{got}'"
          Category.TYPE,
          "Lambda parameter '{name}' has no type and none could be inferred from context",
          "Jac is strictly typed: a lambda's parameter types must be known. Annotate the"
-         " parameter, e.g. `lambda x: int : x + 1` (the return type is still inferred), or"
+         " parameter, e.g. `lambda (x: int) { x + 1; }` (the return type is still inferred), or"
          " place the lambda where its type is fixed by context — passed as a typed callback"
-         " (`sorted(xs, key=lambda x: ...)`) or bound to a `Callable`-typed target."
+         " (`sorted(xs, key=lambda (x) { ... })`) or bound to a `Callable`-typed target."
+     ),
+     E1120 = _err(
+         "E1120",
+         Category.IMPORT,
+         "Import of '{name}' from untyped external module '{module}' (no type declarations found)",
+         "This project sets `[check] untyped-external = \"error\"` in jac.toml, so"
+         " every external import must be typed. Install a package that ships"
+         " TypeScript declarations (or the matching @types/<package>), or relax"
+         " the setting to \"warn\"."
+     ),
+     E1301 = _err(
+         "E1301",
+         Category.SEMANTIC,
+         "Use of '{name}' after it was moved",
+         help="'{name}' is an `own` binding, so assigning it elsewhere (or passing"
+         " it into managed storage) moves the value out. The value now lives at the"
+         " destination — read it there, or reassign '{name}' before using it again."
+     ),
+     E1302 = _err(
+         "E1302",
+         Category.SEMANTIC,
+         "Conflicting mutable borrow of '{name}' while another borrow is live",
+         help="A value may have any number of shared (&) borrows or exactly one"
+         " mutable (&mut) borrow, never both at once. Let the existing borrow go out"
+         " of scope before taking '&mut {name}'."
+     ),
+     E1303 = _err(
+         "E1303",
+         Category.SEMANTIC,
+         "Cannot mutate '{name}' while a shared borrow of it is live",
+         help="While a `&` shared borrow is live, the owner is read-only. Let every"
+         " shared borrow go out of scope before mutating '{name}' — reassigning it or"
+         " writing one of its fields both count as mutation."
+     ),
+     E1304 = _err(
+         "E1304",
+         Category.SEMANTIC,
+         "'{name}' is destroyed while still borrowed",
+         help="The owner '{name}' goes out of scope (and is destroyed) while a borrow"
+         " of it is still live. A borrow must not outlive the value it points to; keep"
+         " '{name}' in scope for at least as long as every borrow of it."
+     ),
+     E1306 = _err(
+         "E1306",
+         Category.SEMANTIC,
+         "Borrow of '{name}' escapes its scope",
+         help="Borrows are second-class: a `&`/`&mut` reference may not be stored in a"
+         " field, returned (except a single passthrough parameter), or otherwise"
+         " outlive the scope that created it."
+     ),
+     E1307 = _err(
+         "E1307",
+         Category.SEMANTIC,
+         "Reference to '{name}' escapes its region",
+         help="A region owns everything allocated under an `in <handle> {}` open"
+         " and frees it wholesale when the region is reclaimed. A reference rooted"
+         " in the region may not be returned, stored outside, or handed to a"
+         " `flow`/`wait` boundary; it would dangle once the region is freed. Keep"
+         " the reference inside the region, or move the value out with `own`"
+         " before the open ends."
+     ),
+     E1308 = _err(
+         "E1308",
+         Category.SEMANTIC,
+         "'{name}' is not sendable across a concurrency boundary",
+         help="Only a deep-immutable `imm` value or a moved `own` value may cross a"
+         " `flow`/`wait`/`thread_run` boundary — those are the only payloads that are"
+         " statically race-free. A live `&`/`&mut` borrow or a shared managed value may"
+         " not be sent; move it with `own`, or send an `imm` snapshot instead."
+     ),
+     E1309 = _err(
+         "E1309",
+         Category.SEMANTIC,
+         "Cannot mutate '{name}' through a deep-immutable `imm` binding",
+         help="'{name}' is an `imm` value: it is transitively immutable, so it may never"
+         " be reassigned, have a field written, or be borrowed `&mut`. Take an `imm` as"
+         " read-only, or use an `own`/managed binding if you need to mutate."
+     ),
+     W1310 = _warn(
+         "W1310",
+         Category.LINT,
+         "Region open on '{name}' has an empty body",
+         help="Opening a region that allocates nothing pays for an arena and its"
+         " teardown with no benefit. Allocate inside the open, or drop the open."
+     ),
+     E1401 = _err(
+         "E1401",
+         Category.SEMANTIC,
+         "Heap-typed {position} '{name}' has no ownership state in a nogc-enforced module ({provenance})",
+         help="Inside a nogc-enforced module every heap-typed contract position"
+         " (parameter, return, or `has` field) must be in the owned world: annotate"
+         " it `own`, `&`, `&mut`, or `imm`. Locals still infer ownership from a fresh"
+         " right-hand side; only contracts must be explicit.",
+         blocks_codegen=True
+     ),
+     E1402 = _err(
+         "E1402",
+         Category.SEMANTIC,
+         "Owned value '{name}' is sealed into managed storage inside a nogc-enforced module ({provenance})",
+         help="Storing an owned value into a managed or graph location re-enters the"
+         " reference-counted world, which a nogc-enforced module promises not to do."
+         " Keep the value owned, or copy it across the membrane explicitly with"
+         " `managed(...)` at the module boundary.",
+         blocks_codegen=True
+     ),
+     E1403 = _err(
+         "E1403",
+         Category.SEMANTIC,
+         "Heap value '{name}' crosses implicitly out of a nogc-enforced module ({provenance})",
+         help="Heap values may leave a nogc-enforced module only by an explicit copy:"
+         " wrap the argument in `managed(...)`, which reboxes it into a"
+         " reference-counted allocation on the managed side. Scalars and `imm` values"
+         " cross freely.",
+         blocks_codegen=True
+     ),
+     E1404 = _err(
+         "E1404",
+         Category.SEMANTIC,
+         "'{name}' is `any`-typed and could be heap-allocated in a nogc-enforced module ({provenance})",
+         help="If the static type cannot say heap-or-not, zero-RC coverage cannot be"
+         " enforced. Give '{name}' a concrete type, or confine `any` to scalar values"
+         " in enforced modules.",
+         blocks_codegen=True
+     ),
+     E1405 = _err(
+         "E1405",
+         Category.SEMANTIC,
+         "Closure capture of '{name}' escapes its scope in a nogc-enforced module ({provenance})",
+         help="An escaping closure keeps its captures alive past the enclosing scope,"
+         " which needs reference counting. Pass '{name}' as an explicit parameter, or"
+         " restructure so the closure does not outlive the scope.",
+         blocks_codegen=True
+     ),
+     E1406 = _err(
+         "E1406",
+         Category.SEMANTIC,
+         "'{name}' has retaining or aliasing semantics not supported in a nogc-enforced module ({provenance})",
+         help="This builtin or construct retains or aliases its heap arguments, which"
+         " the zero-RC contract cannot express yet. Use an owned-compatible"
+         " alternative, or move this code outside the enforced module.",
+         blocks_codegen=True
      ),
      W1050 = _warn("W1050", Category.TYPE, "Unknown intrinsic JSX element '<{tag}>'"),
      W1051 = _warn(
@@ -605,6 +766,16 @@ glob E0001 = _err("E0001", Category.SYNTAX, "Expected '{expected}', got '{got}'"
          "W2007",
          Category.SEMANTIC,
          "'@staticmethod' is not supported in '{kind}' definitions. Use the 'static' keyword instead (e.g., 'static def method_name')."
+     ),
+     W2029 = _warn(
+         "W2029",
+         Category.SEMANTIC,
+         "'@{decorator}' is not recommended in '{kind}' definitions. Use native property syntax 'has {name}: {type_name} {{ getter; ... }}' instead.",
+         help="Declare the property with an accessor block: 'has {name}: {type_name} "
+         "{{ getter {{ ... }} setter(value: {type_name}) {{ ... }} }}'. Backing storage "
+         "is a separate 'has _{name}: {type_name} = ...;' field. Run "
+         "'jac check --lint --fix' to rewrite it automatically. A Python-compat "
+         "'class' is exempt from this rule."
      ),
      E2008 = _err(
          "E2008", Category.SEMANTIC, "Invalid target for context update: {target}"
@@ -992,7 +1163,7 @@ glob E0001 = _err("E0001", Category.SYNTAX, "Expected '{expected}', got '{got}'"
          Category.LINT,
          "Comment can be removed [strip-comments]",
          help="Opt-in 'deslop' rule. Enable by adding \"strip-comments\" to "
-         "[check.lint] select in jac.toml. `jac format --lintfix` then removes "
+         "[check.lint] select in jac.toml. `jac fmt --lintfix` then removes "
          "all comments; it never fires under select = [\"all\"] or [\"default\"]."
      ),
      W3051 = _warn(
@@ -1000,7 +1171,7 @@ glob E0001 = _err("E0001", Category.SYNTAX, "Expected '{expected}', got '{got}'"
          Category.LINT,
          "Docstring can be removed [strip-docstrings]",
          help="Opt-in 'deslop' rule. Enable by adding \"strip-docstrings\" to "
-         "[check.lint] select in jac.toml. `jac format --lintfix` then removes "
+         "[check.lint] select in jac.toml. `jac fmt --lintfix` then removes "
          "all docstrings; it never fires under select = [\"all\"] or [\"default\"]."
      ),
      LINT_ALIASES: dict[str, str] = {
@@ -1166,12 +1337,11 @@ glob E0001 = _err("E0001", Category.SYNTAX, "Expected '{expected}', got '{got}'"
          "Native union trigger members {members} disagree on the layout of field '{field}'",
          help="A tuple/union trigger like `with (A, B) entry` lowers field access on `here`/`visitor` through a single shared layout, so every member must place the common field at the same offset and type. Reorder the `has` declarations so the shared fields line up, or split the trigger into separate abilities per archetype."
      ),
-     E5070 = _err("E5070", Category.CODEGEN, "Error during type check: {error}"),
-     E5071 = _err("E5071", Category.CODEGEN, "Error during formatting: {error}"),
-     W5072 = _warn(
-         "W5072",
+     E5092 = _err(
+         "E5092",
          Category.CODEGEN,
-         "Attribute error when accessing node attributes: {error}"
+         "Native lowering failed for {kind} '{name}'",
+         help="The construct is within the native capability set, but this specific shape (its types, values, or runtime bindings) could not be lowered by NaIRGenPass. Adjust the shape, add type annotations, or move the code to a non-native context. Statically-known unsupported constructs are reported as E5090 by the capability check instead."
      ),
      E5080 = _err(
          "E5080",

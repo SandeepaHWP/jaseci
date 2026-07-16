@@ -12,8 +12,9 @@ cd jac/examples/todo_app
 jac start --client desktop
 ```
 
-Editable installs of `jaclang` and `jac-scale` are auto-wired by
-the runner; no manual `JAC_DESKTOP_*` or `LD_LIBRARY_PATH` setup is needed.
+An editable install of `jaclang` (which now includes the built-in `scale`
+subsystem) is auto-wired by the runner; no manual `JAC_DESKTOP_*` or
+`LD_LIBRARY_PATH` setup is needed.
 
 ## Backend smoke test (no window)
 
@@ -27,14 +28,14 @@ toggle walkers the same way the embedded host does.
 ## Desktop plugin capabilities (least privilege)
 
 Desktop SDK capabilities are off by default -- enable only what the app uses
-under `[plugins.desktop.plugins]` in `jac.toml`. For example, an app that only
+under `[desktop.plugins]` in `jac.toml`. For example, an app that only
 sends an OS notification turns on just that one:
 
 ```toml
 # Least privilege: only the capabilities the app actually uses are enabled.
 # Others (window, path, clipboard, dialog, fs, shell) stay off; fs/shell
 # additionally require allow-lists.
-[plugins.desktop.plugins]
+[desktop.plugins]
 notification = true
 ```
 

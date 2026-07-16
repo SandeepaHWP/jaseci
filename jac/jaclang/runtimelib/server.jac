@@ -46,6 +46,7 @@ obj UserManager {
     def authenticate(username: str, password: str) -> (dict[(str, str)] | None);
     def validate_token(token: str) -> (str | None);
     def get_root_id(username: str) -> (str | None);
+    def reset_root(username: str) -> (str | None);
     def get_user(username: str) -> (dict[(str, str)] | None);
     def user_exists(username: str) -> bool;
     def update_username(current_username: str, new_username: str) -> dict[str, str];
@@ -110,6 +111,7 @@ obj ModuleIntrospector {
     def _load_manifest -> None;
     def _extract_access_levels -> None;
     def _collect_cross_boundary_endpoints -> None;
+    def _register_sealed_bindings(sm: dict[str, any], img_root: str) -> None;
     def _fill_endpoint_effect_defaults -> None;
     def _collect_functions -> dict[str, Callable[(..., Any)]];
     def _collect_walkers -> dict[str, type[WalkerArchetype]];

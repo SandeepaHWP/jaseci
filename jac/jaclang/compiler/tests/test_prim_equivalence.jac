@@ -192,6 +192,24 @@ test "zlib bundled" {
     run_with_both("prim_zlib.jac", "zlib_py", "zlib_cl", "zlib_na", require=["na"]);
 }
 
+test "gzip bundled" {
+    run_with_both("prim_gzip.jac", "gzip_py", "gzip_cl", "gzip_na", require=["na"]);
+}
+
+test "bz2 bundled" {
+    run_with_both("prim_bz2.jac", "bz2_py", "bz2_cl", "bz2_na", require=["na"]);
+}
+
+test "fractions bundled" {
+    run_with_both(
+        "prim_fractions.jac",
+        "fractions_py",
+        "fractions_cl",
+        "fractions_na",
+        require=["na"]
+    );
+}
+
 test "hashlib + hmac bundled" {
     run_with_both(
         "prim_hashlib.jac", "hashlib_py", "hashlib_cl", "hashlib_na", require=["na"]
@@ -226,6 +244,44 @@ test "datetime bundled" {
 
 test "json bundled" {
     run_with_both("prim_json.jac", "json_py", "json_cl", "json_na", require=["na"]);
+}
+
+test "base64 bundled" {
+    run_with_both(
+        "prim_base64.jac", "base64_py", "base64_cl", "base64_na", require=["na"]
+    );
+}
+
+test "textwrap bundled" {
+    run_with_both(
+        "prim_textwrap.jac", "textwrap_py", "textwrap_cl", "textwrap_na", require=["na"]
+    );
+}
+
+test "csv bundled" {
+    run_with_both("prim_csv.jac", "csv_py", "csv_cl", "csv_na", require=["na"]);
+}
+
+test "pprint bundled" {
+    run_with_both(
+        "prim_pprint.jac", "pprint_py", "pprint_cl", "pprint_na", require=["na"]
+    );
+}
+
+test "difflib bundled" {
+    run_with_both(
+        "prim_difflib.jac", "difflib_py", "difflib_cl", "difflib_na", require=["na"]
+    );
+}
+
+test "native call resolves bundled stdlib signature, not typeshed (#7037)" {
+    (eng, _) = compile_native("bundled_stdlib_sig.jac");
+    pos = get_func(eng, "dumps_pos_len", ctypes.c_int64);
+    kw = get_func(eng, "dumps_kw_len", ctypes.c_int64);
+    pos_len = pos();
+    kw_len = kw();
+    assert pos_len == 4 , f"positional dumps len {pos_len}";
+    assert kw_len == 4 , f"keyword dumps len {kw_len}";
 }
 
 test "random" {
@@ -270,6 +326,36 @@ test "native any guarded consume" {
         "guard_consume_check_py",
         "guard_consume_check_cl",
         "guard_consume_check_na",
+        require=["na"]
+    );
+}
+
+test "native bare list flow inference" {
+    run_with_both(
+        "native_any_stdlib_gaps.jac",
+        "bare_list_check_py",
+        "bare_list_check_cl",
+        "bare_list_check_na",
+        require=["na"]
+    );
+}
+
+test "native none any consume" {
+    run_with_both(
+        "native_any_stdlib_gaps.jac",
+        "none_consume_check_py",
+        "none_consume_check_cl",
+        "none_consume_check_na",
+        require=["na"]
+    );
+}
+
+test "native any alias retain" {
+    run_with_both(
+        "native_any_alias_retain.jac",
+        "alias_retain_py",
+        "alias_retain_cl",
+        "alias_retain_na",
         require=["na"]
     );
 }

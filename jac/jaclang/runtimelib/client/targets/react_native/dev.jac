@@ -6,15 +6,16 @@ import from typing { Any, Optional, cast }
 import from jaclang.cli.console { console }
 import from jaclang.runtimelib.watcher { FileChangeEvent }
 import from jaclang.runtimelib.client.targets.react_native.common {
-    resolve_npx,
-    resolve_rn_project_dir
+    resolve_node_runner
 }
 import from jaclang.runtimelib.client.targets.react_native.build {
     lint_native_incompatible_usage,
     lint_unmapped_tags,
+    read_user_js_sources,
     stage_native_image_assets,
     stage_compiled_entry,
     strip_css_imports,
+    write_api_base_shim,
     write_native_entry
 }
 import from jaclang.runtimelib.client.targets.client_dev_common {
@@ -68,7 +69,11 @@ def inject_dev_api_base_url(rn_dir: Path, api_url: str) -> Optional[str] {
     expo["extra"] = extra;
     cfg["expo"] = expo;
     config_path.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8");
-    console.print(f"  ✔ app.json → expo.extra.apiBaseUrl = {api_url}", style="success");
+
+    write_api_base_shim(rn_dir, api_url);
+    console.print(
+        f"  ✔ app.json + __jacApiBase.js → apiBaseUrl = {api_url}", style="success"
+    );
     return original;
 }
 
@@ -109,19 +114,13 @@ def rn_hmr_on_jac_changed(
         if not mod2 {
             return;
         }
-        compiler.compile(
-            mod2,
-            entry_file,
-            runtime_filename="client_runtime_native.cl.jac",
-            target_name="react-native"
-        );
+        compiler.compile(mod2, entry_file, target_name="react-native");
         compiled_dir = compiler.compiled_dir;
         if compiled_dir is not None {
             try {
-                lint_unmapped_tags(compiled_dir);
-            } except Exception { }
-            try {
-                lint_native_incompatible_usage(compiled_dir);
+                js_sources = read_user_js_sources(compiled_dir);
+                lint_unmapped_tags(compiled_dir, sources=js_sources);
+                lint_native_incompatible_usage(compiled_dir, sources=js_sources);
             } except Exception { }
             try {
                 strip_css_imports(compiled_dir);
@@ -152,7 +151,12 @@ def rn_hmr_on_jac_changed(
 }
 
 def build_expo_start_argv(metro_port: int, clear_cache: bool = True) -> list[str] {
-    argv: list[str] = [resolve_npx(), "expo", "start", "--port", str(metro_port)];
+    argv: list[str] = resolve_node_runner() + [
+        "expo",
+        "start",
+        "--port",
+        str(metro_port)
+    ];
     if clear_cache {
         argv.append("--clear");
     }

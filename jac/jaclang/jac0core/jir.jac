@@ -6,7 +6,7 @@ import zlib;
 import from pathlib { Path }
 
 glob MAGIC = b"JIR\x00",
-     FORMAT_VERSION: int = 13,
+     FORMAT_VERSION: int = 15,
      HEADER_SIZE: int = 32,
      HEADER_FMT: str = "<4sHHIIIIII",
      EXTERNAL_REF: int = 0xFFFFFF,
@@ -18,6 +18,7 @@ glob MAGIC = b"JIR\x00",
      SEC_NATIVE_OBJ: int = 0x06,
      SEC_SYMINDEX: int = 0x07,
      SEC_MODKEY: int = 0x08,
+     SEC_DEBUG_SRC: int = 0x09,
      SEC_TERMINATOR: int = 0xFF,
      FLAG_PRECOMPILED: int = 0x02,
      PRECOMPILE_SENTINEL: str = "__PKG_ROOT__",
@@ -134,6 +135,45 @@ def _related_files(source_path: str) -> list[tuple[str, str]] {
     return result;
 }
 
+glob _client_kind_probe_active: bool = False;
+
+def _module_client_kind(source_path: str) -> str {
+    global _client_kind_probe_active;
+    if _client_kind_probe_active {
+        return "web";
+    }
+    _client_kind_probe_active = True;
+    try {
+        import from jaclang.project.client_kind { resolve_client_kind_context }
+        (kind, _) = resolve_client_kind_context(source_path);
+        return kind;
+    } except Exception {
+        return "web";
+    } finally {
+        _client_kind_probe_active = False;
+    }
+}
+
+glob _SCHEMA_DIGEST_CACHE: list = [];
+
+def schema_digest -> str {
+    if _SCHEMA_DIGEST_CACHE {
+        return _SCHEMA_DIGEST_CACHE[0];
+    }
+    import from jaclang.jac0core.jir_registry { NODE_SPECS }
+    h = hashlib.sha256();
+    for spec in NODE_SPECS {
+        h.update(str(getattr(spec, 'type_idx', -1)).encode());
+        h.update(getattr(spec, 'class_name', '').encode());
+        for fd in (getattr(spec, 'fields', ()) or ()) {
+            h.update(getattr(fd, 'name', '').encode());
+            h.update(str(getattr(fd, 'kind', -1)).encode());
+        }
+    }
+    _SCHEMA_DIGEST_CACHE.append(h.hexdigest());
+    return _SCHEMA_DIGEST_CACHE[0];
+}
+
 def compute_module_key(source_path: str) -> str {
     import from importlib.metadata { version as pkg_version }
     try {
@@ -145,6 +185,8 @@ def compute_module_key(source_path: str) -> str {
     h.update(jac_ver.encode());
     h.update(struct.pack('<H', (sys.version_info.major << 8) | sys.version_info.minor));
     h.update(struct.pack('<H', FORMAT_VERSION));
+    h.update(schema_digest().encode());
+    h.update(_module_client_kind(source_path).encode());
     h.update(compute_content_sha256(source_path).encode());
     for (rel, digest) in _related_files(source_path) {
         h.update(rel.encode());
@@ -305,7 +347,10 @@ def read_bytecode_only(data: bytes) -> (bytes | None) {
 }
 
 def write_precompiled_jir(
-    bytecode: bytes, module_key: str = "", flags: int = 0
+    bytecode: bytes,
+    module_key: str = "",
+    flags: int = 0,
+    extra_sections: (dict[int, bytes] | None) = None
 ) -> bytes {
     import from importlib.metadata { version as pkg_version }
     try {
@@ -330,8 +375,26 @@ def write_precompiled_jir(
     if module_key {
         sections[SEC_MODKEY] = module_key.encode('utf-8');
     }
+    if extra_sections {
+        sections.update(extra_sections);
+    }
     section_bytes = write_sections(sections);
     return header + empty_payload + section_bytes;
+}
+
+def read_debug_source(data: bytes) -> (str | None) {
+    try {
+        magic_bytes: any = SECTIONS_MAGIC;
+        pos = data.find(magic_bytes, HEADER_SIZE);
+        if pos < 0 {
+            return None;
+        }
+        sections = read_sections(data, pos + len(magic_bytes));
+        src = sections.get(SEC_DEBUG_SRC);
+        return zlib.decompress(src).decode('utf-8') if src is not None else None;
+    } except Exception {
+        return None;
+    }
 }
 
 def is_module_cache_valid(source_path: str, cache_path: Path) -> bool {

@@ -2,13 +2,13 @@ import shutil;
 import subprocess;
 import os;
 import re;
+import json;
 import from pathlib { Path }
-import from typing { Optional }
 import from jaclang.cli.console { console }
 import from jaclang.runtimelib.client.targets.build_common { artifact_mtime }
 import from jaclang.runtimelib.client.targets.react_native.common {
     SUBPROCESS_TIMEOUT_BUILD,
-    resolve_npx
+    resolve_node_runner
 }
 import from jaclang.runtimelib.client.targets.react_native.html_tag_map {
     supported_rn_html_tags
@@ -42,6 +42,18 @@ def _iter_user_js_files(compiled_dir: Path) -> list[Path] {
     return files;
 }
 
+def read_user_js_sources(compiled_dir: Path) -> list[tuple[Path, str]] {
+    sources = [];
+    for js_file in _iter_user_js_files(compiled_dir) {
+        try {
+            sources.append((js_file, js_file.read_text(encoding="utf-8")));
+        } except Exception {
+            continue;
+        }
+    }
+    return sources;
+}
+
 def _is_relative_img_src(src: str) -> bool {
     txt = str(src or "").strip();
     if txt == "" {
@@ -66,11 +78,22 @@ def _resolve_relative_img_src(js_file: Path, src: str) -> Path | None {
 
 def build_native_index_entry_body -> str {
     return (
+        "import './__jacApiBase';\n"
         "import 'react-native-gesture-handler';\n"
         "import { registerRootComponent } from 'expo';\n"
         "import App from './app/App';\n\n"
         "registerRootComponent(App);\n"
     );
+}
+
+
+def write_api_base_shim(rn_dir: Path, api_url: str = "") {
+    if api_url {
+        body = f"globalThis.__JAC_API_BASE_URL__ = {json.dumps(api_url)};\n";
+    } else {
+        body = "// __JAC_API_BASE_URL__ is set here by `jac start --client react-native --dev`.\n";
+    }
+    (rn_dir / "__jacApiBase.js").write_text(body, encoding="utf-8");
 }
 
 def build_native_index_entry_source -> str {
@@ -84,6 +107,8 @@ def write_native_entry(rn_dir: Path) {
     (rn_dir / "index.ts").write_text(
         build_native_index_entry_source(), encoding="utf-8"
     );
+
+    write_api_base_shim(rn_dir);
     console.print("  ✔ Wrote native entry (index.ts)", style="success");
 }
 
@@ -97,10 +122,30 @@ def stage_compiled_entry(compiled_dir: Path, rn_dir: Path, entry_module: str) ->
     }
 
     staged_tree = rn_dir / "jac-src";
-    if staged_tree.exists() {
-        shutil.rmtree(staged_tree);
+    staged_tmp = rn_dir / ".jac-src.tmp";
+    staged_old = rn_dir / ".jac-src.old";
+
+    if staged_tmp.exists() {
+        shutil.rmtree(staged_tmp);
     }
-    shutil.copytree(compiled_dir, staged_tree);
+    if staged_old.exists() {
+        shutil.rmtree(staged_old);
+    }
+    shutil.copytree(compiled_dir, staged_tmp);
+    if staged_tree.exists() {
+        os.rename(staged_tree, staged_old);
+    }
+    try {
+        os.rename(staged_tmp, staged_tree);
+    } except BaseException {
+        if staged_old.exists() and not staged_tree.exists() {
+            os.rename(staged_old, staged_tree);
+        }
+        raise;
+    }
+    if staged_old.exists() {
+        shutil.rmtree(staged_old);
+    }
 
     dest = rn_dir / "jac-app.js";
     dest.write_text(
@@ -214,16 +259,16 @@ def stage_native_image_assets(js_tree_dir: Path, rn_dir: Path) {
     };
 }
 
-def lint_unmapped_tags(compiled_dir: Path) -> list[str] {
+def lint_unmapped_tags(
+    compiled_dir: Path, sources: (list[tuple[Path, str]] | None) = None
+) -> list[str] {
     import re;
     pattern = re.compile(r'__jacJsx\(\s*[\'"]([a-z][a-zA-Z0-9]*)[\'"]');
     seen_unmapped: set[str] = set();
-    for js_file in _iter_user_js_files(compiled_dir) {
-        try {
-            text = js_file.read_text(encoding="utf-8");
-        } except Exception {
-            continue;
-        }
+    if sources is None {
+        sources = read_user_js_sources(compiled_dir);
+    }
+    for (js_file, text) in sources {
         for match in pattern.finditer(text) {
             tag = match.group(1);
             if tag not in supported_rn_html_tags() {
@@ -238,15 +283,18 @@ def lint_unmapped_tags(compiled_dir: Path) -> list[str] {
         console.print(
             "    These render as <View> with a red dashed border in dev. "
             "Replace with a React Native primitive (View/Text/Pressable/"
-            "TextInput/Image/ScrollView) or a .native.cl.jac override. See D10 in "
-            "docs/REACT_NATIVE_ARCHITECTURE.md.",
+            "TextInput/Image/ScrollView) or a .native.cl.jac override. See the "
+            "React Native target section of the jac-client reference "
+            "(docs/docs/reference/plugins/jac-client.md).",
             style="muted"
         );
     }
     return unmapped;
 }
 
-def lint_native_incompatible_usage(compiled_dir: Path) -> dict[(str, list[str])] {
+def lint_native_incompatible_usage(
+    compiled_dir: Path, sources: (list[tuple[Path, str]] | None) = None
+) -> dict[(str, list[str])] {
     import re;
 
     css_pattern = re.compile(
@@ -265,12 +313,10 @@ def lint_native_incompatible_usage(compiled_dir: Path) -> dict[(str, list[str])]
         );
     }
 
-    for js_file in _iter_user_js_files(compiled_dir) {
-        try {
-            text = js_file.read_text(encoding="utf-8");
-        } except Exception {
-            continue;
-        }
+    if sources is None {
+        sources = read_user_js_sources(compiled_dir);
+    }
+    for (js_file, text) in sources {
         for m in css_pattern.finditer(text) {
             css_hits.add(m.group(1));
         }
@@ -361,8 +407,14 @@ def lint_native_incompatible_usage(compiled_dir: Path) -> dict[(str, list[str])]
 def strip_css_imports(compiled_dir: Path) -> int {
     import re;
 
-    css_import_pattern = re.compile(
-        r"^import\s+['\"][^'\"]+\.(?:css|scss|sass|less)['\"]\s*;\s*$", re.MULTILINE
+    css_single_pattern = re.compile(
+        r"^[^\S\n]*import\s+(?:[^'\"\n]*?\sfrom\s+)?['\"][^'\"\n]+\.(?:css|scss|sass|less)['\"]\s*;?\s*(?://[^\n]*)?$",
+        re.MULTILINE
+    );
+
+    css_multi_pattern = re.compile(
+        r"import\s+(?:[^;'\"]*?\sfrom\s+)?['\"][^'\"\n]+\.(?:css|scss|sass|less)['\"]\s*;?",
+        re.DOTALL
     );
     css_asset_extensions = {".css", ".scss", ".sass", ".less"};
     stripped_total = 0;
@@ -374,11 +426,16 @@ def strip_css_imports(compiled_dir: Path) -> int {
         } except Exception {
             continue;
         }
-        matches = css_import_pattern.findall(text);
-        if len(matches) > 0 {
-            new_text = css_import_pattern.sub("", text);
+        single_matches = css_single_pattern.findall(text);
+        new_text = css_single_pattern.sub("", text) if single_matches else text;
+        multi_matches = css_multi_pattern.findall(new_text);
+        if multi_matches {
+            new_text = css_multi_pattern.sub("", new_text);
+        }
+        total_matches = len(single_matches) + len(multi_matches);
+        if total_matches > 0 {
             js_file.write_text(new_text, encoding="utf-8");
-            stripped_total += len(matches);
+            stripped_total += total_matches;
         }
     }
 
@@ -410,10 +467,21 @@ def run_expo_prebuild(rn_dir: Path, platform: str = "android") {
             f"Unsupported Expo prebuild platform '{platform}'. Use android or ios."
         );
     }
-    npx = resolve_npx();
-    cmd = [npx, "expo", "prebuild", "--platform", plat, "--no-install"];
+    cmd = resolve_node_runner() + [
+        "expo",
+        "prebuild",
+        "--platform",
+        plat,
+        "--no-install"
+    ];
     console.print(f"  Running expo prebuild: {' '.join(cmd)}", style="muted");
-    subprocess.run(cmd, cwd=rn_dir, check=True, capture_output=False);
+    subprocess.run(
+        cmd,
+        cwd=rn_dir,
+        check=True,
+        capture_output=False,
+        timeout=SUBPROCESS_TIMEOUT_BUILD
+    );
     console.print("  ✔ Expo prebuild complete", style="success");
 }
 
@@ -428,7 +496,7 @@ def run_gradle_assemble(rn_dir: Path, release: bool = False) -> Path {
     if not gradlew.exists() {
         raise RuntimeError(
             f"gradlew wrapper not found at {gradlew}. Expo prebuild should "
-            "have written it — try deleting mobile-rn/android/ and "
+            f"have written it — try deleting {rn_dir}/android/ and "
             "re-running."
         );
     }
@@ -588,14 +656,12 @@ def run_eas_local_build(
     if plat not in ["android", "ios"] {
         raise ValueError(f"Unsupported EAS platform '{platform}'");
     }
-    npx = resolve_npx();
     ext = ".ipa" if plat == "ios" else ".apk";
     mode = "release" if release else "debug";
     out_dir = rn_dir / "dist";
     out_dir.mkdir(parents=True, exist_ok=True);
     out_file = out_dir / f"{plat}-{mode}-local{ext}";
-    cmd = [
-        npx,
+    cmd = resolve_node_runner() + [
         "eas",
         "build",
         "--platform",
@@ -633,9 +699,7 @@ def run_eas_local_build(
 }
 
 def run_eas_update_opt_in(rn_dir: Path, platform: str, branch: str, message: str = "") {
-    npx = resolve_npx();
-    cmd = [
-        npx,
+    cmd = resolve_node_runner() + [
         "eas",
         "update",
         "--branch",
@@ -651,11 +715,16 @@ def run_eas_update_opt_in(rn_dir: Path, platform: str, branch: str, message: str
         cmd.append("--auto");
     }
     console.print(
-        "  OTA publish enabled (plugins.client.react_native.eas_update=true)",
-        style="muted"
+        "  OTA publish enabled (client.react_native.eas_update=true)", style="muted"
     );
     console.print(f"  Running EAS update: {' '.join(cmd)}", style="muted");
-    subprocess.run(cmd, cwd=rn_dir, check=True, capture_output=False);
+    subprocess.run(
+        cmd,
+        cwd=rn_dir,
+        check=True,
+        capture_output=False,
+        timeout=SUBPROCESS_TIMEOUT_BUILD
+    );
 }
 
 def _find_first_workspace_or_project(ios_dir: Path) -> Path | None {

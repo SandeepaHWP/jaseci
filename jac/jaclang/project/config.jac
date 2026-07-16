@@ -5,6 +5,8 @@ import tomllib;
 import from pathlib { Path }
 import from typing { Any }
 
+glob VALID_CLIENT_KINDS: list[str] = ["web", "mobui"];
+
 obj PersonConfig {
     has name: str = "",
         email: str = "";
@@ -18,6 +20,7 @@ obj PackageIncludeConfig {
 obj ProjectConfig {
     has name: str = "",
         version: str = "0.1.0",
+        client_kind: str = "web",
         description: str = "",
         authors: list[PersonConfig] = [],
         maintainers: list[PersonConfig] = [],
@@ -45,6 +48,16 @@ obj RunConfig {
 obj NativeBuildConfig {
     has opt_level: int = 2,
         dump_ir: str = "";
+}
+
+obj GcEnforceConfig {
+    has modules: list[str] = [],
+        grandfathered: list[str] = [];
+}
+
+obj GcConfig {
+    has default: str = "cycles",
+        enforce: GcEnforceConfig = GcEnforceConfig();
 }
 
 obj BuildConfig {
@@ -76,6 +89,10 @@ obj FormatConfig {
     has outfile: str = "";
 }
 
+obj PrecommitConfig {
+    has typecheck: bool = True;
+}
+
 obj LintConfig {
     has select: list[str] = ["default"],
         ignore: list[str] = [],
@@ -103,12 +120,6 @@ obj DotConfig {
 obj CacheConfig {
     has enabled: bool = True,
         dir: str = "cache";
-}
-
-obj PluginsConfig {
-    has discovery: str = "auto",
-        enabled: list[str] = [],
-        disabled: list[str] = [];
 }
 
 obj StorageConfig {
@@ -154,14 +165,15 @@ obj JacConfig {
     has project: ProjectConfig = ProjectConfig(),
         run: RunConfig = RunConfig(),
         build: BuildConfig = BuildConfig(),
+        gc: GcConfig = GcConfig(),
         test: TestConfig = TestConfig(),
         serve: ServeConfig = ServeConfig(),
         format: FormatConfig = FormatConfig(),
+        precommit: PrecommitConfig = PrecommitConfig(),
         check: CheckConfig = CheckConfig(),
         dot: DotConfig = DotConfig(),
         cache: CacheConfig = CacheConfig(),
         storage: StorageConfig = StorageConfig(),
-        plugins_config: PluginsConfig = PluginsConfig(),
         environment: EnvironmentConfig = EnvironmentConfig(),
         client_errors: ClientErrorsConfig = ClientErrorsConfig(),
         client: ClientConfig = ClientConfig(),
@@ -192,10 +204,12 @@ obj JacConfig {
     ) -> JacConfig;
 
     def apply_env_interpolation -> None;
+    def _section_map -> dict;
     def apply_profile(profile_name: str, _visited: set | None = None) -> None;
     def apply_profile_overlay(profile_name: str | None = None) -> None;
     def get_plugin_deps(dep_type: str) -> dict[str, any];
     def get_plugin_config(plugin_name: str) -> dict[str, any];
+    def get_section(name: str) -> dict[str, any] | None;
     def get_build_dir -> Path;
     def get_cache_dir -> Path;
     def get_venv_dir -> Path;
@@ -204,6 +218,7 @@ obj JacConfig {
     def is_valid -> bool;
     def save -> None;
     def persist_doc(doc: dict[str, any]) -> None;
+    def _write_toml_text(text: str) -> None;
     def add_dependency(
         name: str, version: str, dev: bool = False, dep_type: str = "python"
     ) -> None;

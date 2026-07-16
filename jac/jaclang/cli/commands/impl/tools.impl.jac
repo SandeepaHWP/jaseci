@@ -4,6 +4,41 @@ import from jaclang.cli.commands.cli_helpers { proc_file as _proc_file }
 
 impl tool(tool: str, args: list = []) -> int {
     import from jaclang.utils.lang_tools { AstTool }
+    if tool in ("jac2py", "py2jac", "jac2js") {
+        import from jaclang.cli.commands.transform { jac2py, py2jac, jac2js }
+        if not args {
+            console.error(f"Usage: jac tool {tool} <file>");
+            return 1;
+        }
+        fwd = {"jac2py": jac2py, "py2jac": py2jac, "jac2js": jac2js};
+        return fwd[tool](args[0]);
+    }
+    if tool == "grammar" {
+        import from jaclang.cli.commands.analysis { grammar }
+        output = "";
+        strict = False;
+        i = 0;
+        while i < len(args) {
+            a = args[i];
+            if a in ("-o", "--output") {
+                if i + 1 >= len(args) {
+                    console.error("Usage: jac tool grammar [-o <file>] [--strict]");
+                    return 1;
+                }
+                i += 1;
+                output = args[i];
+            } elif a.startswith("--output=") {
+                output = a.split("=", 1)[1];
+            } elif a == "--strict" {
+                strict = True;
+            } else {
+                console.error(f"jac tool grammar: unknown argument '{a}'");
+                return 1;
+            }
+            i += 1;
+        }
+        return grammar(output=output, strict=strict);
+    }
     if hasattr(AstTool, tool) {
         try {
             console.print(
@@ -53,9 +88,7 @@ impl dot(
                 format=format
             );
         } except Exception as e {
-            console.print(f"Error while generating graph: {e}");
-            import traceback;
-            traceback.print_exc();
+            console.error(f"Error generating graph: {e}");
             jac_machine.close();
             return 1;
         }
@@ -87,6 +120,33 @@ impl lsp -> int {
         console.error(f"Error: {e}");
         return 1;
     }
+}
+
+impl ninja -> int {
+    import os;
+    import sys;
+
+    exe = os.environ.get('JAC_EXECUTABLE');
+    reexec_guard = os.environ.get('JAC_NINJA_REEXEC');
+    if exe and os.path.exists(exe) and not reexec_guard {
+        os.environ['JAC_NINJA_REEXEC'] = '1';
+        os.execv(exe, [exe, 'ninja'] + sys.argv[2:]);
+    }
+    if reexec_guard {
+        console.error(
+            "This jac binary's launcher predates the fused editor "
+            "(it did not intercept 'ninja'). Rebuild the binary "
+            "(zig build) to get jac ninja."
+        );
+    } else {
+        console.error(
+            "jac ninja is fused into the self-contained jac binary "
+            "(the launcher dispatches it before Python ever starts). "
+            "This jaclang is running as a plain Python package, which has "
+            "no bundled editor -- install the jac binary release to use it."
+        );
+    }
+    return 1;
 }
 
 impl completions(shell: str = "bash", install: bool = False) -> int {
@@ -242,7 +302,7 @@ impl gen_jir_registry(verify: bool = False) -> int {
                 cfg.write("[check.lint]\nselect = [\"all\"]\n");
             }
             subprocess.run(
-                [sys.executable, '-m', 'jaclang', 'format', '--lintfix', tmp_path],
+                [sys.executable, '-m', 'jaclang', 'fmt', '--lintfix', tmp_path],
                 capture_output=True,
                 cwd=fmt_dir
             );

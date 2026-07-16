@@ -24,6 +24,7 @@ def tool(tool: str, args: list = []) -> int;
 
 @registry.command(
     name="dot",
+    hidden=True,
     help="Generate graph visualization (DOT format)",
     args=[
         Arg.create("filename", kind=ArgKind.POSITIONAL, help="Path to .jac file"),
@@ -85,7 +86,17 @@ def dot(
 def lsp -> int;
 
 @registry.command(
+    name="ninja",
+    help="Open the built-in jac editor (fused Neovim + LSP + tree-sitter)",
+    args=[],
+    examples=[("jac ninja file.jac", "Edit a jac file in the built-in editor"), ],
+    group="tools"
+)
+def ninja -> int;
+
+@registry.command(
     name="completions",
+    hidden=True,
     help="Generate shell completion script",
     args=[
         Arg.create(
@@ -119,6 +130,7 @@ def completions(shell: str = "bash", install: bool = False) -> int;
 
 @registry.command(
     name="gen-jir-registry",
+    hidden=True,
     help="Regenerate jir_registry.jac from unitree node classes",
     args=[
         Arg.create(
@@ -141,6 +153,7 @@ def gen_jir_registry(verify: bool = False) -> int;
 
 @registry.command(
     name="gen-uni-dispatch",
+    hidden=True,
     help="Regenerate static enter_node/exit_node dispatch for UniPass subclasses",
     args=[
         Arg.create(

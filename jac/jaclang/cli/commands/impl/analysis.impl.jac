@@ -8,17 +8,29 @@ import from jaclang.cli.check_report {
     print_final_summary
 }
 
+def _maybe_malloc_trim {
+    try {
+        import ctypes;
+        ctypes.CDLL("libc.so.6").malloc_trim(0);
+    } except (ImportError, OSError, AttributeError, ValueError) { }
+}
+
 impl check(
     paths: list,
     print_errs: bool = True,
     ignore: (list | None) = None,
     disable_error_code: (list | None) = None,
     parse_only: bool = False,
-    nowarn: bool = False
+    nowarn: bool = False,
+    lint_only: bool = False,
+    fix: bool = False
 ) -> int {
     import from jaclang.jac0core.program { JacProgram }
     import from jaclang.jac0core.diagnostic_utils { resolve_diagnostic_tokens }
     import from time { time }
+    if lint_only {
+        return lint(paths=paths, fix=fix, ignore=ignore);
+    }
     if isinstance(paths, str) {
         paths = [paths];
     }
@@ -87,6 +99,11 @@ impl check(
                     suppress_codes=suppressed_codes
                 )
             );
+
+            for m in prog.mod.hub.values() {
+                m.terminals = [];
+                m.src_terminals = [];
+            }
             new_errors = prog.errors_had[err_start:];
             new_warnings = prog.warnings_had[warn_start:];
 
@@ -97,7 +114,7 @@ impl check(
                     if i.loc
                     and i.loc.mod_path
                     and i.loc.mod_path.endswith(".jac")
-                    and not any(p in i.loc.mod_path for p in ignore_list)
+                    and not _should_ignore(i.loc.mod_path, ignore_list)
                 ];
             }
             filtered_errors = filter_issues(new_errors);
@@ -128,6 +145,8 @@ impl check(
         } except Exception as e {
             console.error(f"Error checking '{file_path}': {e}");
             return (False, 1, 0, [], []);
+        } finally {
+            prog.release_compile_closure();
         }
     }
     total_files = failed_files=total_errors=total_warnings=0;
@@ -136,6 +155,8 @@ impl check(
     total_to_check = len(all_files);
     for (idx, jac_file_path) in enumerate(all_files, 1) {
         process_file_result(jac_file_path, idx, total_to_check);
+
+        _maybe_malloc_trim();
     }
 
     if print_errs and len(failed_results) > 0 {
@@ -179,7 +200,7 @@ impl lint(paths: list, fix: bool = False, ignore: (list | None) = None) -> int {
             return (False, 1);
         }
     }
-    def lint_fix_file(file_path: str) -> tuple[bool, int, int] {
+    def lint_fix_file(file_path: str, covered: set[str]) -> tuple[bool, int, int] {
         path_obj = Path(file_path);
         if not path_obj.exists() {
             console.error(f"File '{file_path}' does not exist.");
@@ -232,12 +253,16 @@ impl lint(paths: list, fix: bool = False, ignore: (list | None) = None) -> int {
             }
 
             import from jaclang.jac0core.bccache { discover_annex_files }
+            import os;
             annex_paths = (
                 discover_annex_files(str(path_obj), '.impl.jac') + discover_annex_files(
                     str(path_obj), '.test.jac'
                 )
             );
             for annex_path in annex_paths {
+                if os.path.realpath(annex_path) in covered {
+                    continue;
+                }
                 try {
                     annex_prog = JacProgram.jac_file_formatter(
                         annex_path, auto_lint=True
@@ -273,10 +298,12 @@ impl lint(paths: list, fix: bool = False, ignore: (list | None) = None) -> int {
     total_errors = 0;
     total_unfixable = 0;
     (all_files, had_path_errors) = _iter_jac_files(paths, ignore_list);
+    import os;
+    covered: set[str] = {os.path.realpath(f) for f in all_files};
     for file_path in all_files {
         total_files += 1;
         if fix {
-            (success, errors, unfixable) = lint_fix_file(file_path);
+            (success, errors, unfixable) = lint_fix_file(file_path, covered);
             total_unfixable += unfixable;
         } else {
             (success, errors) = lint_report_file(file_path);
@@ -309,7 +336,9 @@ impl lint(paths: list, fix: bool = False, ignore: (list | None) = None) -> int {
     return 0;
 }
 
-def _format_single_file_worker(file_path: str, lintfix: bool, check: bool) -> dict {
+def _format_single_file_worker(
+    file_path: str, lintfix: bool, check: bool, covered: (set[str] | None) = None
+) -> dict {
     import from jaclang.jac0core.program { JacProgram }
     path_obj = Path(file_path);
     result: dict = {
@@ -356,12 +385,17 @@ def _format_single_file_worker(file_path: str, lintfix: bool, check: bool) -> di
 
             if lintfix {
                 import from jaclang.jac0core.bccache { discover_annex_files }
+                import os;
                 annex_paths = (
                     discover_annex_files(file_path, '.impl.jac') + discover_annex_files(
                         file_path, '.test.jac'
                     )
                 );
                 for annex_path in annex_paths {
+                    if covered is not None
+                    and (os.path.realpath(annex_path) in covered) {
+                        continue;
+                    }
                     try {
                         annex_prog = JacProgram.jac_file_formatter(
                             annex_path, auto_lint=True
@@ -424,6 +458,9 @@ impl format(
         return 1 if had_path_errors else 0;
     }
 
+    import os;
+    covered: set[str] = {os.path.realpath(f) for f in all_files};
+
     use_parallel = total_files > 1 and not to_screen;
     max_workers = min(os.cpu_count() or 4, total_files, 8);
 
@@ -436,12 +473,13 @@ impl format(
             pool_cls = (
                 ProcessPoolExecutor
                     if ctx is None
-                    else lambda **kw : ProcessPoolExecutor(mp_context=ctx, **kw)
+                    else lambda (**kw) { ProcessPoolExecutor(mp_context=ctx, **kw); }
             );
             with pool_cls(max_workers=max_workers) as executor {
                 futures = {
-                    executor.submit(_format_single_file_worker, fp, lintfix, check): fp
-                    for fp in all_files
+                    executor.submit(
+                        _format_single_file_worker, fp, lintfix, check, covered
+                    ): fp for fp in all_files
                 };
                 completed = 0;
                 for future in as_completed(futures) {
@@ -476,7 +514,7 @@ impl format(
     if not use_parallel {
         for fp in all_files {
             console.print(f"Formatting {fp}...");
-            results.append(_format_single_file_worker(fp, lintfix, check));
+            results.append(_format_single_file_worker(fp, lintfix, check, covered));
         }
     }
 
@@ -555,7 +593,7 @@ impl format(
         if len(unformatted_files) > 0 {
             console.error("The following files are not properly formatted:");
             for file in unformatted_files {
-                console.error(f"  jac format --lintfix {file}");
+                console.error(f"  jac fmt --lintfix {file}");
             }
             has_errors = True;
         }
@@ -603,15 +641,20 @@ impl precommit(
     paths: (list | None) = None,
     staged: bool = False,
     verify: bool = False,
-    install: bool = False
+    install: bool = False,
+    force: bool = False
 ) -> int {
     import os;
+    import shutil;
     import subprocess;
+    import tempfile;
     import from jaclang.project.config { get_config }
     if install {
-        return _install_precommit_hook();
+        return _install_precommit_hook(force);
     }
     targets: list[str] = [];
+    rel_targets: list[str] = [];
+    git_root = "";
     if staged {
         try {
             git_root = subprocess.run(
@@ -637,6 +680,7 @@ impl precommit(
             }
             abs_candidate = os.path.join(git_root, candidate);
             if os.path.exists(abs_candidate) {
+                rel_targets.append(candidate);
                 targets.append(abs_candidate);
             }
         }
@@ -650,10 +694,63 @@ impl precommit(
         config = get_config();
         targets = [str(config.project_root)] if config?.project_root else ["."];
     }
+
+    fmt_targets = targets;
+    tmp_root: (str | None) = None;
+    if staged and verify {
+        dirty = _staged_dirty_files(git_root, rel_targets);
+        if dirty {
+            tmp_root = tempfile.mkdtemp(prefix="jac-precommit-");
+            try {
+                subprocess.run(
+                    [
+                        "git",
+                        "checkout-index",
+                        "-f",
+                        f"--prefix={tmp_root}{os.sep}",
+                        "--"
+                    ] + rel_targets,
+                    check=True,
+                    cwd=git_root
+                );
+                fmt_targets = [os.path.join(tmp_root, rel) for rel in rel_targets];
+                console.print("[precommit] Verifying staged content (index checkout).");
+            } except Exception as e {
+                shutil.rmtree(tmp_root, ignore_errors=True);
+                tmp_root = None;
+                fmt_targets = targets;
+                console.warning(
+                    f"[precommit] Could not check out the staged blobs ({e}); "
+                    "verifying the WORKTREE copies instead -- staged content "
+                    "that differs from the worktree was NOT verified."
+                );
+            }
+        }
+    }
     console.print("[precommit] Running format (--lintfix)...");
-    fmt_ret = format(targets, to_screen=False, lintfix=True, check=verify);
-    console.print("[precommit] Running check...");
-    check_ret = check(targets);
+    fmt_ret = format(fmt_targets, to_screen=False, lintfix=True, check=verify);
+    if tmp_root {
+        shutil.rmtree(tmp_root, ignore_errors=True);
+    }
+    run_typecheck = True;
+    pc_config = get_config();
+    if pc_config {
+        run_typecheck = pc_config.precommit.typecheck;
+    }
+    if run_typecheck {
+        console.print("[precommit] Running check...");
+        check_ret = check(targets);
+    } else {
+        console.print("[precommit] Skipping check ([precommit] typecheck = false).");
+        check_ret = 0;
+    }
+    if not verify
+    and check_ret == 0
+    and fmt_ret == 0
+    and staged
+    and _staged_dirty_files(git_root, rel_targets) {
+        fmt_ret = 1;
+    }
     if not verify and check_ret == 0 and fmt_ret != 0 {
         console.warning(
             "Pre-commit applied formatting/lint fixes — review the changes, "
@@ -675,7 +772,30 @@ impl precommit(
     return 0;
 }
 
-def _install_precommit_hook -> int {
+def _staged_dirty_files(git_root: str, rel_targets: list[str]) -> list[str] {
+    import subprocess;
+    if not git_root or not rel_targets {
+        return [];
+    }
+    try {
+        out = subprocess.run(
+            ["git", "diff", "--name-only", "--"] + rel_targets,
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=git_root
+        ).stdout;
+    } except Exception {
+        return [];
+    }
+    return [
+        line.strip()
+        for line in out.splitlines()
+        if line.strip()
+    ];
+}
+
+def _install_precommit_hook(force: bool = False) -> int {
     import os;
     import stat;
     import subprocess;
@@ -695,11 +815,32 @@ def _install_precommit_hook -> int {
     os.makedirs(hooks_dir, exist_ok=True);
     hook_path = os.path.join(hooks_dir, "pre-commit");
     if os.path.exists(hook_path) {
-        console.warning(f"A pre-commit hook already exists at '{hook_path}'.");
-        console.warning(
-            "Back it up or remove it, then re-run 'jac precommit --install'."
-        );
-        return 1;
+        try {
+            with open(hook_path, encoding="utf-8", errors="replace") as f {
+                existing = f.read();
+            }
+        } except Exception {
+            existing = "";
+        }
+
+        is_framework = "generated by pre-commit" in existing;
+        if not (is_framework or force) {
+            console.warning(f"A pre-commit hook already exists at '{hook_path}'.");
+            console.warning(
+                "Re-run 'jac precommit --install --force' to replace it "
+                "(the old hook is kept as pre-commit.bak)."
+            );
+            return 1;
+        }
+        backup_path = hook_path + ".bak";
+        try {
+            os.replace(hook_path, backup_path);
+        } except Exception as e {
+            console.error(f"Could not back up the existing hook: {e}");
+            return 1;
+        }
+        kind = "pre-commit framework hook" if is_framework else "existing hook";
+        console.print(f"Replaced {kind} (backup at '{backup_path}').");
     }
     hook_body = (
         "#!/bin/sh\n"
@@ -791,6 +932,11 @@ impl `test(
                 pargs.append(target);
             }
 
+            if directory and not paths {
+                pargs.append('--jac-test-dir');
+                pargs.append(str(Path(directory).resolve()));
+            }
+
             if ignore {
                 pargs.append('--ignore=' + ignore);
             }
@@ -860,7 +1006,7 @@ impl gen_parser -> int {
     return 0;
 }
 
-impl grammar(lark: bool = False, output: str = "") -> int {
+impl grammar(output: str = "", strict: bool = False) -> int {
     import from jaclang.jac0core.program { JacProgram }
     import from jaclang.compiler.passes.tool.grammar_extract_pass { GrammarExtractPass }
     import jaclang;
@@ -881,18 +1027,18 @@ impl grammar(lark: bool = False, output: str = "") -> int {
         console.error("No grammar rules extracted.");
         return 1;
     }
-    text = pass_.emit_lark() if lark else pass_.emit_ebnf();
+    text = pass_.emit_ebnf();
     if output {
         with open(output, "w", encoding="utf-8") as f {
             f.write(text);
             f.write("\n");
         }
-        fmt_name = "Lark" if lark else "EBNF";
-        console.success(
-            f"{fmt_name} grammar ({len(pass_.rules)} rules) written to {output}"
-        );
-    } else {
+        console.success(f"EBNF grammar ({len(pass_.rules)} rules) written to {output}");
+    } elif not strict {
         console.print(text);
+    }
+    if strict {
+        console.print(pass_.emit_diagnostics());
     }
     return 0;
 }

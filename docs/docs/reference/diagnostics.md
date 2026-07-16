@@ -49,7 +49,7 @@ Use `jac.toml` to suppress diagnostics project-wide. See the [Configuration](con
 ### CLI Flags
 
 - `--nowarn` on `jac check` suppresses all warnings (errors are still shown)
-- `-e` / `--diagnostics` on `jac run` controls diagnostic verbosity: `error` (default -- fail on errors with full details), `all` (errors + warnings), or `none` (silent)
+- `-e` / `--diagnostics` on `jac run` controls diagnostic verbosity: `error` (default -- report error-level diagnostics with full detail), `all` (errors + warnings), or `none` (silent). This flag governs *what is printed*, not whether the program runs. `jac run` still executes -- and exits `0` -- when the type checker finds errors: for example, `x: int = "no";` reports `E1001` under `jac check` but runs anyway under `jac run`. Only errors that stop the compiler from producing runnable code (parse/lex and codegen errors, such as a missing `;`) abort a run. To gate on type errors, use `jac check`, which exits non-zero
 
 ---
 
@@ -73,7 +73,6 @@ Emitted by the parser and lexer during source code parsing.
 | Code | Message |
 |------|---------|
 | `E0010` | '{keyword}' is not supported in Jac |
-| `E0011` | Jac does not allow this keyword in any syntactic position |
 | `E0012` | Use the `new(target, ...args)` ambient builtin to create new instances |
 | `E0013` | '{keyword}' is a keyword and cannot be used as a {context} name |
 
@@ -93,7 +92,6 @@ Emitted by the parser and lexer during source code parsing.
 | `E0030` | Unexpected semicolon at module level |
 | `E0031` | Module-level 'with' blocks only support 'entry', not 'exit' |
 | `E0032` | Unexpected '{token}' -- must follow its parent statement (if/try/match/switch) |
-| `E0033` | '{modifier}' is not a valid prefix modifier |
 | `E0034` | Expected 'with' after 'can' ability name (use 'def' for function-style declarations) |
 
 ### Block / Body Requirements
@@ -115,6 +113,7 @@ Emitted by the parser and lexer during source code parsing.
 |------|---------|
 | `E0050` | Duplicate '{param}' in parameter list |
 | `E0051` | '{first}' must appear before '{second}' in parameter list |
+| `E0052` | Parameter '{name}' is missing a type annotation |
 
 ### Property Declaration Errors
 
@@ -169,6 +168,7 @@ Emitted by the type checker and type evaluator.
 |------|---------|
 | `E1010` | Operator "{op}" not supported for type "{type}" |
 | `E1011` | Unsupported operand types for {op}: {left} and {right} |
+| `E1110` | Operator "{op}" not supported between types "{left}" and "{right}" (comparison operators) |
 
 ### Iterability / Callable
 
@@ -257,14 +257,56 @@ Emitted by the type checker and type evaluator.
 | `E1098` | Connection type must be an edge instance |
 | `E1099` | Cannot access attribute "{attr}" for type "{type}"; attribute is missing from {missing} |
 
+### mobUI-Project JSX Host Tags
+
+Emitted by `JsxIntrinsicGuardPass` when a `mobui` project (see [React Native target](plugins/jac-client.md#react-native-target-beta)) uses a raw HTML host tag in JSX. The guard resolves every tag name in the enclosing scope; only **unresolved lowercase names** are treated as HTML host elements and rejected. Uppercase components and lowercase components that resolve to an in-scope symbol are allowed. `.cl.jac` web-boundary files (but not `.native.cl.jac` files, which target React Native) and modules outside the project root are exempt; the client kind is discovered from each module's own project `jac.toml`, never the process cwd.
+
+| Code | Message |
+|------|---------|
+| `E1105` | JSX tag '<{tag}>' is not in scope in a mobUI project; use {suggestion} instead |
+
+!!! tip "Fixing `E1105`"
+    `E1105` fires only in `mobui` projects (`[project] client_kind = "mobui"` in `jac.toml`). Replace the HTML tag with the suggested `@jac/mobui` primitive: `div`/`section`/`main` -> `View`, `span`/`p`/`h1`-`h6` -> `Text`, `button` -> `Pressable`, `input`/`textarea` -> `TextInput`, `img` -> `Image`, `ul`/`ol` -> `ScrollView`. If the lowercase name is meant to be a component, import it so it resolves in scope. Web projects (`client_kind` unset) are unaffected -- HTML tags remain valid there.
+
+### Ownership / Borrow Errors
+
+Emitted by `OwnershipCheckPass` for `own`/`imm`/`borrow`/`&`/`&mut` bindings and `region` blocks. See [Ownership & Borrowing](language/ownership-borrowing.md). On the native pathway the checker is one of the required analyses: it always runs there, and error-severity findings block native codegen -- a clean check is what makes the annotations trustworthy facts for lowering (see the [Ownership Fact Schema](language/ownership-checker-spec.md)). Whether diagnostics are *displayed* never changes generated code; builds with and without display are bit-identical.
+
+| Code | Message |
+|------|---------|
+| `E1301` | Use of '{name}' after it was moved |
+| `E1302` | Conflicting mutable borrow of '{name}' while another borrow is live |
+| `E1303` | Cannot mutate '{name}' while a shared borrow of it is live |
+| `E1304` | '{name}' is destroyed while still borrowed |
+| `E1305` | *Reserved, not yet registered* -- will be "Linear resource '{name}' is never consumed" once the planned `linear` marker lands (a `linear` binding must be moved exactly once; plain `own` is affine and may be silently dropped) |
+| `E1306` | Borrow of '{name}' escapes its scope |
+| `E1307` | Reference to '{name}' escapes its region |
+| `E1308` | '{name}' is not sendable across a concurrency boundary |
+| `E1309` | Cannot mutate '{name}' through a deep-immutable `imm` binding |
+
+### Zero-RC Enforcement Errors
+
+Emitted by `OwnershipCheckPass` only in **nogc-enforced** native modules (`jac nacompile --enforce-nogc`, or a module matching a `jac.toml [gc.enforce]` pattern -- see [Zero-RC ownership compilation](language/native-pathway.md#zero-rc-ownership-compilation)). They make zero-RC ownership coverage a compile-time contract: every heap-typed contract position must be in the owned world, and each violation is a hard error that blocks native codegen. The `{provenance}` in every message states why the module is enforced (the CLI flag or the matching config pattern).
+
+| Code | Message |
+|------|---------|
+| `E1401` | Heap-typed {position} '{name}' has no ownership state in a nogc-enforced module ({provenance}) |
+| `E1402` | Owned value '{name}' is sealed into managed storage inside a nogc-enforced module ({provenance}) |
+| `E1403` | Heap value '{name}' crosses implicitly out of a nogc-enforced module ({provenance}) |
+| `E1404` | '{name}' is `any`-typed and could be heap-allocated in a nogc-enforced module ({provenance}) |
+| `E1405` | Closure capture of '{name}' escapes its scope in a nogc-enforced module ({provenance}) |
+| `E1406` | '{name}' has retaining or aliasing semantics not supported in a nogc-enforced module ({provenance}) |
+
 ### Type Warnings
 
 | Code | Message |
 |------|---------|
 | `W1036` | Generic type "{type}" used without type arguments, defaulting to "{type}[Any]"; consider adding explicit type arguments |
+| `W1037` | Explicit 'any' type annotation disables type checking here; consider a more specific type |
 | `W1050` | Unknown intrinsic JSX element '<{tag}>' |
 | `W1051` | Expression type could not be resolved (Unknown) |
 | `W1052` | JSX component '{component}' uses an untyped props bag (`props: any`); its JSX props cannot be type-checked |
+| `W1310` | Region open on '{name}' has an empty body |
 
 ---
 
@@ -275,6 +317,7 @@ Emitted by the type checker and type evaluator.
 | `W1100` | Module not found |
 | `W1101` | Cannot import name '{name}' from module '{module}' |
 | `W1102` | Imported name '{name}' from foreign-source module '{module}' typed as Any |
+| `E1120` | Import of '{name}' from untyped external module '{module}' (no type declarations found) |
 | `W1103` | '{name}' is ambient and does not need to be imported from '{module}' |
 | `W1104` | Use the lowercase `any` keyword instead of importing `Any` from typing |
 
@@ -301,6 +344,26 @@ Emitted by static analysis and declaration-implementation matching passes.
 | `W2006` | '@classmethod' decorator is not recommended in '{kind}' definitions |
 | `W2007` | '@staticmethod' is not supported in '{kind}' definitions |
 | `E2008` | Invalid target for context update: {target} |
+| `W2029` | '@{decorator}' is not recommended in '{kind}' definitions -- use native property syntax |
+
+`W2029` covers the Python property decorators -- `@property`, and the same-object
+`@x.getter` / `@x.setter` / `@x.deleter` -- in favour of [native property
+syntax](language/functions-objects.md#6-properties-and-encapsulation):
+
+```jac
+obj Account {
+    has _balance: float = 0.0,
+        balance: float {
+            getter -> float { return self._balance; }
+            setter(value: float) { self._balance = value; }
+        }
+}
+```
+
+`jac check --lint --fix` rewrites the decorator form automatically
+([`property-to-native`](#lint-rules-w3xxx-e3xxx)). As with `W2006`/`W2007`, a
+Python-compat `class` is exempt. A cross-object `@Base.x.setter` extends a parent's
+property and has no direct native form, so it is not reported.
 
 ### Declaration-Implementation Matching
 
@@ -331,9 +394,9 @@ Emitted by `ViewLowerPass` when a `{...}` JSX slot's statement-template body vio
 
 ---
 
-## Lint Rules (W3xxx / E3xxx)
+## Lint Rules (W3xxx, E3xxx)
 
-Emitted by `jac lint`. Rules can be configured in [`jac.toml`](config/index.md#checklint). The kebab-case name in brackets is used for `jac.toml` configuration.
+Emitted by `jac check --lint`. Rules can be configured in [`jac.toml`](config/index.md#checklint). The kebab-case name in brackets is used for `jac.toml` configuration.
 
 | Code | Rule Name | Message | Group |
 |------|-----------|---------|-------|
@@ -432,14 +495,6 @@ Emitted during code generation, formatting, and native compilation.
 | Code | Message |
 |------|---------|
 | `E5060` | C library import declaration '{name}' must not have a body |
-
-### Language Server
-
-| Code | Message |
-|------|---------|
-| `E5070` | Error during type check: {error} |
-| `E5071` | Error during formatting: {error} |
-| `W5072` | Attribute error when accessing node attributes: {error} |
 
 ---
 

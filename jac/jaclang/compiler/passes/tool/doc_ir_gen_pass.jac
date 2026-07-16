@@ -1,7 +1,7 @@
 import from collections.abc { Sequence }
 import jaclang.compiler.passes.tool.doc_ir as doc;
 import jaclang.jac0core.unitree as uni;
-import from jaclang.jac0core.constant { Tokens as Tok }
+import from jaclang.jac0core.constant { Tokens as Tok, is_mut_kind }
 import from jaclang.jac0core.passes { UniPass }
 
 obj DocIRGenPass(UniPass) {
@@ -38,6 +38,7 @@ obj DocIRGenPass(UniPass) {
     def _assign_compr_doc_ir(nd: uni.UniNode) -> None;
     def _assign_else_doc_ir(nd: uni.UniNode, body: Sequence[uni.UniNode]) -> None;
     def _emit_keyword_block(nd: uni.UniNode, kw: Tok) -> None;
+    def _assign_case_block_doc_ir(nd: uni.UniNode, case_cls: type) -> None;
     def intersperse(
         items: list[doc.DocType], separator: doc.DocType
     ) -> list[doc.DocType];
@@ -60,7 +61,6 @@ obj DocIRGenPass(UniPass) {
     def trim_trailing_line(parts: list[doc.DocType]) -> None;
     def jsx_whitespace -> doc.DocType;
     def jsx_mixed_child_parts(children: Sequence[uni.UniNode]) -> list[doc.DocType];
-    def emit_section_header_block(nd: uni.UniNode) -> None;
     def remove_all_spaces(doc_node: doc.DocType) -> doc.DocType;
     def exit_module(nd: uni.Module) -> None;
     def exit_import(nd: uni.Import) -> None;
@@ -88,6 +88,7 @@ obj DocIRGenPass(UniPass) {
     def exit_has_var(nd: uni.HasVar) -> None;
     def exit_arch_has(nd: uni.ArchHas) -> None;
     def exit_while_stmt(nd: uni.WhileStmt) -> None;
+    def exit_forever_stmt(nd: uni.ForeverStmt) -> None;
     def exit_in_for_stmt(nd: uni.InForStmt) -> None;
     def exit_iter_for_stmt(nd: uni.IterForStmt) -> None;
     def exit_try_stmt(nd: uni.TryStmt) -> None;
@@ -160,6 +161,7 @@ obj DocIRGenPass(UniPass) {
     def exit_sem_def(nd: uni.SemDef) -> None;
     def exit_event_signature(nd: uni.EventSignature) -> None;
     def exit_typed_ctx_block(nd: uni.TypedCtxBlock) -> None;
+    def exit_open_stmt(nd: uni.OpenStmt) -> None;
     def exit_token(nd: uni.Token) -> None;
     def exit_semi(nd: uni.Semi) -> None;
     def exit_name(nd: uni.Name) -> None;

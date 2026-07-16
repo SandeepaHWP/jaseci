@@ -1,7 +1,7 @@
 import from jaclang.cli.console { console }
 import from jaclang.cli.banners { JAC_DISCORD_URL }
 import from jaclang.runtimelib.serializer { Serializer }
-import from jaclang.runtimelib.client_bundle { _ensure_js_generated }
+import from jaclang.runtimelib.client_bundle { MissingBunError, _ensure_js_generated }
 import from jaclang.runtimelib.exceptions { WriteConflict }
 import from jaclang.runtimelib.auth_models {
     IdentityType,
@@ -74,6 +74,30 @@ impl UserManager.create_user(username: str, password: str) -> dict[str, str] {
         );
         self._conn.commit();
         return {'username': username, 'token': token, 'root_id': root_id};
+    }
+}
+
+impl UserManager.reset_root(username: str) -> (str | None) {
+    import from jaclang.jac0core.constructs { Root }
+    self._ensure_connection();
+    assert self._conn is not None;
+    with self._lock {
+        cursor = self._conn.execute(
+            "SELECT 1 FROM users WHERE username = ?", (username, )
+        );
+        if not cursor.fetchone() {
+            return None;
+        }
+        user_root = Root();
+        root_anchor = user_root.__jac__;
+        Jac.save(root_anchor);
+        Jac.commit(root_anchor);
+        root_id = root_anchor.id.hex;
+        self._conn.execute(
+            "UPDATE users SET root_id = ? WHERE username = ?", (root_id, username)
+        );
+        self._conn.commit();
+        return root_id;
     }
 }
 
@@ -243,6 +267,50 @@ async def _begin_request_context(user_root_id: str) -> tuple[(ExecutionContext, 
     return (req_ctx, token);
 }
 
+async def _abegin_user_request_context(
+    user_manager: UserManager, username: str
+) -> tuple[(ExecutionContext, Any, str)] | dict[str, JsonValue] {
+    import from jaclang.runtimelib.exceptions { MissingAnchorError }
+    root_id = await user_manager.aget_root_id(username);
+    if not root_id {
+        import os;
+        if (
+            username != Con.GUEST.value
+            and os.environ.get('JAC_SV_SIBLING')
+            and hasattr(user_manager, 'ensure_user_root')
+        ) {
+            root_id = await asyncio.to_thread(user_manager.ensure_user_root, username);
+        }
+        if not root_id {
+            return {'error': 'User not found'};
+        }
+    }
+    try {
+        (ctx, token) = await _begin_request_context(root_id);
+        return (ctx, token, root_id);
+    } except MissingAnchorError {
+        if username != Con.GUEST.value {
+            raise RuntimeError(
+                f"Root anchor {root_id} for user '{username}' does not "
+                "exist in the anchor store. The data store was likely "
+                "reset or migrated out from under the users db; restore "
+                "it or re-register the user."
+            );
+        }
+        import logging;
+        logging.getLogger('jaclang.serve').warning(
+            f"Guest root anchor {root_id} is missing from the anchor store; "
+            "minting a fresh guest root."
+        );
+        healed_id = await asyncio.to_thread(user_manager.reset_root, username);
+        if not healed_id {
+            return {'error': 'User not found'};
+        }
+        (ctx, token) = await _begin_request_context(healed_id);
+        return (ctx, token, healed_id);
+    }
+}
+
 def _deserialize_wire_args(args: dict[(str, Any)]) {
     for (k, v) in list(args.items()) {
         if isinstance(v, dict) and '__type__' in v {
@@ -307,15 +375,22 @@ impl ExecutionManager._finalize_call_response(
 }
 
 async def _run_function_with_occ(
-    mgr: ExecutionManager, args: dict[(str, Any)], username: str, run_attempt: Callable
+    mgr: ExecutionManager,
+    args: dict[(str, Any)],
+    username: str,
+    run_attempt: Callable,
+    deserialize_args: bool = True,
+    include_traceback: bool = False
 ) -> dict[str, JsonValue] | Generator | AsyncGenerator {
-    root_id = await mgr.user_manager.aget_root_id(username);
-    if not root_id {
-        return {'error': 'User not found'};
+    resolved = await _abegin_user_request_context(mgr.user_manager, username);
+    if isinstance(resolved, dict) {
+        return resolved;
     }
-    (ctx, req_token) = await _begin_request_context(root_id);
+    (ctx, req_token, root_id) = resolved;
     try {
-        _deserialize_wire_args(args);
+        if deserialize_args {
+            _deserialize_wire_args(args);
+        }
         (occ_mode, occ_max, occ_backoff_ms) = _occ_policy();
         max_attempts = 1 if occ_mode == "fail" else max(1, occ_max);
         attempt = 0;
@@ -324,7 +399,7 @@ async def _run_function_with_occ(
             call_token = ctx.call_state.set(CallState());
             call_state = ctx.call_state.get();
             try {
-                return await run_attempt(call_state);
+                return await run_attempt(call_state, ctx);
             } except WriteConflict as wc {
                 ctx.mem.abort();
                 ctx.pending_effects.clear();
@@ -344,6 +419,11 @@ async def _run_function_with_occ(
                 await ctx.aset_user_root(root_id);
             } except Exception as e {
                 ctx.mem.abort();
+                if include_traceback {
+                    import traceback;
+
+                    return {'error': str(e), 'traceback': traceback.format_exc()};
+                }
                 return {'error': str(e)};
             } finally {
                 ctx.call_state.reset(call_token);
@@ -373,7 +453,7 @@ impl ExecutionManager.execute_function(
 impl ExecutionManager.execute_function_sync(
     func: Callable[(..., Any)], args: dict[(str, Any)], username: str
 ) -> dict[str, JsonValue] {
-    async def run_attempt(call_state: CallState) {
+    async def run_attempt(call_state: CallState, _ctx: ExecutionContext) {
         result = await asyncio.to_thread(func, **args);
 
         if iscoroutine(result) {
@@ -387,7 +467,7 @@ impl ExecutionManager.execute_function_sync(
 impl ExecutionManager.execute_function_async(
     func: Callable[(..., Any)], args: dict[(str, Any)], username: str
 ) -> dict[str, JsonValue] {
-    async def run_attempt(call_state: CallState) {
+    async def run_attempt(call_state: CallState, _ctx: ExecutionContext) {
         result = await func(**args);
         return await self._finalize_call_response(call_state, result);
     }
@@ -407,146 +487,69 @@ impl ExecutionManager.spawn_walker_sync(
     walker_cls: type[WalkerArchetype], fields: dict[(str, Any)], username: str
 ) -> dict[str, JsonValue] {
     import from jaclang.jac0core.constructs { NodeArchetype }
-    root_id = await self.user_manager.aget_root_id(username);
-    if not root_id {
-        return {'error': 'User not found'};
-    }
     target_node_id = fields.pop('_jac_spawn_node', None);
     _deserialize_wire_args(fields);
-    (ctx, req_token) = await _begin_request_context(root_id);
 
-    try {
-        (occ_mode, occ_max, occ_backoff_ms) = _occ_policy();
-        max_attempts = 1 if occ_mode == "fail" else max(1, occ_max);
-        attempt = 0;
-        while attempt < max_attempts {
-            attempt += 1;
-            call_token = ctx.call_state.set(CallState());
-            call_state = ctx.call_state.get();
-            try {
-                `walker = walker_cls(**fields);
-                if target_node_id {
-                    target_node = await Jac.aget_object(target_node_id);
-                    if not isinstance(target_node, NodeArchetype) {
-                        return {'error': f"Invalid target node: {target_node_id}"};
-                    }
-                } else {
-                    target_node = ctx.get_root();
-                }
-                result = await asyncio.to_thread(Jac.spawn, `walker, target_node);
-
-                if iscoroutine(result) {
-                    result = await result;
-                }
-                return await self._finalize_call_response(call_state, result);
-            } except WriteConflict as wc {
-                ctx.mem.abort();
-                ctx.pending_effects.clear();
-                ctx.read_versions.clear();
-
-                ctx.diagnostics.clear();
-                if attempt >= max_attempts {
-                    return {
-                        'error': wc.message(),
-                        'error_code': 'write_conflict',
-                        'http_status': 409
-                    };
-                }
-                if occ_backoff_ms > 0 {
-                    await asyncio.sleep(occ_backoff_ms * attempt / 1000.0);
-                }
-                await ctx.aset_user_root(root_id);
-            } except Exception as e {
-                import traceback;
-
-                ctx.mem.abort();
-                return {'error': str(e), 'traceback': traceback.format_exc()};
-            } finally {
-                ctx.call_state.reset(call_token);
+    async def run_attempt(call_state: CallState, ctx: ExecutionContext) {
+        `walker = walker_cls(**fields);
+        if target_node_id {
+            target_node = await Jac.aget_object(target_node_id);
+            if not isinstance(target_node, NodeArchetype) {
+                return {'error': f"Invalid target node: {target_node_id}"};
             }
+        } else {
+            target_node = ctx.get_root();
         }
+        result = await asyncio.to_thread(Jac.spawn, `walker, target_node);
 
-        return {
-            'error': 'write_conflict: retries exhausted',
-            'error_code': 'write_conflict',
-            'http_status': 409
-        };
-    } finally {
-        Jac.reset_request_context(req_token);
+        if iscoroutine(result) {
+            result = await result;
+        }
+        return await self._finalize_call_response(call_state, result);
     }
+    return await _run_function_with_occ(
+        self,
+        fields,
+        username,
+        run_attempt,
+        deserialize_args=False,
+        include_traceback=True
+    );
 }
 
 impl ExecutionManager.spawn_walker_async(
     walker_cls: type[WalkerArchetype], fields: dict[(str, Any)], username: str
 ) -> dict[str, JsonValue] {
     import from jaclang.jac0core.constructs { NodeArchetype }
-    root_id = await self.user_manager.aget_root_id(username);
-    if not root_id {
-        return {'error': 'User not found'};
-    }
     target_node_id = fields.pop('_jac_spawn_node', None);
     _deserialize_wire_args(fields);
-    (ctx, req_token) = await _begin_request_context(root_id);
 
-    try {
-        (occ_mode, occ_max, occ_backoff_ms) = _occ_policy();
-        max_attempts = 1 if occ_mode == "fail" else max(1, occ_max);
-        attempt = 0;
-        while attempt < max_attempts {
-            attempt += 1;
-            call_token = ctx.call_state.set(CallState());
-            call_state = ctx.call_state.get();
-            try {
-                `walker = walker_cls(**fields);
-                if target_node_id {
-                    target_node = await Jac.aget_object(target_node_id);
-                    if not isinstance(target_node, NodeArchetype) {
-                        return {'error': f"Invalid target node: {target_node_id}"};
-                    }
-                } else {
-                    target_node = ctx.get_root();
-                }
-                spawn_result = Jac.spawn(`walker, target_node);
-                if iscoroutine(spawn_result) {
-                    result = await spawn_result;
-                } else {
-                    result = spawn_result;
-                }
-                return await self._finalize_call_response(call_state, result);
-            } except WriteConflict as wc {
-                ctx.mem.abort();
-                ctx.pending_effects.clear();
-                ctx.read_versions.clear();
-
-                ctx.diagnostics.clear();
-                if attempt >= max_attempts {
-                    return {
-                        'error': wc.message(),
-                        'error_code': 'write_conflict',
-                        'http_status': 409
-                    };
-                }
-                if occ_backoff_ms > 0 {
-                    await asyncio.sleep(occ_backoff_ms * attempt / 1000.0);
-                }
-                await ctx.aset_user_root(root_id);
-            } except Exception as e {
-                import traceback;
-
-                ctx.mem.abort();
-                return {'error': str(e), 'traceback': traceback.format_exc()};
-            } finally {
-                ctx.call_state.reset(call_token);
+    async def run_attempt(call_state: CallState, ctx: ExecutionContext) {
+        `walker = walker_cls(**fields);
+        if target_node_id {
+            target_node = await Jac.aget_object(target_node_id);
+            if not isinstance(target_node, NodeArchetype) {
+                return {'error': f"Invalid target node: {target_node_id}"};
             }
+        } else {
+            target_node = ctx.get_root();
         }
-        return {
-            'error': 'write_conflict: retries exhausted',
-            'error_code': 'write_conflict',
-            'http_status': 409
-        };
-    } finally {
-        Jac.reset_request_context(req_token);
+        spawn_result = Jac.spawn(`walker, target_node);
+        if iscoroutine(spawn_result) {
+            result = await spawn_result;
+        } else {
+            result = spawn_result;
+        }
+        return await self._finalize_call_response(call_state, result);
     }
+    return await _run_function_with_occ(
+        self,
+        fields,
+        username,
+        run_attempt,
+        deserialize_args=False,
+        include_traceback=True
+    );
 }
 
 impl ModuleIntrospector.postinit -> None {
@@ -585,6 +588,16 @@ impl ModuleIntrospector._load_manifest -> None {
     }
     base: dict = {};
     mod_path = self._module?.__file__;
+    if mod_path {
+        import from jaclang.runtimelib.sealed_serve { serve_manifest_for }
+        sm = serve_manifest_for(mod_path);
+        if sm is not None {
+            base = dict(sm.get('client', {}) or {});
+            base['endpoint_effects'] = sm.get('endpoint_effects', {}) or {};
+            self._client_manifest = base;
+            return;
+        }
+    }
     if mod_path {
         mod = Jac.program.find_module(os.path.abspath(mod_path));
         if not mod {
@@ -628,6 +641,15 @@ impl ModuleIntrospector._extract_access_levels -> None {
     self._function_access = {};
     self._walker_access = {};
     mod_path = self._module?.__file__;
+    if mod_path {
+        import from jaclang.runtimelib.sealed_serve { serve_manifest_for }
+        sm = serve_manifest_for(mod_path);
+        if sm is not None {
+            self._function_access = dict(sm.get('func_access', {}) or {});
+            self._walker_access = dict(sm.get('walker_access', {}) or {});
+            return;
+        }
+    }
     main_mod = Jac.program.find_module(os.path.abspath(mod_path)) if mod_path else None;
 
     if not main_mod and mod_path {
@@ -707,12 +729,98 @@ impl ModuleIntrospector._extract_access_levels -> None {
 }
 
 
+impl ModuleIntrospector._register_sealed_bindings(
+    sm: dict[str, any], img_root: str
+) -> None {
+    import from jaclang.jac0core.constructs { WalkerArchetype }
+
+    def resolve_sealed(src_path: str, name: str) -> any {
+        for loaded in list(Jac.loaded_modules.values()) {
+            f = loaded?.__file__;
+            if f and os.path.abspath(f) == os.path.abspath(src_path) {
+                sym = getattr(loaded, name, None);
+                if sym is not None {
+                    return sym;
+                }
+            }
+        }
+        target = os.path.basename(src_path);
+        if target.endswith('.jac') {
+            target = target.removesuffix('.jac');
+        }
+        try {
+            imported = Jac.jac_import(
+                target=target, base_path=os.path.dirname(src_path), lng='jac'
+            );
+            if imported {
+                return getattr(imported[0], name, None);
+            }
+        } except Exception as e {
+            import logging;
+            logging.getLogger("jaclang.serve").warning(
+                "sealed cross-boundary endpoint '%s' unavailable: server module "
+                "%r failed to import (%s: %s)",
+                name,
+                src_path,
+                type(e).__name__,
+                e
+            );
+            return None;
+        }
+        return None;
+    }
+
+    for b in sm.get('cross_bindings', []) or [] {
+        name = b.get('name');
+        rel = b.get('src');
+        if not name or not rel {
+            continue;
+        }
+        auth = bool(b.get('auth', True));
+        src_path = os.path.join(img_root, rel);
+        if b.get('kind') == 'walker' {
+            if name in self._walkers {
+                continue;
+            }
+            wcls = resolve_sealed(src_path, name);
+            if isinstance(wcls, type) and issubclass(wcls, WalkerArchetype) {
+                self._walkers[name] = wcls;
+                self._walker_access[name] = auth;
+            }
+        } else {
+            if name in self._functions {
+                continue;
+            }
+            fn = resolve_sealed(src_path, name);
+            if fn is not None and callable(fn) {
+                self._functions[name] = fn;
+                self._function_access[name] = auth;
+            }
+        }
+    }
+}
+
 impl ModuleIntrospector._collect_cross_boundary_endpoints -> None {
     if not (self._module and Jac.program and Jac.program.mod) {
         return;
     }
     import from jaclang.jac0core.constant { Tokens as Tok }
     import from jaclang.jac0core.constructs { WalkerArchetype }
+
+    sealed_mod_path = self._module?.__file__;
+    if sealed_mod_path {
+        import from jaclang.runtimelib.sealed_serve {
+            serve_manifest_for,
+            sealed_root_for
+        }
+        sm_sealed = serve_manifest_for(sealed_mod_path);
+        if sm_sealed is not None {
+            self._register_sealed_bindings(
+                sm_sealed, sealed_root_for(sealed_mod_path) or ""
+            );
+            return;
+        }
+    }
 
     fn_bindings: dict[str, any] = {};
     walker_bindings: dict[str, any] = {};
@@ -1097,6 +1205,9 @@ impl ModuleIntrospector.ensure_bundle -> str {
         self._bundle = self._bundle_builder.build(self._module);
         self._bundle_error = None;
         return self._bundle.hash;
+    } except MissingBunError {
+        self._bundle = None;
+        raise;
     } except Exception as exc {
         self._bundle = None;
         self._bundle_error = str(exc);
@@ -1484,6 +1595,25 @@ impl JacAPIServer.create_handler -> type[BaseHTTPRequestHandler] {
             }
         }
 
+        def _dispatch_safely(self: JacRequestHandler, method: Callable[[], None]) {
+            try {
+                method();
+            } except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError) {
+                self.close_connection = True;
+            } except Exception as exc {
+                import logging;
+                import traceback;
+                logging.getLogger('jaclang.serve').error(
+                    f"Unhandled error serving {self.command} {self.path}:\n" + traceback.format_exc()
+                );
+                try {
+                    Jac.send_json(self, 500, {'error': f"{type(exc).__name__}: {exc}"});
+                } except Exception {
+                    self.close_connection = True;
+                }
+            }
+        }
+
         def _get_auth_token(self: JacRequestHandler) -> (str | None) {
             auth_header = self.headers.get('Authorization');
             return auth_header[7:]
@@ -1601,15 +1731,124 @@ impl JacAPIServer.create_handler -> type[BaseHTTPRequestHandler] {
         }
 
         def do_OPTIONS(self: JacRequestHandler) {
+            self._dispatch_safely(self._do_OPTIONS);
+        }
+
+        def _do_OPTIONS(self: JacRequestHandler) {
             self.send_response(200);
             ResponseBuilder._add_cors_headers(self);
             ResponseBuilder._add_custom_headers(self);
             self.end_headers();
         }
 
-        def do_GET(self: JacRequestHandler) -> None {
+        def _serve_graph_page(self: JacRequestHandler) {
+            try {
+                import jaclang.scale;
+                template = (
+                    Path(jaclang.scale.__file__).parent / 'templates' / 'graph.html'
+                );
+                html = template.read_text(encoding='utf-8');
+            } except (ImportError, OSError) as exc {
+                Jac.send_json(
+                    self,
+                    503,
+                    {
+                        'error': (
+                            "Graph visualizer template unavailable "
+                            f"({type(exc).__name__}: {exc})"
+                        )
+                    }
+                );
+                return;
+            }
+            Jac.send_html(self, 200, html);
+        }
+
+        def _serve_graph_data(self: JacRequestHandler) {
+            import from jaclang.runtimelib.utils { collect_node_connections }
+            username = self._authenticate();
+            if not username {
+                username = Con.GUEST.value;
+                if not server.user_manager.user_exists(username) {
+                    server.user_manager.create_user(username, '__no_password__');
+                }
+            }
+            root_id = server.user_manager.get_root_id(username);
+            if not root_id {
+                Jac.send_json(self, 404, {'error': 'User root not found'});
+                return;
+            }
+            req_ctx = ExecutionContext(_parent=Jac.get_context());
+            req_ctx.set_user_root(root_id);
+            token = Jac.push_request_context(req_ctx);
+            try {
+                user_root = req_ctx.get_root();
+                visited_nodes: set = set();
+                connections: set = set();
+                edge_ids: set = set();
+                nodes: list[dict] = [];
+                edges: list[dict] = [];
+                collect_node_connections(
+                    user_root, visited_nodes, connections, edge_ids
+                );
+                nodes.append({'id': Jac.object_ref(user_root), 'label': 'root'});
+                for node_arch in visited_nodes {
+                    if (node_arch != user_root) {
+                        nodes.append(
+                            {'id': Jac.object_ref(node_arch), 'label': repr(node_arch)}
+                        );
+                    }
+                }
+                for (_, source_node, target_node, edge_arch) in connections {
+                    edge_data: dict = {
+                        'from': Jac.object_ref(source_node),
+                        'to': Jac.object_ref(target_node)
+                    };
+                    if (repr(edge_arch) != 'GenericEdge()') {
+                        edge_data['label'] = repr(edge_arch);
+                    }
+                    edges.append(edge_data);
+                }
+                Jac.send_json(
+                    self, 200, {'version': '1.0', 'nodes': nodes, 'edges': edges}
+                );
+            } finally {
+                Jac.reset_request_context(token);
+            }
+        }
+
+        def do_GET(self: JacRequestHandler) {
+            self._dispatch_safely(self._do_GET);
+        }
+
+        def do_POST(self: JacRequestHandler) {
+            self._dispatch_safely(self._do_POST);
+        }
+
+        def do_PUT(self: JacRequestHandler) {
+            self._dispatch_safely(self._do_PUT);
+        }
+
+        def _do_GET(self: JacRequestHandler) -> None {
             parsed_path = urlparse(self.path);
             path = parsed_path.path;
+
+            if path in ('/healthz', '/healthz/live', '/healthz/ready') {
+                Jac.send_json(self, 200, {'status': 'ok'});
+                return;
+            }
+            if (path == '/graph') {
+                self._serve_graph_page();
+                return;
+            }
+            if (path == '/graph/data') {
+                self._serve_graph_data();
+                return;
+            }
+            if (path == '/docs') {
+                Jac.send_html(self, 200, _docs_html(server));
+                return;
+            }
             if (path == '/static/client.js') {
                 try {
                     Jac.send_javascript(self, Jac.get_client_js(server.introspector));
@@ -1866,7 +2105,7 @@ impl JacAPIServer.create_handler -> type[BaseHTTPRequestHandler] {
             }
         }
 
-        def do_POST(self: JacRequestHandler) -> None {
+        def _do_POST(self: JacRequestHandler) -> None {
             parsed_path = urlparse(self.path);
             path = parsed_path.path;
             try {
@@ -2014,7 +2253,7 @@ impl JacAPIServer.create_handler -> type[BaseHTTPRequestHandler] {
             }
         }
 
-        def do_PUT(self: JacRequestHandler) -> None {
+        def _do_PUT(self: JacRequestHandler) -> None {
             parsed_path = urlparse(self.path);
             path = parsed_path.path;
 
@@ -2153,7 +2392,10 @@ impl JacAPIServer.start(
 
                 bundle_exists = dist_dir.exists() and any(dist_dir.glob('client.*.js'));
                 if bundle_exists {
-                    console.print("  ✔ Client bundle already built", style="success");
+                    console.print(
+                        "  ✔ Client bundle found (rebuilt on first request if stale)",
+                        style="success"
+                    );
                 } else {
                     self.introspector.ensure_bundle();
                 }
@@ -2232,6 +2474,137 @@ impl JacAPIServer.start(
         }
     }
 }
+
+def _docs_html(server: JacAPIServer) -> str {
+    import html as _html;
+    server.introspector.load();
+    functions = server.introspector.get_functions();
+    walkers = server.introspector.get_walkers();
+    client_exports = server.introspector._client_manifest.get('exports', []);
+
+    def esc(text: any) -> str {
+        return _html.escape(str(text));
+    }
+
+    def format_param(name: str, info: dict[(str, Any)]) -> str {
+        req = 'required' if info['required'] else 'optional';
+        `default = f", default: {info['default']}" if info.get('default') else '';
+        return f"{name}: {info['type']} ({req}{`default})";
+    }
+
+    rows: list[str] = [];
+
+    def section(title: str, note: str = '') {
+        note_html = f" <small>{esc(note)}</small>" if note else '';
+        rows.append(f"<h2>{esc(title)}{note_html}</h2>");
+    }
+
+    def endpoint(method: str, path: str, desc: str, details: str = '') {
+        details_html = f"<div class='det'>{esc(details)}</div>" if details else '';
+        rows.append(
+            f"<div class='ep'><span class='m {method.lower()}'>{esc(method)}"
+            f"</span> <code>{esc(path)}</code>"
+            f"<div class='desc'>{esc(desc)}</div>{details_html}</div>"
+        );
+    }
+
+    section('Authentication');
+    endpoint(
+        'POST',
+        '/user/register',
+        'Create new user account',
+        'Body: { "username": str, "password": str }'
+    );
+    endpoint(
+        'POST',
+        '/user/login',
+        'Authenticate and get token',
+        'Body: { "username": str, "password": str }'
+    );
+    endpoint(
+        'GET',
+        '/user/info',
+        'Get authenticated user information',
+        'Requires: Authorization header with Bearer token'
+    );
+    section('Introspection');
+    endpoint('GET', '/functions', 'List all functions');
+    endpoint('GET', '/walkers', 'List all walkers');
+    if functions {
+        section('Functions');
+        for (name, func) in functions.items() {
+            sig = server.introspector.introspect_callable(func);
+            params = [format_param(n, i) for (n, i) in sig['parameters'].items()];
+            params_str = ', '.join(params) if params else '';
+            endpoint(
+                'POST',
+                f"/function/{name}",
+                f"Call function → {sig['return_type']}",
+                f"Args: {{ {params_str} }}" if params else 'No arguments'
+            );
+        }
+    }
+    if walkers {
+        section('Walkers');
+        for (name, walker_cls) in walkers.items() {
+            info = server.introspector.introspect_walker(walker_cls);
+            fields = [format_param(n, i) for (n, i) in info['fields'].items()];
+            fields_str = ', '.join(fields);
+            endpoint(
+                'POST',
+                f"/walker/{name}",
+                'Spawn walker',
+                f"Fields: {{ {fields_str} }}" if fields else 'No fields'
+            );
+        }
+    }
+    config = get_config();
+    cl_route_prefix = config.serve.cl_route_prefix if config else "cl";
+    if client_exports {
+        section('Client pages', 'public');
+        for name in sorted(client_exports) {
+            endpoint('GET', f"/{cl_route_prefix}/{name}", 'Render HTML page');
+        }
+    }
+    section('Graph');
+    endpoint('GET', '/graph', 'Interactive graph visualizer');
+    endpoint(
+        'GET',
+        '/graph/data',
+        'Graph nodes + edges as JSON',
+        'Optional Bearer token selects the user graph; anonymous gets the '
+        'guest graph'
+    );
+
+    body = '\n'.join(rows);
+    return (
+        "<!doctype html><html><head><meta charset='utf-8'>"
+        f"<title>{esc(server.module_name)} API</title>"
+        "<meta name='viewport' content='width=device-width, initial-scale=1'>"
+        "<style>"
+        "body{font-family:system-ui,sans-serif;margin:2rem auto;max-width:52rem;"
+        "padding:0 1rem;background:#fff;color:#1a1a1a;line-height:1.45}"
+        "h1{font-size:1.4rem}h2{font-size:1.05rem;margin:1.6rem 0 .4rem;"
+        "border-bottom:1px solid #e5e5e5;padding-bottom:.25rem}"
+        "h2 small{color:#888;font-weight:normal;font-size:.8rem}"
+        "code{font-family:ui-monospace,monospace;font-size:.9rem}"
+        ".ep{padding:.45rem .6rem;border:1px solid #eee;border-radius:6px;"
+        "margin:.35rem 0}"
+        ".m{display:inline-block;min-width:3.2rem;text-align:center;"
+        "font-size:.72rem;font-weight:700;border-radius:4px;padding:.1rem .3rem;"
+        "color:#fff;font-family:ui-monospace,monospace}"
+        ".m.get{background:#2f855a}.m.post{background:#2b6cb0}"
+        ".m.put{background:#b7791f}"
+        ".desc{color:#444;font-size:.85rem;margin-top:.15rem}"
+        ".det{color:#777;font-size:.8rem;font-family:ui-monospace,monospace;"
+        "margin-top:.15rem}"
+        "</style></head><body>"
+        f"<h1>{esc(server.module_name)} — Jac API</h1>"
+        f"{body}"
+        "</body></html>"
+    );
+}
+
 
 impl print_endpoint_docs(server: JacAPIServer) -> None {
     server.introspector.load();
