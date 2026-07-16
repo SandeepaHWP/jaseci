@@ -14,6 +14,12 @@ glob KEY_W: int = 87,
      KEY_S: int = 83,
      KEY_D: int = 68,
      KEY_R: int = 82,
+     # digit row 1..5 -- weapon select (ascii, matches the shim keymap)
+     KEY_1: int = 49,
+     KEY_2: int = 50,
+     KEY_3: int = 51,
+     KEY_4: int = 52,
+     KEY_5: int = 53,
      KEY_SPACE: int = 32,
      KEY_RIGHT: int = 262,
      KEY_LEFT: int = 263,
@@ -29,11 +35,18 @@ glob KEY_W: int = 87,
      PLAYER_R: float = 0.4,
      PLAYER_H: float = 1.8,
      EYE_H: float = 1.6,
+     # the rifle's tunables; weapon_table() builds the rifle entry from these
      W_DMG: int = 20,
      W_FIRE_CD: float = 0.11,
      W_MAG: int = 30,
      W_RELOAD: float = 1.5,
      W_RANGE: float = 200.0,
+     # weapon ids -- indices into World.weapons (see weapon_table in combat)
+     GUN_PISTOL: int = 0,
+     GUN_RIFLE: int = 1,
+     GUN_SHOTGUN: int = 2,
+     GUN_SMG: int = 3,
+     GUN_SNIPER: int = 4,
      RESPAWN_T: float = 2.0,
      BOT_COUNT: int = 5,
      BOT_SPD_FRAC: float = 0.6,
@@ -69,6 +82,19 @@ obj Tracer {
         life: float = 0.0;
 }
 
+"""One weapon's tunables. Names are not here: str does not cross the wasm
+boundary cheaply, so the cl{} HUD maps id -> display name instead."""
+obj Weapon {
+    has dmg: int = 20,
+        fire_cd: float = 0.11,
+        mag: int = 30,
+        reload_t: float = 1.5,
+        max_range: float = 200.0,
+        spread: float = 0.0,
+        pellets: int = 1,
+        ammo_max: int = 90;
+}
+
 """A player or bot: position, velocity, look angles, health, weapon + AI state."""
 obj Ent {
     has x: float = 0.0,
@@ -84,6 +110,7 @@ obj Ent {
         on_ground: bool = False,
         ammo: int = 90,
         mag: int = 30,
+        weapon_id: int = GUN_RIFLE,
         fire_cd: float = 0.0,
         reload_cd: float = 0.0,
         reloading: bool = False,
@@ -102,6 +129,7 @@ obj Ent {
 obj World {
     has player: Ent = Ent(),
         bots: list[Ent] = [],
+        weapons: list[Weapon] = [],
         colliders: list[Box] = [],
         spawns: list[Vec3] = [],
         tracers: list[Tracer] = [],

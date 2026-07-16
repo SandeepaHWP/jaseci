@@ -64,6 +64,7 @@ def:pub GameView(
             alive: int = int(f"{exports.get_alive()}");
             hit: int = int(f"{exports.get_hit()}");
             reload: int = int(f"{exports.get_reloading()}");
+            gun: int = int(f"{exports.get_weapon()}");
             prev_hp: int = int(f"{w2.__fps_prev_hp}");
             prev_kills: int = int(f"{w2.__fps_prev_kills}");
             prev_deaths: int = int(f"{w2.__fps_prev_deaths}");
@@ -99,6 +100,7 @@ def:pub GameView(
                     reload == 1,
                     low,
                     vig,
+                    gun,
                     feed
                 );
             }
@@ -131,7 +133,7 @@ def:pub GameView(
     return
         <div id="wrap">
             <div id="hint">
-                {"WASD move · Space jump · mouse aim · click fire · R reload · Tab release · Esc menu"}
+                {"WASD move · Space jump · mouse aim · click fire · R reload · 1-5 weapon · Tab release · Esc menu"}
             </div>
             <canvas id="glcanvas" width={960} height={600}></canvas>
             <Hud/>

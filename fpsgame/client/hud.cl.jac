@@ -1,5 +1,9 @@
 """React HUD overlay: health, ammo, score, crosshair, kill feed, death overlay."""
 
+# Weapon display names, indexed by the sim's GUN_* ids. They live here because
+# str does not cross the wasm boundary cheaply -- the sim only exports the id.
+glob GUN_NAMES: list = ["Pistol", "Rifle", "Shotgun", "SMG", "Sniper"];
+
 # ── React HUD overlay (driven by the shim each frame via window.__fps_hud) ──
 def:pub Hud -> JsxElement {
     has hp: int = 100,
@@ -13,6 +17,7 @@ def:pub Hud -> JsxElement {
         reloading: bool = False,
         low: bool = False,
         vig: int = 0,
+        gun: int = 1,
         feed: list = [];
 
     can with entry {
@@ -32,6 +37,7 @@ def:pub Hud -> JsxElement {
             nreload: bool,
             nlow: bool,
             nvig: int,
+            ngun: int,
             nfeed: list
         ) {
             hp = nhp;
@@ -45,11 +51,13 @@ def:pub Hud -> JsxElement {
             reloading = nreload;
             low = nlow;
             vig = nvig;
+            gun = ngun;
             feed = nfeed;
         };
     }
     hpw: str = f"{hp}%";
     ammo_txt: str = "RELOADING" if reloading else f"{mag} / {ammo}";
+    gun_txt: str = f"{GUN_NAMES[gun]}" if gun >= 0 and gun < 5 else "?";
     return
         <div id="hud-root">
             <div id="cross" className={"hot" if hit else ""}></div>
@@ -75,6 +83,7 @@ def:pub Hud -> JsxElement {
                 <div id="hpbar">
                     <div id="hpfill" style={{"width": hpw}}></div>
                 </div>
+                <div id="gun">{gun_txt}</div>
                 <div id="ammo" className={"low" if (low or reloading) else ""}>
                     {ammo_txt}
                 </div>

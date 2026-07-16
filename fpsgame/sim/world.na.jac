@@ -14,6 +14,11 @@ import from .types {
     KEY_S,
     KEY_D,
     KEY_R,
+    KEY_1,
+    KEY_2,
+    KEY_3,
+    KEY_4,
+    KEY_5,
     KEY_SPACE,
     KEY_LEFT,
     KEY_RIGHT,
@@ -23,7 +28,12 @@ import from .types {
     MOUSE_LEFT,
     DEG2RAD,
     MOVE_SPD,
-    JUMP_V
+    JUMP_V,
+    GUN_PISTOL,
+    GUN_RIFLE,
+    GUN_SHOTGUN,
+    GUN_SMG,
+    GUN_SNIPER
 }
 import from .mathx { jsin, jcos, fsqrt }
 import from .render {
@@ -39,7 +49,14 @@ import from .render {
     unlock_mouse
 }
 import from .physics { move_and_collide }
-import from .combat { tick_weapon, start_reload, try_fire, spawn_ent }
+import from .combat {
+    tick_weapon,
+    start_reload,
+    try_fire,
+    spawn_ent,
+    build_weapons,
+    set_weapon
+}
 import from .maps { map_load }
 import from .bots { bot_update, assign_route }
 
@@ -136,7 +153,23 @@ def:pub handle_input(world: World, step: float) {
         world.player.vy = JUMP_V;
     }
     if key_tapped(KEY_R) {
-        start_reload(world.player);
+        start_reload(world, world.player);
+    }
+    # 1..5 select a weapon from the roster
+    if key_tapped(KEY_1) {
+        set_weapon(world, world.player, GUN_PISTOL);
+    }
+    if key_tapped(KEY_2) {
+        set_weapon(world, world.player, GUN_RIFLE);
+    }
+    if key_tapped(KEY_3) {
+        set_weapon(world, world.player, GUN_SHOTGUN);
+    }
+    if key_tapped(KEY_4) {
+        set_weapon(world, world.player, GUN_SMG);
+    }
+    if key_tapped(KEY_5) {
+        set_weapon(world, world.player, GUN_SNIPER);
     }
     if mouse_held(MOUSE_LEFT) and world.mouse_captured {
         yp = world.player.pitch * DEG2RAD;
@@ -145,7 +178,7 @@ def:pub handle_input(world: World, step: float) {
         dy = jsin(yp);
         dz = -jcos(yaw_r) * cp;
         if world.player.mag <= 0 {
-            start_reload(world.player);
+            start_reload(world, world.player);
         } else {
             try_fire(world, world.player, dx, dy, dz);
         }
@@ -172,6 +205,8 @@ def:pub new_round(world: World) {
 """Open the window and build the first round."""
 def:pub world_init(world: World) {
     open_window(960, 600, "Jac FPS - Phase 1");
+    # before new_round: spawn_ent reads the weapon to fill mag/ammo.
+    build_weapons(world);
     new_round(world);
 }
 
@@ -193,7 +228,7 @@ def:pub world_frame(world: World) -> bool {
         world.muzzle_t -= step;
     }
     handle_input(world, step);
-    tick_weapon(world.player, step);
+    tick_weapon(world, world.player, step);
     if world.player.alive {
         move_and_collide(world, world.player, step);
     } else {

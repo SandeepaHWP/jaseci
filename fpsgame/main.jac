@@ -304,6 +304,11 @@ na {
         return 1 if WORLD.player.reloading else 0;
     }
 
+    """Current weapon id; the HUD maps it to a display name."""
+    def get_weapon -> int {
+        return WORLD.player.weapon_id;
+    }
+
     # ── Render state getters (Phase 4.5: the cl{} Three.js renderer reads these) ─
     #    Floats return as JS numbers directly. Index args (i) are wasm i64, so the
     #    renderer must call them as fn(BigInt(i)) -- see FIX_wasm_i64_bigint.md.

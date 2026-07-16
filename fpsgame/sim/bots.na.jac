@@ -107,13 +107,13 @@ def:pub bot_update(world: World, b: Ent, step: float) {
     #     aimz = aimz / al;
     # }
     # wall_t = ray_world(world, ox, oy, oz, aimx, aimy, aimz, al);
-    # tick_weapon(b, step);
+    # tick_weapon(world, b, step);
     # if wall_t >= al - 0.2 and world.player.alive {
     #     sxp = rand_range(-0.04, 0.04);
     #     syp = rand_range(-0.04, 0.04);
     #     try_fire(world, b, aimx + sxp, aimy + syp, aimz);
     #     if b.mag <= 0 {
-    #         start_reload(b);
+    #         start_reload(world, b);
     #     }
     # }
 }
