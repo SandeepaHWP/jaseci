@@ -88,6 +88,11 @@ def:pub ensure_styles {
     #ammo.low { color: #ff6b6b; }
     #gun { font-size: 12px; letter-spacing: 1px; text-transform: uppercase;
            color: #f5c451; opacity: 0.85; margin-bottom: 1px; }
+    #clock { position: absolute; left: 50%; top: 10px; transform: translateX(-50%);
+             font-size: 26px; font-weight: 700; color: #e8f0ff; pointer-events: none;
+             text-shadow: 0 1px 3px #000; font-variant-numeric: tabular-nums; }
+    #clock.low { color: #ff6b6b; }
+    .row.modes { width: auto; justify-content: center; }
     #vignette { position: absolute; inset: 0;
                 box-shadow: inset 0 0 120px 36px rgba(190,20,20,0.6);
                 animation: vignflash 0.45s ease-out forwards; }

@@ -587,6 +587,7 @@ async def:pub run_game(
         if opts is not None {
             inst.exports.set_sensitivity(BigInt(opts.get("sens", 12)));
             inst.exports.set_bots(BigInt(opts.get("bots", 5)));
+            inst.exports.set_mode(BigInt(opts.get("mode", 0)));
         }
         inst.exports.init();
         # Apply the chosen map (0 = open, 1 = cover) after init.

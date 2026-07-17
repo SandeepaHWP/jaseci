@@ -124,6 +124,7 @@ cl {
     # ── App shell: the screen state machine / router ───────────────────────────
     def:pub app -> JsxElement {
         has screen: str = "menu",
+            mode: int = 0,
             sens: int = 12,
             fov: int = 90,
             bots: int = 5,
@@ -178,6 +179,9 @@ cl {
         def go_menu {
             screen = "menu";
         }
+        def set_mode(m: int) {
+            mode = m;
+        }
         async def save_settings(ns: int, nf: int, nb: int, nm: int, nt: int) {
             sens = ns;
             fov = nf;
@@ -207,6 +211,8 @@ cl {
                         onPlay={go_play}
                         onSettings={go_settings}
                         highScore={highScore}
+                        mode={mode}
+                        onMode={set_mode}
                     />
                 )
                     if screen == "menu"
@@ -229,6 +235,7 @@ cl {
                                 sens={sens}
                                 fov={fov}
                                 bots={bots}
+                                mode={mode}
                                 onExit={go_menu}
                                 onGameOver={end_game}
                             />
@@ -253,7 +260,14 @@ cl {
 #     wasm interface the shim calls (init / frame / HUD getters) over one World.
 na {
     import from .sim.types { World, EYE_H }
-    import from .sim.world { world_init, world_frame, new_round, world_set_map }
+    import from .sim.world {
+        world_init,
+        world_frame,
+        new_round,
+        world_set_map,
+        time_left,
+        round_over
+    }
 
     glob WORLD: World = World();
 
@@ -434,6 +448,21 @@ na {
     """Switch map and restart the round (0 or 1)."""
     def set_map(mid: int) {
         world_set_map(WORLD, mid);
+    }
+
+    """Set the game mode, 0 = ffa / 1 = time attack (applied on new_round)."""
+    def set_mode(m: int) {
+        WORLD.mode = m;
+    }
+
+    """Whole seconds left on the round clock; 0 when the mode has no clock."""
+    def get_time_left -> int {
+        return int(time_left(WORLD));
+    }
+
+    """1 once a clocked round has run out of time."""
+    def get_round_over -> int {
+        return 1 if round_over(WORLD) else 0;
     }
 
     """Restart the current round."""

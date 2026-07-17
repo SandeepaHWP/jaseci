@@ -47,6 +47,10 @@ glob KEY_W: int = 87,
      GUN_SHOTGUN: int = 2,
      GUN_SMG: int = 3,
      GUN_SNIPER: int = 4,
+     # game modes -- World.mode; ffa has no clock, time attack runs a countdown
+     MODE_FFA: int = 0,
+     MODE_TIME_ATTACK: int = 1,
+     TA_SECS: float = 60.0,
      RESPAWN_T: float = 2.0,
      BOT_COUNT: int = 5,
      BOT_SPD_FRAC: float = 0.6,
@@ -143,5 +147,8 @@ obj World {
         mouse_captured: bool = False,
         # tunables set from the settings screen (defaults match the constants)
         sens: float = 0.12,
-        bot_count: int = 5;
+        bot_count: int = 5,
+        mode: int = 0,
+        # seconds the round is capped at; 0.0 = no clock (ffa)
+        round_limit: float = 0.0;
 }

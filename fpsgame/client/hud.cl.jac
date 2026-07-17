@@ -18,6 +18,8 @@ def:pub Hud -> JsxElement {
         low: bool = False,
         vig: int = 0,
         gun: int = 1,
+        tleft: int = 0,
+        mode: int = 0,
         feed: list = [];
 
     can with entry {
@@ -38,6 +40,8 @@ def:pub Hud -> JsxElement {
             nlow: bool,
             nvig: int,
             ngun: int,
+            ntleft: int,
+            nmode: int,
             nfeed: list
         ) {
             hp = nhp;
@@ -52,12 +56,18 @@ def:pub Hud -> JsxElement {
             low = nlow;
             vig = nvig;
             gun = ngun;
+            tleft = ntleft;
+            mode = nmode;
             feed = nfeed;
         };
     }
     hpw: str = f"{hp}%";
     ammo_txt: str = "RELOADING" if reloading else f"{mag} / {ammo}";
     gun_txt: str = f"{GUN_NAMES[gun]}" if gun >= 0 and gun < 5 else "?";
+    # mm:ss for the time-attack clock; ffa (mode 0) has no clock to show
+    mins: int = tleft // 60;
+    secs: int = tleft % 60;
+    clock_txt: str = f"{mins}:0{secs}" if secs < 10 else f"{mins}:{secs}";
     return
         <div id="hud-root">
             <div id="cross" className={"hot" if hit else ""}></div>
@@ -68,6 +78,13 @@ def:pub Hud -> JsxElement {
                     <div className="feeditem" key={item}>{item}</div>
                 }}
             </div>
+            {(
+                <div id="clock" className={"low" if tleft <= 10 else ""}>
+                    {clock_txt}
+                </div>
+            )
+                if mode == 1
+                else None}
             <div id="stat">
                 {"score "}
                 <b>{kills}</b>

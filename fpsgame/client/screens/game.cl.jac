@@ -12,6 +12,7 @@ def:pub GameView(
     sens: int,
     fov: int,
     bots: int,
+    mode: int,
     onExit: any,
     onGameOver: any
 ) -> JsxElement {
@@ -65,6 +66,8 @@ def:pub GameView(
             hit: int = int(f"{exports.get_hit()}");
             reload: int = int(f"{exports.get_reloading()}");
             gun: int = int(f"{exports.get_weapon()}");
+            tleft: int = int(f"{exports.get_time_left()}");
+            timeup: int = int(f"{exports.get_round_over()}");
             prev_hp: int = int(f"{w2.__fps_prev_hp}");
             prev_kills: int = int(f"{w2.__fps_prev_kills}");
             prev_deaths: int = int(f"{w2.__fps_prev_deaths}");
@@ -101,6 +104,8 @@ def:pub GameView(
                     low,
                     vig,
                     gun,
+                    tleft,
+                    mode,
                     feed
                 );
             }
@@ -108,7 +113,8 @@ def:pub GameView(
                 return;
             }
             won: bool = kills >= target;
-            if alive == 0 or won {
+            # time attack ends on the clock; you win only if you hit the target
+            if alive == 0 or won or timeup == 1 {
                 w2.__fps_ending = True;
                 now_ms: float = float(f"{Date.now()}");
                 secs: int = int((now_ms - start_ms) / 1000.0);
@@ -127,7 +133,7 @@ def:pub GameView(
             on_tick,
             on_exit,
             on_render,
-            {"map_id": mapId, "sens": sens, "bots": bots}
+            {"map_id": mapId, "sens": sens, "bots": bots, "mode": mode}
         );
     }
     return

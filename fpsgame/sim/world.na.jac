@@ -33,7 +33,9 @@ import from .types {
     GUN_RIFLE,
     GUN_SHOTGUN,
     GUN_SMG,
-    GUN_SNIPER
+    GUN_SNIPER,
+    MODE_TIME_ATTACK,
+    TA_SECS
 }
 import from .mathx { jsin, jcos, fsqrt }
 import from .render {
@@ -200,6 +202,22 @@ def:pub new_round(world: World) {
     }
     world.tracers = [];
     world.world_t = 0.0;
+    # time attack caps the round with a clock; ffa runs until the score target
+    world.round_limit = TA_SECS if world.mode == MODE_TIME_ATTACK else 0.0;
+}
+
+"""Seconds left in the round; 0 when the mode has no clock or time is up."""
+def:pub time_left(world: World) -> float {
+    if world.round_limit <= 0.0 {
+        return 0.0;
+    }
+    left = world.round_limit - world.world_t;
+    return left if left > 0.0 else 0.0;
+}
+
+"""True once a clocked round has run out of time."""
+def:pub round_over(world: World) -> bool {
+    return world.round_limit > 0.0 and world.world_t >= world.round_limit;
 }
 
 """Open the window and build the first round."""
@@ -215,6 +233,7 @@ def:pub world_set_map(world: World, mid: int) {
     world.map_id = mid % 2;
     new_round(world);
 }
+
 
 """Advance the sim one frame. Rendering lives in cl{} now (Phase 4.5): this only
 steps the world; the Three.js renderer reads state via the get_* exports."""
