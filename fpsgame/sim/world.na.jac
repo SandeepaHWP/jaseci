@@ -14,11 +14,6 @@ import from .types {
     KEY_S,
     KEY_D,
     KEY_R,
-    KEY_1,
-    KEY_2,
-    KEY_3,
-    KEY_4,
-    KEY_5,
     KEY_SPACE,
     KEY_LEFT,
     KEY_RIGHT,
@@ -29,11 +24,6 @@ import from .types {
     DEG2RAD,
     MOVE_SPD,
     JUMP_V,
-    GUN_PISTOL,
-    GUN_RIFLE,
-    GUN_SHOTGUN,
-    GUN_SMG,
-    GUN_SNIPER,
     MODE_TIME_ATTACK,
     TA_SECS
 }
@@ -51,14 +41,7 @@ import from .render {
     unlock_mouse
 }
 import from .physics { move_and_collide }
-import from .combat {
-    tick_weapon,
-    start_reload,
-    try_fire,
-    spawn_ent,
-    build_weapons,
-    set_weapon
-}
+import from .combat { tick_weapon, start_reload, try_fire, spawn_ent, build_weapons }
 import from .maps { map_load }
 import from .bots { bot_update, assign_route }
 
@@ -157,22 +140,6 @@ def:pub handle_input(world: World, step: float) {
     if key_tapped(KEY_R) {
         start_reload(world, world.player);
     }
-    # 1..5 select a weapon from the roster
-    if key_tapped(KEY_1) {
-        set_weapon(world, world.player, GUN_PISTOL);
-    }
-    if key_tapped(KEY_2) {
-        set_weapon(world, world.player, GUN_RIFLE);
-    }
-    if key_tapped(KEY_3) {
-        set_weapon(world, world.player, GUN_SHOTGUN);
-    }
-    if key_tapped(KEY_4) {
-        set_weapon(world, world.player, GUN_SMG);
-    }
-    if key_tapped(KEY_5) {
-        set_weapon(world, world.player, GUN_SNIPER);
-    }
     if mouse_held(MOUSE_LEFT) and world.mouse_captured {
         yp = world.player.pitch * DEG2RAD;
         cp = jcos(yp);
@@ -190,6 +157,8 @@ def:pub handle_input(world: World, step: float) {
 """(Re)build the world for the current map and spawn everyone."""
 def:pub new_round(world: World) {
     map_load(world, world.map_id);
+    # before spawn_ent: it reads the weapon to fill mag/ammo
+    world.player.weapon_id = world.loadout;
     spawn_ent(world, world.player);
     world.player.kills = 0;
     world.player.deaths = 0;

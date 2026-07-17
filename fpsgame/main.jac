@@ -125,6 +125,7 @@ cl {
     def:pub app -> JsxElement {
         has screen: str = "menu",
             mode: int = 0,
+            loadout: int = 1,
             sens: int = 12,
             fov: int = 90,
             bots: int = 5,
@@ -182,6 +183,9 @@ cl {
         def set_mode(m: int) {
             mode = m;
         }
+        def set_loadout(g: int) {
+            loadout = g;
+        }
         async def save_settings(ns: int, nf: int, nb: int, nm: int, nt: int) {
             sens = ns;
             fov = nf;
@@ -213,6 +217,8 @@ cl {
                         highScore={highScore}
                         mode={mode}
                         onMode={set_mode}
+                        loadout={loadout}
+                        onLoadout={set_loadout}
                     />
                 )
                     if screen == "menu"
@@ -236,6 +242,7 @@ cl {
                                 fov={fov}
                                 bots={bots}
                                 mode={mode}
+                                loadout={loadout}
                                 onExit={go_menu}
                                 onGameOver={end_game}
                             />
@@ -453,6 +460,11 @@ na {
     """Set the game mode, 0 = ffa / 1 = time attack (applied on new_round)."""
     def set_mode(m: int) {
         WORLD.mode = m;
+    }
+
+    """Set the weapon the player spawns with (applied on new_round)."""
+    def set_loadout(g: int) {
+        WORLD.loadout = g;
     }
 
     """Whole seconds left on the round clock; 0 when the mode has no clock."""

@@ -13,6 +13,7 @@ def:pub GameView(
     fov: int,
     bots: int,
     mode: int,
+    loadout: int,
     onExit: any,
     onGameOver: any
 ) -> JsxElement {
@@ -133,13 +134,13 @@ def:pub GameView(
             on_tick,
             on_exit,
             on_render,
-            {"map_id": mapId, "sens": sens, "bots": bots, "mode": mode}
+            {"map_id": mapId, "sens": sens, "bots": bots, "mode": mode, "gun": loadout}
         );
     }
     return
         <div id="wrap">
             <div id="hint">
-                {"WASD move · Space jump · mouse aim · click fire · R reload · 1-5 weapon · Tab release · Esc menu"}
+                {"WASD move · Space jump · mouse aim · click fire · R reload · Tab release · Esc menu"}
             </div>
             <canvas id="glcanvas" width={960} height={600}></canvas>
             <Hud/>

@@ -14,12 +14,6 @@ glob KEY_W: int = 87,
      KEY_S: int = 83,
      KEY_D: int = 68,
      KEY_R: int = 82,
-     # digit row 1..5 -- weapon select (ascii, matches the shim keymap)
-     KEY_1: int = 49,
-     KEY_2: int = 50,
-     KEY_3: int = 51,
-     KEY_4: int = 52,
-     KEY_5: int = 53,
      KEY_SPACE: int = 32,
      KEY_RIGHT: int = 262,
      KEY_LEFT: int = 263,
@@ -149,6 +143,8 @@ obj World {
         sens: float = 0.12,
         bot_count: int = 5,
         mode: int = 0,
+        # the weapon the player spawns with, chosen in the menu
+        loadout: int = GUN_RIFLE,
         # seconds the round is capped at; 0.0 = no clock (ffa)
         round_limit: float = 0.0;
 }

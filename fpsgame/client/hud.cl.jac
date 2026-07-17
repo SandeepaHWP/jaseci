@@ -1,8 +1,6 @@
 """React HUD overlay: health, ammo, score, crosshair, kill feed, death overlay."""
 
-# Weapon display names, indexed by the sim's GUN_* ids. They live here because
-# str does not cross the wasm boundary cheaply -- the sim only exports the id.
-glob GUN_NAMES: list = ["Pistol", "Rifle", "Shotgun", "SMG", "Sniper"];
+import from .guns { GUN_NAMES }
 
 # ── React HUD overlay (driven by the shim each frame via window.__fps_hud) ──
 def:pub Hud -> JsxElement {

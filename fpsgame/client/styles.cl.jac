@@ -92,7 +92,13 @@ def:pub ensure_styles {
              font-size: 26px; font-weight: 700; color: #e8f0ff; pointer-events: none;
              text-shadow: 0 1px 3px #000; font-variant-numeric: tabular-nums; }
     #clock.low { color: #ff6b6b; }
-    .row.modes { width: auto; justify-content: center; }
+    .row.modes, .row.guns { width: auto; justify-content: center; flex-wrap: wrap; }
+    .loadout { display: flex; flex-direction: column; align-items: center; gap: 6px;
+               padding: 10px 14px; border: 1px solid #232a3d; border-radius: 8px;
+               background: #0c0f18; }
+    .lolabel { font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
+               opacity: 0.55; }
+    .loadout .note { max-width: 320px; text-align: center; }
     #vignette { position: absolute; inset: 0;
                 box-shadow: inset 0 0 120px 36px rgba(190,20,20,0.6);
                 animation: vignflash 0.45s ease-out forwards; }
