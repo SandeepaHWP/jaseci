@@ -46,6 +46,7 @@ obj Shim {
         h_mousedown: any = None,
         h_mouseup: any = None,
         h_mousemove: any = None,
+        h_contextmenu: any = None,
         h_plock: any = None;
 }
 
@@ -418,11 +419,7 @@ def _keymap(code: str) -> int {
         "KeyS": 83,
         "KeyD": 68,
         "KeyR": 82,
-        "Digit1": 49,
-        "Digit2": 50,
-        "Digit3": 51,
-        "Digit4": 52,
-        "Digit5": 53,
+        "KeyF": 70,
         "Space": 32,
         "Tab": 258,
         "ArrowRight": 262,
@@ -463,13 +460,22 @@ def _install_input(sh: any) {
         }
     };
     window.addEventListener("keyup", sh.h_keyup);
+    # browser MouseEvent.button (0 left / 1 middle / 2 right) -> raylib button
+    # (0 left / 1 right / 2 middle), which is what the sim's MOUSE_* ids expect.
     sh.h_mousedown = lambda (e: any) {
-        sh.mpressed[0] = 1;
-        sh.mdown[0] = 1;
+        b = 1 if e.button == 2 else (2 if e.button == 1 else 0);
+        sh.mpressed[b] = 1;
+        sh.mdown[b] = 1;
     };
     sh.canvas.addEventListener("mousedown", sh.h_mousedown);
-    sh.h_mouseup = lambda (e: any) { sh.mdown[0] = 0; };
+    sh.h_mouseup = lambda (e: any) {
+        b = 1 if e.button == 2 else (2 if e.button == 1 else 0);
+        sh.mdown[b] = 0;
+    };
     document.addEventListener("mouseup", sh.h_mouseup);
+    # right-click aims down sights; stop the browser context menu from popping.
+    sh.h_contextmenu = lambda (e: any) { e.preventDefault(); };
+    sh.canvas.addEventListener("contextmenu", sh.h_contextmenu);
     sh.h_mousemove = lambda (e: any) { if sh.locked {
         sh.mouseX = sh.mouseX + e.movementX;
         sh.mouseY = sh.mouseY + e.movementY;
@@ -498,6 +504,9 @@ def _remove_input(sh: any) {
     }
     if sh.h_mousemove is not None {
         document.removeEventListener("mousemove", sh.h_mousemove);
+    }
+    if sh.h_contextmenu is not None {
+        sh.canvas.removeEventListener("contextmenu", sh.h_contextmenu);
     }
     if sh.h_plock is not None {
         document.removeEventListener("pointerlockchange", sh.h_plock);

@@ -41,9 +41,12 @@ obj R3D {
         gun: any = None,
         flash: any = None,
         bots: list = [],
+        pickups: list = [],
         tracers: list = [],
         flash_op: float = 0.0,
         recoil: float = 0.0,
+        base_fov: float = 90.0,
+        cur_zoom: float = 1.0,
         static_built: bool = False;
 }
 
@@ -64,6 +67,38 @@ def _make_gun -> any {
     grip.rotation.x = 0.3;
     g.add(grip);
     g.position.set(0.22, -0.2, -0.3);
+    return g;
+}
+
+# One colour per GUN_* id so a crate reads as "that is the sniper" from across
+# the map. Matches the HUD's GUN_NAMES order.
+glob GUN_COLORS: list = [0x8fa3bf, 0x6ee7a8, 0xff8c42, 0x9b7bd8, 0xf5c451];
+
+"""A weapon crate: a coloured box on a dark plinth, bobbing and spinning."""
+def _make_pickup -> any {
+    g = new(Group);
+    plinth = new(
+        Mesh,
+        new(BoxGeometry, 0.5, 0.06, 0.5),
+        new(MeshStandardMaterial, {"color": 0x1a1f2e, "roughness": 0.9})
+    );
+    plinth.position.set(0.0, -0.22, 0.0);
+    g.add(plinth);
+    box = new(
+        Mesh,
+        new(BoxGeometry, 0.34, 0.34, 0.34),
+        new(
+            MeshStandardMaterial,
+            {
+                "color": 0xffffff,
+                "roughness": 0.35,
+                "metalness": 0.4,
+                "emissive": 0x000000
+            }
+        )
+    );
+    box.castShadow = True;
+    g.add(box);
     return g;
 }
 
@@ -96,6 +131,7 @@ def:pub make_renderer(canvas: any, fov: any) -> any {
     r.scene = new(Scene);
     r.scene.background = new(Color, 0x9fbcd6);
     r.scene.fog = new(Fog, 0x9fbcd6, 35.0, 110.0);
+    r.base_fov = float(f"{fov}");
     r.cam = new(PerspectiveCamera, fov, 960.0 / 600.0, 0.05, 400.0);
     r.renderer = new(WebGLRenderer, {"canvas": canvas, "antialias": True});
     r.renderer.setSize(960, 600, False);
@@ -226,6 +262,14 @@ def:pub draw(r: any, exports: any) {
     fz: float = -Math.cos(yr) * cp;
     r.cam.position.set(cx, cy, cz);
     r.cam.lookAt(cx + fx, cy + fy, cz + fz);
+    # ── scope: ease the FOV toward base_fov * zoom while aiming down sights ──
+    want_zoom: float = float(f"{exports.get_zoom()}");
+    cur: float = float(f"{r.cur_zoom}");
+    cur = cur + (want_zoom - cur) * 0.35;
+    r.cur_zoom = cur;
+    bf: float = float(f"{r.base_fov}");
+    r.cam.fov = bf * cur;
+    r.cam.updateProjectionMatrix();
     # ── bots ──
     n: int = int(f"{exports.get_bot_count()}");
     i: int = 0;
@@ -253,6 +297,36 @@ def:pub draw(r: any, exports: any) {
     while j < len(r.bots) {
         r.bots[j].visible = False;
         j = j + 1;
+    }
+    # ── weapon pickups ──
+    pn: int = int(f"{exports.get_pickup_count()}");
+    t: float = float(f"{Date.now()}") * 0.001;
+    k: int = 0;
+    while k < pn {
+        ki = BigInt(k);
+        if k >= len(r.pickups) {
+            r.pickups.append(_make_pickup());
+            r.scene.add(r.pickups[k]);
+        }
+        pk = r.pickups[k];
+        gid: int = int(f"{exports.get_pickup_gun(ki)}");
+        px: float = float(f"{exports.get_pickup_x(ki)}");
+        py: float = float(f"{exports.get_pickup_y(ki)}");
+        pz: float = float(f"{exports.get_pickup_z(ki)}");
+        # bob + spin; the phase is offset per crate so they are not in lockstep
+        pk.position.set(px, py + Math.sin(t * 2.0 + float(k)) * 0.09, pz);
+        pk.rotation.y = t * 0.8 + float(k);
+        col = GUN_COLORS[gid] if gid >= 0 and gid < 5 else 0xffffff;
+        pk.children[1].material.color.setHex(col);
+        pk.children[1].material.emissive.setHex(col);
+        pk.children[1].material.emissiveIntensity = 0.25;
+        pk.visible = True;
+        k = k + 1;
+    }
+    m: int = pn;
+    while m < len(r.pickups) {
+        r.pickups[m].visible = False;
+        m = m + 1;
     }
     # ── muzzle flash + recoil ──
     mz: int = int(f"{exports.get_muzzle()}");

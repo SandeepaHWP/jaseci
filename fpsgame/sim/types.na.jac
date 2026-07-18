@@ -14,6 +14,7 @@ glob KEY_W: int = 87,
      KEY_S: int = 83,
      KEY_D: int = 68,
      KEY_R: int = 82,
+     KEY_F: int = 70,
      KEY_SPACE: int = 32,
      KEY_RIGHT: int = 262,
      KEY_LEFT: int = 263,
@@ -21,6 +22,7 @@ glob KEY_W: int = 87,
      KEY_UP: int = 265,
      KEY_TAB: int = 258,
      MOUSE_LEFT: int = 0,
+     MOUSE_RIGHT: int = 1,
      DEG2RAD: float = 0.017453292519943295,
      MOUSE_SENS: float = 0.12,
      GRAV: float = -22.0,
@@ -45,6 +47,8 @@ glob KEY_W: int = 87,
      MODE_FFA: int = 0,
      MODE_TIME_ATTACK: int = 1,
      TA_SECS: float = 60.0,
+     # how close you must be to a pickup for F to swap with it
+     PICKUP_REACH: float = 2.2,
      RESPAWN_T: float = 2.0,
      BOT_COUNT: int = 5,
      BOT_SPD_FRAC: float = 0.6,
@@ -90,7 +94,21 @@ obj Weapon {
         max_range: float = 200.0,
         spread: float = 0.0,
         pellets: int = 1,
-        ammo_max: int = 90;
+        ammo_max: int = 90,
+        # right-click FOV multiplier (1.0 = no scope, lower = more zoom)
+        zoom: float = 1.0;
+}
+
+"""A weapon lying in the world. It carries its OWN mag/ammo: swapping exchanges
+state both ways, so a gun you drop keeps the rounds it had left until you come
+back for it. The weapon table holds immutable tunables; this holds the wear."""
+obj Pickup {
+    has x: float = 0.0,
+        y: float = 0.0,
+        z: float = 0.0,
+        weapon_id: int = 0,
+        mag: int = 0,
+        ammo: int = 0;
 }
 
 """A player or bot: position, velocity, look angles, health, weapon + AI state."""
@@ -128,6 +146,7 @@ obj World {
     has player: Ent = Ent(),
         bots: list[Ent] = [],
         weapons: list[Weapon] = [],
+        pickups: list[Pickup] = [],
         colliders: list[Box] = [],
         spawns: list[Vec3] = [],
         tracers: list[Tracer] = [],
@@ -145,6 +164,8 @@ obj World {
         mode: int = 0,
         # the weapon the player spawns with, chosen in the menu
         loadout: int = GUN_RIFLE,
+        # right mouse held: aiming down sights with the weapon's zoom
+        scoped: bool = False,
         # seconds the round is capped at; 0.0 = no clock (ffa)
         round_limit: float = 0.0;
 }

@@ -14,6 +14,7 @@ import from .types {
     KEY_S,
     KEY_D,
     KEY_R,
+    KEY_F,
     KEY_SPACE,
     KEY_LEFT,
     KEY_RIGHT,
@@ -21,6 +22,7 @@ import from .types {
     KEY_DOWN,
     KEY_TAB,
     MOUSE_LEFT,
+    MOUSE_RIGHT,
     DEG2RAD,
     MOVE_SPD,
     JUMP_V,
@@ -41,7 +43,17 @@ import from .render {
     unlock_mouse
 }
 import from .physics { move_and_collide }
-import from .combat { tick_weapon, start_reload, try_fire, spawn_ent, build_weapons }
+import from .combat {
+    tick_weapon,
+    start_reload,
+    try_fire,
+    spawn_ent,
+    build_weapons,
+    gun_zoom,
+    stock_pickups,
+    near_pickup,
+    swap_pickup
+}
 import from .maps { map_load }
 import from .bots { bot_update, assign_route }
 
@@ -75,6 +87,10 @@ def:pub handle_input(world: World, step: float) {
     if key_held(KEY_DOWN) {
         world.player.pitch -= turn;
     }
+    # right mouse = aim down sights; only while the pointer is captured
+    world.scoped = world.mouse_captured and mouse_held(MOUSE_RIGHT);
+    # scoping scales look speed by the zoom factor so a tight FOV isn't twitchy
+    look_scale = gun_zoom(world, world.player.weapon_id) if world.scoped else 1.0;
     if world.mouse_captured {
         mx = mouse_x();
         my = mouse_y();
@@ -84,8 +100,8 @@ def:pub handle_input(world: World, step: float) {
             ddx = mx - world.prev_mx;
             ddy = my - world.prev_my;
             if ddx < 150.0 and ddx > -150.0 and ddy < 150.0 and ddy > -150.0 {
-                world.player.yaw -= ddx * world.sens;
-                world.player.pitch -= ddy * world.sens;
+                world.player.yaw -= ddx * world.sens * look_scale;
+                world.player.pitch -= ddy * world.sens * look_scale;
             }
         }
         world.prev_mx = mx;
@@ -140,6 +156,10 @@ def:pub handle_input(world: World, step: float) {
     if key_tapped(KEY_R) {
         start_reload(world, world.player);
     }
+    # F swaps your gun with the nearest pickup in reach (you carry exactly one)
+    if key_tapped(KEY_F) {
+        swap_pickup(world, world.player, near_pickup(world, world.player));
+    }
     if mouse_held(MOUSE_LEFT) and world.mouse_captured {
         yp = world.player.pitch * DEG2RAD;
         cp = jcos(yp);
@@ -169,6 +189,8 @@ def:pub new_round(world: World) {
         assign_route(b);
         world.bots.append(b);
     }
+    # map_load rebuilt world.pickups; give each one a full load of its weapon
+    stock_pickups(world);
     world.tracers = [];
     world.world_t = 0.0;
     # time attack caps the round with a clock; ffa runs until the score target

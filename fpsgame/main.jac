@@ -275,6 +275,7 @@ na {
         time_left,
         round_over
     }
+    import from .sim.combat { near_pickup, gun_zoom }
 
     glob WORLD: World = World();
 
@@ -467,6 +468,38 @@ na {
         WORLD.loadout = g;
     }
 
+    # ── Pickups (Phase 3: F swaps your gun with the one on the ground) ────────
+    """How many weapon pickups the current map has."""
+    def get_pickup_count -> int {
+        return len(WORLD.pickups);
+    }
+
+    def get_pickup_x(i: int) -> float {
+        return WORLD.pickups[i].x;
+    }
+
+    def get_pickup_y(i: int) -> float {
+        return WORLD.pickups[i].y;
+    }
+
+    def get_pickup_z(i: int) -> float {
+        return WORLD.pickups[i].z;
+    }
+
+    """Which weapon is lying at pickup i (a GUN_* id)."""
+    def get_pickup_gun(i: int) -> int {
+        return WORLD.pickups[i].weapon_id;
+    }
+
+    """The gun id F would swap to right now, or -1 when nothing is in reach."""
+    def get_pickup_prompt -> int {
+        idx = near_pickup(WORLD, WORLD.player);
+        if idx < 0 {
+            return -1;
+        }
+        return WORLD.pickups[idx].weapon_id;
+    }
+
     """Whole seconds left on the round clock; 0 when the mode has no clock."""
     def get_time_left -> int {
         return int(time_left(WORLD));
@@ -475,6 +508,15 @@ na {
     """1 once a clocked round has run out of time."""
     def get_round_over -> int {
         return 1 if round_over(WORLD) else 0;
+    }
+
+    """FOV multiplier for the camera: the weapon's zoom while scoped, else 1.0.
+    The cl{} renderer multiplies its base FOV by this to aim down sights."""
+    def get_zoom -> float {
+        if WORLD.scoped {
+            return gun_zoom(WORLD, WORLD.player.weapon_id);
+        }
+        return 1.0;
     }
 
     """Restart the current round."""

@@ -92,6 +92,10 @@ def:pub ensure_styles {
              font-size: 26px; font-weight: 700; color: #e8f0ff; pointer-events: none;
              text-shadow: 0 1px 3px #000; font-variant-numeric: tabular-nums; }
     #clock.low { color: #ff6b6b; }
+    #prompt { position: absolute; left: 50%; top: 58%; transform: translateX(-50%);
+              white-space: nowrap; pointer-events: none; font-size: 14px;
+              color: #e8f0ff; background: rgba(0,0,0,0.5); padding: 4px 12px;
+              border-radius: 6px; text-shadow: 0 1px 2px #000; }
     .row.modes, .row.guns { width: auto; justify-content: center; flex-wrap: wrap; }
     .loadout { display: flex; flex-direction: column; align-items: center; gap: 6px;
                padding: 10px 14px; border: 1px solid #232a3d; border-radius: 8px;

@@ -18,6 +18,7 @@ def:pub Hud -> JsxElement {
         gun: int = 1,
         tleft: int = 0,
         mode: int = 0,
+        prompt: int = -1,
         feed: list = [];
 
     can with entry {
@@ -40,6 +41,7 @@ def:pub Hud -> JsxElement {
             ngun: int,
             ntleft: int,
             nmode: int,
+            nprompt: int,
             nfeed: list
         ) {
             hp = nhp;
@@ -56,6 +58,7 @@ def:pub Hud -> JsxElement {
             gun = ngun;
             tleft = ntleft;
             mode = nmode;
+            prompt = nprompt;
             feed = nfeed;
         };
     }
@@ -66,6 +69,10 @@ def:pub Hud -> JsxElement {
     mins: int = tleft // 60;
     secs: int = tleft % 60;
     clock_txt: str = f"{mins}:0{secs}" if secs < 10 else f"{mins}:{secs}";
+    # prompt is the gun id F would swap to, or -1 when nothing is in reach
+    swap_txt: str = f"[F] Swap for {GUN_NAMES[prompt]}"
+        if prompt >= 0 and prompt < 5
+        else "";
     return
         <div id="hud-root">
             <div id="cross" className={"hot" if hit else ""}></div>
@@ -83,6 +90,7 @@ def:pub Hud -> JsxElement {
             )
                 if mode == 1
                 else None}
+            {(<div id="prompt">{swap_txt}</div>) if prompt >= 0 else None}
             <div id="stat">
                 {"score "}
                 <b>{kills}</b>

@@ -110,6 +110,26 @@ Key things learned/fixed while getting Phase 1 playable:
   line of sight. (Bot firing is fully implemented in `sim/bots.na.jac` and is intentionally
   commented out for now so solo testing is easier -- uncomment the marked block to re-enable;
   all supporting imports are kept. This is a test toggle, not missing work.)
+- **Struct layout + the sticky cache (cost hours, 2026-07-17):** adding `World.weapons`
+  *between* `bots` and `colliders` made weapon stats read back as **collider coordinates**
+  (`mag` = -24.0, 23.5) and then trap in `ray_vs_ent`. The code was correct throughout;
+  cached modules kept the OLD struct layout while others used the new one, so field reads
+  landed on a neighbour. `rm -rf .jac` fixed it with zero code change. **Rule: adding or
+  reordering a field on a shared `na{}` obj (`World`, `Ent`) requires `rm -rf .jac`.**
+  Tell-tale: garbage that looks like *another field's* plausible data, not noise or zeros.
+  Suspect the cache before the compiler.
+- **Headless wasm probe (`node` + a stub env):** `main.wasm` can be instantiated outside the
+  browser to read sim state directly - it reproduced the bug above in ~1s. The stub must
+  mirror `raylib_shim`: set `heap` from `exports.__heap_base.value`, call
+  `exports.__jac_glob_init()` **before** `init()` (without it `glob WORLD` is None and
+  `new_round` raises), and make `abort` a **no-op** as the shim does. Note the sim printf's
+  `"Uncaught exception: %s"` before aborting, and the shim stubs `printf` to 0 - so real sim
+  exceptions are invisible in the browser.
+- **`glob` is private by default:** needs `glob:pub` to import across client modules (see
+  `examples/mobui/littlex/theme.cl.jac`). **`jac check` does NOT catch a missing `glob`
+  export** - only the bundle build does. `jac build` is unusable as a gate here: it fails on
+  pre-existing type errors in `raylib_shim.cl.jac` / `render3d.cl.jac` (the `.cl.jac` deps
+  are compiled, not strictly type-checked, by `jac start`).
 - **Jump/gravity dead -> backend constant bug:** jump never worked because gravity was not being
   applied. Root cause: the imported `GRAV` constant read wrong in the native/wasm arithmetic
   (`e.vy += GRAV * step`), so `vy` never accumulated -> player never fell -> `on_ground` never set
@@ -334,17 +354,56 @@ Goal: a complete, shippable single-player product.
 
 ### 3B. Game modes (single-player)
 
-- [ ] P3-005  Wave survival mode (escalating bot waves).
-- [ ] P3-006  Time attack / target practice mode.
-- [ ] P3-007  Free-for-all vs bots with score target.
-- [ ] P3-008  Mode select in menu; mode rules parameterize `world_init`/`world_step`.
+- [ ] P3-005  Wave survival mode (escalating bot waves). **Blocked on bot fire** -
+  batch with P3-012 (see the bot-fire note in the Progress Log).
+- [x] P3-006  Time attack / target practice mode. Reach the score target inside
+  `TA_SECS` (60s); HUD countdown; `World.round_limit` (0.0 = no clock).
+- [x] P3-007  Free-for-all vs bots with score target. This is the default mode
+  (`MODE_FFA`), now explicit in the menu - it was already the Phase 1/2 game.
+- [x] P3-008  Mode select in menu; mode rules parameterize the round. **The plan
+  assumed `world_init(map_id, bots)`; the real signature takes only `World`**, so
+  config reaches the sim through setters the shim calls before `init()`
+  (`set_sensitivity`/`set_bots`/`set_mode`/`set_loadout`) and `new_round` applies
+  them. `set_map` is called after `init` and restarts the round.
 
 ### 3C. Content
 
 - [ ] P3-009  3–5 finished maps with art pass (colors, props, lighting fakes).
-- [ ] P3-010  Full weapon roster (pistol, rifle, shotgun, smg, sniper) with distinct feel.
-- [ ] P3-011  Weapon pickups / loadout selection.
-- [ ] P3-012  Bot difficulty tiers + per-mode tuning.
+- [x] P3-010  Full weapon roster (pistol, rifle, shotgun, smg, sniper). `Weapon`
+  obj + `World.weapons` built by `build_weapons`; read through scalar `gun_*`
+  accessors (never hand a `Weapon` back to a caller). Rifle is built from the
+  `W_*` tunables so it stays the Phase 1 weapon. **Feel is unverified** - the
+  other four guns' numbers are untuned guesses.
+- [x] P3-011  Weapon pickups / loadout selection.
+  - [x] P3-011a  Loadout select in the menu (`World.loadout`, applied by
+    `new_round` before `spawn_ent`). Replaced the debug 1-5 switching, which
+    also handed out a free reload on every switch.
+  - [x] P3-011b  **Pickups: press F to swap.** You carry exactly one gun. F near a
+    pickup **exchanges** your weapon with it - `weapon_id`/`mag`/`ammo` swap both
+    ways (`swap_pickup`), so your old gun is left on the ground holding *its*
+    remaining ammo and the gun you take keeps *its* own. Ammo state lives on the
+    `Pickup` obj, not in the weapon table (the table is immutable tunables).
+    `stock_pickups` refills every pickup on `new_round`.
+  - [x] P3-011c  Pickups placed as an **armoury**: `add_table` (a low block +
+    the gun resting at y=1.25) x5 along the west wall via `add_armoury`, one per
+    gun. Scattered crates were dropped - they sat on top of cover boxes at y=2.4,
+    above `PICKUP_REACH` (2.2, measured from the player's feet), so un-grabbable.
+    Colour-coded crate meshes + getters in `render3d`; "[F] Swap for X" HUD
+    prompt (`near_pickup` / `get_pickup_prompt`) when in range.
+- [ ] P3-012  Bot difficulty tiers + per-mode tuning. **Blocked on bot fire** -
+  reaction/accuracy/aggression *are* the fire knobs; batch with P3-005.
+
+### 3C-bis. Weapon feel (pulled forward from Phase 4)
+
+- [ ] P3-019  Per-gun viewmodels: a distinct mesh per weapon in `render3d`
+  (today `_make_gun` builds one box gun for everything).
+- [x] P3-020  **ADS / scope on right-click** (was P4-003). Per-weapon `zoom`
+  factor on `Weapon` (sniper 0.35, rifle 0.7, smg 0.85, pistol/shotgun 1.0);
+  `World.scoped` set from the right mouse button in `handle_input`; `get_zoom`
+  export = the weapon's zoom while scoped else 1.0; `render3d` eases the camera
+  FOV toward `base_fov * zoom` each frame. Look sensitivity is scaled by the same
+  factor while scoped so a tight FOV isn't twitchy. The shim maps browser mouse
+  button 2 -> raylib button 1 and suppresses the canvas context menu.
 
 ### 3D. Progression
 
@@ -551,6 +610,3 @@ Goal: real-time PvP. The `na{}` sim now also compiles native for the authoritati
 - P3: accounts, modes, full content, progression - shippable single-player.
 - P4: audio/particles/polish/perf.
 - P5: server-authoritative real-time multiplayer with prediction.
-</content>
-
-</invoke>

@@ -69,6 +69,7 @@ def:pub GameView(
             gun: int = int(f"{exports.get_weapon()}");
             tleft: int = int(f"{exports.get_time_left()}");
             timeup: int = int(f"{exports.get_round_over()}");
+            prompt: int = int(f"{exports.get_pickup_prompt()}");
             prev_hp: int = int(f"{w2.__fps_prev_hp}");
             prev_kills: int = int(f"{w2.__fps_prev_kills}");
             prev_deaths: int = int(f"{w2.__fps_prev_deaths}");
@@ -107,6 +108,7 @@ def:pub GameView(
                     gun,
                     tleft,
                     mode,
+                    prompt,
                     feed
                 );
             }
@@ -140,7 +142,7 @@ def:pub GameView(
     return
         <div id="wrap">
             <div id="hint">
-                {"WASD move · Space jump · mouse aim · click fire · R reload · Tab release · Esc menu"}
+                {"WASD move · Space jump · mouse aim · click fire · right-click scope · R reload · F swap weapon · Tab release · Esc menu"}
             </div>
             <canvas id="glcanvas" width={960} height={600}></canvas>
             <Hud/>
