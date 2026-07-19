@@ -74,6 +74,22 @@ def:pub ensure_styles {
     #hud-root { position: absolute; inset: 0; pointer-events: none; overflow: hidden;
                 border-radius: 6px; }
     #cross.hot::before, #cross.hot::after { background: #ff5a5a; opacity: 1; }
+    /* red-dot reticle: a clean glowing dot at centre while ADS (the optic model
+       is on the gun itself; the full look-through view is future work). */
+    #scope-reddot { position: absolute; left: 50%; top: 50%; width: 8px; height: 8px;
+        transform: translate(-50%,-50%); border-radius: 50%; background: #ff2b2b;
+        box-shadow: 0 0 9px 3px rgba(255,45,45,0.95); pointer-events: none; }
+    /* sniper scope: black vignette with a clear centre circle + crosshair reticle */
+    #scope-sniper { position: absolute; inset: 0; pointer-events: none;
+        background: radial-gradient(circle 33vh at 50% 50%,
+            transparent 0 95%, rgba(0,0,0,0.5) 97%, #000 100%); }
+    #scope-sniper .s-ring { position: absolute; left: 50%; top: 50%; width: 66vh; height: 66vh;
+        transform: translate(-50%,-50%); border-radius: 50%;
+        border: 2px solid rgba(0,0,0,0.9); box-shadow: inset 0 0 0 1px rgba(230,240,255,0.18); }
+    #scope-sniper .s-h { position: absolute; left: 0; top: 50%; width: 100%; height: 1px;
+        background: rgba(10,12,16,0.85); transform: translateY(-50%); }
+    #scope-sniper .s-v { position: absolute; left: 50%; top: 0; width: 1px; height: 100%;
+        background: rgba(10,12,16,0.85); transform: translateX(-50%); }
     #feed { position: absolute; left: 12px; top: 36px; display: flex;
             flex-direction: column; gap: 3px; align-items: flex-start; }
     .feeditem { background: rgba(0,0,0,0.45); padding: 2px 9px; border-radius: 4px;

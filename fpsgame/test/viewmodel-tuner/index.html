@@ -2,17 +2,23 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>gun viewmodel tuner</title>
+  <title>gun + optic viewmodel tuner</title>
   <style>
-    body { margin: 0; background: #7fa8c9; color: #fff; font: 13px monospace; overflow: hidden; }
-    #panel { position: fixed; left: 8px; top: 8px; z-index: 10; background: rgba(0,0,0,.6);
+    body { margin: 0; background: #7fa8c9; color: #fff; font: 12px monospace; overflow: hidden; }
+    #panel { position: fixed; left: 8px; top: 8px; z-index: 10; background: rgba(0,0,0,.62);
              padding: 10px; border-radius: 8px; width: 300px; }
-    #panel .row { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
-    #panel label { width: 62px; } #panel input[type=range] { flex: 1; }
-    #panel b { width: 52px; text-align: right; color: #ffd86b; }
-    #vals { white-space: pre; margin-top: 8px; color: #9fe; font-size: 12px; }
+    #panel .sec { margin-top: 8px; color: #ffd86b; border-top: 1px solid #444; padding-top: 6px; }
+    #panel .row { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
+    #panel label { width: 58px; } #panel input[type=range] { flex: 1; }
+    #panel b { width: 50px; text-align: right; color: #ffd86b; }
+    #vals { white-space: pre; margin-top: 8px; color: #9fe; font-size: 11px; }
     #pick { position: fixed; right: 8px; top: 8px; z-index: 10; }
     button { font: inherit; margin: 2px; padding: 4px 10px; cursor: pointer; }
+    #dot { position: fixed; left: 50%; top: 50%; width: 8px; height: 8px; z-index: 6;
+           transform: translate(-50%,-50%); border-radius: 50%; background: #ff2b2b;
+           box-shadow: 0 0 8px 3px rgba(255,45,45,.9); display: none; }
+    #cross { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%);
+             color: #fff; font-size: 22px; z-index: 5; }
   </style>
   <script type="importmap">
   { "imports": {
@@ -23,21 +29,38 @@
 </head>
 <body>
   <div id="panel">
-    <div><b id="name" style="color:#ffd86b">rifle</b> — drag to pose the gun</div>
-    <div class="row"><label>rot X</label><input id="rx" type="range" min="-3.15" max="3.15" step="0.01" value="0"><b id="rxv">0</b></div>
-    <div class="row"><label>rot Y</label><input id="ry" type="range" min="-3.15" max="3.15" step="0.01" value="1.9"><b id="ryv">1.9</b></div>
-    <div class="row"><label>rot Z</label><input id="rz" type="range" min="-3.15" max="3.15" step="0.01" value="0"><b id="rzv">0</b></div>
-    <div class="row"><label>pos X</label><input id="px" type="range" min="-1" max="1" step="0.01" value="0.22"><b id="pxv">0.22</b></div>
-    <div class="row"><label>pos Y</label><input id="py" type="range" min="-1" max="1" step="0.01" value="-0.2"><b id="pyv">-0.2</b></div>
-    <div class="row"><label>pos Z</label><input id="pz" type="range" min="-1.2" max="-0.05" step="0.01" value="-0.3"><b id="pzv">-0.3</b></div>
-    <div class="row"><label>scale</label><input id="sc" type="range" min="0.02" max="0.35" step="0.005" value="0.1"><b id="scv">0.1</b></div>
+    <div><b id="name" style="color:#ffd86b">rifle</b> · <span id="adslbl">HIP</span></div>
+    <div class="sec">GUN pose</div>
+    <div class="row"><label>rot X</label><input id="rx" type="range" min="-3.15" max="3.15" step="0.01" value="0"><b id="rxv"></b></div>
+    <div class="row"><label>rot Y</label><input id="ry" type="range" min="-3.15" max="3.15" step="0.01" value="1.86"><b id="ryv"></b></div>
+    <div class="row"><label>rot Z</label><input id="rz" type="range" min="-3.15" max="3.15" step="0.01" value="0.12"><b id="rzv"></b></div>
+    <div class="row"><label>scale</label><input id="sc" type="range" min="0.02" max="0.35" step="0.005" value="0.19"><b id="scv"></b></div>
+    <div class="sec">HIP position</div>
+    <div class="row"><label>hip X</label><input id="px" type="range" min="-1" max="1" step="0.01" value="0.22"><b id="pxv"></b></div>
+    <div class="row"><label>hip Y</label><input id="py" type="range" min="-1" max="1" step="0.01" value="-0.2"><b id="pyv"></b></div>
+    <div class="row"><label>hip Z</label><input id="pz" type="range" min="-1.2" max="-0.05" step="0.01" value="-0.32"><b id="pzv"></b></div>
+    <div class="sec">ADS position (press A to toggle)</div>
+    <div class="row"><label>ads X</label><input id="ax" type="range" min="-0.6" max="0.6" step="0.005" value="0"><b id="axv"></b></div>
+    <div class="row"><label>ads Y</label><input id="ay" type="range" min="-0.6" max="0.4" step="0.005" value="-0.08"><b id="ayv"></b></div>
+    <div class="row"><label>ads Z</label><input id="az" type="range" min="-0.6" max="-0.05" step="0.005" value="-0.2"><b id="azv"></b></div>
+    <div class="sec">OPTIC mount (nudge onto the gun)</div>
+    <div class="row"><label>side ⟷</label><input id="ox" type="range" min="-0.4" max="0.4" step="0.002" value="0"><b id="oxv"></b></div>
+    <div class="row"><label>up ↕</label><input id="oy" type="range" min="-0.3" max="0.4" step="0.002" value="0.08"><b id="oyv"></b></div>
+    <div class="row"><label>fwd ⤢</label><input id="oz" type="range" min="-0.5" max="0.5" step="0.002" value="0"><b id="ozv"></b></div>
+    <div class="row"><label>opt sc</label><input id="os" type="range" min="0.05" max="2.5" step="0.01" value="0.6"><b id="osv"></b></div>
+    <div class="row"><label>opt rX</label><input id="orx" type="range" min="-3.15" max="3.15" step="0.01" value="0"><b id="orxv"></b></div>
+    <div class="row"><label>opt rY</label><input id="ory" type="range" min="-3.15" max="3.15" step="0.01" value="0"><b id="oryv"></b></div>
+    <div class="row"><label>opt rZ</label><input id="orz" type="range" min="-3.15" max="3.15" step="0.01" value="0"><b id="orzv"></b></div>
     <div id="vals"></div>
   </div>
   <div id="pick">
-    <button data-g="../models/rifle.glb">rifle</button>
-    <button data-g="../models/pistol.glb">pistol</button>
-    <button data-g="../models/sniper.glb">sniper</button>
+    <button data-g="rifle">rifle</button>
+    <button data-g="pistol">pistol</button>
+    <button data-g="smg">smg</button>
+    <button data-g="sniper">sniper</button>
   </div>
+  <div id="cross">+</div>
+  <div id="dot"></div>
   <script type="module">
     import * as THREE from 'three';
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -49,7 +72,6 @@
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x7fa8c9);
-    // ground + reference boxes so it feels like the game
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200),
       new THREE.MeshStandardMaterial({ color: 0x3a7d34 }));
     ground.rotation.x = -Math.PI / 2; ground.position.y = -1.6; scene.add(ground);
@@ -61,62 +83,95 @@
     scene.add(new THREE.HemisphereLight(0xffffff, 0x334, 1.1));
     const dir = new THREE.DirectionalLight(0xffffff, 1.4); dir.position.set(5, 8, 5); scene.add(dir);
 
-    // FPS-style camera: at eye height, looking straight down -Z (like the game view)
     const camera = new THREE.PerspectiveCamera(90, innerWidth / innerHeight, 0.05, 400);
-    camera.position.set(0, 0, 0);
     scene.add(camera);
-    const cross = document.createElement('div');
-    cross.textContent = '+'; cross.style.cssText =
-      'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);color:#fff;font-size:24px;z-index:5';
-    document.body.appendChild(cross);
 
-    const holder = new THREE.Group(); camera.add(holder);   // = r.gun in the game
-    let wrap = null;                                        // scaled+rotated model
-    let baseScale = 0.55;
+    // holder = moving anchor (hip <-> ADS).
+    //   gunFrame = gun ROTATION (shared by gun + optic so they move together)
+    //     gunWrap  = gun SCALE  -> gunModel (centering must be scaled with it)
+    //     opticWrap = the optic, positioned in the gun's frame (on the rail)
+    const holder = new THREE.Group(); camera.add(holder);
+    const gunFrame = new THREE.Group(); holder.add(gunFrame);
+    const gunWrap = new THREE.Group(); gunFrame.add(gunWrap);
+    const opticWrap = new THREE.Group(); gunFrame.add(opticWrap);
+    let gunModel = null, opticModel = null, ads = false;
 
     const loader = new GLTFLoader();
     const $ = id => document.getElementById(id);
 
-    function loadGun(url) {
-      $('name').textContent = url.split('/').pop().replace('.glb','');
-      if (wrap) { holder.remove(wrap); wrap = null; }
-      loader.load(url, (gltf) => {
-        const m = gltf.scene;
-        m.updateMatrixWorld(true);
+    function centered(url) {
+      return new Promise((res, rej) => loader.load(url, g => {
+        const m = g.scene; m.updateMatrixWorld(true);
         const box = new THREE.Box3().setFromObject(m);
-        const ctr = box.getCenter(new THREE.Vector3());
-        // ONE uniform scale for every gun -> they keep their real relative sizes
-        // (pistol small, sniper big). The slider IS that shared factor.
-        baseScale = 1;
-        wrap = new THREE.Group();
-        m.position.set(-ctr.x, -ctr.y, -ctr.z);
-        wrap.traverse(o => { if (o.isMesh) o.visible = true; });
-        wrap.add(m);
-        holder.add(wrap);
-        apply();
-      });
+        const c = box.getCenter(new THREE.Vector3());
+        m.position.sub(c);
+        m.traverse(o => { if (o.isMesh) o.visible = true; });
+        res(m);
+      }, undefined, rej));
+    }
+
+    // each gun remembers its OWN optic mount (rail height/size differ per gun)
+    const OPT_KEYS = ['ox','oy','oz','os','orx','ory','orz'];
+    const opticByGun = JSON.parse(sessionStorage.opticByGun || '{}');
+    let currentGun = null;
+    function saveOptic() {
+      if (!currentGun) return;
+      opticByGun[currentGun] = {}; OPT_KEYS.forEach(k => opticByGun[currentGun][k] = $(k).value);
+      sessionStorage.opticByGun = JSON.stringify(opticByGun);
+    }
+    function loadOptic(name) {
+      const v = opticByGun[name];
+      if (v) OPT_KEYS.forEach(k => { if (v[k] !== undefined) $(k).value = v[k]; });
+    }
+
+    async function loadGun(name) {
+      saveOptic();                 // keep the gun we're leaving
+      currentGun = name;
+      loadOptic(name);             // restore this gun's saved optic (if any)
+      $('name').textContent = name;
+      if (gunModel) { gunWrap.remove(gunModel); gunModel = null; }
+      gunModel = await centered(`../models/${name}.glb`);
+      gunWrap.add(gunModel);
+      if (!opticModel) {
+        try { opticModel = await centered('../models/reddot.glb'); opticWrap.add(opticModel); }
+        catch (e) { $('vals').textContent = 'NOTE: ../models/reddot.glb not found yet.'; }
+      }
+      apply();
     }
 
     function apply() {
-      if (!wrap) return;
-      const rx = +$('rx').value, ry = +$('ry').value, rz = +$('rz').value;
-      const px = +$('px').value, py = +$('py').value, pz = +$('pz').value;
-      const sc = +$('sc').value;
-      wrap.rotation.set(rx, ry, rz);
-      wrap.scale.setScalar(baseScale * sc);
-      holder.position.set(px, py, pz);
-      for (const k of ['rx','ry','rz','px','py','pz','sc'])
-        $(k + 'v').textContent = (+$(k).value).toFixed(2);
+      const g = id => +$(id).value;
+      // gun rotation on the shared frame; scale on the wrap (so the centering
+      // offset scales with it -- otherwise the gun flies off screen)
+      gunFrame.rotation.set(g('rx'), g('ry'), g('rz'));
+      gunWrap.scale.setScalar(g('sc'));
+      if (opticModel) {
+        // optic sits in the gun's frame, so it moves/rotates WITH the gun.
+        // side/up/fwd are in that frame; scale is world-ish (independent of gun).
+        opticWrap.position.set(g('ox'), g('oy'), g('oz'));
+        opticWrap.rotation.set(g('orx'), g('ory'), g('orz'));
+        opticWrap.scale.setScalar(g('os'));
+        opticWrap.visible = true;
+      }
+      holder.position.set(ads ? g('ax') : g('px'), ads ? g('ay') : g('py'), ads ? g('az') : g('pz'));
+      $('dot').style.display = ads ? 'block' : 'none';
+      $('adslbl').textContent = ads ? 'ADS' : 'HIP';
+      for (const k of ['rx','ry','rz','sc','px','py','pz','ax','ay','az','ox','oy','oz','os','orx','ory','orz'])
+        $(k + 'v').textContent = (+$(k).value).toFixed(3);
       $('vals').textContent =
-        `// paste into _load_gun_model:\n` +
-        `wrap.rotation.set(${rx}, ${ry}, ${rz});\n` +
-        `holder pos = (${px}, ${py}, ${pz})\n` +
-        `scale mult = ${sc}  (target size ~${sc.toFixed(2)})`;
+        `HIP  holder (${g('px')}, ${g('py')}, ${g('pz')})\n` +
+        `ADS  holder (${g('ax')}, ${g('ay')}, ${g('az')})\n` +
+        `gun  rot (${g('rx')}, ${g('ry')}, ${g('rz')}) scale ${g('sc')}\n` +
+        `optic pos (${g('ox')}, ${g('oy')}, ${g('oz')}) scale ${g('os')}\n` +
+        `optic rot (${g('orx')}, ${g('ory')}, ${g('orz')})`;
+      saveOptic();
     }
 
-    ['rx','ry','rz','px','py','pz','sc'].forEach(id => $(id).oninput = apply);
+    ['rx','ry','rz','sc','px','py','pz','ax','ay','az','ox','oy','oz','os','orx','ory','orz']
+      .forEach(id => $(id).oninput = apply);
     document.querySelectorAll('#pick button').forEach(b => b.onclick = () => loadGun(b.dataset.g));
-    loadGun('../models/rifle.glb');
+    addEventListener('keydown', e => { if (e.key === 'a' || e.key === 'A') { ads = !ads; apply(); } });
+    loadGun('rifle');
 
     addEventListener('resize', () => {
       camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();

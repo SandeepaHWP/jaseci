@@ -85,9 +85,48 @@ def _make_gun -> any {
     return g;
 }
 
-"""Load a weapon GLB and swap it in for the box gun once ready. Auto-scaled to
-the box gun's size and recentered; parented to the holder, hidden until the
-player is holding that gun. Rotation/offset are first-guess -- tune in-browser."""
+# Mount the red-dot optic onto a gun (rifle=1, smg=3). The optic rides the gun's
+# rotation FRAME (not the scaled wrap), positioned/sized/rotated as tuned in
+# test/viewmodel-tuner. Pistol/shotgun/sniper get no mounted optic.
+def _mount_optic(frame: any, gid: int) {
+    loader: any = new(GLTFLoader);
+    loader.load(
+        "/static/models/reddot.glb",
+        lambda (gltf: any) {
+            om: any = gltf.scene;
+            om.updateMatrixWorld(True);
+            obb: any = new(Box3);
+            obb.setFromObject(om);
+            octr: any = new(Vector3);
+            obb.getCenter(octr);
+            ow: any = new(Group);
+            om.position.set(-octr.x, -octr.y, -octr.z);
+            ow.add(om);
+            if gid == 1 {
+                ow.position.set(0.0, 0.172, 0.0);
+                ow.scale.set(1.99, 1.99, 1.99);
+                ow.rotation.set(0.0, -1.77, 0.0);
+            } else {
+                ow.position.set(0.0, 0.182, 0.0);
+                ow.scale.set(2.12, 2.12, 2.12);
+                ow.rotation.set(0.0, -1.81, 0.0);
+            }
+            ow.traverse(
+                lambda (o: any) { if o.isMesh {
+                    o.visible = True;
+                    o.castShadow = True;
+                }}
+            );
+            frame.add(ow);
+        },
+        None,
+        lambda (err: any) { console.log("[fps] optic load FAILED", gid, err); }
+    );
+}
+
+"""Load a weapon GLB and swap it in for the box gun once ready. The gun rotation
+lives on `frame`, its uniform scale on `gunScale` inside it, so a mounted optic
+can ride `frame` unscaled (same layout as test/viewmodel-tuner)."""
 def _load_gun_model(r: any, gid: int, url: str) {
     loader: any = new(GLTFLoader);
     loader.load(
@@ -102,24 +141,28 @@ def _load_gun_model(r: any, gid: int, url: str) {
             bb.setFromObject(m);
             ctr: any = new(Vector3);
             bb.getCenter(ctr);
-            # center the model at the wrapper origin, then apply ONE uniform scale
-            # to every gun so they keep their real relative sizes (pistol small,
-            # sniper big -- GUN_SCALE, tuned in test/viewmodel-tuner).
-            wrap: any = new(Group);
+            # gunScale holds the centered model at ONE uniform scale (pistol
+            # small, sniper big); frame holds the shared rotation + any optic.
+            gscale: any = new(Group);
             m.position.set(-ctr.x, -ctr.y, -ctr.z);
-            wrap.add(m);
-            wrap.scale.set(0.19, 0.19, 0.19);
-            # pose tuned in the viewmodel tuner: barrel forward + slight roll.
-            wrap.rotation.set(0.0, 1.86, 0.12);
-            wrap.visible = False;
-            wrap.traverse(
+            gscale.add(m);
+            gscale.scale.set(0.19, 0.19, 0.19);
+            frame: any = new(Group);
+            frame.add(gscale);
+            frame.rotation.set(0.0, 1.86, 0.12);
+            frame.visible = False;
+            frame.traverse(
                 lambda (o: any) { if o.isMesh {
                     o.visible = True;
                     o.castShadow = True;
                 }}
             );
-            r.gun.add(wrap);
-            r.gun_models[gid] = wrap;
+            # rifle + smg carry a mounted red-dot optic (visual only for now).
+            if gid == 1 or gid == 3 {
+                _mount_optic(frame, gid);
+            }
+            r.gun.add(frame);
+            r.gun_models[gid] = frame;
             # force draw's swap check to re-run: this model may be the held gun,
             # which was already showing the box because we weren't loaded yet.
             r.shown_gun = -2;
@@ -417,6 +460,10 @@ def:pub draw(r: any, exports: any) {
             r.shown_wrap = w;
         }
     }
+    # sniper ADS shows the scope overlay instead of the gun -> hide the holder
+    # while scoped with the sniper (gun id 4); every other gun stays visible.
+    scoped_now: int = int(f"{exports.get_scoped()}");
+    r.gun.visible = not (scoped_now == 1 and held == 4);
     # ── muzzle flash + recoil ──
     mz: int = int(f"{exports.get_muzzle()}");
     if mz == 1 {

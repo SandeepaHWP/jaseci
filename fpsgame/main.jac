@@ -519,6 +519,11 @@ na {
         return 1.0;
     }
 
+    """1 while aiming down sights (right mouse held); the HUD draws the scope."""
+    def get_scoped -> int {
+        return 1 if WORLD.scoped else 0;
+    }
+
     """Restart the current round."""
     def restart {
         new_round(WORLD);

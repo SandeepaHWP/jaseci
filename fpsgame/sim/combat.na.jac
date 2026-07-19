@@ -47,7 +47,7 @@ def:pub build_weapons(world: World) {
             spread=0.0,
             pellets=1,
             ammo_max=90,
-            zoom=0.7
+            zoom=0.9
         )
     );
     world.weapons.append(
@@ -73,7 +73,7 @@ def:pub build_weapons(world: World) {
             spread=0.035,
             pellets=1,
             ammo_max=140,
-            zoom=0.85
+            zoom=0.9
         )
     );
     world.weapons.append(

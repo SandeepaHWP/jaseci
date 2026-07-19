@@ -395,15 +395,33 @@ Goal: a complete, shippable single-player product.
 
 ### 3C-bis. Weapon feel (pulled forward from Phase 4)
 
-- [ ] P3-019  Per-gun viewmodels: a distinct mesh per weapon in `render3d`
-  (today `_make_gun` builds one box gun for everything).
+- [x] P3-019  Per-gun viewmodels: real CC0 glTF models (Quaternius Ultimate Guns
+  Pack) loaded with `GLTFLoader`, one per weapon, shown for the held gun; the box
+  gun stays as the fallback. Served from `assets/models/*.glb` via `/static/`
+  (`[client.assets] custom_extensions`). ONE uniform scale keeps real relative
+  sizes. Pose tuned in `test/viewmodel-tuner`. Start of Phase 4.6.
 - [x] P3-020  **ADS / scope on right-click** (was P4-003). Per-weapon `zoom`
-  factor on `Weapon` (sniper 0.35, rifle 0.7, smg 0.85, pistol/shotgun 1.0);
+  factor on `Weapon` (sniper 0.35, rifle 0.7, smg 0.85, pistol 0.9, shotgun 1.0);
   `World.scoped` set from the right mouse button in `handle_input`; `get_zoom`
   export = the weapon's zoom while scoped else 1.0; `render3d` eases the camera
   FOV toward `base_fov * zoom` each frame. Look sensitivity is scaled by the same
   factor while scoped so a tight FOV isn't twitchy. The shim maps browser mouse
   button 2 -> raylib button 1 and suppresses the canvas context menu.
+- [x] P3-021  **Per-gun scope overlays + mounted red-dot optic.** Scope style
+  per gun (`GUN_SCOPES` in `guns.cl.jac`): rifle / smg = **red dot** (mounted
+  reddot.glb optic on the viewmodel + FOV zoom + a clean centre dot while ADS),
+  sniper = **full circular scope** (black vignette, clear centre circle, crosshair
+  reticle; gun viewmodel hidden while scoped), pistol / shotgun = **none** (no
+  optic, no zoom). The optic rides the gun's rotation `frame` (unscaled) at
+  per-gun pos/scale/rot tuned in `test/viewmodel-tuner`; `_load_gun_model` splits
+  the gun into `frame` (rotation) > `gunScale` (scale) so the optic can mount
+  unscaled. Driven by a `get_scoped` export + the held gun id.
+- [ ] P3-022  **Full red-dot ADS view (future).** Right now red-dot ADS just
+  crops/zooms with the optic sitting on the gun. The real thing: raise the gun to
+  a centred ADS pose (`holder` lerps hip -> ADS on right-click), so you look
+  *through* the mounted optic with the dot floating in its glass. Needs the ADS
+  holder position (started in the tuner) + a 3D dot at the optic reticle + the
+  hip<->ADS lerp. Deferred - the mount + zoom is enough for now.
 
 ### 3D. Progression
 

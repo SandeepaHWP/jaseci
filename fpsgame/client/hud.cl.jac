@@ -1,6 +1,6 @@
 """React HUD overlay: health, ammo, score, crosshair, kill feed, death overlay."""
 
-import from .guns { GUN_NAMES }
+import from .guns { GUN_NAMES, GUN_SCOPES }
 
 # ── React HUD overlay (driven by the shim each frame via window.__fps_hud) ──
 def:pub Hud -> JsxElement {
@@ -19,6 +19,7 @@ def:pub Hud -> JsxElement {
         tleft: int = 0,
         mode: int = 0,
         prompt: int = -1,
+        scoped: bool = False,
         feed: list = [];
 
     can with entry {
@@ -42,6 +43,7 @@ def:pub Hud -> JsxElement {
             ntleft: int,
             nmode: int,
             nprompt: int,
+            nscoped: bool,
             nfeed: list
         ) {
             hp = nhp;
@@ -59,6 +61,7 @@ def:pub Hud -> JsxElement {
             tleft = ntleft;
             mode = nmode;
             prompt = nprompt;
+            scoped = nscoped;
             feed = nfeed;
         };
     }
@@ -73,9 +76,24 @@ def:pub Hud -> JsxElement {
     swap_txt: str = f"[F] Swap for {GUN_NAMES[prompt]}"
         if prompt >= 0 and prompt < 5
         else "";
+    # scope optic per held gun; an active optic replaces the default crosshair
+    scope: str = f"{GUN_SCOPES[gun]}" if gun >= 0 and gun < 5 else "none";
+    aiming: bool = scoped and scope != "none";
     return
         <div id="hud-root">
-            <div id="cross" className={"hot" if hit else ""}></div>
+            {(<div id="cross" className={"hot" if hit else ""}></div>)
+                if not aiming
+                else None}
+            {(<div id="scope-reddot"></div>) if aiming and scope == "reddot" else None}
+            {(
+                <div id="scope-sniper">
+                    <div className="s-ring"></div>
+                    <div className="s-h"></div>
+                    <div className="s-v"></div>
+                </div>
+            )
+                if aiming and scope == "sniper"
+                else None}
             {(<div id="hitmark">✕</div>) if hit else None}
             {(<div id="vignette" key={f"v{vig}"}></div>) if vig > 0 else None}
             <div id="feed">

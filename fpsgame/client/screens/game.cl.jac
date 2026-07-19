@@ -70,6 +70,7 @@ def:pub GameView(
             tleft: int = int(f"{exports.get_time_left()}");
             timeup: int = int(f"{exports.get_round_over()}");
             prompt: int = int(f"{exports.get_pickup_prompt()}");
+            scoped: int = int(f"{exports.get_scoped()}");
             prev_hp: int = int(f"{w2.__fps_prev_hp}");
             prev_kills: int = int(f"{w2.__fps_prev_kills}");
             prev_deaths: int = int(f"{w2.__fps_prev_deaths}");
@@ -109,6 +110,7 @@ def:pub GameView(
                     tleft,
                     mode,
                     prompt,
+                    scoped == 1,
                     feed
                 );
             }
