@@ -29,10 +29,22 @@ import from "three" {
     MeshBasicMaterial,
     Mesh,
     Group,
+    Box3,
+    Vector3,
     PCFSoftShadowMap,
     ACESFilmicToneMapping,
     SRGBColorSpace
 }
+import from "three/examples/jsm/loaders/GLTFLoader.js" { GLTFLoader }
+
+# viewmodel filename per GUN_* id; served from assets/models -> /static/models
+glob GUN_MODELS: list = [
+         "/static/models/pistol.glb",
+         "/static/models/rifle.glb",
+         "/static/models/shotgun.glb",
+         "/static/models/smg.glb",
+         "/static/models/sniper.glb"
+     ];
 
 obj R3D {
     has scene: any = None,
@@ -47,6 +59,10 @@ obj R3D {
         recoil: float = 0.0,
         base_fov: float = 90.0,
         cur_zoom: float = 1.0,
+        box_gun: any = None,
+        gun_models: dict = {},
+        shown_gun: int = -2,
+        shown_wrap: any = None,
         static_built: bool = False;
 }
 
@@ -66,8 +82,51 @@ def _make_gun -> any {
     grip.position.set(0.0, -0.12, -0.08);
     grip.rotation.x = 0.3;
     g.add(grip);
-    g.position.set(0.22, -0.2, -0.3);
     return g;
+}
+
+"""Load a weapon GLB and swap it in for the box gun once ready. Auto-scaled to
+the box gun's size and recentered; parented to the holder, hidden until the
+player is holding that gun. Rotation/offset are first-guess -- tune in-browser."""
+def _load_gun_model(r: any, gid: int, url: str) {
+    loader: any = new(GLTFLoader);
+    loader.load(
+        url,
+        lambda (gltf: any) {
+            m: any = gltf.scene;
+            # a freshly-loaded scene has stale world matrices; update them or
+            # Box3.setFromObject measures nested-transform models in the wrong
+            # space -> a bad center that pushes the viewmodel off-screen.
+            m.updateMatrixWorld(True);
+            bb: any = new(Box3);
+            bb.setFromObject(m);
+            ctr: any = new(Vector3);
+            bb.getCenter(ctr);
+            # center the model at the wrapper origin, then apply ONE uniform scale
+            # to every gun so they keep their real relative sizes (pistol small,
+            # sniper big -- GUN_SCALE, tuned in test/viewmodel-tuner).
+            wrap: any = new(Group);
+            m.position.set(-ctr.x, -ctr.y, -ctr.z);
+            wrap.add(m);
+            wrap.scale.set(0.19, 0.19, 0.19);
+            # pose tuned in the viewmodel tuner: barrel forward + slight roll.
+            wrap.rotation.set(0.0, 1.86, 0.12);
+            wrap.visible = False;
+            wrap.traverse(
+                lambda (o: any) { if o.isMesh {
+                    o.visible = True;
+                    o.castShadow = True;
+                }}
+            );
+            r.gun.add(wrap);
+            r.gun_models[gid] = wrap;
+            # force draw's swap check to re-run: this model may be the held gun,
+            # which was already showing the box because we weren't loaded yet.
+            r.shown_gun = -2;
+        },
+        None,
+        lambda (err: any) { console.log("[fps] gun load FAILED", gid, url, err); }
+    );
 }
 
 # One colour per GUN_* id so a crate reads as "that is the sniper" from across
@@ -163,9 +222,13 @@ def:pub make_renderer(canvas: any, fov: any) -> any {
     ground.rotation.x = -1.5707963267948966;
     ground.receiveShadow = True;
     r.scene.add(ground);
-    # ── gun viewmodel (parented to the camera; camera added to the scene so its
-    #    children render) + muzzle flash ──
-    r.gun = _make_gun();
+    # ── gun viewmodel: a holder parented to the camera. The box gun is the
+    #    fallback child (shown until a GLB loads / for a gun with no model);
+    #    loaded models are added as hidden children and swapped in by draw. ──
+    r.gun = new(Group);
+    r.gun.position.set(0.22, -0.2, -0.32);
+    r.box_gun = _make_gun();
+    r.gun.add(r.box_gun);
     r.flash = new(
         Mesh,
         new(PlaneGeometry, 0.32, 0.32),
@@ -175,6 +238,12 @@ def:pub make_renderer(canvas: any, fov: any) -> any {
     r.gun.add(r.flash);
     r.cam.add(r.gun);
     r.scene.add(r.cam);
+    # kick off async model loads; each swaps in for the box gun when ready
+    i = 0;
+    for url in GUN_MODELS {
+        _load_gun_model(r, i, url);
+        i = i + 1;
+    }
     return r;
 }
 
@@ -328,6 +397,26 @@ def:pub draw(r: any, exports: any) {
         r.pickups[m].visible = False;
         m = m + 1;
     }
+    # ── viewmodel swap: show the loaded model for the held gun, else the box ──
+    # Toggle the shown model DIRECTLY (hide prev, show new). The old
+    # `for .. in gun_models.items()` loop did not toggle visibility at runtime
+    # -- the jac dict does not iterate like a plain object in the ES backend,
+    # which is why the model stayed visible=False and never appeared.
+    held: int = int(f"{exports.get_weapon()}");
+    if held != r.shown_gun {
+        r.shown_gun = held;
+        if r.shown_wrap is not None {
+            r.shown_wrap.visible = False;
+            r.shown_wrap = None;
+        }
+        has_model: bool = held in r.gun_models;
+        r.box_gun.visible = not has_model;
+        if has_model {
+            w: any = r.gun_models[held];
+            w.visible = True;
+            r.shown_wrap = w;
+        }
+    }
     # ── muzzle flash + recoil ──
     mz: int = int(f"{exports.get_muzzle()}");
     if mz == 1 {
@@ -337,7 +426,7 @@ def:pub draw(r: any, exports: any) {
         r.flash_op = r.flash_op * 0.55;
     }
     r.flash.material.opacity = r.flash_op;
-    r.gun.position.z = -0.3 + r.recoil;
+    r.gun.position.z = -0.32 + r.recoil;
     r.recoil = r.recoil * 0.8;
     # ── tracers + present ──
     _update_tracers(r, exports);

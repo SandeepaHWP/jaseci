@@ -1,0 +1,128 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>gun viewmodel tuner</title>
+  <style>
+    body { margin: 0; background: #7fa8c9; color: #fff; font: 13px monospace; overflow: hidden; }
+    #panel { position: fixed; left: 8px; top: 8px; z-index: 10; background: rgba(0,0,0,.6);
+             padding: 10px; border-radius: 8px; width: 300px; }
+    #panel .row { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
+    #panel label { width: 62px; } #panel input[type=range] { flex: 1; }
+    #panel b { width: 52px; text-align: right; color: #ffd86b; }
+    #vals { white-space: pre; margin-top: 8px; color: #9fe; font-size: 12px; }
+    #pick { position: fixed; right: 8px; top: 8px; z-index: 10; }
+    button { font: inherit; margin: 2px; padding: 4px 10px; cursor: pointer; }
+  </style>
+  <script type="importmap">
+  { "imports": {
+      "three": "https://unpkg.com/three@0.169.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.169.0/examples/jsm/"
+  } }
+  </script>
+</head>
+<body>
+  <div id="panel">
+    <div><b id="name" style="color:#ffd86b">rifle</b> — drag to pose the gun</div>
+    <div class="row"><label>rot X</label><input id="rx" type="range" min="-3.15" max="3.15" step="0.01" value="0"><b id="rxv">0</b></div>
+    <div class="row"><label>rot Y</label><input id="ry" type="range" min="-3.15" max="3.15" step="0.01" value="1.9"><b id="ryv">1.9</b></div>
+    <div class="row"><label>rot Z</label><input id="rz" type="range" min="-3.15" max="3.15" step="0.01" value="0"><b id="rzv">0</b></div>
+    <div class="row"><label>pos X</label><input id="px" type="range" min="-1" max="1" step="0.01" value="0.22"><b id="pxv">0.22</b></div>
+    <div class="row"><label>pos Y</label><input id="py" type="range" min="-1" max="1" step="0.01" value="-0.2"><b id="pyv">-0.2</b></div>
+    <div class="row"><label>pos Z</label><input id="pz" type="range" min="-1.2" max="-0.05" step="0.01" value="-0.3"><b id="pzv">-0.3</b></div>
+    <div class="row"><label>scale</label><input id="sc" type="range" min="0.02" max="0.35" step="0.005" value="0.1"><b id="scv">0.1</b></div>
+    <div id="vals"></div>
+  </div>
+  <div id="pick">
+    <button data-g="../models/rifle.glb">rifle</button>
+    <button data-g="../models/pistol.glb">pistol</button>
+    <button data-g="../models/sniper.glb">sniper</button>
+  </div>
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    document.body.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x7fa8c9);
+    // ground + reference boxes so it feels like the game
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200),
+      new THREE.MeshStandardMaterial({ color: 0x3a7d34 }));
+    ground.rotation.x = -Math.PI / 2; ground.position.y = -1.6; scene.add(ground);
+    for (let i = 0; i < 5; i++) {
+      const b = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2),
+        new THREE.MeshStandardMaterial({ color: 0x2a3340 }));
+      b.position.set((i - 2) * 4, -0.6, -8 - i); scene.add(b);
+    }
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x334, 1.1));
+    const dir = new THREE.DirectionalLight(0xffffff, 1.4); dir.position.set(5, 8, 5); scene.add(dir);
+
+    // FPS-style camera: at eye height, looking straight down -Z (like the game view)
+    const camera = new THREE.PerspectiveCamera(90, innerWidth / innerHeight, 0.05, 400);
+    camera.position.set(0, 0, 0);
+    scene.add(camera);
+    const cross = document.createElement('div');
+    cross.textContent = '+'; cross.style.cssText =
+      'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);color:#fff;font-size:24px;z-index:5';
+    document.body.appendChild(cross);
+
+    const holder = new THREE.Group(); camera.add(holder);   // = r.gun in the game
+    let wrap = null;                                        // scaled+rotated model
+    let baseScale = 0.55;
+
+    const loader = new GLTFLoader();
+    const $ = id => document.getElementById(id);
+
+    function loadGun(url) {
+      $('name').textContent = url.split('/').pop().replace('.glb','');
+      if (wrap) { holder.remove(wrap); wrap = null; }
+      loader.load(url, (gltf) => {
+        const m = gltf.scene;
+        m.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(m);
+        const ctr = box.getCenter(new THREE.Vector3());
+        // ONE uniform scale for every gun -> they keep their real relative sizes
+        // (pistol small, sniper big). The slider IS that shared factor.
+        baseScale = 1;
+        wrap = new THREE.Group();
+        m.position.set(-ctr.x, -ctr.y, -ctr.z);
+        wrap.traverse(o => { if (o.isMesh) o.visible = true; });
+        wrap.add(m);
+        holder.add(wrap);
+        apply();
+      });
+    }
+
+    function apply() {
+      if (!wrap) return;
+      const rx = +$('rx').value, ry = +$('ry').value, rz = +$('rz').value;
+      const px = +$('px').value, py = +$('py').value, pz = +$('pz').value;
+      const sc = +$('sc').value;
+      wrap.rotation.set(rx, ry, rz);
+      wrap.scale.setScalar(baseScale * sc);
+      holder.position.set(px, py, pz);
+      for (const k of ['rx','ry','rz','px','py','pz','sc'])
+        $(k + 'v').textContent = (+$(k).value).toFixed(2);
+      $('vals').textContent =
+        `// paste into _load_gun_model:\n` +
+        `wrap.rotation.set(${rx}, ${ry}, ${rz});\n` +
+        `holder pos = (${px}, ${py}, ${pz})\n` +
+        `scale mult = ${sc}  (target size ~${sc.toFixed(2)})`;
+    }
+
+    ['rx','ry','rz','px','py','pz','sc'].forEach(id => $(id).oninput = apply);
+    document.querySelectorAll('#pick button').forEach(b => b.onclick = () => loadGun(b.dataset.g));
+    loadGun('../models/rifle.glb');
+
+    addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+    renderer.setAnimationLoop(() => renderer.render(scene, camera));
+  </script>
+</body>
+</html>

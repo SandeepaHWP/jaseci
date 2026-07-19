@@ -22,3 +22,14 @@ typescript = "^5.3.3"
 "@types/react-dom" = "^18.2.0"
 
 [plugins.client]
+
+# Register .glb so weapon models in assets/ are copied to the client build and
+# served at /assets/*. custom_extensions is read from the top-level [client]
+# table (not [plugins.client]).
+[client.assets]
+custom_extensions = [".glb"]
+
+# Single-process app: don't let a top-level [client] section trip microservice
+# auto-detection (which scans for sv services).
+[scale.microservices]
+enabled = false
