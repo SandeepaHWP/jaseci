@@ -1,0 +1,91 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>map preview</title>
+  <style>
+    body { margin: 0; background: #8fb4d6; color: #fff; font: 13px monospace; overflow: hidden; }
+    #log { position: fixed; left: 8px; top: 8px; white-space: pre; z-index: 10;
+           background: rgba(0,0,0,.55); padding: 9px; border-radius: 7px; }
+    #pick { position: fixed; right: 8px; top: 8px; z-index: 10; }
+    button { font: inherit; margin: 2px; padding: 5px 12px; cursor: pointer; }
+    #hint { position: fixed; left: 8px; bottom: 8px; z-index: 10; opacity: .8;
+            background: rgba(0,0,0,.45); padding: 6px 9px; border-radius: 6px; }
+  </style>
+  <script type="importmap">
+  { "imports": {
+      "three": "https://unpkg.com/three@0.169.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.169.0/examples/jsm/"
+  } }
+  </script>
+</head>
+<body>
+  <div id="log">loading…</div>
+  <div id="pick">
+    <button data-m="../models/map_fpslevel.glb">FPS level</button>
+    <button data-m="../models/map_city.glb">city</button>
+  </div>
+  <div id="hint">drag = look · scroll = zoom · right-drag = pan · the red box = your ~48-unit arena for scale</div>
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    const logEl = document.getElementById('log');
+    const log = s => { logEl.textContent = s; };
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    document.body.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x8fb4d6);
+    scene.add(new THREE.GridHelper(96, 48, 0x446, 0x335));
+    // red wireframe box = the sim arena footprint (~48 x 48, walls ~6 tall) for scale
+    const arena = new THREE.Mesh(new THREE.BoxGeometry(48, 6, 48),
+      new THREE.MeshBasicMaterial({ color: 0xff4444, wireframe: true }));
+    arena.position.y = 3; scene.add(arena);
+
+    const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 5000);
+    camera.position.set(40, 30, 40);
+    const controls = new OrbitControls(camera, renderer.domElement);
+
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x445, 1.1));
+    const sun = new THREE.DirectionalLight(0xfff2e0, 2.0); sun.position.set(30, 50, 20); scene.add(sun);
+
+    const loader = new GLTFLoader();
+    let current = null;
+
+    function show(url) {
+      if (current) { scene.remove(current); current = null; }
+      log('loading ' + url + ' …');
+      loader.load(url, gltf => {
+        const m = gltf.scene;
+        m.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(m);
+        const size = box.getSize(new THREE.Vector3());
+        const ctr = box.getCenter(new THREE.Vector3());
+        let meshes = 0; m.traverse(o => { if (o.isMesh) meshes++; });
+        // drop it onto the grid: centre X/Z, floor at y=0
+        m.position.x -= ctr.x; m.position.z -= ctr.z;
+        m.position.y -= box.min.y;
+        scene.add(m);
+        current = m;
+        const name = url.split('/').pop();
+        log(`OK ${name}\nsize  ${size.x.toFixed(1)} x ${size.y.toFixed(1)} x ${size.z.toFixed(1)} (world units)` +
+            `\nmeshes ${meshes}\narena box is 48x48 — compare footprints`);
+      }, undefined, e => log('LOAD FAILED ' + url + '\n' + e));
+    }
+
+    document.querySelectorAll('#pick button').forEach(b => b.onclick = () => show(b.dataset.m));
+    show('../models/map_fpslevel.glb');
+
+    addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+    renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+  </script>
+</body>
+</html>

@@ -25,11 +25,21 @@ Then open one of:
   and a readout of size / mesh count / bbox center. Good for checking a new
   GLB loads and which way its barrel points.
 
+- **Map preview** - http://localhost:8765/map-preview/
+  Fly around a candidate map GLB with a red wireframe box showing the sim's
+  arena footprint for scale, plus a size readout. Used to evaluate downloaded
+  maps before integrating. NOTE: the shipped map is built procedurally in
+  `sim/maps.na.jac` + `render3d.cl.jac` (tiled floor, brick, water) -- these
+  GLBs were candidates we evaluated and kept for reference.
+
 ## Folders
 
-- `models/` - sample GLBs copied from `../assets/models/` (rifle, pistol, sniper).
-- `viewmodel-tuner/` - the pose tuner page.
+- `models/` - sample GLBs: guns (rifle, pistol, smg, shotgun, sniper), the
+  `reddot` optic, and two candidate maps (`map_fpslevel` three.js/MIT,
+  `map_city` CC-BY-4.0 Khronos VirtualCity).
+- `viewmodel-tuner/` - gun + optic pose tuner (sliders, ADS toggle, per-gun memory).
 - `orbit-preview/` - the single-model inspector page.
+- `map-preview/` - the map/level inspector page.
 
 three.js is pulled from a CDN (unpkg, pinned to 0.169.0 to match the app).
 

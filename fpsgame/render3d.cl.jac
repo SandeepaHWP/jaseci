@@ -31,6 +31,8 @@ import from "three" {
     Group,
     Box3,
     Vector3,
+    CanvasTexture,
+    RepeatWrapping,
     PCFSoftShadowMap,
     ACESFilmicToneMapping,
     SRGBColorSpace
@@ -63,6 +65,7 @@ obj R3D {
         gun_models: dict = {},
         shown_gun: int = -2,
         shown_wrap: any = None,
+        water: any = None,
         static_built: bool = False;
 }
 
@@ -226,13 +229,98 @@ def _make_bot(r: any) -> any {
     return g;
 }
 
+# Procedural textures drawn on a <canvas> -- no external files, so nothing to
+# serve and no CSP worries.
+"""A colourful checkerboard tile texture for the floor."""
+def _tile_texture -> any {
+    cv: any = document.createElement("canvas");
+    cv.width = 512;
+    cv.height = 512;
+    ctx: any = cv.getContext("2d");
+    cols = [
+        "#e0574d",
+        "#f0a63c",
+        "#4db6a0",
+        "#5a86d8",
+        "#9b6ad8",
+        "#e0c84d",
+        "#63bd6b",
+        "#d86ea8"
+    ];
+    gy = 0;
+    while gy < 8 {
+        gx = 0;
+        while gx < 8 {
+            ctx.fillStyle = cols[(gx * 3 + gy * 5) % 8];
+            ctx.fillRect(gx * 64, gy * 64, 64, 64);
+            ctx.strokeStyle = "rgba(0,0,0,0.22)";
+            ctx.lineWidth = 4.0;
+            ctx.strokeRect(gx * 64, gy * 64, 64, 64);
+            gx = gx + 1;
+        }
+        gy = gy + 1;
+    }
+    tex: any = new(CanvasTexture, cv);
+    tex.wrapS = RepeatWrapping;
+    tex.wrapT = RepeatWrapping;
+    tex.repeat.set(16.0, 16.0);
+    return tex;
+}
+
+"""A red-brick texture (offset rows + mortar) for walls and cover."""
+def _brick_texture -> any {
+    cv: any = document.createElement("canvas");
+    cv.width = 256;
+    cv.height = 256;
+    ctx: any = cv.getContext("2d");
+    ctx.fillStyle = "#6e3428";
+    ctx.fillRect(0, 0, 256, 256);
+    row = 0;
+    while row < 8 {
+        off = 0.0 if row % 2 == 0 else 32.0;
+        col = -1;
+        while col < 5 {
+            x = float(col) * 64.0 + off;
+            ctx.fillStyle = "#a8543f" if (col + row) % 2 == 0 else "#9c4a37";
+            ctx.fillRect(x + 3.0, float(row) * 32.0 + 3.0, 58.0, 26.0);
+            col = col + 1;
+        }
+        row = row + 1;
+    }
+    tex: any = new(CanvasTexture, cv);
+    tex.wrapS = RepeatWrapping;
+    tex.wrapT = RepeatWrapping;
+    return tex;
+}
+
+"""A translucent, gently rippling water plane over the map's pool area."""
+def _make_water(r: any) {
+    wmat: any = new(
+        MeshStandardMaterial,
+        {
+            "color": 0x2f7fb5,
+            "transparent": True,
+            "opacity": 0.72,
+            "roughness": 0.15,
+            "metalness": 0.4
+        }
+    );
+    w: any = new(Mesh, new(PlaneGeometry, 16.0, 16.0), wmat);
+    w.rotation.x = -1.5707963267948966;
+    # matches sim WATER_CX/CZ (33, 33), sitting just above the floor
+    w.position.set(33.0, 0.06, 33.0);
+    w.receiveShadow = True;
+    r.scene.add(w);
+    r.water = w;
+}
+
 """Build the scene, camera, renderer, lights, ground and gun on `canvas`.
 `fov` is the vertical field of view in degrees (from the settings screen)."""
 def:pub make_renderer(canvas: any, fov: any) -> any {
     r = R3D();
     r.scene = new(Scene);
     r.scene.background = new(Color, 0x9fbcd6);
-    r.scene.fog = new(Fog, 0x9fbcd6, 35.0, 110.0);
+    r.scene.fog = new(Fog, 0x9fbcd6, 70.0, 220.0);
     r.base_fov = float(f"{fov}");
     r.cam = new(PerspectiveCamera, fov, 960.0 / 600.0, 0.05, 400.0);
     r.renderer = new(WebGLRenderer, {"canvas": canvas, "antialias": True});
@@ -248,23 +336,30 @@ def:pub make_renderer(canvas: any, fov: any) -> any {
     sun.shadow.mapSize.width = 2048;
     sun.shadow.mapSize.height = 2048;
     sun.shadow.camera.near = 1.0;
-    sun.shadow.camera.far = 140.0;
-    sun.shadow.camera.left = -40.0;
-    sun.shadow.camera.right = 40.0;
-    sun.shadow.camera.top = 40.0;
-    sun.shadow.camera.bottom = -40.0;
+    sun.shadow.camera.far = 220.0;
+    # widened to cover the 96x96 arena
+    sun.shadow.camera.left = -70.0;
+    sun.shadow.camera.right = 70.0;
+    sun.shadow.camera.top = 70.0;
+    sun.shadow.camera.bottom = -70.0;
     r.scene.add(sun);
     r.scene.add(new(HemisphereLight, 0xbfd4ff, 0x20281c, 0.9));
     r.scene.add(new(AmbientLight, 0xffffff, 0.2));
-    # ── ground ──
+    # ── ground: colourful tiled floor ──
     gmat = new(
         MeshStandardMaterial,
-        {"color": 0x3a7d34, "roughness": 0.97, "metalness": 0.0, "side": DoubleSide}
+        {
+            "map": _tile_texture(),
+            "roughness": 0.85,
+            "metalness": 0.0,
+            "side": DoubleSide
+        }
     );
     ground = new(Mesh, new(PlaneGeometry, 300.0, 300.0), gmat);
     ground.rotation.x = -1.5707963267948966;
     ground.receiveShadow = True;
     r.scene.add(ground);
+    _make_water(r);
     # ── gun viewmodel: a holder parented to the camera. The box gun is the
     #    fallback child (shown until a GLB loads / for a gun with no model);
     #    loaded models are added as hidden children and swapped in by draw. ──
@@ -296,9 +391,9 @@ def:pub build_static(r: any, exports: any) {
         return;
     }
     n: int = int(f"{exports.get_collider_count()}");
-    mat = new(
-        MeshStandardMaterial, {"color": 0x55617f, "roughness": 0.85, "metalness": 0.1}
-    );
+    # one shared brick image; each box gets its own texture clone so the brick
+    # size stays ~constant regardless of the wall/cover dimensions.
+    brick: any = _brick_texture();
     i: int = 0;
     while i < n {
         bi = BigInt(i);
@@ -311,6 +406,12 @@ def:pub build_static(r: any, exports: any) {
         sx: float = maxx - minx;
         sy: float = maxy - miny;
         sz: float = maxz - minz;
+        bt: any = brick.clone();
+        bt.needsUpdate = True;
+        bt.repeat.set(Math.max(sx, sz) / 4.0, sy / 2.0);
+        mat: any = new(
+            MeshStandardMaterial, {"map": bt, "roughness": 0.92, "metalness": 0.05}
+        );
         box = new(Mesh, new(BoxGeometry, sx, sy, sz), mat);
         box.position.set((minx + maxx) / 2.0, (miny + maxy) / 2.0, (minz + maxz) / 2.0);
         box.castShadow = True;
@@ -477,6 +578,12 @@ def:pub draw(r: any, exports: any) {
     r.recoil = r.recoil * 0.8;
     # ── tracers + present ──
     _update_tracers(r, exports);
+    # gentle water shimmer
+    if r.water is not None {
+        wt: float = float(f"{Date.now()}") * 0.001;
+        r.water.position.y = 0.07 + Math.sin(wt * 1.4) * 0.03;
+        r.water.material.opacity = 0.66 + Math.sin(wt * 2.1) * 0.07;
+    }
     r.renderer.render(r.scene, r.cam);
 }
 

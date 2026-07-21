@@ -368,7 +368,22 @@ Goal: a complete, shippable single-player product.
 
 ### 3C. Content
 
-- [ ] P3-009  3–5 finished maps with art pass (colors, props, lighting fakes).
+- [x] P3-009  **Big arena + art pass.** The 2 maps were rebuilt 4x bigger
+  (`MAP_EXT` 24 -> 48, a 96x96 floor) with richer layouts: central raised
+  platform, corner blocks, sightline walls, low cover, armoury moved to the far
+  west wall, and spawns spread to the edges. Art pass is **procedural** (canvas
+  textures, no external files to serve): a colourful 8-colour tiled floor, a
+  red-brick texture on every wall/cover box (per-box UV repeat so bricks stay a
+  constant size on both long walls and small blocks), and a translucent
+  shimmering water pool in the NE corner. Fog + the sun's shadow camera were
+  widened to cover the bigger arena.
+  - Downloaded maps were evaluated and rejected: the game's physics is AABB-only
+    so a mesh map would have no real collision, realistic CC0 maps are scarce
+    (Sponza is CryEngine-licensed, the good ones are Sketchfab browser-only),
+    and photoreal would clash with the low-poly bots. Candidates kept in
+    `test/models/` + `test/map-preview/` for reference.
+  - Remaining: more than 2 maps, and the water is visual-only (flat floor
+    under it) rather than a sunken pool.
 - [x] P3-010  Full weapon roster (pistol, rifle, shotgun, smg, sniper). `Weapon`
   obj + `World.weapons` built by `build_weapons`; read through scalar `gun_*`
   accessors (never hand a `Weapon` back to a caller). Rifle is built from the
