@@ -51,7 +51,7 @@ impl _decode_value(oid: int, raw: bytes) -> any {
 }
 
 
-impl _named_to_positional(sql: str, params: dict) -> tuple[str, list] {
+impl _named_to_positional(sql: str, params: dict[any, any]) -> tuple[str, list] {
     out: list[str] = [];
     order: dict[str, int] = {};
     args: list[any] = [];
@@ -366,7 +366,7 @@ impl PgWireConnection._handle_async(msg_type: str, payload: bytes) -> bool {
 }
 
 
-impl PgWireConnection.run(sql: str, **params: any) -> list {
+impl PgWireConnection.run(sql: str, **params: any) -> list[any] {
     assert not self._closed , 'connection is closed';
     (pos_sql, args) = _named_to_positional(sql, params);
     bind = b'\x00\x00' + struct.pack(_INT16, 0) + struct.pack(_INT16, len(args));

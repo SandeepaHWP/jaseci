@@ -234,7 +234,7 @@ test "read barrier hashes only dirty anchors, not the whole session" {
         ctx = _make_ctx(td);
         JacRuntime.exec_ctx = ctx;
         orig = smod._persist_hash;
-        calls: list = [];
+        calls: list[any] = [];
         def counting_hash(anchor: Anchor) -> int {
             calls.append(1);
             return orig(anchor);
@@ -280,7 +280,7 @@ test "on_commit fires exactly once, after successful commit" {
         JacRuntime.exec_ctx = ctx;
         try {
             _root(ctx);
-            fired: list = [];
+            fired: list[any] = [];
             ctx.mem.on_commit(lambda { fired.append(1); });
             assert fired == [];
             ctx.mem.commit();

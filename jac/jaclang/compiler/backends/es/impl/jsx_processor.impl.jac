@@ -253,7 +253,9 @@ impl EsJsxProcessor._view_arm(
     return [ElementChild(element=ve, jac_node=nd)];
 }
 
-impl EsJsxProcessor._split_key(self: EsJsxProcessor, ve: ViewElement) -> tuple {
+impl EsJsxProcessor._split_key(
+    self: EsJsxProcessor, ve: ViewElement
+) -> tuple[any, ...] {
     import from jaclang.compiler.backends.es.view_ir { StaticAttr, DynamicAttr }
     key_expr = None;
     kept = [];

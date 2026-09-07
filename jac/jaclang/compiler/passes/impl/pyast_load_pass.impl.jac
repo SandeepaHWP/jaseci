@@ -1,4 +1,4 @@
-impl PyastBuildPass.aug_op_map(tok_dict: dict, op: Token) -> str {
+impl PyastBuildPass.aug_op_map(tok_dict: dict[any, any], op: Token) -> str {
     op.value += '=';
     for (_key, value) in tok_dict.items() {
         if (value == op.value) {
@@ -237,7 +237,7 @@ impl PyastBuildPass.operator(tok: Tok, value: str) -> Token {
 }
 
 impl PyastBuildPass.proc_arguments(nd: py_ast.arguments) -> FuncSignature {
-    def _apply_kind(params: list, kind: ParamKind) -> list {
+    def _apply_kind(params: list[any], kind: ParamKind) -> list[any] {
         for param in params {
             cast(ParamVar, param).param_kind = kind;
         }

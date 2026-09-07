@@ -75,12 +75,12 @@ glob SYMTAB_SCHED_DEPS: tuple[any, ...] = ('jaclang.compiler.symbol_utils', ),
          'jaclang.compiler.passes.region_infer_pass',
          'jaclang.compiler.tools.jac_auto_lint_pass'
      ),
-     CODEGEN_SCHED_DEPS: tuple = (
+     CODEGEN_SCHED_DEPS: tuple[any, ...] = (
          'jaclang.compiler.passes.rc_facts_pass',
          'jaclang.compiler.backends.es',
          'jaclang.compiler.passes.freeze_structure_pass'
      ),
-     NATIVE_CODEGEN_DEPS: tuple = ('jaclang.compiler.backends.native', );
+     NATIVE_CODEGEN_DEPS: tuple[any, ...] = ('jaclang.compiler.backends.native', );
 
 def module_in_flight(names: tuple[any, ...]) -> str {
     import sys;

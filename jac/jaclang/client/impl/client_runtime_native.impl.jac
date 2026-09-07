@@ -10,7 +10,7 @@ impl __jacWirePlatformAdapters -> None {
     globalThis.__jacGetLocalStorage__ = __getLocalStorage;
     globalThis.__jacSetLocalStorage__ = __setLocalStorage;
     globalThis.__jacRemoveLocalStorage__ = __removeLocalStorage;
-    globalThis.__jacSeedEndpointEffects__ = lambda -> dict {
+    globalThis.__jacSeedEndpointEffects__ = lambda -> dict[any, any] {
         seed = globalThis.__JAC_INIT__;
         effects: any = seed.endpointEffects if seed else None;
         if effects {
@@ -35,7 +35,9 @@ impl __jacGetRenderer -> any {
     return globalThis.__jacRenderer__;
 }
 
-impl __jacNativeCreate(tag: any, props: dict = {}, children: any = []) -> JsxElement {
+impl __jacNativeCreate(
+    tag: any, props: dict[any, any] = {}, children: any = []
+) -> JsxElement {
     if tag is None {
         tag = React.Fragment;
     }
@@ -95,7 +97,7 @@ impl __jacNativeCreate(tag: any, props: dict = {}, children: any = []) -> JsxEle
     return React.createElement(RNView, debug_adapted, *flat);
 }
 
-impl _adaptProps(tag: str, props: dict) -> dict {
+impl _adaptProps(tag: str, props: dict[any, any]) -> dict[any, any] {
     if not props {
         return {};
     }
@@ -122,7 +124,7 @@ impl _adaptProps(tag: str, props: dict) -> dict {
     return out;
 }
 
-impl _textStyleFrom(style: any) -> dict {
+impl _textStyleFrom(style: any) -> dict[any, any] {
     out = {};
     if _isNil(style) {
         return out;
@@ -166,7 +168,7 @@ impl _isAbsoluteImageUri(src: str) -> bool {
     );
 }
 
-impl _adaptImageProps(props: dict) -> dict {
+impl _adaptImageProps(props: dict[any, any]) -> dict[any, any] {
     out = {** (props or {})};
     src = out["src"] if out["src"] else None;
     if out["alt"] and not out["accessibilityLabel"] {
@@ -223,7 +225,7 @@ impl _adaptImageProps(props: dict) -> dict {
     return out;
 }
 
-impl _makeNativeLink(link_props: dict, children: list) -> JsxElement {
+impl _makeNativeLink(link_props: dict[any, any], children: list[any]) -> JsxElement {
     href = link_props["href"] if link_props["href"] else None;
     rest = {** link_props};
     if rest["href"] {
@@ -245,7 +247,7 @@ impl _makeNativeLink(link_props: dict, children: list) -> JsxElement {
     return React.createElement(RNText, rest, *children);
 }
 
-impl _toChildrenArray(children: any) -> list {
+impl _toChildrenArray(children: any) -> list[any] {
     if _isNil(children) {
         return [];
     }
@@ -311,7 +313,7 @@ impl _cacheNativeRoutes(route_defs: list[RouteDef]) {
     ];
 }
 
-impl _getNativeRoutes -> list {
+impl _getNativeRoutes -> list[any] {
     routes = globalThis.__jacNativeRouteDefs__;
     if routes and isinstance(routes, list) {
         return routes;
@@ -379,7 +381,7 @@ impl _hydratePath(pattern_path: str, params: any) -> str {
     return _normalizeRoutePath("/" + "/".join(hydrated));
 }
 
-impl _stripMetaParams(params: any) -> dict {
+impl _stripMetaParams(params: any) -> dict[any, any] {
     if not params {
         return {};
     }
@@ -390,7 +392,7 @@ impl _stripMetaParams(params: any) -> dict {
     };
 }
 
-impl _performNavigation(nav: any, target: any, options: dict = {}) -> None {
+impl _performNavigation(nav: any, target: any, options: dict[any, any] = {}) -> None {
     if nav is None {
         console.warn("[jac-native-runtime] navigation is unavailable.");
         return;
@@ -451,7 +453,7 @@ impl _performNavigation(nav: any, target: any, options: dict = {}) -> None {
 }
 
 impl _collectNativeRoutes(
-    children: any, parent_path: str, wrappers: list, out_routes: list[RouteDef]
+    children: any, parent_path: str, wrappers: list[any], out_routes: list[RouteDef]
 ) {
     for child in _toChildrenArray(children) {
         if not React.isValidElement(child) {
@@ -506,7 +508,7 @@ impl _makeNativeRouteScreen(route: RouteDef) -> any {
     };
 }
 
-impl __nativeRouter(props: dict = {}) -> JsxElement {
+impl __nativeRouter(props: dict[any, any] = {}) -> JsxElement {
     nav_ref = React.useRef(None);
     React.useEffect(lambda { globalThis.__jacNativeNavigationRef__ = nav_ref; }, []);
     def _flushPendingNavigation {
@@ -524,9 +526,9 @@ impl __nativeRouter(props: dict = {}) -> JsxElement {
     );
 }
 
-impl __nativeRoutes(props: dict = {}) -> JsxElement {
+impl __nativeRoutes(props: dict[any, any] = {}) -> JsxElement {
     routes = React.useMemo(
-        lambda -> list {
+        lambda -> list[any] {
             out: list[RouteDef] = [];
             _collectNativeRoutes(props["children"], "/", [], out);
             return out;
@@ -536,7 +538,7 @@ impl __nativeRoutes(props: dict = {}) -> JsxElement {
     React.useEffect(lambda { _cacheNativeRoutes(routes); }, [routes]);
 
     screens = React.useMemo(
-        lambda -> list { return [
+        lambda -> list[any] { return [
             React.createElement(
                 _JAC_NATIVE_STACK.Screen,
                 {
@@ -564,11 +566,11 @@ impl __nativeRoutes(props: dict = {}) -> JsxElement {
     );
 }
 
-impl __nativeRoute(props: dict = {}) -> (JsxElement | None) {
+impl __nativeRoute(props: dict[any, any] = {}) -> (JsxElement | None) {
     return None;
 }
 
-impl __nativeLink(props: dict = {}) -> JsxElement {
+impl __nativeLink(props: dict[any, any] = {}) -> JsxElement {
     to = props.get("to", None) or (props.get("href", None) or "/");
     rest = {** props};
     if rest["to"] {
@@ -596,7 +598,7 @@ impl __nativeLink(props: dict = {}) -> JsxElement {
     return React.createElement(RNPressable, rest, label);
 }
 
-impl __nativeNavigate(props: dict = {}) -> (JsxElement | None) {
+impl __nativeNavigate(props: dict[any, any] = {}) -> (JsxElement | None) {
     opts = props or {};
     target = opts.get("to", None) or "/";
     should_replace = opts.get("replace", None) == True;
@@ -610,11 +612,11 @@ impl __nativeNavigate(props: dict = {}) -> (JsxElement | None) {
     return None;
 }
 
-impl __nativeOutlet(props: dict = {}) -> (JsxElement | None) {
+impl __nativeOutlet(props: dict[any, any] = {}) -> (JsxElement | None) {
     return React.useContext(_JAC_NATIVE_OUTLET_CONTEXT);
 }
 
-impl useRouter -> dict {
+impl useRouter -> dict[any, any] {
     nav_fn = useNavigate();
     location = useLocation();
     params = useParams();
@@ -636,7 +638,7 @@ impl useNavigate -> any {
     return _navigate;
 }
 
-impl useLocation -> dict {
+impl useLocation -> dict[any, any] {
     route = jacUseRoute();
     pathname = "/";
     search = "";
@@ -660,7 +662,7 @@ impl useLocation -> dict {
     return {"pathname": pathname, "search": search, "hash": hash, "state": state};
 }
 
-impl useParams -> dict {
+impl useParams -> dict[any, any] {
     route = jacUseRoute();
     params = route.params if route and route.params else {};
     return _stripMetaParams(params);

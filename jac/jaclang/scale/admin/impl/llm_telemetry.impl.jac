@@ -560,7 +560,7 @@ impl JacAPIServerLLMTelemetry.register_llm_telemetry_endpoints -> None {
 
             def log_success_event(
                 self: JacLLMLogger,
-                kwargs: dict,
+                kwargs: dict[any, any],
                 response_obj: any,
                 start_time: any,
                 end_time: any
@@ -595,7 +595,7 @@ impl JacAPIServerLLMTelemetry.register_llm_telemetry_endpoints -> None {
 
             def log_failure_event(
                 self: JacLLMLogger,
-                kwargs: dict,
+                kwargs: dict[any, any],
                 response_obj: any,
                 start_time: any,
                 end_time: any

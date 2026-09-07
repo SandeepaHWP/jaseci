@@ -1525,7 +1525,7 @@ impl JacConfig.default_app.getter -> str {
     return self.project.default_app;
 }
 
-def _apply_build_section(cfg: JacConfig, data: dict) -> None {
+def _apply_build_section(cfg: JacConfig, data: dict[any, any]) -> None {
     if "build" not in data or not isinstance(data["build"], dict) {
         return;
     }
@@ -1560,7 +1560,7 @@ def _apply_build_section(cfg: JacConfig, data: dict) -> None {
     );
 }
 
-def _apply_memory_native_placement(cfg: JacConfig, data: dict) {
+def _apply_memory_native_placement(cfg: JacConfig, data: dict[any, any]) {
     import from jaclang.cli.console { console }
     for (_old, _new) in [("gc", "[memory] profile / enforce / exempt")] {
         if _old in data {

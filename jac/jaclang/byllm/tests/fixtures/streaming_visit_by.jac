@@ -14,7 +14,7 @@ glob llm: MockLLM = MockLLM(
          config={"outputs": ['{"schema_object_wrapper": ["GreenNode"]}']}
      );
 
-glob streamed_chunks: list = [];
+glob streamed_chunks: list[any] = [];
 
 """Collect the routing call's streamed tokens, the way the UI firehose does."""
 def route_sink(ev: StreamEvent) -> None {

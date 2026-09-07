@@ -28,7 +28,10 @@ def _need(args: list[str], n: int, usage: str) {
 }
 
 impl browse(
-    action: str, args: list = [], session: str = "default", viewport: str = "1280x720"
+    action: str,
+    args: list[any] = [],
+    session: str = "default",
+    viewport: str = "1280x720"
 ) -> int {
     sess = os.environ.get("JACBROWSER_SESSION", session);
     out: any = "";

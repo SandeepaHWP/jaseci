@@ -430,7 +430,7 @@ def _default_compact(
         return messages;
     }
 
-    lines: list = [];
+    lines: list[any] = [];
     for msg in compact_slice {
         if isinstance(msg, dict) {
             role = msg.get("role", "");
@@ -444,7 +444,7 @@ def _default_compact(
             if str(role) == "assistant" and not content {
                 tool_calls = msg.get("tool_calls") or [];
                 if tool_calls {
-                    descs: list = [];
+                    descs: list[any] = [];
                     for tc in tool_calls {
                         fn = tc.get("function", {})
                             if isinstance(tc, dict)
@@ -500,7 +500,7 @@ def _default_compact(
 }
 
 
-impl BaseLLM._get_ctx_window(call_params: dict) -> int {
+impl BaseLLM._get_ctx_window(call_params: dict[any, any]) -> int {
     `override = int(
         call_params.get("ctx_window")
             or self.ctx_window
@@ -514,7 +514,7 @@ impl BaseLLM._get_ctx_window(call_params: dict) -> int {
 }
 
 
-impl BaseLLM._resolve_compaction_params(mt_run: MTRuntime) -> dict {
+impl BaseLLM._resolve_compaction_params(mt_run: MTRuntime) -> dict[any, any] {
     comp_cfg = get_byllm_config().get_compaction_config();
     enabled = bool(
         mt_run.call_params.get("compaction_enabled")
@@ -558,7 +558,7 @@ impl BaseLLM._resolve_compaction_params(mt_run: MTRuntime) -> dict {
 
 
 impl BaseLLM._maybe_compact(
-    mt_run: MTRuntime, usage: object, just_compacted: bool, cp: dict
+    mt_run: MTRuntime, usage: object, just_compacted: bool, cp: dict[any, any]
 ) -> bool {
     ctx_window = int(cp["ctx_window"]);
     if not (bool(cp["enabled"]) and ctx_window > 0) {
@@ -593,7 +593,7 @@ impl BaseLLM._maybe_compact(
 
 
 impl BaseLLM._emergency_compact_retry(
-    mt_run: MTRuntime, just_compacted: bool, cp: dict
+    mt_run: MTRuntime, just_compacted: bool, cp: dict[any, any]
 ) -> CompletionResult {
     if not bool(cp["enabled"]) {
         raise;
@@ -822,7 +822,11 @@ impl BaseLLM._ainvoke_typed_retry(mt_run: MTRuntime) -> object {
 
 
 impl BaseLLM._typed_retry_reset(
-    mt_run: MTRuntime, base_msgs: list, base_scaffolding: list, reason: str, output: str
+    mt_run: MTRuntime,
+    base_msgs: list[any],
+    base_scaffolding: list[any],
+    reason: str,
+    output: str
 ) -> None {
     mt_run.messages = list(base_msgs);
     mt_run._scaffolding_ids = list(base_scaffolding);
@@ -834,7 +838,7 @@ impl BaseLLM._typed_retry_reset(
 
 impl BaseLLM._parse_failure_feedback(
     attempt: int, max_attempts: int, err: object
-) -> tuple {
+) -> tuple[any, ...] {
     self.log_info(
         f"[byllm] typed-output attempt {attempt}/{max_attempts} failed to parse: {err}"
     );
@@ -847,7 +851,7 @@ impl BaseLLM._parse_failure_feedback(
 
 impl BaseLLM._nonconforming_feedback(
     attempt: int, max_attempts: int, mt_run: MTRuntime, result: object
-) -> tuple {
+) -> tuple[any, ...] {
     self.log_info(
         f"[byllm] typed-output attempt {attempt}/{max_attempts} "
             + "returned a non-conforming value; retrying"
@@ -1150,7 +1154,7 @@ impl BaseLLM._invoke_react_loop(mt_run: MTRuntime) -> object {
     return resp.output;
 }
 
-impl BaseLLM.make_model_params(mt_run: MTRuntime) -> dict {
+impl BaseLLM.make_model_params(mt_run: MTRuntime) -> dict[any, any] {
     default_temp = _call_params_config.get("temperature");
     default_max_tokens = _call_params_config.get("max_tokens");
 
@@ -1288,7 +1292,7 @@ impl BaseLLM.log_info(message: str) -> None {
     }
 }
 
-impl BaseLLM.format_prompt(params: dict) -> str {
+impl BaseLLM.format_prompt(params: dict[any, any]) -> str {
     MAGENTA = "\033[95m";
     RESET = "\033[0m";
     log_params = params.copy();
@@ -1653,7 +1657,7 @@ impl BaseLLM.dispatch_streaming_with_tools(
         return;
     }
 
-    message: (LiteLLMMessage | dict | None) = None;
+    message: (LiteLLMMessage | dict[any, any] | None) = None;
     usage_data: dict[any, any] = {};
     actual_model = self.model_name;
     try {
@@ -1798,25 +1802,27 @@ impl BaseLLM.adispatch_streaming(mt_run: MTRuntime) {
     }
 }
 
-impl BaseLLM.model_call_no_stream(params: dict) -> dict {
+impl BaseLLM.model_call_no_stream(params: dict[any, any]) -> dict[any, any] {
     raise NotImplementedError(
         "Subclasses must implement this method for LLM call without streaming."
     );
 }
 
-impl BaseLLM.model_call_with_stream(params: dict) -> Generator[object, None, None] {
+impl BaseLLM.model_call_with_stream(
+    params: dict[any, any]
+) -> Generator[object, None, None] {
     raise NotImplementedError(
         "Subclasses must implement this method for LLM call with streaming."
     );
 }
 
-impl BaseLLM.model_call_no_stream_async(params: dict) -> dict {
+impl BaseLLM.model_call_no_stream_async(params: dict[any, any]) -> dict[any, any] {
     import asyncio;
     return await asyncio.to_thread(self.model_call_no_stream, params);
 }
 
 impl BaseLLM.model_call_with_stream_async(
-    params: dict
+    params: dict[any, any]
 ) -> AsyncGenerator[object, None] {
     import asyncio;
     def _next_chunk(gen: Generator[object, None, None]) -> tuple[bool, object] {

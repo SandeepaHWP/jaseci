@@ -601,7 +601,8 @@ def native_layout_to_dict(layout: NativeModuleLayout) -> dict[str, any] {
                 "name": s.name,
                 "has_vtable": s.has_vtable,
                 "accessors": {
-                    fname: dict(kinds) for (fname, kinds) in s.accessors.items()
+                    fname: dict[any, any](kinds)
+                    for (fname, kinds) in s.accessors.items()
                 },
                 "fields": [
                     {

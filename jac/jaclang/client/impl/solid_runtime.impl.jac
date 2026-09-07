@@ -2,20 +2,21 @@ impl navigate(path: str) -> None {
     _navigate(path);
 }
 
-impl jacSpawn(left: str, right: str = "", fields: dict = {}) -> any {
+impl jacSpawn(left: str, right: str = "", fields: dict[any, any] = {}) -> any {
     return _jacSpawn(left, right, fields);
 }
 
 impl jacSignup(
-    identities_or_username: (str | list),
-    credential_or_password: (str | dict),
+    identities_or_username: (str | list[any]),
+    credential_or_password: (str | dict[any, any]),
     profile: (dict | None) = None
-) -> dict {
+) -> dict[any, any] {
     return await _jacSignup(identities_or_username, credential_or_password, profile);
 }
 
 impl jacLogin(
-    identity_or_username: (str | dict), credential_or_password: (str | dict)
+    identity_or_username: (str | dict[any, any]),
+    credential_or_password: (str | dict[any, any])
 ) -> bool {
     return await _jacLogin(identity_or_username, credential_or_password);
 }
@@ -101,7 +102,7 @@ impl __jacMakeLayoutRoot(layout_component: any) -> any {
     };
 }
 
-impl useRouter -> dict {
+impl useRouter -> dict[any, any] {
     navigate = solidUseNavigate();
     location = solidUseLocation();
     params = solidUseParams();
@@ -215,7 +216,7 @@ impl JacForm(props: dict[str, any]) -> JsxElement {
         }
         return schema;
     }
-    def renderError(errors: list, isTouched: bool) -> JsxElement | None {
+    def renderError(errors: list[any], isTouched: bool) -> JsxElement | None {
         if validateMode == "onTouched" and not isTouched {
             return None;
         }
@@ -228,7 +229,7 @@ impl JacForm(props: dict[str, any]) -> JsxElement {
             </p>
         );
     }
-    def getEnumOptions(fieldSchema: any) -> list {
+    def getEnumOptions(fieldSchema: any) -> list[any] {
         unwrapped = unwrapZodSchema(fieldSchema);
 
         if unwrapped.options and Array.isArray(unwrapped.options) {
@@ -524,7 +525,7 @@ impl JacForm(props: dict[str, any]) -> JsxElement {
             </form.Field>
         );
     }
-    def getLayoutStyle -> dict {
+    def getLayoutStyle -> dict[any, any] {
         if layout == "grid" {
             return {
                 display: "grid",

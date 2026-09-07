@@ -52,7 +52,7 @@ impl native_compiler_fingerprint(options: any) -> str {
     return _comp_h.hexdigest()[:8];
 }
 
-impl native_dep_cache_paths(real_path: str, options: any) -> tuple {
+impl native_dep_cache_paths(real_path: str, options: any) -> tuple[any, ...] {
     import os as _dcp_os;
     import from jaclang.compiler.driver.jir { ct_dep_digest, get_native_cache_dir }
     _ir_cache_dir = str(get_native_cache_dir(real_path));
@@ -65,7 +65,7 @@ impl native_dep_cache_paths(real_path: str, options: any) -> tuple {
     );
 }
 
-impl DepClibMeta.to_meta -> dict {
+impl DepClibMeta.to_meta -> dict[any, any] {
     return {
         "clib_paths": self.clib_paths,
         "clib_symbol_lib": self.clib_symbol_lib,
@@ -81,7 +81,7 @@ impl DepClibMeta.to_meta -> dict {
     };
 }
 
-impl DepClibMeta.from_meta(meta: dict) -> DepClibMeta {
+impl DepClibMeta.from_meta(meta: dict[any, any]) -> DepClibMeta {
     return DepClibMeta(
         clib_paths=meta.get("clib_paths", []),
         clib_symbol_lib=meta.get("clib_symbol_lib", {}),
@@ -163,7 +163,7 @@ impl native_ir_live_externs(llvm_ir_text: str) -> set[str] {
 }
 
 impl native_prune_live_record(
-    pending: dict, declared: set[str]
+    pending: dict[any, any], declared: set[str]
 ) -> dict[str, set[str]] {
     pruned: dict[str, set[str]] = {};
     for (_pr_callee, _pr_names) in (pending or {}).items() {
@@ -269,7 +269,7 @@ impl native_unit_demotions(
 }
 
 impl native_live_call_conflicts(
-    prog: any, pending: dict, options: any
+    prog: any, pending: dict[any, any], options: any
 ) -> dict[str, set[str]] {
     conflicts: dict[str, set[str]] = {};
     for (_cc_callee, _cc_names) in (pending or {}).items() {
@@ -613,7 +613,7 @@ impl NativeCompilePass._jit_load_clib(lib_path: str) -> bool {
 impl NativeCompilePass._compile_and_link_native_imports(
     module: uni.Module,
     main_mod: ModuleRef,
-    imports: list,
+    imports: list[any],
     target_machine: TargetMachine
 ) -> None {
     import os;

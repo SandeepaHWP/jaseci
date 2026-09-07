@@ -28,7 +28,7 @@ def emit_backend(
 
     walker_fields: dict[any, any] = {};
     func_params: dict[any, any] = {};
-    emitted_codes: list = [];
+    emitted_codes: list[any] = [];
     written = 0;
     for unit in compiled {
         if not unit["server"] {
@@ -810,7 +810,7 @@ def _emit_main_py(
     }
 
     if functions {
-        triple_parts: list = [];
+        triple_parts: list[any] = [];
         for f in functions {
             fn = str(f["name"]);
             has_upload = False;

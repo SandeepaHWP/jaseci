@@ -786,7 +786,7 @@ impl NaIRGenPass._is_runtime_class_tuple(t: any) -> bool {
     return saw_class;
 }
 
-impl NaIRGenPass._runtime_class_arms(expr: (uni.UniNode | None)) -> tuple {
+impl NaIRGenPass._runtime_class_arms(expr: (uni.UniNode | None)) -> tuple[any, ...] {
     """The class handles an `isinstance` type argument carries as a value.
 
     `isinstance(x, types)` where `types` is a value is the same check as a

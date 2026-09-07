@@ -483,7 +483,7 @@ impl JacAPIServerWorkloads.admin_workloads_list(
         );
     }
 
-    def _wl_name(d: dict) -> str {
+    def _wl_name(d: dict[any, any]) -> str {
         return d["name"];
     }
     workloads = sorted(workloads, key=_wl_name);
@@ -580,7 +580,7 @@ impl JacAPIServerWorkloads.admin_workloads_pods(
             }
         );
     }
-    def _pod_name(d: dict) -> str {
+    def _pod_name(d: dict[any, any]) -> str {
         return d["name"];
     }
     pods = sorted(pods, key=_pod_name);

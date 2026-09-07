@@ -432,7 +432,7 @@ impl LanguageServer.start_io -> None {
     }
 }
 
-impl LanguageServer.publish_diagnostics(uri: str, diagnostics: list) -> None {
+impl LanguageServer.publish_diagnostics(uri: str, diagnostics: list[any]) -> None {
     self._send_notification(
         TEXT_DOCUMENT_PUBLISH_DIAGNOSTICS,
         {"uri": uri, "diagnostics": [to_dict(d) for d in diagnostics]}
@@ -483,7 +483,7 @@ impl LanguageServer._send_response(msg_id: any, result: any) -> None {
     self._write_message(body);
 }
 
-impl LanguageServer._write_message(body: dict) -> None {
+impl LanguageServer._write_message(body: dict[any, any]) -> None {
     if self._transport_writer is None {
         return;
     }
@@ -525,13 +525,13 @@ impl LanguageServer._read_message(stream: any) -> Optional[dict] {
     return json.loads(body.decode("utf-8"));
 }
 
-impl LanguageServer._handle_initialize(params: dict) -> dict {
+impl LanguageServer._handle_initialize(params: dict[any, any]) -> dict[any, any] {
     root_uri = params.get("rootUri") or params.get("rootPath");
     self._workspace = Workspace(root_uri=root_uri);
     return {"capabilities": self._build_capabilities()};
 }
 
-impl LanguageServer._build_capabilities -> dict {
+impl LanguageServer._build_capabilities -> dict[any, any] {
     caps: dict[str, any] = {
         "textDocumentSync": {
             "openClose": True,

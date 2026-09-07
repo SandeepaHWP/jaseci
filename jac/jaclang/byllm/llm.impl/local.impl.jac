@@ -66,7 +66,7 @@ impl LocalLLM._ensure_llama -> object {
     return self._llama;
 }
 
-impl LocalLLM.model_call_no_stream(params: dict) -> dict {
+impl LocalLLM.model_call_no_stream(params: dict[any, any]) -> dict[any, any] {
     engine = self._ensure_llama();
     call_params = filter_params(params);
     resp = engine.create_chat_completion(**call_params);
@@ -91,7 +91,9 @@ impl LocalLLM.model_call_no_stream(params: dict) -> dict {
     return resp;
 }
 
-impl LocalLLM.model_call_with_stream(params: dict) -> Generator[object, None, None] {
+impl LocalLLM.model_call_with_stream(
+    params: dict[any, any]
+) -> Generator[object, None, None] {
     engine = self._ensure_llama();
     call_params = filter_params(params);
     call_params["stream"] = True;
@@ -100,7 +102,7 @@ impl LocalLLM.model_call_with_stream(params: dict) -> Generator[object, None, No
     }
 }
 
-impl LocalLLM._get_ctx_window(call_params: dict) -> int {
+impl LocalLLM._get_ctx_window(call_params: dict[any, any]) -> int {
     `override = int(
         call_params.get("ctx_window")
             or self.ctx_window

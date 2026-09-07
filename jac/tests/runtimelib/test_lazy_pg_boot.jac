@@ -266,7 +266,7 @@ test "the schema gate readies the store instead of deadlocking on first use" {
         ),
         auto_schema=True
     );
-    outcome: list = [];
+    outcome: list[any] = [];
 
     def first_use {
         store.ensure_schema_once({});

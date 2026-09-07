@@ -384,7 +384,7 @@ def _serve_overrides(
 def _entry_flags_used(
     entry_name: str, nd: str, root_id: str, debug_mode: bool
 ) -> list[any] {
-    used: list = [];
+    used: list[any] = [];
     if entry_name {
         used.append("--entry");
     }
@@ -796,7 +796,7 @@ impl run(
     takeover: (bool | None) = None,
     fleet: bool = False,
     workers: (str | None) = None,
-    args: list = [],
+    args: list[any] = [],
     backend: str = ""
 ) -> int {
     use_line_buffered_output();
@@ -937,7 +937,7 @@ def _exec_file(
     main: bool,
     cache: bool,
     diagnostics: str,
-    args: list,
+    args: list[any],
     backend: str = ""
 ) -> int {
     import from jaclang.runtime.runtime { JacRuntime as Jac }

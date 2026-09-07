@@ -137,7 +137,7 @@ impl WebSocket.close{
 
 impl CDP.call(
     method: str, params: (dict | None) = None, timeout: float = 30.0
-) -> dict {
+) -> dict[any, any] {
     self._id += 1;
     msg_id = self._id;
     self.ws.send(json.dumps({"id": msg_id, "method": method, "params": params or {}}));

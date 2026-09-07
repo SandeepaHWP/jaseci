@@ -780,7 +780,9 @@ impl NaIRGenPass._build_iter_from_expr(expr: uni.UniNode) -> (tuple | None) {
     return _built;
 }
 
-impl NaIRGenPass._make_map_iter(up: tuple, callee: tuple) -> (tuple | None) {
+impl NaIRGenPass._make_map_iter(
+    up: tuple[any, ...], callee: tuple[any, ...]
+) -> (tuple | None) {
     i8p = ir.IntType(8).as_pointer();
     i32 = ir.IntType(32);
     i1 = ir.IntType(1);
@@ -852,7 +854,9 @@ impl NaIRGenPass._make_map_iter(up: tuple, callee: tuple) -> (tuple | None) {
     return (self._make_jac_iter(nfn, st), "adapter", out_type);
 }
 
-impl NaIRGenPass._make_filter_iter(up: tuple, callee: tuple) -> (tuple | None) {
+impl NaIRGenPass._make_filter_iter(
+    up: tuple[any, ...], callee: tuple[any, ...]
+) -> (tuple | None) {
     i8p = ir.IntType(8).as_pointer();
     i32 = ir.IntType(32);
     i1 = ir.IntType(1);
@@ -929,7 +933,7 @@ impl NaIRGenPass._make_filter_iter(up: tuple, callee: tuple) -> (tuple | None) {
     return (self._make_jac_iter(nfn, st), up_name, up_type);
 }
 
-impl NaIRGenPass._make_enumerate_iter(up: tuple) -> (tuple | None) {
+impl NaIRGenPass._make_enumerate_iter(up: tuple[any, ...]) -> (tuple | None) {
     i8p = ir.IntType(8).as_pointer();
     i32 = ir.IntType(32);
     i64 = ir.IntType(64);
@@ -984,7 +988,9 @@ impl NaIRGenPass._make_enumerate_iter(up: tuple) -> (tuple | None) {
     return (self._make_jac_iter(nfn, st), "tuple", tuple_type);
 }
 
-impl NaIRGenPass._make_zip_iter(up_a: tuple, up_b: tuple) -> (tuple | None) {
+impl NaIRGenPass._make_zip_iter(
+    up_a: tuple[any, ...], up_b: tuple[any, ...]
+) -> (tuple | None) {
     i8p = ir.IntType(8).as_pointer();
     i32 = ir.IntType(32);
     i1 = ir.IntType(1);

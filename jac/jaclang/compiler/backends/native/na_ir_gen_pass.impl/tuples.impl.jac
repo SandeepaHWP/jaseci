@@ -90,7 +90,7 @@ impl NaIRGenPass._infer_unpack_struct_ptr(nd: object) -> (ir.Type | None) {
 }
 
 impl NaIRGenPass._codegen_tuple_unpack(
-    targets: list, tuple_val: ir.Value, tuple_node: (object | None)
+    targets: list[any], tuple_val: ir.Value, tuple_node: (object | None)
 ) -> bool {
     _elem_owned = tuple_val?.na_tuple_owned;
     _tu_opt = self._opt_payload_of(tuple_val.type);
@@ -245,7 +245,7 @@ impl NaIRGenPass._rc_slot_ref(val: ir.Value) -> (ir.Value | None) {
     return None;
 }
 
-impl NaIRGenPass._tuple_managed_fields(struct_type: ir.LiteralStructType) -> list {
+impl NaIRGenPass._tuple_managed_fields(struct_type: ir.LiteralStructType) -> list[any] {
     out: list[any] = [];
     for (i, ety) in enumerate(struct_type.elements) {
         if self?.jacval_type and ety == self.jacval_type {
@@ -361,7 +361,7 @@ impl NaIRGenPass._codegen_tuple_index(
     return self.builder.load(elem_ptr, name=f"tuple.idx.{idx}");
 }
 
-impl NaIRGenPass._variadic_tuple_seq_type(type_args: list) -> (ir.Type | None) {
+impl NaIRGenPass._variadic_tuple_seq_type(type_args: list[any]) -> (ir.Type | None) {
     """The native shape of a tuple annotation that withholds its arity.
 
     `tuple[T, ...]` describes any number of `T`, and a native tuple carries its
@@ -476,7 +476,7 @@ impl NaIRGenPass._tuple_iter_shape(
         and isinstance(_t.pointee, ir.LiteralStructType);
 }
 
-impl NaIRGenPass._tuple_seq_flavor(elem_types: list) -> (tuple | None) {
+impl NaIRGenPass._tuple_seq_flavor(elem_types: list[any]) -> (tuple | None) {
     i8p = ir.IntType(8).as_pointer();
     if not elem_types {
         return ("i64", ir.IntType(64));

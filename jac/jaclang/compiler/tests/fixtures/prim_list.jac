@@ -43,7 +43,7 @@ def list_py() -> dict[any, any] {
     b[1] = 99;
     set_val: int = b[1];
 
-    c: list = [];
+    c: list[any] = [];
     c.append(1);
     c.append(2);
     c.append(3);

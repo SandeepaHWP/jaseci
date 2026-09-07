@@ -117,7 +117,7 @@ impl NaIRGenPass._codegen_enum_layout(
 }
 
 impl NaIRGenPass._build_enum_string_table(
-    enum_name: str, entries: list, with_values: bool = True
+    enum_name: str, entries: list[any], with_values: bool = True
 ) -> None {
     i8p = ir.IntType(8).as_pointer();
     i32 = ir.IntType(32);

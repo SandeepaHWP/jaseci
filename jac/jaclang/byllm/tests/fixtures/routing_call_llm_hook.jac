@@ -12,7 +12,7 @@ import from jaclang.byllm.lib { MockLLM }
 import from jaclang.byllm.types { CompletionResult }
 import from jaclang.byllm.mtir { MTRuntime }
 
-glob hook_calls: list = [];
+glob hook_calls: list[any] = [];
 
 obj PickFirstMock(MockLLM) {
     """Selects the first candidate handle."""

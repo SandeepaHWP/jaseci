@@ -1414,7 +1414,7 @@ walker NaIRGenPass(Transform) {
 
     def _receiver_union_parts(nd: (uni.UniNode | None)) -> (list[str] | None);
     def _jc_reference_schema(
-        ft: ir.Type, layouts: dict, semantic: object = None
+        ft: ir.Type, layouts: dict[any, any], semantic: object = None
     ) -> (dict | None);
 
     def _codegen_union_member(
@@ -2119,16 +2119,16 @@ walker NaIRGenPass(Transform) {
     def _transfer_own_args(
         nd: uni.FuncCall,
         func: (ir.Function | None),
-        args: list,
-        release_args: list,
+        args: list[any],
+        release_args: list[any],
         offset: int = 0
-    ) -> list;
+    ) -> list[any];
 
     def _emit_elem_slot_drop(
         b: ir.IRBuilder,
         fn: ir.Function,
         cont: ir.Value,
-        layout: dict,
+        layout: dict[any, any],
         data_index: int,
         val: ir.Value
     ) -> ir.IRBuilder;

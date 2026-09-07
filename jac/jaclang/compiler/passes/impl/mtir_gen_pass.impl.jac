@@ -48,7 +48,7 @@ impl MTIRGenPass._doc_text(doc: String | None) -> str | None {
 
 impl MTIRGenPass._parse_type_expr(
     type_expr: Expr | None, scope: UniScopeNode
-) -> ClassInfo | EnumInfo | str | tuple | None {
+) -> ClassInfo | EnumInfo | str | tuple[any, ...] | None {
     if type_expr is None {
         return None;
     }
@@ -543,7 +543,7 @@ impl MTIRGenPass._archetype_of_type_expr(
 
 impl MTIRGenPass._traversal_candidate_archetypes(
     expr: Expr, scope: UniScopeNode
-) -> tuple {
+) -> tuple[any, ...] {
     cands: list[Archetype] = [];
     bare = False;
     if not isinstance(expr, EdgeRefTrailer) {

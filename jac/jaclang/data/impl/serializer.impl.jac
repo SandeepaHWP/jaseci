@@ -402,7 +402,7 @@ impl Serializer.register_alias(old_name: str, cls: type) -> None {
     Serializer._aliases[old_name] = new_name;
 }
 
-impl Serializer.repair(data: dict[str, object], cls: type) -> tuple {
+impl Serializer.repair(data: dict[str, object], cls: type) -> tuple[any, ...] {
     import from jaclang.data.schema_rules { apply_rules, merged_rules_for, repair_mode }
     mode = repair_mode();
     if mode == 'off' {
@@ -436,7 +436,7 @@ impl Serializer.repair(data: dict[str, object], cls: type) -> tuple {
     return (repaired, steps);
 }
 
-impl Serializer.coerce(val: object, target_type: object) -> tuple {
+impl Serializer.coerce(val: object, target_type: object) -> tuple[any, ...] {
     if target_type is None or isinstance(target_type, str) {
         return (val, False);
     }
@@ -558,7 +558,7 @@ impl Serializer.fingerprint(cls: type) -> str {
             field_pairs.append([f.name, str(f.type)]);
         }
     }
-    field_pairs.sort(key=lambda (p: list) { p[0]; });
+    field_pairs.sort(key=lambda (p: list[any]) { p[0]; });
     payload = {'module': cls.__module__, 'name': cls.__name__, 'fields': field_pairs};
     encoded = _json_dumps(payload, sort_keys=True, `default=str).encode('utf-8');
     return sha256(encoded).hexdigest()[:FINGERPRINT_LENGTH];

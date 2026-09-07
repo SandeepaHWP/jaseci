@@ -1062,7 +1062,7 @@ impl JacGraph.refs(
         ctx = JacRuntimeInterface.get_context();
     }
 
-    def _archetypes(planned: list) -> list {
+    def _archetypes(planned: list[any]) -> list[any] {
         out: list[(NodeArchetype | EdgeArchetype)] = [];
         for a in planned {
             arch = a.archetype;
@@ -1091,7 +1091,7 @@ impl JacGraph.refs(
     ctx.note_traversal_reads([nd.__jac__ for nd in path.origin]);
     store_mem = cast(Session, ctx.mem);
 
-    def _run(q: GraphQuery) -> list {
+    def _run(q: GraphQuery) -> list[any] {
         return _archetypes(
             resolve_query_edges(store_mem, q)
                 if q.edges_only
@@ -1190,7 +1190,7 @@ impl JacGraph.connect(
 
 impl JacGraph.hop(
     origin: any, dir: int, edge_type: (type | None) = None, edges_only: bool = False
-) -> list {
+) -> list[any] {
     if not isinstance(origin, `list) {
         anchor = origin.__jac__;
         if (
@@ -2013,7 +2013,7 @@ impl JacPersistence.store(
     return LocalStorage(base_path=base_path, create_dirs=create_dirs);
 }
 
-impl JacPersistence.get_persistent_memory(config: dict) -> any {
+impl JacPersistence.get_persistent_memory(config: dict[any, any]) -> any {
     provider = _persistent_memory_provider[0];
     if provider is not None {
         return provider(config);

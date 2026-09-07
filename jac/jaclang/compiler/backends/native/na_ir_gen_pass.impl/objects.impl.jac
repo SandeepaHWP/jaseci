@@ -265,7 +265,7 @@ impl NaIRGenPass._register_archetypes(module: uni.Module) -> None {
     self._generate_inherited_method_wrappers();
 }
 
-impl NaIRGenPass._constructor_slots -> tuple {
+impl NaIRGenPass._constructor_slots -> tuple[any, ...] {
     return ("init", "__init__", "postinit", "__post_init__", );
 }
 
@@ -329,7 +329,7 @@ impl NaIRGenPass._predemote_capability_constructors -> None {
     }
 }
 
-impl NaIRGenPass._codegen_constructors_first(archetypes: list) -> None {
+impl NaIRGenPass._codegen_constructors_first(archetypes: list[any]) -> None {
     """Lower every constructor body before any other body is lowered.
 
     The companion to `_predemote_capability_constructors`, for the demotions
@@ -617,7 +617,7 @@ impl NaIRGenPass._codegen_archetype(nd: uni.Archetype) -> None {
     ];
 }
 
-impl NaIRGenPass._erased_sig_typevars(nd: uni.Archetype) -> dict {
+impl NaIRGenPass._erased_sig_typevars(nd: uni.Archetype) -> dict[any, any] {
     """The type params a method signature erases, keyed by the slot naming it.
 
     A sequence of `T` in a signature lays out as the pointer-flavoured list,
@@ -3624,7 +3624,9 @@ impl NaIRGenPass._class_const_global(
     return None;
 }
 
-impl NaIRGenPass._class_const_variants(arch_name: str, field_name: str) -> tuple {
+impl NaIRGenPass._class_const_variants(
+    arch_name: str, field_name: str
+) -> tuple[any, ...] {
     import from jaclang.compiler.passes.layout_pass { get_layout_registry }
     reg = get_layout_registry(self.ir_in, self.prog);
     out: list[tuple[any, ...]] = [];
@@ -4325,7 +4327,7 @@ impl NaIRGenPass._emit_class_routed_call(
 
 
 impl NaIRGenPass._jc_reference_schema(
-    ft: ir.Type, layouts: dict, semantic: object = None
+    ft: ir.Type, layouts: dict[any, any], semantic: object = None
 ) -> (dict | None) {
     """Combine semantic reference types with the backend's container ABI.""";
     args = semantic.private.type_args or [] if isinstance(semantic, ClassType) else [];
@@ -4386,7 +4388,7 @@ impl NaIRGenPass._build_jc_layout -> str {
     import json;
     import from jaclang.compiler.backends.native.abi { struct_layouts }
     layouts = struct_layouts(self.llvm_module);
-    out: dict = {"classes": {}};
+    out: dict[any, any] = {"classes": {}};
     _model = self.ir_in.gen.osp_model;
     _tags = _model.tags if _model is not None else {};
     for arch_name in self.struct_field_indices {
@@ -4406,7 +4408,7 @@ impl NaIRGenPass._build_jc_layout -> str {
         }
             if arch_layout is not None
             else {};
-        fields: dict = {};
+        fields: dict[any, any] = {};
         for (fname, fidx) in idx_map.items() {
             if fidx >= len(offsets) {
                 continue;

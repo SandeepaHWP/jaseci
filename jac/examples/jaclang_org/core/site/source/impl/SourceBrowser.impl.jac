@@ -76,7 +76,7 @@ impl SourceBrowser.toggle_dir(d: str) {
     }
 }
 
-impl SourceBrowser.is_visible(row: dict) -> bool {
+impl SourceBrowser.is_visible(row: dict[any, any]) -> bool {
     for a in (row["ancestors"] as list[str]) {
         if a in closed {
             return False;

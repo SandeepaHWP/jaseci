@@ -154,7 +154,7 @@ obj OAuthSession {
         );
     }
 
-    def record(state: str) -> dict | None {
+    def record(state: str) -> dict[any, any] | None {
         record = AuthTokenStore.instance().peek_token(
             state, "oauth_session:" + self.platform
         );

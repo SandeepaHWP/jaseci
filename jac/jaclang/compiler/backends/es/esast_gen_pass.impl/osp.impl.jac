@@ -44,7 +44,7 @@ impl EsastGenPass._osp_const_decl(
     );
 }
 
-impl EsastGenPass._emit_osp_slot_method(nd: uni.Ability, osp: dict) -> None {
+impl EsastGenPass._emit_osp_slot_method(nd: uni.Ability, osp: dict[any, any]) -> None {
     self.needs_jac_runtime = True;
     is_walker = osp["kind"] == "walker";
     other_ref = self.sync_loc(es.Identifier(name="__other"), jac_node=nd);
@@ -365,7 +365,7 @@ impl EsastGenPass._build_osp_setup_js -> str {
     return "\n".join(lines);
 }
 
-impl EsastGenPass._osp_slots_js(slots: list, tags: dict) -> str {
+impl EsastGenPass._osp_slots_js(slots: list[any], tags: dict[any, any]) -> str {
     parts: list[str] = [];
     for slot in slots {
         fn = "(o, x) => o." + slot.ability + "(x)";

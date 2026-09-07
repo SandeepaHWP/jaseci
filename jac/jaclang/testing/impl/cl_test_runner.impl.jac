@@ -111,7 +111,10 @@ impl _stub_npm_imports(
 }
 
 impl _build_harness(
-    module_js: str, tests: list, api_base_url: str = "", storage: (dict | None) = None
+    module_js: str,
+    tests: list[any],
+    api_base_url: str = "",
+    storage: (dict | None) = None
 ) -> str {
     imports = "\n".join([m.group(0).strip() for m in _IMPORT_LINE.finditer(module_js)]);
     body = _IMPORT_LINE.sub("", module_js);
@@ -424,8 +427,8 @@ impl run_cl_test_file(
 
 impl _run_harness(
     module_js: str,
-    tests: list,
-    imports: dict,
+    tests: list[any],
+    imports: dict[any, any],
     api_base_url: str,
     storage: (dict | None),
     timeout: float,
@@ -521,7 +524,7 @@ impl _run_harness(
     }
 }
 
-impl _parse_results(stdout: str, tests: list) -> (list[ClTestResult] | None) {
+impl _parse_results(stdout: str, tests: list[any]) -> (list[ClTestResult] | None) {
     for line in stdout.splitlines() {
         if line.startswith(_RESULT_SENTINEL) {
             payload = json.loads(line[len(_RESULT_SENTINEL):]);
@@ -595,7 +598,7 @@ impl is_cl_test_file_for_discovery(filepath: str) -> bool {
     return module_is_client(filepath);
 }
 
-impl register_results_into_jactestcheck(filepath: str, results: list) -> None {
+impl register_results_into_jactestcheck(filepath: str, results: list[any]) -> None {
     import from jaclang.testing.test { JacTestCheck }
 
     for res in results {

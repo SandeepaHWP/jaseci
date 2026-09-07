@@ -87,7 +87,7 @@ impl Tool.get_json_schema -> dict[str, object] {
     );
 }
 
-impl Tool.parse_arguments(args_json: dict | str) -> dict {
+impl Tool.parse_arguments(args_json: dict[any, any] | str) -> dict[any, any] {
     annotations: dict[any, any] = {};
     try {
         annotations = self.func.__annotations__;
@@ -132,7 +132,9 @@ impl Tool.parse_arguments(args_json: dict | str) -> dict {
     return args;
 }
 
-impl Tool._parse_finish_arguments(args_json: dict, params: dict) -> dict {
+impl Tool._parse_finish_arguments(
+    args_json: dict[any, any], params: dict[any, any]
+) -> dict[any, any] {
     resp_type = params.get("final_output", object);
 
     candidates: list[any] = [];
@@ -157,13 +159,13 @@ impl Tool._parse_finish_arguments(args_json: dict, params: dict) -> dict {
     );
 }
 
-impl Tool._required_params(params: dict) -> list {
+impl Tool._required_params(params: dict[any, any]) -> list[any] {
     try {
         sig = inspect.signature(self.func);
     } except (TypeError, ValueError) {
         return list(params.keys());
     }
-    required: list = [];
+    required: list[any] = [];
     for (name, param) in sig.parameters.items() {
         if (
             name in params

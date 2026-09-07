@@ -254,7 +254,7 @@ def _check_file_job(request: dict[(str, any)]) -> dict[(str, any)] {
 }
 
 impl check(
-    paths: list,
+    paths: list[any],
     print_errs: bool = True,
     ignore: (list | None) = None,
     disable_error_code: (list | None) = None,
@@ -641,7 +641,7 @@ impl check(
     return 1 if (total_errors > 0 or had_path_errors) else 0;
 }
 
-impl lint(paths: list, fix: bool = False, ignore: (list | None) = None) -> int {
+impl lint(paths: list[any], fix: bool = False, ignore: (list | None) = None) -> int {
     import from jaclang.compiler.driver.program { JacProgram }
     if isinstance(paths, str) {
         paths = [paths];
@@ -1080,14 +1080,14 @@ def _format_single_file_worker(
 }
 
 impl format(
-    paths: list,
+    paths: list[any],
     to_screen: bool = False,
     lintfix: bool = False,
     check: bool = False,
     cache: bool = False,
     cache_anchor: str = "",
-    path_map: dict | None = None,
-    cache_stats: dict | None = None,
+    path_map: dict[any, any] | None = None,
+    cache_stats: dict[any, any] | None = None,
     jobs: str = ""
 ) -> int {
     import os;
@@ -1147,7 +1147,7 @@ impl format(
 
     progress: dict[(str, any)] = {"pooled": use_pool, "done": 0};
 
-    def fmt_job(request: dict[(str, any)]) -> dict {
+    def fmt_job(request: dict[(str, any)]) -> dict[any, any] {
         fp = str(request["path"]);
         return _format_single_file_worker(
             fp, lintfix, check, covered, cache_stamp, cache_anchor, remap.get(fp, "")
@@ -1363,7 +1363,7 @@ impl precommit(
     verify: bool = False,
     install: bool = False,
     force: bool = False,
-    cache_stats: dict | None = None
+    cache_stats: dict[any, any] | None = None
 ) -> int {
     import os;
     import shutil;
@@ -1655,7 +1655,7 @@ def _write_git_hook(hook_path: str, body: str, force: bool) -> int {
 
 impl `test(
     target: str = "",
-    paths: list = [],
+    paths: list[any] = [],
     test_name: str = "",
     filter: str = "",
     xit: bool = False,

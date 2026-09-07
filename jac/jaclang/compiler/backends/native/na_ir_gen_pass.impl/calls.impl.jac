@@ -79,10 +79,10 @@ impl NaIRGenPass._erased_generic_ctor(nd: uni.FuncCall) -> (str | None) {
 impl NaIRGenPass._transfer_own_args(
     nd: uni.FuncCall,
     func: (ir.Function | None),
-    args: list,
-    release_args: list,
+    args: list[any],
+    release_args: list[any],
     offset: int = 0
-) -> list {
+) -> list[any] {
     _hl = self._nogc_headerless();
     if _hl and not self._nogc_owned_world() {
         return release_args;
@@ -113,7 +113,7 @@ impl NaIRGenPass._transfer_own_args(
     if not _own_idx {
         return release_args;
     }
-    _param_idx: dict = {};
+    _param_idx: dict[any, any] = {};
     for (_pi2, _p2) in enumerate(_sig_params) {
         _param_idx[_p2.name.sym_name] = _pi2 + offset;
     }
@@ -220,13 +220,13 @@ impl NaIRGenPass._default_arg_fallback(t: ir.Type) -> ir.Value {
 
 impl NaIRGenPass._codegen_bound_args(
     nd: uni.FuncCall, func: ir.Function, self_offset: int = 0
-) -> list {
+) -> list[any] {
     raw = nd.params or [];
     positional: list[any] = [];
     kw_map: dict[any, any] = {};
     kw_spreads: list[any] = [];
     kw_order: list[any] = [];
-    _unpack_names: list = [];
+    _unpack_names: list[any] = [];
     for param in raw {
         if isinstance(param, uni.KWPair) {
             key = param.key.sym_name if param.key is not None else None;
@@ -726,7 +726,7 @@ impl NaIRGenPass._emit_pack_slot_refusal(nd: uni.FuncCall, star: str) -> None {
 }
 
 impl NaIRGenPass._codegen_varargs_list(
-    nd: uni.FuncCall, extras: list, expected: (ir.Type | None)
+    nd: uni.FuncCall, extras: list[any], expected: (ir.Type | None)
 ) -> (ir.Value | None) {
     spec: (str | None) = None;
     if expected is not None and isinstance(expected, ir.PointerType) {
@@ -831,7 +831,7 @@ impl NaIRGenPass._codegen_varargs_list(
 
 impl NaIRGenPass._codegen_kwargs_dict(
     nd: uni.FuncCall,
-    leftover: dict,
+    leftover: dict[any, any],
     expected: (ir.Type | None),
     order: (list | None) = None,
     bind_records: (list | None) = None
@@ -1008,7 +1008,7 @@ impl NaIRGenPass._codegen_kwargs_dict(
 impl NaIRGenPass._merge_dict_into(
     dst: ir.Value,
     src: ir.Value,
-    helpers: dict,
+    helpers: dict[any, any],
     dict_key: str,
     loc: str,
     skip_keys: (ir.Value | None) = None
@@ -1075,7 +1075,7 @@ impl NaIRGenPass._merge_dict_into(
     return True;
 }
 
-impl NaIRGenPass._codegen_call_args(nd: uni.FuncCall) -> list {
+impl NaIRGenPass._codegen_call_args(nd: uni.FuncCall) -> list[any] {
     arg_vals: list[ir.Value] = [];
     for param in (nd.params or []) {
         v = self._coerce_narrowed_arg(param, self._codegen_expr(param));
@@ -1303,7 +1303,7 @@ impl NaIRGenPass._intrinsic_operand(
 }
 
 impl NaIRGenPass._emit_intrinsic_rc_runtime(
-    nd: uni.FuncCall, intr: IntrinsicEntry, args: list
+    nd: uni.FuncCall, intr: IntrinsicEntry, args: list[any]
 ) -> (ir.Value | None) {
     if intr.gc_mode_gate is not None and self._gc_mode() != intr.gc_mode_gate {
         return None;
@@ -1316,7 +1316,7 @@ impl NaIRGenPass._emit_intrinsic_rc_runtime(
 }
 
 impl NaIRGenPass._emit_intrinsic_float_bits(
-    nd: uni.FuncCall, intr: IntrinsicEntry, args: list
+    nd: uni.FuncCall, intr: IntrinsicEntry, args: list[any]
 ) -> (ir.Value | None) {
     arg_val = self._intrinsic_operand(nd, intr, args[0], intr.param_specs[0]);
     if arg_val is None {
@@ -1326,7 +1326,7 @@ impl NaIRGenPass._emit_intrinsic_float_bits(
 }
 
 impl NaIRGenPass._emit_intrinsic_bits_float(
-    nd: uni.FuncCall, intr: IntrinsicEntry, args: list
+    nd: uni.FuncCall, intr: IntrinsicEntry, args: list[any]
 ) -> (ir.Value | None) {
     arg_val = self._intrinsic_operand(nd, intr, args[0], intr.param_specs[0]);
     if arg_val is None {
@@ -1336,7 +1336,7 @@ impl NaIRGenPass._emit_intrinsic_bits_float(
 }
 
 impl NaIRGenPass._emit_intrinsic_mem_load(
-    nd: uni.FuncCall, intr: IntrinsicEntry, args: list
+    nd: uni.FuncCall, intr: IntrinsicEntry, args: list[any]
 ) -> (ir.Value | None) {
     addr = self._intrinsic_operand(nd, intr, args[0], intr.param_specs[0]);
     if addr is None {
@@ -1348,7 +1348,7 @@ impl NaIRGenPass._emit_intrinsic_mem_load(
 }
 
 impl NaIRGenPass._emit_intrinsic_mem_store(
-    nd: uni.FuncCall, intr: IntrinsicEntry, args: list
+    nd: uni.FuncCall, intr: IntrinsicEntry, args: list[any]
 ) -> (ir.Value | None) {
     addr = self._intrinsic_operand(nd, intr, args[0], intr.param_specs[0]);
     val = self._intrinsic_operand(nd, intr, args[1], intr.param_specs[1]);
@@ -1362,7 +1362,7 @@ impl NaIRGenPass._emit_intrinsic_mem_store(
 }
 
 impl NaIRGenPass._emit_intrinsic_atomic_xchg(
-    nd: uni.FuncCall, intr: IntrinsicEntry, args: list
+    nd: uni.FuncCall, intr: IntrinsicEntry, args: list[any]
 ) -> (ir.Value | None) {
     addr = self._intrinsic_operand(nd, intr, args[0], intr.param_specs[0]);
     val = self._intrinsic_operand(nd, intr, args[1], intr.param_specs[1]);
@@ -1377,7 +1377,7 @@ impl NaIRGenPass._emit_intrinsic_atomic_xchg(
 }
 
 impl NaIRGenPass._emit_intrinsic_call_dtor(
-    nd: uni.FuncCall, intr: IntrinsicEntry, args: list
+    nd: uni.FuncCall, intr: IntrinsicEntry, args: list[any]
 ) -> (ir.Value | None) {
     fn_val = self._intrinsic_operand(nd, intr, args[0], intr.param_specs[0]);
     obj_val = self._intrinsic_operand(nd, intr, args[1], intr.param_specs[1]);
@@ -2637,7 +2637,7 @@ impl NaIRGenPass._isinstance_type_name(nd: uni.UniNode) -> (str | None) {
 
 impl NaIRGenPass._enum_union_tags(
     operand_expr: uni.UniNode, names: list[str]
-) -> tuple {
+) -> tuple[any, ...] {
     try {
         import from jaclang.compiler.types.types {
             ClassType as _EnClassType,
@@ -3384,7 +3384,7 @@ impl NaIRGenPass._try_flow_future(nd: uni.ConcurrentExpr) -> (ir.Value | None) {
     return _hraw;
 }
 
-impl NaIRGenPass._empty_ctor_args_of(nd: uni.FuncCall) -> list {
+impl NaIRGenPass._empty_ctor_args_of(nd: uni.FuncCall) -> list[any] {
     _own = self._container_type_args(nd?.type);
     if _own {
         return _own;
@@ -3413,7 +3413,7 @@ impl NaIRGenPass._unwrap_cfg_expr(e: any) -> any {
 }
 
 impl NaIRGenPass._call_args_lowered(
-    nd: uni.UniNode, func: ir.Function, func_name: str, coerced: list
+    nd: uni.UniNode, func: ir.Function, func_name: str, coerced: list[any]
 ) -> bool {
     """Whether every argument reached the callee's parameter type.
 
@@ -3460,7 +3460,7 @@ impl NaIRGenPass._spec_from_container_ptr(t: (ir.Type | None)) -> (str | None) {
     return None;
 }
 
-impl NaIRGenPass._container_type_args(t: any) -> list {
+impl NaIRGenPass._container_type_args(t: any) -> list[any] {
     if t is None {
         return [];
     }
@@ -3480,7 +3480,7 @@ impl NaIRGenPass._prep_kwbind_record(
     stored: ir.Value,
     bound_kind: (str | None),
     required_kind: (str | None)
-) -> dict {
+) -> dict[any, any] {
     rec: dict[any, any] = {};
     rec["name"] = name;
     rec["slot_type"] = slot_type;
@@ -3569,7 +3569,7 @@ impl NaIRGenPass._emit_swap(nd: uni.FuncCall) -> (ir.Value | None) {
         self.emit(E5092, node_override=nd, kind="swap() call", name="swap");
         return None;
     }
-    _slots: list = [];
+    _slots: list[any] = [];
     for _p in params_l {
         _place = _p.operand if isinstance(_p, uni.UnaryExpr) else _p;
         _slot = self._codegen_place_ptr(_place, allow_inline=True);

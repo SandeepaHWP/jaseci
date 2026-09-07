@@ -1,4 +1,4 @@
-impl NaIRGenPass._codegen_body(stmts: (list | tuple)) -> None {
+impl NaIRGenPass._codegen_body(stmts: (list | tuple[any, ...])) -> None {
     for stmt in stmts {
         if self.builder.block.is_terminated {
             break;
@@ -956,7 +956,7 @@ impl NaIRGenPass._match_subj_ty(expr: (uni.UniNode | None)) -> (object | None) {
     return None;
 }
 
-impl NaIRGenPass._match_seq_parts(pat: uni.MatchSequence) -> tuple {
+impl NaIRGenPass._match_seq_parts(pat: uni.MatchSequence) -> tuple[any, ...] {
     heads: list[any] = [];
     tails: list[any] = [];
     star: (uni.MatchStar | None) = None;
@@ -1113,7 +1113,7 @@ impl NaIRGenPass._match_tuple_seq_cond(
 }
 
 impl NaIRGenPass._match_map_key(
-    kv: uni.MatchKVPair, helpers: dict
+    kv: uni.MatchKVPair, helpers: dict[any, any]
 ) -> (ir.Value | None) {
     key_node = kv.key.value if isinstance(kv.key, uni.MatchValue) else kv.key;
     key_val = self._codegen_expr(key_node) if isinstance(key_node, uni.Expr) else None;
@@ -4121,8 +4121,8 @@ impl NaIRGenPass._codegen_for_indexed(
     kind: str,
     collection_val: ir.Value,
     helpers: (dict | None),
-    var_names: list,
-    var_types: list,
+    var_names: list[any],
+    var_types: list[any],
     rc_vars: bool,
     coll_release_op: str,
     range_start: (ir.Value | None) = None,

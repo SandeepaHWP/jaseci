@@ -179,7 +179,7 @@ impl ConsoleRenderer.emit(spans: list[Span], stream: any = None) -> None {
 }
 
 impl ConsoleRenderer.emit_raw(
-    args: list, stream: any, style: str | None, kwargs: dict
+    args: list[any], stream: any, style: str | None, kwargs: dict[any, any]
 ) -> None {
     self.clear_status();
     out = stream if stream is not None else sys.stdout;
@@ -269,7 +269,7 @@ impl ConsoleRenderer.header(title: str, version: str | None = None) -> None {
     }
 }
 
-impl ConsoleRenderer.urls(items: list, symbol: str = '') -> None {
+impl ConsoleRenderer.urls(items: list[any], symbol: str = '') -> None {
     sym = symbol or ('➜' if self.use_emoji else '>');
     for (label, url) in items {
         padded_label = f"{label}:".ljust(10);
@@ -382,7 +382,7 @@ impl ConsoleRenderer.table(
 }
 
 @contextmanager
-impl ConsoleRenderer.status_ctx(args: list, kwargs: dict) -> object {
+impl ConsoleRenderer.status_ctx(args: list[any], kwargs: dict[any, any]) -> object {
     text = "";
     if args {
         text = args[0] if isinstance(args[0], str) else str(args[0]);

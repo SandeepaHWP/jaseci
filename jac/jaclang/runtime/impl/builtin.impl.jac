@@ -214,7 +214,7 @@ impl new(cls: any, *args: any) -> any {
     return cls(*args);
 }
 
-impl unsafe_html(html: any) -> dict {
+impl unsafe_html(html: any) -> dict[any, any] {
     return {"__jacUnsafeHtml": str(html) if (html is not None) else ""};
 }
 
@@ -435,7 +435,7 @@ impl _jac_swap_places(
     }
 }
 
-impl _jac_chunks(xs: any, n: int) -> list {
+impl _jac_chunks(xs: any, n: int) -> list[any] {
     if n < 1 {
         n = 1;
     }

@@ -6,7 +6,7 @@ In microservice mode, the client calls gateway function endpoints:
   /orders/function/create_order
 """
 
-impl app.apiCall(service: str, endpoint: str, body: dict = {}) -> any {
+impl app.apiCall(service: str, endpoint: str, body: dict[any, any] = {}) -> any {
     token = localStorage.getItem("jac_token");
     options: dict[any, any] = {
         "method": "POST",

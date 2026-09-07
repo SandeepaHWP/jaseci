@@ -241,7 +241,7 @@ def compiler_source_digest(pkg_dir: str) -> str {
     return f"{len(rels)}:{h.hexdigest()}";
 }
 
-glob _COMPILER_DIGEST_CACHE: list = [];
+glob _COMPILER_DIGEST_CACHE: list[any] = [];
 
 def _digest_manifest_path(pkg_dir: str) -> Path {
     tag = hashlib.sha256(str(Path(pkg_dir).resolve()).encode()).hexdigest()[:8];
@@ -317,7 +317,7 @@ def running_compiler_digest -> str {
     return _COMPILER_DIGEST_CACHE[0];
 }
 
-glob _COMPILER_GENERATION_CACHE: list = [];
+glob _COMPILER_GENERATION_CACHE: list[any] = [];
 
 def compiler_generation -> str {
     if not _COMPILER_GENERATION_CACHE {
@@ -328,7 +328,7 @@ def compiler_generation -> str {
     return _COMPILER_GENERATION_CACHE[0];
 }
 
-glob _JAC_VERSION_CACHE: list = [];
+glob _JAC_VERSION_CACHE: list[any] = [];
 
 def jaclang_version -> str {
     if not _JAC_VERSION_CACHE {

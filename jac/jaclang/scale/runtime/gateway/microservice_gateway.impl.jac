@@ -554,7 +554,7 @@ impl MicroserviceGateway.probe_services(
 
     ordered: list[tuple[str, ServiceEntry]] = sorted(
         candidates,
-        key=lambda (pair: tuple) { (
+        key=lambda (pair: tuple[any, ...]) { (
             0 if pair[1].is_root else 1,
             0 if pair[1].status == ServiceStatus.HEALTHY else 1
         ); }

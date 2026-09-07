@@ -803,7 +803,7 @@ impl ModuleIntrospector._collect_cross_boundary_endpoints -> None {
         return None;
     }
 
-    def auth_for(name: str, table: dict, ast_node: any) -> bool {
+    def auth_for(name: str, table: dict[any, any], ast_node: any) -> bool {
         auth = table.get(name, None);
         if auth is None {
             is_pub = ast_node is not None

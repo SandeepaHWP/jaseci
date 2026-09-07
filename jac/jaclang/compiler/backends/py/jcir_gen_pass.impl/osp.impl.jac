@@ -278,7 +278,7 @@ impl JcirGenPass._cmp_op_str(op: CgNode) -> (str | None) {
 
 impl JcirGenPass._query_filter_kws(
     fc: FilterCompr, type_arg: str, preds_arg: str
-) -> list {
+) -> list[any] {
     return self._query_filter_kws_ord(fc, type_arg, preds_arg, False, [])[0];
 }
 

@@ -52,7 +52,7 @@ glob FIXTURES = os.path.join(
 wrappers (mirroring the nacompile CLI), and emit a PIC relocatable object.
 
 Returns (object_bytes, export_symbols)."""
-def emit_shared_object(fixture: str, triple: str) -> tuple {
+def emit_shared_object(fixture: str, triple: str) -> tuple[any, ...] {
     prev = push_native_target(triple);
     try {
         prog = JacProgram();

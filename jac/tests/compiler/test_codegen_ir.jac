@@ -65,7 +65,7 @@ def encode_value(w: CodegenIrWriter, val: object) {
         }
         w.emit_list(len(val));
     } elif isinstance(val, pyast.AST) {
-        names: list = [];
+        names: list[any] = [];
         for (fname, fval) in pyast.iter_fields(val) {
             encode_value(w, fval);
             names.append(fname);

@@ -736,7 +736,7 @@ impl JcirGenPass._invoke_llm_call(
     return call;
 }
 
-impl JcirGenPass.gen_llm_body(nd: Ability) -> list {
+impl JcirGenPass.gen_llm_body(nd: Ability) -> list[any] {
     assert isinstance(nd.signature, FuncSignature);
     model_expr: CgNode;
     if (

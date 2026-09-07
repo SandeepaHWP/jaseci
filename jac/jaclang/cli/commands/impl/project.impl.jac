@@ -729,10 +729,10 @@ def _create_root_gitignore(project_path: Path, entries: list[str]) {
 }
 
 impl install(
-    packages: list = [],
-    editable: list = [],
+    packages: list[any] = [],
+    editable: list[any] = [],
     dev: bool = False,
-    extras: list = [],
+    extras: list[any] = [],
     no_save: bool = False,
     git: str = "",
     npm: bool | None = None,
@@ -1132,7 +1132,7 @@ def _bootstrap_project_deps(project_path: Path) -> bool {
 }
 
 impl remove(
-    packages: list = [], dev: bool = False, npm: bool = False, shadcn: bool = False
+    packages: list[any] = [], dev: bool = False, npm: bool = False, shadcn: bool = False
 ) -> int {
     if shadcn {
         import from jaclang.cli.shadcn.cli { run_shadcn_remove }
@@ -1182,7 +1182,7 @@ def _major_minor(version: str) -> str {
     return version;
 }
 
-impl update(packages: list = [], dev: bool = False, verbose: bool = False) -> int {
+impl update(packages: list[any] = [], dev: bool = False, verbose: bool = False) -> int {
     import from jaclang.project.config { get_config }
     import from jaclang.project.pyvenv { make_git_spec }
     import from jaclang.project.providers { InstallContext, get_python_provider }

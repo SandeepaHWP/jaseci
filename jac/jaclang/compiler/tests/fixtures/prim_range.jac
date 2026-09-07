@@ -19,17 +19,17 @@ def range_py() -> dict[any, any] {
         total += i;
     }
 
-    stepped: list = [];
+    stepped: list[any] = [];
     for i in range(1, 10, 3) {
         stepped.append(i);
     }
 
-    countdown: list = [];
+    countdown: list[any] = [];
     for i in range(5, 0, -1) {
         countdown.append(i);
     }
 
-    pairs: list = [];
+    pairs: list[any] = [];
     for i in range(3) {
         for j in range(2) {
             pairs.append(i * 10 + j);
@@ -96,17 +96,17 @@ def range_cl() -> dict[any, any] {
         total += i;
     }
 
-    stepped: list = [];
+    stepped: list[any] = [];
     for i in range(1, 10, 3) {
         stepped.append(i);
     }
 
-    countdown: list = [];
+    countdown: list[any] = [];
     for i in range(5, 0, -1) {
         countdown.append(i);
     }
 
-    pairs: list = [];
+    pairs: list[any] = [];
     for i in range(3) {
         for j in range(2) {
             pairs.append(i * 10 + j);

@@ -42,7 +42,7 @@ impl HotReloader.stop -> None {
     logger.debug("Hot reloader stopped");
 }
 
-impl HotReloader.build_status -> dict {
+impl HotReloader.build_status -> dict[any, any] {
     diags = self.diagnostics();
     if diags {
         return {
@@ -53,7 +53,7 @@ impl HotReloader.build_status -> dict {
     return {"status": self._build_status.value, "diagnostics": []};
 }
 
-impl HotReloader.diagnostics -> list {
+impl HotReloader.diagnostics -> list[any] {
     with HotReloader._build_lock {
         if self._build_status is BuildStatus.ERROR {
             return list(self._diagnostics);
@@ -163,7 +163,7 @@ impl HotReloader._sync_status_file -> None {
     } except OSError {}
 }
 
-impl get_build_status -> dict {
+impl get_build_status -> dict[any, any] {
     reloader = HotReloader._active;
     if not reloader {
         return {"status": BuildStatus.UNAVAILABLE.value, "diagnostics": []};

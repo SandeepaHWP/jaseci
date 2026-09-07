@@ -297,7 +297,7 @@ obj WasmLinker {
 
 impl WasmLinker.link(
     obj_bytes: bytes,
-    export_funcs: list = [],
+    export_funcs: list[any] = [],
     mem_pages: int = 256,
     host_abi: (set | None) = None,
     host_module: str = "jac_host1",

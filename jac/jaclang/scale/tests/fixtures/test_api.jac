@@ -386,7 +386,7 @@ def ws_private_echo(message: str = "") -> dict[any, any] {
 # ============================================================================
 import datetime;
 
-glob execution_log: list = [],
+glob execution_log: list[any] = [],
      # Scheduler default TZ is UTC — compute the static date trigger in UTC
      # so the same fixture value lands at the same moment on dev and CI.
      _future_date: str = (

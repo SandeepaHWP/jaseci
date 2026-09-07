@@ -634,7 +634,7 @@ impl NaIRGenPass._codegen_nested_ability(nd: uni.Ability) -> None {
     }
 
     param_types: list[any] = [];
-    param_names: list = [];
+    param_names: list[any] = [];
     sig_params = sig.get_parameters() if sig is not None else [];
     for (i, p) in enumerate(sig_params) {
         p_name = p.name.value if p?.name and p.name else f"arg{i}";

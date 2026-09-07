@@ -244,7 +244,7 @@ impl JacAutoLintPass.enter_archetype with uni.Archetype entry {
     self._combine_has_in_node(arch);
 }
 
-impl JacAutoLintPass.combine_consecutive_glob(body: list) -> list {
+impl JacAutoLintPass.combine_consecutive_glob(body: list[any]) -> list[any] {
     if len(body) <= 1 {
         return body;
     }
@@ -312,7 +312,7 @@ impl JacAutoLintPass.combine_consecutive_glob(body: list) -> list {
     return new_body;
 }
 
-impl JacAutoLintPass.combine_consecutive_has(body: list) -> list {
+impl JacAutoLintPass.combine_consecutive_has(body: list[any]) -> list[any] {
     if len(body) <= 1 {
         return body;
     }
@@ -429,7 +429,7 @@ impl JacAutoLintPass.can_combine_has(has1: uni.ArchHas, has2: uni.ArchHas) -> bo
     return True;
 }
 
-impl JacAutoLintPass.create_entry_block(stmts: list) -> uni.ModuleCode {
+impl JacAutoLintPass.create_entry_block(stmts: list[any]) -> uni.ModuleCode {
     entry_block = uni.ModuleCode(name=None, body=stmts, kid=stmts, doc=None);
     new_kid: list[uni.UniNode] = [];
     new_kid.append(entry_block.gen_token(Tok.KW_WITH));
@@ -916,7 +916,7 @@ impl JacAutoLintPass.exit_func_call with uni.FuncCall exit {
 }
 
 impl JacAutoLintPass._collect_atom_trailers(
-    uni_node: uni.UniNode, results: list
+    uni_node: uni.UniNode, results: list[any]
 ) -> None {
     if isinstance(uni_node, uni.AtomTrailer) {
         results.append(uni_node);
@@ -1609,7 +1609,7 @@ impl JacAutoLintPass._extract_string_literal_value(expr: uni.Expr) -> (str | Non
     return None;
 }
 
-impl JacAutoLintPass._check_unnecessary_pass(body: list) -> None {
+impl JacAutoLintPass._check_unnecessary_pass(body: list[any]) -> None {
     if self._is_suppressed(W3020) {
         return;
     }
@@ -2114,7 +2114,7 @@ impl JacAutoLintPass._check_unnecessary_none_return(
     }
 }
 
-impl JacAutoLintPass._body_has_return_stmt(body: list) -> bool {
+impl JacAutoLintPass._body_has_return_stmt(body: list[any]) -> bool {
     for stmt in body {
         if isinstance(stmt, uni.ReturnStmt) {
             return True;
@@ -2832,7 +2832,7 @@ impl JacAutoLintPass._make_accessor_from_ability(
 }
 
 impl JacAutoLintPass._build_property_has(
-    ref_node: uni.UniNode, prop_name: str, type_expr: uni.Expr, accessors: list
+    ref_node: uni.UniNode, prop_name: str, type_expr: uni.Expr, accessors: list[any]
 ) -> uni.ArchHas {
     name_node = self._make_name_node(ref_node, prop_name);
     colon_tok = ref_node.gen_token(Tok.COLON);

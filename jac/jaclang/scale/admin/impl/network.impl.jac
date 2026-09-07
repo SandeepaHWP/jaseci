@@ -84,7 +84,7 @@ def summarize_ingress(ing: dict[any, any]) -> dict[any, any] {
             );
         }
     }
-    lb: list = [];
+    lb: list[any] = [];
     ingress_status = (status.get("load_balancer", {}) or {}).get("ingress", []) or [];
     for `entry in ingress_status {
         addr = `entry.get("hostname") or `entry.get("ip");

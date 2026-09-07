@@ -453,7 +453,7 @@ class VectorType(Type) {
 
 class Aggregate(Type) {
     with entry {
-        elements: (_Repeat | tuple | None);
+        elements: (_Repeat | tuple[any, ...] | None);
     }
 
     def __len__(self: Aggregate) -> object {

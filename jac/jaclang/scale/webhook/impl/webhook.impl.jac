@@ -223,7 +223,7 @@ impl ApiKeyManager.revoke_api_key(user_id: str, api_key_id: str) -> TransportRes
     );
 }
 
-impl ApiKeyManager._get_key_doc(api_key_id: str) -> dict | None {
+impl ApiKeyManager._get_key_doc(api_key_id: str) -> dict[any, any] | None {
     doc: dict[any, any] | None = None;
     if self._db is not None {
         rows = self._db.rows(
@@ -244,7 +244,7 @@ impl ApiKeyManager._get_key_doc(api_key_id: str) -> dict | None {
     return doc;
 }
 
-impl ApiKeyManager.resolve_key(api_key: str) -> dict | None {
+impl ApiKeyManager.resolve_key(api_key: str) -> dict[any, any] | None {
     key_info = WebhookUtils.validate_api_key(api_key);
     if not key_info {
         return None;

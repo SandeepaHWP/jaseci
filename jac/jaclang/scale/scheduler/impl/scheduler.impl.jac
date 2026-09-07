@@ -42,7 +42,7 @@ impl TriggerSpec.validate(
     return TriggerSpec(trigger=trigger, interval=interval, cron=cron, date=date);
 }
 
-impl TriggerSpec.from_dict(d: dict) -> TriggerSpec {
+impl TriggerSpec.from_dict(d: dict[any, any]) -> TriggerSpec {
     kw: dict[str, any] = {'trigger': d.get('trigger', 'interval')};
     comptime for f in fields(TriggerSpec) {
         comptime if f.name != 'trigger' {
@@ -52,7 +52,7 @@ impl TriggerSpec.from_dict(d: dict) -> TriggerSpec {
     return TriggerSpec(**kw);
 }
 
-impl TriggerSpec.to_dict -> dict {
+impl TriggerSpec.to_dict -> dict[any, any] {
     out: dict[str, any] = {};
     comptime for f in fields(TriggerSpec) {
         out[f.name] = get_field(self, f.name);
@@ -60,7 +60,7 @@ impl TriggerSpec.to_dict -> dict {
     return out;
 }
 
-impl TriggerSpec.apscheduler_kwargs -> dict {
+impl TriggerSpec.apscheduler_kwargs -> dict[any, any] {
     if self.trigger == 'interval' {
         if self.interval is None {
             raise ValueError("interval (seconds) required for trigger='interval'");
@@ -107,7 +107,7 @@ def _where_sql(where: dict[any, any] | None, params: dict[any, any]) -> str {
     return sql;
 }
 
-impl PgJobStore.insert(job: dict) -> str {
+impl PgJobStore.insert(job: dict[any, any]) -> str {
     d = dict(job);
     job_id = str(d['job_id']);
     self.store.rows(
@@ -152,7 +152,7 @@ impl PgJobStore.find_active(
     return ([_doc_row(r[0]) for r in rows], total);
 }
 
-impl PgJobStore.find_active_one(job_id: str) -> dict | None {
+impl PgJobStore.find_active_one(job_id: str) -> dict[any, any] | None {
     rows = self.store.rows(
         "SELECT doc FROM jac_docs WHERE collection = :c AND id = :i "
         "AND doc->>'status' = 'active'",
@@ -161,7 +161,9 @@ impl PgJobStore.find_active_one(job_id: str) -> dict | None {
     return _doc_row(rows[0][0]) if rows else None;
 }
 
-impl PgJobStore.update(job_id: str, updates: dict, where: dict | None = None) -> bool {
+impl PgJobStore.update(
+    job_id: str, updates: dict[any, any], where: dict[any, any] | None = None
+) -> bool {
     params: dict[str, any] = {
         'c': self._collection,
         'i': job_id,
@@ -176,7 +178,7 @@ impl PgJobStore.update(job_id: str, updates: dict, where: dict | None = None) ->
     return len(rows) > 0;
 }
 
-impl PgJobStore.delete(job_id: str, where: dict | None = None) -> bool {
+impl PgJobStore.delete(job_id: str, where: dict[any, any] | None = None) -> bool {
     params: dict[str, any] = {'c': self._collection, 'i': job_id};
     cond = _where_sql(where, params);
     rows = self.store.rows(
@@ -204,7 +206,7 @@ impl MemoryJobStore.postinit -> None {
     self._jobs = {};
 }
 
-impl MemoryJobStore.insert(job: dict) -> str {
+impl MemoryJobStore.insert(job: dict[any, any]) -> str {
     job_id = str(job['job_id']);
     self._jobs[job_id] = dict(job);
     return job_id;
@@ -234,7 +236,7 @@ impl MemoryJobStore.find_active(
     return (matches[offset:end], total);
 }
 
-impl MemoryJobStore.find_active_one(job_id: str) -> dict | None {
+impl MemoryJobStore.find_active_one(job_id: str) -> dict[any, any] | None {
     job = self._jobs.get(job_id);
     if job and job.get('status') == 'active' {
         return job;
@@ -243,7 +245,7 @@ impl MemoryJobStore.find_active_one(job_id: str) -> dict | None {
 }
 
 impl MemoryJobStore.update(
-    job_id: str, updates: dict, where: dict | None = None
+    job_id: str, updates: dict[any, any], where: dict[any, any] | None = None
 ) -> bool {
     job = self._jobs.get(job_id);
     if job is None {
@@ -260,7 +262,7 @@ impl MemoryJobStore.update(
     return True;
 }
 
-impl MemoryJobStore.delete(job_id: str, where: dict | None = None) -> bool {
+impl MemoryJobStore.delete(job_id: str, where: dict[any, any] | None = None) -> bool {
     job = self._jobs.get(job_id);
     if job is None {
         return False;
@@ -476,7 +478,7 @@ impl JacScaleScheduler.register_dynamic_tasks_from_db -> None {
 
 impl JacScaleScheduler.create_job(
     name: str, spec: TriggerSpec, created_by: str
-) -> dict {
+) -> dict[any, any] {
     if self._apscheduler is None {
         raise RuntimeError(
             "APScheduler is not available — enable the 'scheduler' capability and run 'jac install'."

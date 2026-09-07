@@ -370,7 +370,7 @@ impl NaIRGenPass._emit_compr_element(
 }
 
 impl NaIRGenPass._codegen_compr_walk(
-    comprs: list,
+    comprs: list[any],
     idx: int,
     kind: str,
     acc: ir.Value,
@@ -536,14 +536,14 @@ impl NaIRGenPass._codegen_compr_walk(
 
 impl NaIRGenPass._codegen_compr_range_walk(
     inner: uni.InnerCompr,
-    comprs: list,
+    comprs: list[any],
     idx: int,
     kind: str,
     acc: ir.Value,
     key_expr: uni.UniNode,
     val_expr: (uni.UniNode | None),
     spec: str,
-    conditionals: list
+    conditionals: list[any]
 ) -> None {
     collection = inner.collection;
     loop_target = inner.target;

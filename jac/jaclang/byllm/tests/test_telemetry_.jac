@@ -226,7 +226,7 @@ test "failing callback does not prevent other callbacks from firing" {
 test "multiple failing callbacks do not suppress any good callbacks" {
     original = _agent_callbacks.copy();
     _agent_callbacks.clear();
-    results: list = [];
+    results: list[any] = [];
     try {
         def bad1(record: dict[any, any]) {
             raise ValueError("bad1");

@@ -91,7 +91,7 @@ impl JcirGenPass.resolve_stmt_block(
     return ret;
 }
 
-impl JcirGenPass._stmts_with_releases(stmts: list) -> list[CgItem] {
+impl JcirGenPass._stmts_with_releases(stmts: list[any]) -> list[CgItem] {
     out: list[CgItem] = [];
     for x in stmts {
         if isinstance(x, ImplDef) {

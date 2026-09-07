@@ -17,7 +17,10 @@ impl NaIRGenPass._mangled_of(t: any) -> (str | None) {
 }
 
 impl NaIRGenPass._syntactic_bind_type_params(
-    tag_node: (uni.UniNode | None), actual: any, tp_names: list[str], solution: dict
+    tag_node: (uni.UniNode | None),
+    actual: any,
+    tp_names: list[str],
+    solution: dict[any, any]
 ) -> None {
     try {
         import from jaclang.compiler.types.types { ClassType as _SbCT }
@@ -199,7 +202,7 @@ impl NaIRGenPass._ct_eval -> any {
     return self.prog.get_type_evaluator().ct_eval;
 }
 
-impl NaIRGenPass._ct_value_with_bindings(nd: uni.Expr) -> tuple {
+impl NaIRGenPass._ct_value_with_bindings(nd: uni.Expr) -> tuple[any, ...] {
     cv = nd.ct_value;
     if cv is None {
         return (False, None);

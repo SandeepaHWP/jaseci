@@ -22,7 +22,7 @@ impl __getApiBaseUrl -> str {
     return base or "";
 }
 
-impl __getEndpointEffects -> dict {
+impl __getEndpointEffects -> dict[any, any] {
     effects: any = globalThis.__jacEndpointEffects__;
     if effects {
         return effects;
@@ -57,7 +57,7 @@ impl __getEndpointEffects -> dict {
     return effects;
 }
 
-impl __getCacheState -> dict {
+impl __getCacheState -> dict[any, any] {
     state: any = globalThis.__jacCacheState__;
     if not state {
         state = {
@@ -71,7 +71,7 @@ impl __getCacheState -> dict {
     return state;
 }
 
-impl __isFresh(`entry: dict) -> bool {
+impl __isFresh(`entry: dict[any, any]) -> bool {
     if not `entry {
         return False;
     }
@@ -79,7 +79,7 @@ impl __isFresh(`entry: dict) -> bool {
     return age < `entry["ttl"];
 }
 
-impl __cacheGet(key: str) -> dict | None {
+impl __cacheGet(key: str) -> dict[any, any] | None {
     state = __getCacheState();
     `entry = state["cache"][key];
     if not `entry {
@@ -157,7 +157,7 @@ impl __bridgeErrorFor(
     return BridgeError(app=app, name=name, detail=message, status=status);
 }
 
-impl __fetchOrRaise(url: str, init: dict, app: str, name: str) -> Response {
+impl __fetchOrRaise(url: str, init: dict[any, any], app: str, name: str) -> Response {
     try {
         return await fetch(url, init);
     } except Exception as fetch_err {
@@ -186,7 +186,7 @@ impl __bridgeApiBase(opts: (dict | None) = None) -> str {
 }
 
 impl __doWalkerFetch(
-    `walker: str, nodeId: str, fields: dict, opts: (dict | None) = None
+    `walker: str, nodeId: str, fields: dict[any, any], opts: (dict | None) = None
 ) -> any {
     app = opts["app"] if opts and opts["app"] else "";
     token = __getLocalStorage("jac_token");
@@ -224,7 +224,9 @@ impl __doWalkerFetch(
     return payload["data"] if payload["data"] else {};
 }
 
-impl __doFuncFetch(function_name: str, args: dict, opts: (dict | None) = None) -> any {
+impl __doFuncFetch(
+    function_name: str, args: dict[any, any], opts: (dict | None) = None
+) -> any {
     app = opts["app"] if opts and opts["app"] else "";
     token = __getLocalStorage("jac_token");
     base_url = __bridgeApiBase(opts);
@@ -317,7 +319,7 @@ impl __cachedEndpointCall(endpoint_key: str, args_key: str, fetch_fn: any) -> an
 }
 
 impl __jacSpawn(
-    left: str, right: str = "", fields: dict = {}, opts: (dict | None) = None
+    left: str, right: str = "", fields: dict[any, any] = {}, opts: (dict | None) = None
 ) -> any {
     if left == "login"
         or left == "signup"
@@ -336,13 +338,13 @@ impl __jacSpawn(
 }
 
 impl jacSpawn(
-    left: str, right: str = "", fields: dict = {}, opts: (dict | None) = None
+    left: str, right: str = "", fields: dict[any, any] = {}, opts: (dict | None) = None
 ) -> any {
     return __jacSpawn(left, right, fields, opts);
 }
 
 impl __jacCallFunction(
-    function_name: str, args: dict = {}, opts: (dict | None) = None
+    function_name: str, args: dict[any, any] = {}, opts: (dict | None) = None
 ) -> any {
     app = opts["app"] if opts and opts["app"] else "";
     endpoint_key = f"func:{function_name}";
@@ -354,14 +356,14 @@ impl __jacCallFunction(
     );
 }
 
-impl __normalizeIdentity(x: any) -> dict {
+impl __normalizeIdentity(x: any) -> dict[any, any] {
     if x != None and Object.prototype.toString.call(x) == "[object Object]" {
         return x;
     }
     return {"type": "username", "value": x};
 }
 
-impl __normalizeCredential(x: any) -> dict {
+impl __normalizeCredential(x: any) -> dict[any, any] {
     if x != None and Object.prototype.toString.call(x) == "[object Object]" {
         return x;
     }
@@ -379,10 +381,10 @@ impl __errorMessage(err: any) -> str {
 }
 
 impl jacSignup(
-    identities_or_username: (str | list),
-    credential_or_password: (str | dict),
+    identities_or_username: (str | list[any]),
+    credential_or_password: (str | dict[any, any]),
     profile: (dict | None) = None
-) -> dict {
+) -> dict[any, any] {
     base_url = __getApiBaseUrl();
     credential = __normalizeCredential(credential_or_password);
     identities = (
@@ -430,7 +432,8 @@ impl jacSignup(
 }
 
 impl jacLogin(
-    identity_or_username: (str | dict), credential_or_password: (str | dict)
+    identity_or_username: (str | dict[any, any]),
+    credential_or_password: (str | dict[any, any])
 ) -> bool {
     base_url = __getApiBaseUrl();
     identity = __normalizeIdentity(identity_or_username);

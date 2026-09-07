@@ -9,7 +9,7 @@ import from jaclang.jac0core.ext_registry {
 }
 
 glob _project_root_cache: dict[any, any] = {},
-     _import_base_stack: list = [],
+     _import_base_stack: list[any] = [],
      COMPILER_PACKAGE: str = 'jaclang';
 
 def push_import_base(base_dir: str) {

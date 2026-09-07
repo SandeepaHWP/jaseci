@@ -27,7 +27,7 @@ impl JcirGenPass._gen_native_interop_stubs(nd: UniNode) -> None {
     }
 }
 
-impl JcirGenPass._native_import_registration_map -> dict {
+impl JcirGenPass._native_import_registration_map -> dict[any, any] {
     manifest = self.ir_in.gen.interop_manifest;
     if not (manifest and manifest.bindings and manifest.native_imports) {
         return {};
@@ -47,7 +47,7 @@ impl JcirGenPass._native_import_registration_map -> dict {
     return reg_map;
 }
 
-impl JcirGenPass._top_level_bound_names(items: any) -> list {
+impl JcirGenPass._top_level_bound_names(items: any) -> list[any] {
     stmts = items if isinstance(items, list) else [items];
     names: list[str] = [];
     for stmt in stmts {
@@ -97,7 +97,7 @@ impl JcirGenPass._top_level_bound_names(items: any) -> list {
     return names;
 }
 
-impl JcirGenPass._native_test_shim_stmts(nd: Test) -> list {
+impl JcirGenPass._native_test_shim_stmts(nd: Test) -> list[any] {
     import from jaclang.compiler.frontend.codeinfo {
         native_test_symbol,
         native_glob_init_name
@@ -232,7 +232,7 @@ impl JcirGenPass._generate_sv_to_sv_stubs(nd: Import) -> bool {
 }
 
 impl JcirGenPass._sv_wire_args_dict(
-    names: list[str], types: list[str], boundary_types: dict
+    names: list[str], types: list[str], boundary_types: dict[any, any]
 ) -> str {
     args_kvs: list[str] = [];
     for i in range(len(names)) {
@@ -378,7 +378,7 @@ impl JcirGenPass._gen_py_sv_walker_stub(
 impl JcirGenPass._gen_py_boundary_stub_class(
     class_name: str, info: BoundaryTypeInfo
 ) -> str {
-    field_names: list = [];
+    field_names: list[any] = [];
     for f in info.fields {
         field_names.append(f[0]);
     }

@@ -237,7 +237,7 @@ impl NaIRGenPass._codegen_multistring(nd: uni.MultiString) -> (ir.Value | None) 
     return result;
 }
 
-impl NaIRGenPass._static_str_struct_const(data: bytes) -> tuple {
+impl NaIRGenPass._static_str_struct_const(data: bytes) -> tuple[any, ...] {
     i64 = ir.IntType(64);
     i8 = ir.IntType(8);
     arr_type = ir.ArrayType(i8, len(data));

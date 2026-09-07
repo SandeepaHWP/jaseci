@@ -17,7 +17,7 @@ obj AllPicksMock(MockLLM) {
     override def dispatch_no_streaming(mt_run: MTRuntime) -> CompletionResult {
         text = "\n".join([str(getattr(m, "content", m)) for m in mt_run.messages]);
         self.seen_prompts.append(text);
-        handles: list = [];
+        handles: list[any] = [];
         in_candidates = False;
         for line in text.splitlines() {
             if line.startswith("Candidates") {

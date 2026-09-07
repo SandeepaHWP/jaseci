@@ -102,7 +102,7 @@ impl NaIRGenPass._emit_struct_call(name: str, nd: uni.FuncCall) -> (ir.Value | N
 }
 
 impl NaIRGenPass._emit_struct_pack(
-    nd: uni.FuncCall, params: list, fields: list, total: int, little: bool
+    nd: uni.FuncCall, params: list[any], fields: list[any], total: int, little: bool
 ) -> (ir.Value | None) {
     b = self.builder;
     i8 = ir.IntType(8);
@@ -176,7 +176,7 @@ impl NaIRGenPass._emit_struct_pack(
 }
 
 impl NaIRGenPass._emit_struct_unpack(
-    nd: uni.FuncCall, params: list, fields: list, total: int, little: bool
+    nd: uni.FuncCall, params: list[any], fields: list[any], total: int, little: bool
 ) -> (ir.Value | None) {
     if len(params) < 2 {
         return None;

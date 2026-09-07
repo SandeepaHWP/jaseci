@@ -22,7 +22,7 @@ def struct_layouts(module: ir.Module) -> dict[str, tuple[list[int], int]] {
     return layouts;
 }
 
-def scalar_layout(llt: (ir.Type | None)) -> tuple {
+def scalar_layout(llt: (ir.Type | None)) -> tuple[any, ...] {
     if isinstance(llt, ir.DoubleType) {
         return (8, 8, [(0, True, 64)]);
     }
@@ -67,9 +67,9 @@ def classify_struct_sysv(size: int, align: int, scalars: list[any]) -> dict[any,
         };
     }
     num_eb = (size + 7) // 8;
-    eb_cls: list = [];
-    eb_dbl: list = [];
-    eb_nfloat: list = [];
+    eb_cls: list[any] = [];
+    eb_dbl: list[any] = [];
+    eb_nfloat: list[any] = [];
     for _e in range(num_eb) {
         eb_cls.append("NONE");
         eb_dbl.append(False);

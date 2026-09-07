@@ -56,7 +56,9 @@ impl validate_app_name(name: str) -> None {
     }
 }
 
-impl parse_apps(project_data: dict, apps_data: dict) -> dict[str, AppConfig] {
+impl parse_apps(
+    project_data: dict[any, any], apps_data: dict[any, any]
+) -> dict[str, AppConfig] {
     import from jaclang.project.kinds { KIND_SPECS }
     if not isinstance(apps_data, dict) {
         raise ValueError("[apps] must be a table of [apps.<name>] tables");

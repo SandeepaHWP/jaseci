@@ -320,7 +320,9 @@ impl JacScaleConfig.get_events_config(self: JacScaleConfig) -> dict[str, any] {
     };
 }
 
-impl _ws_positive(ws_config: dict, key: str, fallback: (int | float)) -> float {
+impl _ws_positive(
+    ws_config: dict[any, any], key: str, fallback: (int | float)
+) -> float {
     raw = ws_config.get(key, fallback);
     if isinstance(raw, bool) or not isinstance(raw, (int, float, str)) {
         raise ValueError(f"[scale.websocket].{key} must be a number, got {raw!r}.");

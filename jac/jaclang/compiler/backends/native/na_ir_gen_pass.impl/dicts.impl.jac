@@ -1,4 +1,4 @@
-impl NaIRGenPass._dict_key_spec(key_type: ir.Type) -> tuple {
+impl NaIRGenPass._dict_key_spec(key_type: ir.Type) -> tuple[any, ...] {
     if isinstance(key_type, ir.DoubleType) {
         return ("f64", 0);
     }

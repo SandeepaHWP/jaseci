@@ -791,7 +791,7 @@ impl NaIRGenPass._pyb_from_py(
 }
 
 impl NaIRGenPass._pyb_build_args(
-    params: list, skip_kwargs: bool = False
+    params: list[any], skip_kwargs: bool = False
 ) -> (tuple | None) {
     """Marshal call params into (PyTuple handle, PyDict handle | None).
 
@@ -1084,8 +1084,8 @@ impl NaIRGenPass._codegen_pyb_shadow_init(
     nd: (uni.FuncCall | uni.Name),
     type_name: str,
     obj_ptr: ir.Value,
-    params: list,
-    native_fields: dict
+    params: list[any],
+    native_fields: dict[any, any]
 ) -> bool {
     i64 = ir.IntType(64);
     pb = self._pyb_base_of(type_name);

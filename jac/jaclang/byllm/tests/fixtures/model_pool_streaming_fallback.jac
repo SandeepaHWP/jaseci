@@ -43,7 +43,7 @@ glob model1 = MockLLM(model_name="gpt-3.5-turbo", config={"outputs": []}),
 """Stream a short answer to the given question."""
 def stream_answer(question: str) -> str by pool(stream=True);
 
-glob _models_tried: list = [];
+glob _models_tried: list[any] = [];
 
 def mock_completion(
     model: str,
@@ -77,7 +77,7 @@ glob model_b1 = MockLLM(model_name="gpt-3.5-turbo", config={"outputs": []}),
 """Stream a short answer (mid-stream scenario)."""
 def stream_answer_mid(question: str) -> str by pool_mid(stream=True);
 
-glob _tried_mid: list = [];
+glob _tried_mid: list[any] = [];
 
 def mock_midstream_completion(
     model: str,
@@ -126,7 +126,7 @@ with entry {
     mid_raised: bool = False;
 }
 
-glob mid_chunks: list = [];
+glob mid_chunks: list[any] = [];
 
 with entry {
     try {

@@ -332,7 +332,7 @@ impl ViteBundler.add_packages(
 }
 
 impl ViteBundler._format_config_object(
-    self: ViteBundler, config: dict, indent: int = 0
+    self: ViteBundler, config: dict[any, any], indent: int = 0
 ) -> str {
     if not config {
         return '';
@@ -398,7 +398,7 @@ def _to_js_expr(value: any) -> str {
 }
 
 impl ViteBundler._format_define_entries(
-    self: ViteBundler, api_base_url: str, custom_defines: dict
+    self: ViteBundler, api_base_url: str, custom_defines: dict[any, any]
 ) -> str {
     entries = [];
 

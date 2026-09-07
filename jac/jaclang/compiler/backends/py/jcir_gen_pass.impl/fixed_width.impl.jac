@@ -36,11 +36,13 @@ impl JcirGenPass._fw_helper(name: str) -> CgNode {
     return self.name_load(name);
 }
 
-impl JcirGenPass._fw_call_node(helper: str, args: list, jac_node: UniNode) -> CgNode {
+impl JcirGenPass._fw_call_node(
+    helper: str, args: list[any], jac_node: UniNode
+) -> CgNode {
     return self.call_node(self._fw_helper(helper), args, [], jac_node=jac_node);
 }
 
-impl JcirGenPass._fw_wrap_call(nd: Expr, helper: str, args: list) -> None {
+impl JcirGenPass._fw_wrap_call(nd: Expr, helper: str, args: list[any]) -> None {
     self.set_out(nd, [self._fw_call_node(helper, args, nd)]);
 }
 

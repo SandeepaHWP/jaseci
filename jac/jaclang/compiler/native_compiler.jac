@@ -246,7 +246,7 @@ class NativeCompiler {
         }
     }
 
-    def _register_value(self: NativeCompiler, schema: dict) -> int {
+    def _register_value(self: NativeCompiler, schema: dict[any, any]) -> int {
         key = json.dumps(schema, sort_keys=True);
         cached = self._value_rows.get(key);
         if cached is not None {

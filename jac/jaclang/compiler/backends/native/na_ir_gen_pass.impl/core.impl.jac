@@ -212,7 +212,7 @@ impl NaIRGenPass._run_impl(ir_in: uni.Module) -> uni.Module {
 }
 
 impl NaIRGenPass._predemote_capability_unit(
-    full_name: str, func: ir.Function, viols: list, keep_func: bool = False
+    full_name: str, func: ir.Function, viols: list[any], keep_func: bool = False
 ) -> bool {
     _local_mark = len(self.errors_had);
     for (_vnode, _vkind, _vname, _vhelp) in viols {
@@ -753,7 +753,7 @@ impl NaIRGenPass._register_imported_struct_types -> None {
     }
 }
 
-impl NaIRGenPass._permuted_walk_order(mods: list) -> list {
+impl NaIRGenPass._permuted_walk_order(mods: list[any]) -> list[any] {
     _spec = self.prog.options.native_module_walk_order or "";
     if not _spec {
         return mods;
@@ -1637,7 +1637,7 @@ impl NaIRGenPass._dispatch_builtin(
     return _emit_fn(_ctx, args);
 }
 
-impl NaIRGenPass._split_call_kwargs(nd: uni.FuncCall) -> dict {
+impl NaIRGenPass._split_call_kwargs(nd: uni.FuncCall) -> dict[any, any] {
     out: dict[any, any] = {};
     for param in (nd.params or []) {
         if isinstance(param, uni.KWPair) and param.key is not None {

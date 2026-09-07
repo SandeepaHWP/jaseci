@@ -95,7 +95,7 @@ impl Interface.run_shell{
     ShellCmd(self).cmdloop();
 }
 
-impl ShellCmd.init(registry: Interface, *args: list, **kwargs: dict) {
+impl ShellCmd.init(registry: Interface, *args: list[any], **kwargs: dict[any, any]) {
     self.cmd.Cmd.__init__(*args, **kwargs);
     self.reg = registry;
 }

@@ -2467,7 +2467,7 @@ impl DocIRGenPass._assign_space_group(nd: uni.UniNode) -> None {
 }
 
 impl DocIRGenPass._assign_operator_chain(
-    nd: uni.UniNode, operands: list, ops: list
+    nd: uni.UniNode, operands: list[any], ops: list[any]
 ) -> None {
     rest: list[doc.DocType] = [];
     for i in range(len(ops)) {

@@ -374,7 +374,7 @@ edge RtRel {
 }
 
 def _transcript(origin: any) -> list[any] {
-    out: list = [];
+    out: list[any] = [];
     for n in [origin-->] {
         if isinstance(n, RtNode) {
             out.append(n.label);

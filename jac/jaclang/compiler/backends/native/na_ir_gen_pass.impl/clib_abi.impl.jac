@@ -1,4 +1,4 @@
-impl NaIRGenPass._foreign_model -> dict {
+impl NaIRGenPass._foreign_model -> dict[any, any] {
     import from jaclang.compiler.backends.native.foreign { collect_foreign_structs }
     universe = [self.ir_in] + self._foreign_modules;
     if self._foreign_structs is None or self._foreign_model_nmods != len(universe) {
@@ -8,7 +8,7 @@ impl NaIRGenPass._foreign_model -> dict {
     return self._foreign_structs;
 }
 
-impl NaIRGenPass._foreign_fns -> dict {
+impl NaIRGenPass._foreign_fns -> dict[any, any] {
     import from jaclang.compiler.backends.native.foreign { collect_foreign_fns }
     universe = [self.ir_in] + self._foreign_modules;
     if self._foreign_fn_decls is None or self._foreign_fns_nmods != len(universe) {
@@ -18,7 +18,7 @@ impl NaIRGenPass._foreign_fns -> dict {
     return self._foreign_fn_decls;
 }
 
-impl NaIRGenPass._foreign_fields_of(name: str) -> list {
+impl NaIRGenPass._foreign_fields_of(name: str) -> list[any] {
     model = self._foreign_model();
     indices = self.struct_field_indices.get(name, {});
     out: list[any] = [];
@@ -29,7 +29,7 @@ impl NaIRGenPass._foreign_fields_of(name: str) -> list {
     return out;
 }
 
-impl NaIRGenPass._clib_struct_layout(name: str) -> tuple {
+impl NaIRGenPass._clib_struct_layout(name: str) -> tuple[any, ...] {
     import from jaclang.compiler.backends.native.foreign { foreign_struct_layout }
     return foreign_struct_layout(self._foreign_model(), name);
 }

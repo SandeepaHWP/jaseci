@@ -3,7 +3,7 @@ impl NaIRGenPass._ensure_bytearray_type -> ir.Type {
     return self.list_types["u8"].as_pointer();
 }
 
-impl NaIRGenPass._bytearray_runtime_fns -> dict {
+impl NaIRGenPass._bytearray_runtime_fns -> dict[any, any] {
     if self._bytearray_fns {
         return self._bytearray_fns;
     }
@@ -211,7 +211,7 @@ impl NaIRGenPass._dispatch_bytearray_method(
 
 impl NaIRGenPass._emit_struct_pack_into(
     nd: uni.FuncCall,
-    params: list,
+    params: list[any],
     fields: list[tuple[str, int, bool]],
     total: int,
     little: bool

@@ -32,8 +32,8 @@ glob NATIVE_SCOPE: tuple[NativeScopeEntry, ...] = (
 
      );
 
-glob _SCOPE_SUFFIX_CACHE: list = [],
-     _SCOPE_ACTIVE: list = [];
+glob _SCOPE_SUFFIX_CACHE: list[any] = [],
+     _SCOPE_ACTIVE: list[any] = [];
 
 def activate_scope_lowering -> None {
     if _SCOPE_ACTIVE {

@@ -82,7 +82,7 @@ impl NaIRGenPass._osp_active -> bool {
         and (_model.has_event_ability() or _model.uses_construct);
 }
 
-impl NaIRGenPass._xmod_osp_help(names: list) -> (str | None) {
+impl NaIRGenPass._xmod_osp_help(names: list[any]) -> (str | None) {
     _model = self.ir_in.gen.osp_model;
     _tags = _model.tags if (_model is not None) else {};
     for _n in names {
@@ -203,14 +203,14 @@ impl NaIRGenPass._osp_make_immortal(ptr: ir.Value) -> None {
     );
 }
 
-impl NaIRGenPass._osp_collect_slots(arch_name: str, is_entry: bool) -> list {
+impl NaIRGenPass._osp_collect_slots(arch_name: str, is_entry: bool) -> list[any] {
     slots: list[any] = [];
     _model = self.ir_in.gen.osp_model;
     if _model is None {
         return slots;
     }
 
-    merged: dict = {};
+    merged: dict[any, any] = {};
     layout = self._arch_layout(arch_name);
     order = layout.mro if layout is not None else [arch_name];
     for owner in reversed(order) {
@@ -262,7 +262,7 @@ impl NaIRGenPass._osp_build_slot(
     return slot;
 }
 
-impl NaIRGenPass._osp_build_slot_list(pairs: list) -> ir.Value {
+impl NaIRGenPass._osp_build_slot_list(pairs: list[any]) -> ir.Value {
     i8p = ir.IntType(8).as_pointer();
     _h = self.list_helpers.get("ptr");
     _lst = self._rc_call_with_ctx(_h["new"], [], op="new", loc="", name="osp.slots");
@@ -279,7 +279,7 @@ impl NaIRGenPass._osp_build_slot_list(pairs: list) -> ir.Value {
 }
 
 impl NaIRGenPass._osp_build_descriptor(
-    struct_name: str, type_tag: int, entry_slots: list, exit_slots: list
+    struct_name: str, type_tag: int, entry_slots: list[any], exit_slots: list[any]
 ) -> (ir.Value | None) {
     desc = self._osp_rc_new(struct_name);
     if desc is None {
@@ -315,7 +315,7 @@ impl NaIRGenPass._osp_build_descriptor(
     return desc;
 }
 
-impl NaIRGenPass._osp_emit_callbacks -> dict {
+impl NaIRGenPass._osp_emit_callbacks -> dict[any, any] {
     i8 = ir.IntType(8);
     i32 = ir.IntType(32);
     i64 = ir.IntType(64);

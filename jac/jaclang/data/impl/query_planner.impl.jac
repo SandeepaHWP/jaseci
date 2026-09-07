@@ -401,7 +401,7 @@ impl LazyRefs._realize(self: LazyRefs) -> None {
 }
 
 
-impl LazyRefs._bounded(self: LazyRefs, limit: (int | None), offset: int) -> list {
+impl LazyRefs._bounded(self: LazyRefs, limit: (int | None), offset: int) -> list[any] {
     q = self._query;
     bounded = GraphQuery(
         q.origin,
@@ -589,7 +589,7 @@ impl LazyRefs.count(self: LazyRefs, item: any) -> int {
 }
 
 
-impl LazyRefs.copy(self: LazyRefs) -> list {
+impl LazyRefs.copy(self: LazyRefs) -> list[any] {
     self._realize();
     return list(self);
 }

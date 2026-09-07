@@ -140,7 +140,7 @@ def:pub Route(props: dict[str, any]) -> JsxElement;
 def:pub Link(props: dict[str, any]) -> JsxElement;
 def:pub Navigate(props: dict[str, any]) -> JsxElement;
 def:pub Outlet(props: dict[str, any] = {}) -> JsxElement | None;
-def:pub useRouter -> dict;
+def:pub useRouter -> dict[any, any];
 def:pub AuthGuard(redirect: str = "/login", children: any = None) -> JsxElement | None;
 
 def:pub __jacMakeLayoutRoot(layout_component: any) -> any;

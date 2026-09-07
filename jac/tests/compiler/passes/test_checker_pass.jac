@@ -4157,7 +4157,7 @@ test "jsx_step2_handler_aliases" {
         + "\n---\n".join(err.pretty_print() for err in program.errors_had);
 }
 
-def _jsx_msgs(program: JacProgram, code: str) -> list {
+def _jsx_msgs(program: JacProgram, code: str) -> list[any] {
     return sorted(
         [
             d.msg

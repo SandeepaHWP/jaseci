@@ -1,4 +1,4 @@
-impl ws_error_frame(code: str, message: any, reason: any = None) -> dict {
+impl ws_error_frame(code: str, message: any, reason: any = None) -> dict[any, any] {
     err: dict[str, any] = {'code': code, 'message': message};
     if reason {
         err['reason'] = reason;
@@ -6,7 +6,7 @@ impl ws_error_frame(code: str, message: any, reason: any = None) -> dict {
     return {'ok': False, 'error': err};
 }
 
-impl _auth_fail(status: str, reason: str) -> dict {
+impl _auth_fail(status: str, reason: str) -> dict[any, any] {
     return {'status': status, 'user_id': None, 'exp': None, 'reason': reason};
 }
 
@@ -204,7 +204,7 @@ impl ws_receive_frame(
 impl ws_handle_control(
     websocket: WebSocket,
     ctx: ConnectionContext,
-    data: dict,
+    data: dict[any, any],
     user_manager: any,
     requires_auth: bool,
     msgs_per_sec: float,

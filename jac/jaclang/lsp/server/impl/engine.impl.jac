@@ -9,7 +9,7 @@ impl _path_of(uri: str) -> str {
 impl _merge_app_alerts(
     collected: list[tuple[str, list, list]], app_count: int
 ) -> tuple[list, list] {
-    def key_of(alert: any) -> tuple {
+    def key_of(alert: any) -> tuple[any, ...] {
         code = alert.code.code if alert.code else '';
         return (
             alert.loc.mod_path,
@@ -20,7 +20,7 @@ impl _merge_app_alerts(
         );
     }
 
-    def merge(index: int) -> list {
+    def merge(index: int) -> list[any] {
         seen_apps: dict[tuple, set[str]] = {};
         first: dict[tuple, any] = {};
         order: list[tuple] = [];
@@ -43,7 +43,7 @@ impl _merge_app_alerts(
             for key in order
             if len(seen_apps[key]) >= app_count
         };
-        out: list = [];
+        out: list[any] = [];
         emitted: set[tuple] = set();
         for (app_name, alert) in tagged {
             key = key_of(alert);

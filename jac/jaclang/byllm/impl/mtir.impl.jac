@@ -332,7 +332,7 @@ impl MTRuntime.get_tool_list -> list[dict[str, any]] {
     return [tool.get_json_schema() for tool in self.tools];
 }
 
-impl MTRuntime.get_output_schema -> dict | None {
+impl MTRuntime.get_output_schema -> dict[any, any] | None {
     assert (len(self.tools) == 0 or self.get_tool("finish_tool") is not None);
     if len(self.tools) == 0 {
         return self.get_typed_output_schema();
@@ -341,7 +341,7 @@ impl MTRuntime.get_output_schema -> dict | None {
     return None;
 }
 
-impl MTRuntime.get_typed_output_schema -> dict | None {
+impl MTRuntime.get_typed_output_schema -> dict[any, any] | None {
     if self.resp_type is None or self.resp_type is str {
         return None;
     }

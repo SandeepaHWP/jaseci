@@ -142,7 +142,7 @@ def _function_callback(
 def _listing(names: list[str], key: str) -> Callable[..., TransportResponse] {
     async def callback(request: Request, **kwargs: JsonValue) -> TransportResponse {
         return TransportResponse.success(
-            data={key: list(names)}, meta=Meta(extra={'http_status': 200})
+            data={key: list[any](names)}, meta=Meta(extra={'http_status': 200})
         );
     }
     return callback;

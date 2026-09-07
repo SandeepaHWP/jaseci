@@ -80,7 +80,10 @@ glob _scale_config_instance: JacScaleConfig | None = None,
 
 def sanitize_prometheus_namespace(name: str) -> str;
 def _resolve_prometheus_namespace(configured: str | None, k8s_namespace: str) -> str;
-def _ws_positive(ws_config: dict, key: str, fallback: (int | float)) -> float;
+def _ws_positive(
+    ws_config: dict[any, any], key: str, fallback: (int | float)
+) -> float;
+
 def get_scale_config(project_dir: Path | None = None) -> JacScaleConfig;
 def peek_scale_config -> JacScaleConfig | None;
 def reset_scale_config -> None;

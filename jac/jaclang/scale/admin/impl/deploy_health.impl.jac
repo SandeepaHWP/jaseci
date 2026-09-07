@@ -61,7 +61,7 @@ def summarize_deployment(dep: dict[any, any]) -> dict[any, any] {
         "containers", []
     )
         or [];
-    images: list = [];
+    images: list[any] = [];
     for c in containers {
         img = c.get("image");
         if img {

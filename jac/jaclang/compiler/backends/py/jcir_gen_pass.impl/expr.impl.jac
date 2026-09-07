@@ -251,7 +251,7 @@ impl JcirGenPass.exit_binary_expr with BinaryExpr exit {
     }
 }
 
-impl JcirGenPass.translate_jac_bin_op(nd: BinaryExpr) -> list {
+impl JcirGenPass.translate_jac_bin_op(nd: BinaryExpr) -> list[any] {
     if not isinstance(nd.op, Token) {
         raise RuntimeError(
             self.ice('translate_jac_bin_op reached a non-token operator')
@@ -505,7 +505,7 @@ impl JcirGenPass.exit_if_else_expr with IfElseExpr exit {
     );
 }
 
-impl JcirGenPass._multi_string_pieces(str_seq: Sequence[UniNode]) -> list {
+impl JcirGenPass._multi_string_pieces(str_seq: Sequence[UniNode]) -> list[any] {
     pieces: list[any] = [];
     for i in str_seq {
         if isinstance(i, String) {

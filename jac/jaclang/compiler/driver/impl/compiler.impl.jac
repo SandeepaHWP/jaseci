@@ -564,7 +564,7 @@ impl JacCompiler._get_precompiled_jir_bytecode(
     return None;
 }
 
-impl JacCompiler._build_interop_dict(result: uni.Module) -> dict {
+impl JacCompiler._build_interop_dict(result: uni.Module) -> dict[any, any] {
     manifest = result.gen.interop_manifest;
     if manifest is None {
         return {};

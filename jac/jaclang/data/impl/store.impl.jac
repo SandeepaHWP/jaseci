@@ -384,7 +384,7 @@ def _conn_dead(e: Exception) -> bool {
 }
 
 
-impl PgStore._run(sql: str, params: dict) -> list {
+impl PgStore._run(sql: str, params: dict[any, any]) -> list[any] {
     self._ensure_ready();
     with self._lock {
         conn: any = None;
@@ -1040,7 +1040,7 @@ impl PgStore.subtype_names(type_name: str) -> list[str] {
 }
 
 
-impl PgStore.rows(sql: str, params: dict) -> list[tuple] {
+impl PgStore.rows(sql: str, params: dict[any, any]) -> list[tuple] {
     return [tuple(r) for r in self._run(sql, params)];
 }
 

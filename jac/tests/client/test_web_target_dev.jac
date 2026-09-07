@@ -50,7 +50,7 @@ obj _FakeWatcher {
 and returns the steps the flow actually took, in order. Passing a watcher makes
 ensure_watchdog_common() report watchdog as available, so the HMR path runs."""
 def _record_dev_calls(target: any, watcher: any = None) -> list[any] {
-    calls: list = [];
+    calls: list[any] = [];
     fake_bundler = _FakeBundler(calls=calls);
 
     def _fake_prepare(project_dir: any, entry_file: any) -> tuple[any, ...] {

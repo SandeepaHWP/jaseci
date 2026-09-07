@@ -12,7 +12,7 @@ def fmt_spaced(pairs: list[any]) -> str {
 }
 
 def build_lines(items: list[any], redirect: str) -> list[any] {
-    lines: list = [];
+    lines: list[any] = [];
     lines.append("hello");
     # Comment before f-string statement should stay here.
     lines.append(f'function guard() {{ return go("{redirect}"); }}');

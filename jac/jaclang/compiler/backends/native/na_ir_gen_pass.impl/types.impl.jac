@@ -77,7 +77,7 @@ impl NaIRGenPass._lower_type(t: any) -> (ir.Type | None) {
     return lowered;
 }
 
-impl NaIRGenPass._unify_repr_lowering(reprs: list) -> (ir.Type | None) {
+impl NaIRGenPass._unify_repr_lowering(reprs: list[any]) -> (ir.Type | None) {
     """One representation for a set of lowerings that share a slot.
 
     Members that share a lowering keep it. An all-pointer set keeps the
@@ -235,7 +235,7 @@ impl NaIRGenPass._list_spec_of(expr: (uni.UniNode | None)) -> (str | None) {
 }
 
 impl NaIRGenPass._spec_of(
-    expr: (uni.UniNode | None), names: tuple, registry: dict
+    expr: (uni.UniNode | None), names: tuple[any, ...], registry: dict[any, any]
 ) -> (str | None) {
     if not isinstance(expr, uni.Expr) or expr.type is None {
         return None;
@@ -278,7 +278,7 @@ impl NaIRGenPass._spec_of(
     return None;
 }
 
-impl NaIRGenPass._spec_name_match(tk: str, names: tuple) -> bool {
+impl NaIRGenPass._spec_name_match(tk: str, names: tuple[any, ...]) -> bool {
     if tk in names {
         return True;
     }
@@ -318,7 +318,7 @@ impl NaIRGenPass._opt_sole_member(t: any) -> (any | None) {
     return _members[0];
 }
 
-impl NaIRGenPass._spec_union_agreement(t: any, names: tuple) -> (any | None) {
+impl NaIRGenPass._spec_union_agreement(t: any, names: tuple[any, ...]) -> (any | None) {
     try {
         import from jaclang.compiler.types.types {
             ClassType as _SuClassType,
@@ -985,7 +985,7 @@ impl NaIRGenPass._program_has_subclasses(arch_name: str) -> bool {
             return arch_name in _cached;
         }
         _names: set[str] = set();
-        _mods: list = [];
+        _mods: list[any] = [];
         try {
             _mods = list(self.prog.mod.hub.values());
         } except Exception {
@@ -1144,7 +1144,7 @@ impl NaIRGenPass._widened_tuple_decl_type(
     return self._infer_global_init_type(value);
 }
 
-impl NaIRGenPass._tuple_struct_of(elem_types: list) -> ir.Type {
+impl NaIRGenPass._tuple_struct_of(elem_types: list[any]) -> ir.Type {
     tuple_key = f"Tuple.{len(elem_types)}." + ".".join([str(x) for x in elem_types]);
     if tuple_key not in self.tuple_types {
         self.tuple_types[tuple_key] = ir.LiteralStructType(elem_types);
@@ -3105,7 +3105,9 @@ impl NaIRGenPass._emit_arch_dunder_binop(
     return _try_dispatch(self, right, left, rmagic);
 }
 
-impl NaIRGenPass._opt_membership_operand(left: ir.Value, slot_type: ir.Type) -> tuple {
+impl NaIRGenPass._opt_membership_operand(
+    left: ir.Value, slot_type: ir.Type
+) -> tuple[any, ...] {
     _pt = self._opt_payload_of(left.type);
     if _pt is None or (self?.jacval_type and slot_type == self.jacval_type) {
         return (self._coerce_type(left, slot_type), None);

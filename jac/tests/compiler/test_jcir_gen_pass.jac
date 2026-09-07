@@ -487,7 +487,7 @@ with entry {
     (ref_tree, got_tree, _) = dual_compile(src, "lambda_fixture.jac");
     assert_dump_equal(ref_tree, got_tree);
     exec_both(ref_tree, got_tree, "lambda_fixture.jac", ["r1", "r2"]);
-    missing: list = [];
+    missing: list[any] = [];
     for node in pyast.walk(got_tree) {
         if "lineno" in node._attributes {
             # `lineno` lives on concrete nodes, not the `AST` base the stub
