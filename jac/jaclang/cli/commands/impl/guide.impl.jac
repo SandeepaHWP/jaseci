@@ -141,7 +141,7 @@ def _print_nav(as_json: bool) -> int {
                 _emit(f"{pad}{title}  [{name}]");
             } elif "items" in item {
                 console.print(f"{pad}{title}", style="bold");
-                walk(item["items"] as list, depth + 1);
+                walk(item["items"] as list[any], depth + 1);
             } elif "url" in item {
                 _emit(f"{pad}{title}  {item['url']}");
             }
@@ -150,7 +150,7 @@ def _print_nav(as_json: bool) -> int {
     console.print();
     console.print("Bundled docs navigation", style="bold");
     console.print();
-    walk(manifest.get("nav", []) as list, 0);
+    walk(manifest.get("nav", []) as list[any], 0);
     console.print();
     console.print("Read a doc with:  jac guide <name>", style="muted");
     console.print("Manifest as JSON: jac guide --nav --json", style="muted");

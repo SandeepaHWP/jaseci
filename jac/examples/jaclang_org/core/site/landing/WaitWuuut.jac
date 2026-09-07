@@ -488,7 +488,7 @@ def Definition(
 }
 
 def DefCard(k: str) -> JsxElement {
-    d = DEFS[k] as dict;
+    d = DEFS[k] as dict[any, any];
     return
         <Definition
             term={d["term"] as str}
@@ -683,7 +683,7 @@ def:pub WaitWuuut -> JsxElement {
     running = 0;
     for grp in GROUPS {
         bases.append(running);
-        running += len(grp["sections"] as list);
+        running += len(grp["sections"] as list[any]);
     }
     return
         <div className="pb-24">
@@ -727,20 +727,20 @@ def:pub WaitWuuut -> JsxElement {
                             </Reveal>
                         </div>
                     }}
-                    {for (si, s) in enumerate(grp["sections"] as list) {
+                    {for (si, s) in enumerate(grp["sections"] as list[any]) {
                         <div key={str(si)}>
-                            {if "define" in (s as dict) {
+                            {if "define" in (s as dict[any, any]) {
                                 <div
                                     className="mx-auto max-w-3xl pl-4 pr-4 pt-10 pb-2 sm:pl-6 sm:pr-6"
                                 >
                                     <Reveal>
-                                        <DefCard k={(s as dict)["define"] as str}/>
+                                        <DefCard k={(s as dict[any, any])["define"] as str}/>
                                     </Reveal>
                                 </div>
                             }}
                             <FeatureSection
                                 idx={(bases[gi] as int) + si}
-                                data={s as dict}
+                                data={s as dict[any, any]}
                                 on_pop={handle_pop}
                             />
                         </div>

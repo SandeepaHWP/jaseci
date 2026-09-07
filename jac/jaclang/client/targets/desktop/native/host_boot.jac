@@ -205,9 +205,9 @@ def boot(config_json: str) -> HostContext {
     cfg = json.loads(config_json);
     app_name = str(cfg.get("app_name") or "app");
     mode = str(cfg.get("mode") or "webview");
-    program = (cfg.get("program") or {}) as dict;
+    program = (cfg.get("program") or {}) as dict[any, any];
     backend = str(cfg.get("backend") or EMBEDDED);
-    plugin_configs = (cfg.get("plugins") or {}) as dict;
+    plugin_configs = (cfg.get("plugins") or {}) as dict[any, any];
 
     app_dir = str(cfg.get("app_dir") or "") or _app_root();
     data_dir = str(os.environ.get("JAC_DATA_PATH", app_dir));

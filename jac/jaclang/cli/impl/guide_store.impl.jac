@@ -367,11 +367,11 @@ impl nav_pages -> list[NavPage] {
                     )
                 );
             } elif "items" in item {
-                walk(item["items"] as list, trail + [title]);
+                walk(item["items"] as list[any], trail + [title]);
             }
         }
     }
-    walk(nav_manifest().get("nav", []) as list, []);
+    walk(nav_manifest().get("nav", []) as list[any], []);
     return pages;
 }
 

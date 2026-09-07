@@ -9,7 +9,7 @@ glob:pub AuthContext = createContext(None);
 
 async def _jsonBody(resp: Response) -> dict[any, any] {
     body = await resp.json();
-    return body as dict;
+    return body as dict[any, any];
 }
 
 def:pub AuthProvider(children: any) -> JsxElement {

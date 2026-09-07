@@ -74,7 +74,7 @@ def _model(tree: list[TreeNode], version: str) -> dict[any, any] {
         "index": {"": 0},
         "w": 234.0
     };
-    (acc["nodes"] as list).append(
+    (acc["nodes"] as list[any]).append(
         {"i": 0, "path": "", "label": version, "kind": "root", "x": PAD_X, "y": PAD_Y}
     );
     for t in tree {
@@ -122,14 +122,14 @@ def:pub DocsGraphFloat(
             rafRef.current = 0;
         }
         m = _model(tree, version);
-        chain = _chain(m["index"] as dict, cur_path);
-        nodes = m["nodes"] as list;
+        chain = _chain(m["index"] as dict[any, any], cur_path);
+        nodes = m["nodes"] as list[any];
         dot: any = dotRef.current;
         if not dot {
             return;
         }
         if len(chain) < 2 {
-            rn = nodes[0] as dict;
+            rn = nodes[0] as dict[any, any];
             dot.setAttribute("cx", str(rn["x"] as float));
             dot.setAttribute("cy", str(rn["y"] as float));
             dot.setAttribute("opacity", "1");
@@ -190,7 +190,7 @@ def:pub DocsGraphFloat(
                 rafRef.current = window.requestAnimationFrame(fns["step"]);
             } else {
                 rafRef.current = 0;
-                last = segs[len(segs) - 1] as dict;
+                last = segs[len(segs) - 1] as dict[any, any];
                 lel: any = last["el"];
                 ept: any = lel.getPointAtLength(last["len"] as float);
                 dot.setAttribute("cx", str(ept.x as float));
@@ -207,9 +207,9 @@ def:pub DocsGraphFloat(
     }
 
     m = _model(tree, version);
-    nodes = m["nodes"] as list;
-    edges = m["edges"] as list;
-    chain = _chain(m["index"] as dict, cur_path);
+    nodes = m["nodes"] as list[any];
+    edges = m["edges"] as list[any];
+    chain = _chain(m["index"] as dict[any, any], cur_path);
     target_i = (chain[len(chain) - 1] as int) if len(chain) > 1 else -1;
     return
         <div>
