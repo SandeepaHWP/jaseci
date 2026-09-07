@@ -102,7 +102,7 @@ obj RegisterRequest(ApiModel) {
         if not isinstance(data, dict) {
             raise ValueError('request body must be an object');
         }
-        # isinstance narrows to a bare dict, whose values read as Unknown.
+
         data: dict[str, any] = data;
         raw_identities = data.get('identities');
         if not isinstance(raw_identities, list) or len(raw_identities) == 0 {
@@ -267,7 +267,7 @@ obj UpdateProfileRequest(ApiModel) {
         if not isinstance(data, dict) {
             raise ValueError('request body must be an object');
         }
-        # isinstance narrows to a bare dict, whose values read as Unknown.
+
         data: dict[str, any] = data;
         raw_profile = data.get('profile');
         if raw_profile is None {

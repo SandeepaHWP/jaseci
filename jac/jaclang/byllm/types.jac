@@ -173,7 +173,6 @@ def serialize_media_content(content: list[any]) -> list[dict[str, any]] {
         }
         semstring = "";
         if isinstance(item, tuple) {
-            # isinstance narrows to a bare tuple, whose members read as Unknown.
             pair: tuple[any, ...] = item;
             semstring = pair[1] or "";
             item = pair[0];
@@ -293,7 +292,7 @@ def _split_tool_msg_images(
     if not isinstance(content, list) {
         return (msg, []);
     }
-    # isinstance narrows to a bare list, whose elements read as Unknown.
+
     blocks_in: list[dict[str, any]] = content;
     text_blocks: list[dict[str, any]] = [];
     image_blocks: list[dict[str, any]] = [];

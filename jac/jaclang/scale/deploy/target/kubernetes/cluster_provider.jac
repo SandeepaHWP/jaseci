@@ -84,7 +84,7 @@ obj LocalProvider(ClusterProvider) {
         v1 = client.CoreV1Api();
         all_services = v1.list_service_for_all_namespaces();
         used_ports: dict[int, str] = {};
-        # The kubernetes client is untyped, so its items read as Unknown.
+
         svc_items: list[any] = all_services.items or [];
         for svc in svc_items {
             if svc.metadata.namespace == current_namespace {

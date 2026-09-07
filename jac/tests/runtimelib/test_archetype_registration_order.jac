@@ -87,7 +87,7 @@ def _anchor_blob(arch: object) -> dict[any, any] {
 
 # --- Back-fill on hook install ---------------------------------------------
 test "installing a hook back-fills archetype classes that already exist" {
-    seen: list = [];
+    seen: list[any] = [];
 
     def recorder(cls: type) {
         seen.append(_key(cls));
@@ -131,7 +131,7 @@ test "installing the same hook twice neither duplicates it nor re-runs it" {
 
 
 test "an installed hook still fires for classes created afterwards" {
-    seen: list = [];
+    seen: list[any] = [];
 
     def recorder(cls: type) {
         seen.append(cls.__name__);

@@ -139,7 +139,7 @@ impl JacClientConfig.load(self: JacClientConfig) -> dict[str, any] {
     );
     dev_section = npm_plugin_deps.get('dev', {});
     npm_dev_deps: dict[any, any] = dict(dev_section)
-        if isinstance(dev_section, dict[any, any])
+        if isinstance(dev_section, dict)
         else {};
 
     if 'client' in jac_config.plugins {

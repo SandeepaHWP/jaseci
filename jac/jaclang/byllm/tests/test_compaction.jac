@@ -50,7 +50,7 @@ test "above threshold compacts and next iteration sees shortened messages" {
         return [msgs[0], msgs[1]];
     }
 
-    iter_msgs: list = [];
+    iter_msgs: list[any] = [];
     original_dispatch = llm.dispatch_no_streaming;
     def capturing_dispatch(mt_run: MTRuntime) -> CompletionResult {
         iter_msgs.append(len(mt_run.get_msg_list()));

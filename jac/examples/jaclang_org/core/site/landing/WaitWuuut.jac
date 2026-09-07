@@ -734,7 +734,9 @@ def:pub WaitWuuut -> JsxElement {
                                     className="mx-auto max-w-3xl pl-4 pr-4 pt-10 pb-2 sm:pl-6 sm:pr-6"
                                 >
                                     <Reveal>
-                                        <DefCard k={(s as dict[any, any])["define"] as str}/>
+                                        <DefCard
+                                            k={(s as dict[any, any])["define"] as str}
+                                        />
                                     </Reveal>
                                 </div>
                             }}

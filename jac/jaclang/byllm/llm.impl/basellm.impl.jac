@@ -1503,7 +1503,7 @@ impl BaseLLM.dispatch_no_streaming(mt_run: MTRuntime) -> CompletionResult {
     truncated_ids = _truncated_call_ids(message, finish_reason);
     tool_calls: list[ToolCall] = [];
     _tc_raw = (message or {}).get("tool_calls") or [];
-    tool_calls_list: list[any] = _tc_raw if isinstance(_tc_raw, list[any]) else [];
+    tool_calls_list: list[any] = _tc_raw if isinstance(_tc_raw, list) else [];
     tool_calls = _parse_tool_calls(mt_run, tool_calls_list, truncated_ids, damaged_ids);
 
     output_value = mt_run.parse_response(output_content)
@@ -1694,7 +1694,7 @@ impl BaseLLM.dispatch_streaming_with_tools(
     truncated_ids = _truncated_call_ids(message, finish_reason);
     tool_calls: list[ToolCall] = [];
     _tc_raw = (message or {}).get("tool_calls") or [];
-    tool_calls_list: list[any] = _tc_raw if isinstance(_tc_raw, list[any]) else [];
+    tool_calls_list: list[any] = _tc_raw if isinstance(_tc_raw, list) else [];
     tool_calls = _parse_tool_calls(mt_run, tool_calls_list, truncated_ids, damaged_ids);
     output_value = mt_run.parse_response(output_content)
         if not tool_calls_list
@@ -1748,7 +1748,7 @@ impl BaseLLM.adispatch_no_streaming(mt_run: MTRuntime) -> CompletionResult {
     truncated_ids = _truncated_call_ids(message, finish_reason);
     tool_calls: list[ToolCall] = [];
     _tc_raw = (message or {}).get("tool_calls") or [];
-    tool_calls_list: list[any] = _tc_raw if isinstance(_tc_raw, list[any]) else [];
+    tool_calls_list: list[any] = _tc_raw if isinstance(_tc_raw, list) else [];
     tool_calls = _parse_tool_calls(mt_run, tool_calls_list, truncated_ids, damaged_ids);
     output_value = mt_run.parse_response(output_content)
         if not tool_calls_list

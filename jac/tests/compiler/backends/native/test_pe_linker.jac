@@ -163,7 +163,7 @@ def parse_pe(b: bytes) -> dict[any, any] {
     # section table
     st = opt + opt_sz;
     secs: list[any] = [];
-    sec_names: list = [];
+    sec_names: list[any] = [];
     for i in range(nsec) {
         o = st + i * 40;
         nm = b[o:o + 8].rstrip(b"\x00").decode("latin1");
@@ -182,7 +182,7 @@ def parse_pe(b: bytes) -> dict[any, any] {
             break;
         }
         dll = _cstr(b, _rva_to_off(b, secs, name_rva));
-        names: list = [];
+        names: list[any] = [];
         toff = _rva_to_off(b, secs, ilt);
         j = 0;
         while True {

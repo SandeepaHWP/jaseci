@@ -388,7 +388,7 @@ with entry {
 
 test "expression forms match" {
     src = """
-def exprs(a: int, b: int) -> dict {
+def exprs(a: int, b: int) -> dict[any, any] {
     lst = [a, b, a + b];
     st = {a, b};
     tp = (a, b);
@@ -435,7 +435,7 @@ obj Box {
         label: str = "leaf";
 }
 
-def probe(b: (Box | None)) -> tuple {
+def probe(b: (Box | None)) -> tuple[any, ...] {
     lab = b?.label;
     deep = b.inner?.label if b else None;
     ms = "one "
@@ -679,7 +679,7 @@ with entry {
 test "llm ability bodies lower to call_llm recipes" {
     src = """
 obj FakeModel {
-    has call_params: dict = {};
+    has call_params: dict[any, any] = {};
 }
 
 def make_model -> FakeModel {
@@ -749,7 +749,7 @@ walker Traveler {
     }
 }
 
-def build_map -> list {
+def build_map -> list[any] {
     a = Spot(name="a");
     b = Spot(name="b");
     root ++> a;
@@ -910,7 +910,7 @@ with entry {
 test "server-side jsx lowers to jaclib jsx calls" {
     import tempfile;
     src = """
-def page(title: str, items: list[str], extra: dict) -> JsxElement {
+def page(title: str, items: list[str], extra: dict[any, any]) -> JsxElement {
     rows = [<li key={it}>{it}</li> for it in items];
     return <div title="box" active data={len(items)}>
         <h1>Hello &amp; {title}</h1>

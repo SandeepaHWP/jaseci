@@ -45,7 +45,7 @@ obj CreateJobRequest(ApiModel) {
         if not isinstance(data, dict) {
             raise ValueError('request body must be an object');
         }
-        # isinstance narrows to a bare dict, whose values read as Unknown.
+
         data: dict[str, any] = data;
         comptime allowed: set[str] = {f.name for f in fields(CreateJobRequest)};
         _validate_trigger_fields(data, allowed);
@@ -71,7 +71,7 @@ obj UpdateJobRequest(ApiModel) {
         if not isinstance(data, dict) {
             raise ValueError('request body must be an object');
         }
-        # isinstance narrows to a bare dict, whose values read as Unknown.
+
         data: dict[str, any] = data;
         comptime allowed: set[str] = {f.name for f in fields(UpdateJobRequest)};
         _validate_trigger_fields(data, allowed);

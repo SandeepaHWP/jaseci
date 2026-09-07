@@ -54,7 +54,6 @@ def _fail(code: str, message: str, status: int) -> TransportResponse {
 
 def _outcome(result: any, fallback: str) -> TransportResponse {
     if isinstance(result, dict) and 'error' in result {
-        # isinstance narrows to a bare dict, whose values read as Unknown.
         result: dict[str, any] = result;
         if result.get('error') == 'User not found' {
             return _fail('UNAUTHORIZED', 'Unauthorized: unknown user', 401);

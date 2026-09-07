@@ -92,9 +92,7 @@ async def aggregate_openapi(registry: ServiceRegistry) -> dict[any, any] {
         }
 
         raw_paths = doc.get("paths");
-        paths: dict[any, any] = raw_paths
-            if isinstance(raw_paths, dict[any, any])
-            else {};
+        paths: dict[any, any] = raw_paths if isinstance(raw_paths, dict) else {};
         for (path, op) in _prefixed_paths(paths, `entry.prefix).items() {
             if path in merged_paths {
                 _agg_logger.warning(
@@ -107,13 +105,9 @@ async def aggregate_openapi(registry: ServiceRegistry) -> dict[any, any] {
         }
 
         raw_comps = doc.get("components");
-        comps: dict[any, any] = raw_comps
-            if isinstance(raw_comps, dict[any, any])
-            else {};
+        comps: dict[any, any] = raw_comps if isinstance(raw_comps, dict) else {};
         raw_schemas = comps.get("schemas");
-        schemas: dict[any, any] = raw_schemas
-            if isinstance(raw_schemas, dict[any, any])
-            else {};
+        schemas: dict[any, any] = raw_schemas if isinstance(raw_schemas, dict) else {};
         for (schema_name, schema_def) in schemas.items() {
             if schema_name in merged_schemas {
                 if merged_schemas[schema_name] != schema_def {
