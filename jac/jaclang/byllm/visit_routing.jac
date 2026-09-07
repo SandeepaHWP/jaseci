@@ -102,7 +102,7 @@ def _node_run_desc(node_arch: object, wkr: object) -> str {
     }
     funcs: list[ObjectSpatialFunction] = [];
     if isinstance(node_arch, Archetype) {
-        funcs = node_arch._jac_entry_funcs_ or [];
+        funcs: list[any] = node_arch._jac_entry_funcs_ or [];
     }
     parts: list[str] = [];
     for osf in funcs {
@@ -284,7 +284,7 @@ def route_visit(candidates: list[object], model: BaseLLM) -> list[any] {
         return [];
     }
 
-    call_params = model?.call_params or {};
+    call_params: dict[any, any] = model?.call_params or {};
     select = call_params.get("select", "all");
 
     if isinstance(select, int) and not isinstance(select, bool) and (select < 1) {

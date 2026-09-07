@@ -44,7 +44,7 @@ def:pub TracesPage -> JsxElement {
         try {
             result = await getTraceServices(auth["authToken"]);
             if result["ok"] and result["data"] {
-                services = result["data"]["services"] or [];
+                services: list[any] = result["data"]["services"] or [];
             }
         } except Exception as e {
             console.error("loadServices error:", e);
@@ -64,7 +64,7 @@ def:pub TracesPage -> JsxElement {
                 50
             );
             if result["ok"] and result["data"] {
-                traces = result["data"]["traces"] or [];
+                traces: list[any] = result["data"]["traces"] or [];
                 errorMsg = "";
             } elif result["error"] {
                 errorMsg = getErrorMessage(result, "Failed to load traces");
@@ -86,7 +86,7 @@ def:pub TracesPage -> JsxElement {
         try {
             result = await getTrace(auth["authToken"], tid);
             if result["ok"] and result["data"] {
-                spans = result["data"]["spans"] or [];
+                spans: list[any] = result["data"]["spans"] or [];
                 traceStartNs = result["data"]["start_ns"] or 0;
                 traceTotalMs = result["data"]["total_ms"] or 0.0;
             } elif result["error"] {

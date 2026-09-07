@@ -81,8 +81,8 @@ def:pub LLMMetricsPage -> JsxElement {
             </div>;
     }
 
-    perModel = summary["per_model"] or {};
-    perCaller = summary["per_caller"] or {};
+    perModel: dict[any, any] = summary["per_model"] or {};
+    perCaller: dict[any, any] = summary["per_caller"] or {};
     modelKeys = Object.keys(perModel);
     callerKeys = Object.keys(perCaller);
 

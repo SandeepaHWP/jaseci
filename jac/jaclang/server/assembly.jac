@@ -11,7 +11,7 @@ def service_apps(cfg: any, served: any) -> list[any] {
 }
 
 def gateway_colocates(cfg: any) -> bool {
-    scale_cfg = cfg.get_plugin_config("scale") or {};
+    scale_cfg: dict[any, any] = cfg.get_plugin_config("scale") or {};
     gateway = scale_cfg.get("gateway", {}) if isinstance(scale_cfg, dict) else {};
     return not (isinstance(gateway, dict) and gateway.get("colocate") is False);
 }

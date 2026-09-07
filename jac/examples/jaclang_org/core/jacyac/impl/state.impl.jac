@@ -456,7 +456,7 @@ impl useJacYac.handleJoinChannel(channelId: str) -> None {
             detail = detailResult.reports[0] if detailResult.reports else None;
             if detail {
                 selectedChannel = detail;
-                channelPosts = detail.posts or [];
+                channelPosts: list[any] = detail.posts or [];
             }
         }
     } except BridgeError as e {
@@ -476,7 +476,7 @@ impl useJacYac.handleLeaveChannel(channelId: str) -> None {
             detail = detailResult.reports[0] if detailResult.reports else None;
             if detail {
                 selectedChannel = detail;
-                channelPosts = detail.posts or [];
+                channelPosts: list[any] = detail.posts or [];
             }
         }
     } except BridgeError as e {
@@ -492,7 +492,7 @@ impl useJacYac.handleSelectChannel(channelId: str) -> None {
         detail = detailResult.reports[0] if detailResult.reports else None;
         if detail {
             selectedChannel = detail;
-            channelPosts = detail.posts or [];
+            channelPosts: list[any] = detail.posts or [];
         }
     } except BridgeError as e {
         bridgeMessage = bridge_error(e);

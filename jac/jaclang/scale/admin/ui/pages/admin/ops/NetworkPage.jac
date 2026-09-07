@@ -39,9 +39,9 @@ def:pub NetworkPage -> JsxElement {
                 available = data["available"] or False;
                 detail = data["detail"] or "";
                 namespace = data["namespace"] or "";
-                services = data["services"] or [];
-                ingresses = data["ingresses"] or [];
-                pvcs = data["pvcs"] or [];
+                services: list[any] = data["services"] or [];
+                ingresses: list[any] = data["ingresses"] or [];
+                pvcs: list[any] = data["pvcs"] or [];
                 errorMsg = "";
             } elif result["error"] {
                 errorMsg = getErrorMessage(result, "Failed to load network view");

@@ -22,7 +22,7 @@ def:pub LLMTracesPage -> JsxElement {
         try {
             result = await getLLMTraces(auth["authToken"], 50, 0, "", "", "", True);
             if result["ok"] and result["data"] {
-                traces = result["data"]["traces"] or [];
+                traces: list[any] = result["data"]["traces"] or [];
                 errorMsg = "";
             } elif result["error"] {
                 errorMsg = result["error"]["message"] or "Failed to load traces";
@@ -491,7 +491,7 @@ def:pub LLMTracesPage -> JsxElement {
             return;
         }
         nextVisited: list[str] = visited + [parentId];
-        ch = childrenMap[parentId] or [];
+        ch: list[any] = childrenMap[parentId] or [];
         for child in ch {
             items.append({"trace": child, "depth": depth});
             childId = child["invocation_id"] or "";

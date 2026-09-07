@@ -62,9 +62,9 @@ def:pub ServicesPage -> JsxElement {
         metricsAvailable = bool(sumData["metrics_available"]);
         unavailableReason = sumData["reason"] or "";
         summary = sumData;
-        services = listData["workloads"] or [];
-        pods = podsData["pods"] or [];
-        series = tsData["workloads"] or [];
+        services: list[any] = listData["workloads"] or [];
+        pods: list[any] = podsData["pods"] or [];
+        series: list[any] = tsData["workloads"] or [];
         isLoading = False;
     }
 
@@ -180,8 +180,8 @@ def:pub ServicesPage -> JsxElement {
     }
 
     # Cluster-wide rollups (still valid: only PER-service traffic is missing).
-    traffic = summary["traffic"] or {};
-    nodes = summary["nodes"] or {};
+    traffic: dict[any, any] = summary["traffic"] or {};
+    nodes: dict[any, any] = summary["nodes"] or {};
     rps = traffic["requests_per_sec"] or 0;
     errPct = traffic["error_rate_pct"] or 0;
     p95 = traffic["p95_latency_ms"] or 0;

@@ -1019,7 +1019,7 @@ impl NaIRGenPass._generator_elem_type(nd: uni.Ability) -> (ir.Type | None) {
     }
     for prefix in ("Iterator[", "Generator[", "Iterable[") {
         if mangled.startswith(prefix) {
-            targs = rt.type.private.type_args or [];
+            targs: list[any] = rt.type.private.type_args or [];
             if targs {
                 _low = self._lower_type(targs[0]);
                 if _low is not None and isinstance(_low, ir.VoidType) {

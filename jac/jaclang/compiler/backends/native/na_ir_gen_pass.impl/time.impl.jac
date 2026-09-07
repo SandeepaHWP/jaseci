@@ -55,7 +55,7 @@ impl NaIRGenPass._emit_time_call(name: str, nd: uni.FuncCall) -> (ir.Value | Non
     }
 
     if name == "sleep" {
-        params = nd.params or [];
+        params: list[any] = nd.params or [];
         if not params {
             return None;
         }

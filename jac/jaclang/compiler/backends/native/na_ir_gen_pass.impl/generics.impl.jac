@@ -67,7 +67,7 @@ impl NaIRGenPass._syntactic_bind_type_params(
         and isinstance(nd.right, uni.IndexSlice)
         and isinstance(actual, _SbCT)
     ) {
-        _args = actual.private.type_args or [];
+        _args: list[any] = actual.private.type_args or [];
         for (i, sl) in enumerate(nd.right.slices) {
             if sl.start is not None and i < len(_args) {
                 self._syntactic_bind_type_params(
@@ -119,8 +119,8 @@ impl NaIRGenPass._solve_generic_call(
             return;
         }
         if isinstance(decl, _CT) and isinstance(actual, _CT) {
-            d_args = decl.private.type_args or [];
-            a_args = actual.private.type_args or [];
+            d_args: list[any] = decl.private.type_args or [];
+            a_args: list[any] = actual.private.type_args or [];
             for (i, da) in enumerate(d_args) {
                 if i < len(a_args) {
                     unify(da, a_args[i]);
@@ -515,7 +515,7 @@ impl NaIRGenPass._instantiate_generic_for_target(
     if sig is None {
         return None;
     }
-    _tgt_params = tag_t.parameters or [];
+    _tgt_params: list[any] = tag_t.parameters or [];
     solution: dict[any, any] = {};
     for (i, p) in enumerate(sig.get_parameters()) {
         _pt = None;

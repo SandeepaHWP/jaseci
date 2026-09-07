@@ -179,7 +179,7 @@ impl _adaptImageProps(props: dict[any, any]) -> dict[any, any] {
             out["source"] = src;
         } else {
             uri = str(src);
-            asset_map = globalThis.__JAC_RN_ASSET_MAP__ or {};
+            asset_map: dict[any, any] = globalThis.__JAC_RN_ASSET_MAP__ or {};
             mapped_asset = asset_map[uri] if asset_map else None;
             if mapped_asset is not None {
                 out["source"] = mapped_asset;
@@ -494,7 +494,7 @@ impl _collectNativeRoutes(
 }
 
 impl _makeNativeRouteScreen(route: RouteDef) -> any {
-    wrappers = route.wrappers or [];
+    wrappers: list[any] = route.wrappers or [];
     element = route.element or React.createElement(RNView, None);
     return lambda -> JsxElement {
         content = element;
@@ -601,7 +601,7 @@ impl __nativeLink(props: dict[any, any] = {}) -> JsxElement {
 }
 
 impl __nativeNavigate(props: dict[any, any] = {}) -> (JsxElement | None) {
-    opts = props or {};
+    opts: dict[any, any] = props or {};
     target = opts.get("to", None) or "/";
     should_replace = opts.get("replace", None) == True;
     nav_fn = useNavigate();
@@ -1082,14 +1082,14 @@ impl JacForm(props: dict[str, any]) -> JsxElement {
     onSubmit = props["onSubmit"];
     validate_mode = props.get("validateMode", None) or "onTouched";
     submitLabel = props.get("submitLabel", None) or "Submit";
-    field_config = props.get("field_config", None) or {};
+    field_config: dict[any, any] = props.get("field_config", None) or {};
     actualSchema = schema;
     try {
         if schema._def and schema._def.schema {
             actualSchema = schema._def.schema;
         }
     } except Exception {}
-    schemaShape = actualSchema.shape or {};
+    schemaShape: dict[any, any] = actualSchema.shape or {};
     fieldNames = Object.keys(schemaShape);
     form = useJacForm(validate_mode, schema);
     errors = form.formState.errors;
@@ -1098,7 +1098,7 @@ impl JacForm(props: dict[str, any]) -> JsxElement {
     [passwordVisible, setPasswordVisible] = useState({});
     fields = [];
     for fieldName in fieldNames {
-        config = field_config.get(fieldName, None) or {};
+        config: dict[any, any] = field_config.get(fieldName, None) or {};
         label = config.get("label", None) or fieldName;
         placeholder = str(config.get("placeholder", None) or "");
         field_type = str(config.get("type", None) or config.get("key", None) or "text");

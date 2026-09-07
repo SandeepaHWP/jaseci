@@ -342,7 +342,7 @@ impl NaIRGenPass._codegen_enum_ctor(
     if lay is None {
         return None;
     }
-    _params = nd.params or [];
+    _params: list[any] = nd.params or [];
     if len(_params) != 1 or isinstance(_params[0], uni.KWPair) {
         self._emit_enum_ctor_refusal(
             nd, enum_name, "It takes exactly one positional value."

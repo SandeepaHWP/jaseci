@@ -157,7 +157,7 @@ def sealed_spaces_for(source_path: str) -> (set[str] | None) {
     } except Exception {
         return None;
     }
-    placement = manifest.get("placement") or {};
+    placement: dict[any, any] = manifest.get("placement") or {};
     rel = os.path.relpath(ap, d).replace(os.sep, "/");
     spaces = placement.get(rel);
     if spaces is None {

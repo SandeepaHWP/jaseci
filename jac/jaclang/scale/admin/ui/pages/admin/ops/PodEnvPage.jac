@@ -38,8 +38,8 @@ def:pub PodEnvPage -> JsxElement {
                 available = data["available"] or False;
                 detail = data["detail"] or "";
                 namespace = data["namespace"] or "";
-                thisPod = data["this_pod"] or [];
-                pods = data["pods"] or [];
+                thisPod: list[any] = data["this_pod"] or [];
+                pods: list[any] = data["pods"] or [];
                 errorMsg = "";
             } elif result["error"] {
                 errorMsg = getErrorMessage(result, "Failed to load pod env");

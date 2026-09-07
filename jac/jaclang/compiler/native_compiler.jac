@@ -434,8 +434,10 @@ class NativeCompiler {
             if not (completed & pass_id) {
                 continue;
             }
-            errors = self._take(self.lib.jc_take_pass_alerts(pass_id, 0)) or [];
-            warnings = self._take(self.lib.jc_take_pass_alerts(pass_id, 1)) or [];
+            errors: list[any] = self._take(self.lib.jc_take_pass_alerts(pass_id, 0))
+                or [];
+            warnings: list[any] = self._take(self.lib.jc_take_pass_alerts(pass_id, 1))
+                or [];
             for alert in errors + warnings {
                 alert.from_pass = pass_cls;
                 if alert.code is not None {

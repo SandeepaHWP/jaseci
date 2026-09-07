@@ -2,7 +2,7 @@ impl Tool.postinit -> None {
     try {
         annotations = get_type_hints(self.func);
     } except Exception {
-        annotations = getattr(self.func, '__annotations__', {}) or {};
+        annotations: dict[any, any] = getattr(self.func, '__annotations__', {}) or {};
     }
     with suppress(Exception) {
         self.func.__annotations__ = annotations;

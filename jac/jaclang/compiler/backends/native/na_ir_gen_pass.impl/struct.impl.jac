@@ -1,5 +1,5 @@
 impl NaIRGenPass._emit_struct_call(name: str, nd: uni.FuncCall) -> (ir.Value | None) {
-    params = nd.params or [];
+    params: list[any] = nd.params or [];
     if not params {
         return None;
     }

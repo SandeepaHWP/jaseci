@@ -221,7 +221,7 @@ impl NaIRGenPass._default_arg_fallback(t: ir.Type) -> ir.Value {
 impl NaIRGenPass._codegen_bound_args(
     nd: uni.FuncCall, func: ir.Function, self_offset: int = 0
 ) -> list[any] {
-    raw = nd.params or [];
+    raw: list[any] = nd.params or [];
     positional: list[any] = [];
     kw_map: dict[any, any] = {};
     kw_spreads: list[any] = [];
@@ -1153,7 +1153,7 @@ impl NaIRGenPass._emit_unsupported_builtin_call(
 }
 
 impl NaIRGenPass._emit_new(nd: uni.FuncCall) -> (ir.Value | None) {
-    params_l = nd.params or [];
+    params_l: list[any] = nd.params or [];
     if not params_l or any([isinstance(p, uni.KWPair) for p in params_l]) {
         self.emit(
             E5092,
@@ -1457,7 +1457,7 @@ impl NaIRGenPass._codegen_call(nd: uni.FuncCall) -> (ir.Value | None) {
     _callee_t = nd.target?.type;
     if isinstance(_callee_t, jtypes.ClassType)
         and _callee_t.private.distinct_key is not None {
-        _cast_params = nd.params or [];
+        _cast_params: list[any] = nd.params or [];
         if len(_cast_params) == 1 {
             _cast_arg = self._codegen_expr(_cast_params[0]);
             if _cast_arg is not None {
@@ -1494,7 +1494,7 @@ impl NaIRGenPass._codegen_call(nd: uni.FuncCall) -> (ir.Value | None) {
         }
 
         if func_name == "managed" {
-            params_l = nd.params or [];
+            params_l: list[any] = nd.params or [];
             if not params_l {
                 return None;
             }
@@ -1532,7 +1532,7 @@ impl NaIRGenPass._codegen_call(nd: uni.FuncCall) -> (ir.Value | None) {
         }
 
         if func_name == "region_of" {
-            params_l = nd.params or [];
+            params_l: list[any] = nd.params or [];
             if not params_l {
                 return None;
             }
@@ -1548,7 +1548,7 @@ impl NaIRGenPass._codegen_call(nd: uni.FuncCall) -> (ir.Value | None) {
         }
 
         if func_name == "type" {
-            _cid_params = nd.params or [];
+            _cid_params: list[any] = nd.params or [];
             if len(_cid_params) == 1 {
                 _scalar = self._scalar_shape(_cid_params[0]);
                 if _scalar is not None {
@@ -1562,7 +1562,7 @@ impl NaIRGenPass._codegen_call(nd: uni.FuncCall) -> (ir.Value | None) {
         }
 
         if func_name == "id" {
-            _id_params = nd.params or [];
+            _id_params: list[any] = nd.params or [];
             if len(_id_params) == 1 {
                 _id_val = self._codegen_expr(_id_params[0]);
                 if _id_val is not None
@@ -1587,7 +1587,7 @@ impl NaIRGenPass._codegen_call(nd: uni.FuncCall) -> (ir.Value | None) {
         }
 
         if func_name == "len" {
-            params_l = nd.params or [];
+            params_l: list[any] = nd.params or [];
             if params_l {
                 elem_type_name: (str | None) = None;
                 arg_val = self._codegen_expr(params_l[0]);
@@ -1690,7 +1690,7 @@ impl NaIRGenPass._codegen_call(nd: uni.FuncCall) -> (ir.Value | None) {
         }
 
         if func_name == "complex" {
-            params_l = nd.params or [];
+            params_l: list[any] = nd.params or [];
             if len(params_l) >= 2 {
                 real_val = self._codegen_expr(params_l[0]);
                 imag_val = self._codegen_expr(params_l[1]);
@@ -1734,7 +1734,7 @@ impl NaIRGenPass._codegen_call(nd: uni.FuncCall) -> (ir.Value | None) {
         }
 
         if func_name == "range" {
-            params_l = nd.params or [];
+            params_l: list[any] = nd.params or [];
             i64 = ir.IntType(64);
             i32 = ir.IntType(32);
             start_v: (ir.Value | None) = None;
@@ -1780,7 +1780,7 @@ impl NaIRGenPass._codegen_call(nd: uni.FuncCall) -> (ir.Value | None) {
         }
 
         if func_name == "slice" {
-            params_l = nd.params or [];
+            params_l: list[any] = nd.params or [];
             i64 = ir.IntType(64);
             i32 = ir.IntType(32);
             start_v: (ir.Value | None) = None;
@@ -1827,7 +1827,7 @@ impl NaIRGenPass._codegen_call(nd: uni.FuncCall) -> (ir.Value | None) {
 
         if func_name
             in ("abs", "min", "max", "pow", "divmod", "sum", "any", "all", "format") {
-            params_l = nd.params or [];
+            params_l: list[any] = nd.params or [];
             arg_vals: list[ir.Value] = [];
             arg_nodes: list[any] = [];
             for param in params_l {
@@ -1893,7 +1893,7 @@ impl NaIRGenPass._codegen_call(nd: uni.FuncCall) -> (ir.Value | None) {
                 "repr",
                 "ascii"
             ) {
-            params_l = nd.params or [];
+            params_l: list[any] = nd.params or [];
             _ez_peer = self._spec_from_container_ptr(self._peer_container_ty)
                 if not params_l and func_name in ("list", "set")
                 else None;
@@ -1978,7 +1978,7 @@ impl NaIRGenPass._codegen_call(nd: uni.FuncCall) -> (ir.Value | None) {
 
         if func_name == "input" {
             i8p = ir.IntType(8).as_pointer();
-            params_l = nd.params or [];
+            params_l: list[any] = nd.params or [];
 
             if params_l {
                 prompt_val = self._codegen_expr(params_l[0]);
@@ -2247,7 +2247,7 @@ impl NaIRGenPass._codegen_call(nd: uni.FuncCall) -> (ir.Value | None) {
             ) {
                 _fn_type = _loaded.type.pointee;
                 _iargs: list[ir.Value] = [];
-                _iparams = nd.params or [];
+                _iparams: list[any] = nd.params or [];
                 for _ip in _iparams {
                     _iv = self._codegen_expr(_ip);
                     if _iv is not None {
@@ -2715,7 +2715,7 @@ impl NaIRGenPass._enum_union_tags(
 impl NaIRGenPass._emit_isinstance(nd: uni.FuncCall) -> (ir.Value | None) {
     i1 = ir.IntType(1);
     i8 = ir.IntType(8);
-    params = nd.params or [];
+    params: list[any] = nd.params or [];
     if len(params) < 2 {
         self._emit_unsupported_builtin_call(nd, "isinstance");
         return None;
@@ -2779,7 +2779,7 @@ impl NaIRGenPass._emit_isinstance_core(
 ) -> (ir.Value | None) {
     i1 = ir.IntType(1);
     i8 = ir.IntType(8);
-    params = nd.params or [];
+    params: list[any] = nd.params or [];
 
     type_arg = params[1];
     if not isinstance(type_arg, uni.TupleVal) {

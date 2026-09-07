@@ -80,7 +80,7 @@ impl LayoutPass._collect_isinstance_targets(module: Module) -> None {
         if not (isinstance(tgt, Name) and tgt.value == "isinstance") {
             continue;
         }
-        params = call.params or [];
+        params: list[any] = call.params or [];
         if len(params) < 2 {
             continue;
         }
