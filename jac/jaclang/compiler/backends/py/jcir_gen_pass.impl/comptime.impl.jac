@@ -262,7 +262,7 @@ impl JcirGenPass._materialize(v: any, jac_node: UniNode) -> (CgNode | None) {
     }
     if kind == "CtType" {
         cls_ref = self._class_ref(v.module, v.name, jac_node);
-        ct_args = v?.ct_args or ({} as dict[any, any]);
+        ct_args = v?.ct_args or {};
         if not ct_args {
             return cls_ref;
         }

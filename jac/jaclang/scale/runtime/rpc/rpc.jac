@@ -230,7 +230,7 @@ def _unwrap_sv_envelope(data: any, module_name: str, func_name: str) -> any {
         }
         return result_envelope;
     }
-    err = (data.get("error") if isinstance(data, dict) else None) or ({} as dict[any, any]);
+    err = (data.get("error") if isinstance(data, dict) else None) or {};
     msg = err.get("message") if isinstance(err, dict) else str(err);
     raise RuntimeError(
         f"sv-to-sv RPC '{module_name}.{func_name}' failed: {msg or 'unknown error'}"
@@ -241,7 +241,7 @@ def _hydrate_walker_envelope(
     data: any, module_name: str, walker_name: str, stub_cls: any
 ) -> any {
     if isinstance(data, dict) and data.get("ok") {
-        envelope = data.get("data") or ({} as dict[any, any]);
+        envelope = data.get("data") or {};
         result_dict = envelope.get("result") if isinstance(envelope, dict) else None;
         reports = envelope.get("reports") if isinstance(envelope, dict) else None;
         instance = stub_cls._from_wire(result_dict)
@@ -254,7 +254,7 @@ def _hydrate_walker_envelope(
         }
         return instance;
     }
-    err = (data.get("error") if isinstance(data, dict) else None) or ({} as dict[any, any]);
+    err = (data.get("error") if isinstance(data, dict) else None) or {};
     msg = err.get("message") if isinstance(err, dict) else str(err);
     raise RuntimeError(
         f"sv-to-sv walker spawn '{module_name}.{walker_name}' failed: {msg

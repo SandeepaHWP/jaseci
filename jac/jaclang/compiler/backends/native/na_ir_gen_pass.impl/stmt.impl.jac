@@ -397,7 +397,7 @@ impl NaIRGenPass._codegen_return(nd: uni.ReturnStmt) -> None {
                 and nd.expr.sym_name not in self.closure_cell_handles {
                 skip_var = nd.expr.sym_name;
             } elif isinstance(nd.expr, uni.TupleVal) {
-                tup_elems = nd.expr.values or ([] as list[any]);
+                tup_elems = nd.expr.values or [];
                 for tup_elem in tup_elems {
                     elem_name: (str | None) = None;
                     if isinstance(tup_elem, uni.Name) {
@@ -978,7 +978,7 @@ impl NaIRGenPass._match_elem_ty_of(
     if subj_ty is None or not self._mangled_of(subj_ty).startswith(prefix) {
         return None;
     }
-    targs = subj_ty.private.type_args or ([] as list[any]);
+    targs = subj_ty.private.type_args or [];
     if idx < len(targs) {
         return targs[idx];
     }
@@ -1796,7 +1796,7 @@ impl NaIRGenPass._codegen_assignment(nd: uni.Assignment) -> None {
                 and nd.aug_op is None
                 and target_expr.right?.slices
             ) {
-                _env_slices = target_expr.right.slices or ([] as list[any]);
+                _env_slices = target_expr.right.slices or [];
                 _env_key: (ir.Value | None) = None;
                 if _env_slices {
                     _env_key = self._codegen_expr(_env_slices[0]);
@@ -1873,7 +1873,7 @@ impl NaIRGenPass._codegen_assignment(nd: uni.Assignment) -> None {
                 }
             }
             if target_val is not None and target_expr.right?.slices {
-                slices = target_expr.right.slices or ([] as list[any]);
+                slices = target_expr.right.slices or [];
                 if slices {
                     idx_node = slices[0];
                     idx_val = self._codegen_expr(idx_node);
@@ -3143,7 +3143,7 @@ impl NaIRGenPass._codegen_for(nd: uni.InForStmt) -> None {
         and nd.collection.target.is_attr
         and self._get_name(nd.collection.target.right) == "items" {
         items_dict_key = self._dict_key_of(nd.collection.target.target);
-        unpack_targets = nd.target.values or ([] as list[any]);
+        unpack_targets = nd.target.values or [];
         if items_dict_key is not None and len(unpack_targets) == 2 {
             key_var_name = self._get_name(unpack_targets[0]);
             val_var_name = self._get_name(unpack_targets[1]);
@@ -3186,7 +3186,7 @@ impl NaIRGenPass._codegen_for(nd: uni.InForStmt) -> None {
     if isinstance(nd.collection, uni.FuncCall)
         and self._get_name(nd.collection.target) == "range"
         and nd.collection.call_kind == "builtin" {
-        params = nd.collection.params or ([] as list[any]);
+        params = nd.collection.params or [];
         start_val: (ir.Value | None) = None;
         stop_val: (ir.Value | None) = None;
         step_val: (ir.Value | None) = None;

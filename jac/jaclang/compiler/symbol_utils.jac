@@ -94,7 +94,7 @@ def erased_identity_call_arg(nd: FuncCall) -> (Expr | None) {
     if not isinstance(tgt, Name) or tgt.sym_name not in NATIVE_ERASED_IDENTITY_CALLS {
         return None;
     }
-    params = nd.params or ([] as list[any]);
+    params = nd.params or [];
     if len(params) != 2
         or not isinstance(params[0], Expr)
         or not isinstance(params[1], Expr) {

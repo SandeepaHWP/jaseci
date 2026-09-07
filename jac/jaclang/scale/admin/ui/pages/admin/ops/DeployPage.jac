@@ -40,8 +40,8 @@ def:pub DeployPage -> JsxElement {
                 available = data["available"] or False;
                 detail = data["detail"] or "";
                 namespace = data["namespace"] or "";
-                deployments = data["deployments"] or ([] as list[any]);
-                pods = data["pods"] or ([] as list[any]);
+                deployments = data["deployments"] or [];
+                pods = data["pods"] or [];
                 errorMsg = "";
             } elif result["error"] {
                 errorMsg = getErrorMessage(result, "Failed to load deploy health");

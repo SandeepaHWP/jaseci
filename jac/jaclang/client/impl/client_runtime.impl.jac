@@ -140,7 +140,7 @@ impl JacAwaiting(props: dict[str, any]) -> JsxElement {
 
 impl useJacForm(form_mode: str, schema: any, onSubmit: any = None) -> any {
     actualSchema = __unwrapFormSchema(schema);
-    schemaShape = actualSchema.shape or ({} as dict[any, any]);
+    schemaShape = actualSchema.shape or {};
     defaults = {};
     for key in Object.keys(schemaShape) {
         defaults[key] = "";
@@ -176,7 +176,7 @@ impl JacForm(props: dict[str, any]) -> JsxElement {
     validateMode: str = props["validateMode"] or "onTouched";
     className = props["className"] or "";
     actualSchema = __unwrapFormSchema(schema);
-    schemaShape = actualSchema.shape or ({} as dict[any, any]);
+    schemaShape = actualSchema.shape or {};
     fieldNames = Object.keys(schemaShape);
     form = useJacForm(validateMode, schema, onSubmit);
     [passwordVisible, setPasswordVisible] = useState({});

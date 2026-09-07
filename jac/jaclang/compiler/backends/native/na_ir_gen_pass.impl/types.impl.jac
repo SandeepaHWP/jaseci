@@ -302,7 +302,7 @@ impl NaIRGenPass._opt_sole_member(t: any) -> (any | None) {
     if not isinstance(t, _OsUnionType) {
         return None;
     }
-    _all = t.types or ([] as list[any]);
+    _all = t.types or [];
     _members = [
         m
         for m in _all
@@ -645,7 +645,7 @@ impl NaIRGenPass._static_elem_llvm_of(expr: (uni.UniNode | None)) -> (ir.Type | 
         }
         _t = _sole;
     }
-    _args = _t.private.type_args or ([] as list[any]);
+    _args = _t.private.type_args or [];
     if not _args {
         return None;
     }
@@ -694,7 +694,7 @@ impl NaIRGenPass._lower_view_container(t: any) -> (ir.Type | None) {
     if t.shared.class_name not in ("list", "Sequence") {
         return None;
     }
-    _args = t.private.type_args or ([] as list[any]);
+    _args = t.private.type_args or [];
     if not _args {
         return None;
     }
@@ -741,7 +741,7 @@ impl NaIRGenPass._lower_class_type(t: any) -> (ir.Type | None) {
     if cname in self.struct_types {
         return self.struct_types[cname].as_pointer();
     }
-    type_args = t.private.type_args or ([] as list[any]);
+    type_args = t.private.type_args or [];
 
     if cname in ("Iterator", "Iterable") {
         self._ensure_iter_types();
@@ -1244,7 +1244,7 @@ impl NaIRGenPass._foreign_optional_field(tb: any) -> bool {
     if not isinstance(tb, _FofUnionType) {
         return False;
     }
-    _members = tb.types or ([] as list[any]);
+    _members = tb.types or [];
     _non_none = [
         m
         for m in _members
@@ -1311,7 +1311,7 @@ impl NaIRGenPass._typevar_optional_field(tb: any) -> bool {
     if not isinstance(tb, _TvoUnionType) {
         return False;
     }
-    _members = tb.types or ([] as list[any]);
+    _members = tb.types or [];
     _non_none = [
         m
         for m in _members
@@ -1352,7 +1352,7 @@ impl NaIRGenPass._erased_seq_type(tb: any) -> (ir.Type | None) {
     if tb.shared.class_name not in ("list", "Sequence") {
         return None;
     }
-    _args = tb.private.type_args or ([] as list[any]);
+    _args = tb.private.type_args or [];
     if len(_args) != 1 or not self._erased_typevar_names(_args[0]) {
         return None;
     }
@@ -1941,7 +1941,7 @@ impl NaIRGenPass._apply_flow_narrowing(nd: uni.UniNode, val: ir.Value) -> ir.Val
     _want = self._lower_type(_nt);
     _nt_bare = False;
     if _nt.shared.class_name in ("list", "Sequence") {
-        _nt_args = _nt.private.type_args or ([] as list[any]);
+        _nt_args = _nt.private.type_args or [];
         _nt_bare = not _nt_args;
         if not _nt_bare and len(_nt_args) == 1 {
             _a0 = _nt_args[0];

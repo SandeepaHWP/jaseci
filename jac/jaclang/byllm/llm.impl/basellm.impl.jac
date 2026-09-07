@@ -4,7 +4,7 @@ def _tool_call_fragments(chunk: object) -> list[dict[any, any]] {
         if chunk?.choices and chunk?.choices?[0]?.delta {
             raw = chunk?.choices?[0]?.delta?.tool_calls;
         } elif isinstance(chunk, dict) {
-            _choices = chunk.get("choices") or ([] as list[any]);
+            _choices = chunk.get("choices") or [];
             if _choices {
                 _tcs = (_choices[0].get("delta") or {}).get("tool_calls");
                 raw = _tcs if isinstance(_tcs, list) else None;
@@ -20,7 +20,7 @@ def _tool_call_fragments(chunk: object) -> list[dict[any, any]] {
     for (pos, tc) in enumerate(raw) {
         try {
             if isinstance(tc, dict) {
-                fn = tc.get("function") or ({} as dict[any, any]);
+                fn = tc.get("function") or {};
                 idx = tc.get("index");
                 out.append(
                     {
@@ -442,7 +442,7 @@ def _default_compact(
                 );
             }
             if str(role) == "assistant" and not content {
-                tool_calls = msg.get("tool_calls") or ([] as list[any]);
+                tool_calls = msg.get("tool_calls") or [];
                 if tool_calls {
                     descs: list[any] = [];
                     for tc in tool_calls {
@@ -1078,7 +1078,7 @@ impl BaseLLM._invoke_react_loop(mt_run: MTRuntime) -> object {
             }
             return recovery_resp.output;
         }
-        usage = resp.usage or ({} as dict[any, any]);
+        usage = resp.usage or {};
         total_tokens += int(
             usage.get("total_tokens", 0)
                 if isinstance(usage, dict)
@@ -1410,7 +1410,7 @@ def _parse_tool_calls(
 
 def _sanitize_tool_calls(message: LiteLLMMessage) -> set {
     damaged: set = set();
-    tool_calls = (message or {}).get("tool_calls") or ([] as list[any]);
+    tool_calls = (message or {}).get("tool_calls") or [];
     for tc in tool_calls {
         fn = tc?.function;
         if fn is None {
@@ -1502,7 +1502,7 @@ impl BaseLLM.dispatch_no_streaming(mt_run: MTRuntime) -> CompletionResult {
 
     truncated_ids = _truncated_call_ids(message, finish_reason);
     tool_calls: list[ToolCall] = [];
-    _tc_raw = (message or {}).get("tool_calls") or ([] as list[any]);
+    _tc_raw = (message or {}).get("tool_calls") or [];
     tool_calls_list: list[any] = _tc_raw if isinstance(_tc_raw, list) else [];
     tool_calls = _parse_tool_calls(mt_run, tool_calls_list, truncated_ids, damaged_ids);
 
@@ -1622,7 +1622,7 @@ impl BaseLLM.dispatch_streaming_with_tools(
                 if chunk?.choices and chunk?.choices?[0]?.delta {
                     delta_content = chunk?.choices?[0]?.delta?.content or "";
                 } elif isinstance(chunk, dict) {
-                    _choices = chunk.get("choices") or ([] as list[any]);
+                    _choices = chunk.get("choices") or [];
                     if _choices {
                         delta_content = str(
                             (_choices[0].get("delta") or {}).get("content") or ""
@@ -1664,7 +1664,7 @@ impl BaseLLM.dispatch_streaming_with_tools(
         rebuilt = _rebuild_stream_chunks(chunks, _stream_resp?.logging_obj);
         if rebuilt {
             message = rebuilt.get("choices", [])[0].get("message");
-            usage_data = rebuilt.get("usage", {}) or ({} as dict[any, any]);
+            usage_data = rebuilt.get("usage", {}) or {};
             actual_model = rebuilt.get("model", self.model_name);
             _attach_call_cost(usage_data, actual_model, rebuilt);
             finish_reason = str(
@@ -1693,7 +1693,7 @@ impl BaseLLM.dispatch_streaming_with_tools(
 
     truncated_ids = _truncated_call_ids(message, finish_reason);
     tool_calls: list[ToolCall] = [];
-    _tc_raw = (message or {}).get("tool_calls") or ([] as list[any]);
+    _tc_raw = (message or {}).get("tool_calls") or [];
     tool_calls_list: list[any] = _tc_raw if isinstance(_tc_raw, list) else [];
     tool_calls = _parse_tool_calls(mt_run, tool_calls_list, truncated_ids, damaged_ids);
     output_value = mt_run.parse_response(output_content)
@@ -1747,7 +1747,7 @@ impl BaseLLM.adispatch_no_streaming(mt_run: MTRuntime) -> CompletionResult {
 
     truncated_ids = _truncated_call_ids(message, finish_reason);
     tool_calls: list[ToolCall] = [];
-    _tc_raw = (message or {}).get("tool_calls") or ([] as list[any]);
+    _tc_raw = (message or {}).get("tool_calls") or [];
     tool_calls_list: list[any] = _tc_raw if isinstance(_tc_raw, list) else [];
     tool_calls = _parse_tool_calls(mt_run, tool_calls_list, truncated_ids, damaged_ids);
     output_value = mt_run.parse_response(output_content)
@@ -2155,7 +2155,7 @@ impl BaseLLM._invoke_streaming(
             }
             _llm_ms = int((_time.time() - _llm_t0) * 1000);
 
-            usage = resp.usage or ({} as dict[any, any]);
+            usage = resp.usage or {};
             total_tokens += int(
                 usage.get("total_tokens", 0)
                     if isinstance(usage, dict)

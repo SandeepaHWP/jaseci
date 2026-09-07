@@ -1381,8 +1381,8 @@ impl JacAutoLintPass._base_decl_archetypes(annex_path: str) -> list[uni.Archetyp
 impl JacAutoLintPass._signatures_match(
     decl_sig: uni.FuncSignature, impl_sig: uni.FuncSignature
 ) -> bool {
-    decl_params = decl_sig.params or ([] as list[any]);
-    impl_params = impl_sig.params or ([] as list[any]);
+    decl_params = decl_sig.params or [];
+    impl_params = impl_sig.params or [];
     if (
         len(decl_params) != len(impl_params)
         or len(decl_sig.posonly_params) != len(impl_sig.posonly_params)

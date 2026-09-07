@@ -869,7 +869,7 @@ impl NativeCompilePass._compile_and_link_native_imports(
                 self.emit(E5024, path=full_path, error="No LLVM IR generated");
                 continue;
             }
-            _uv_record = self.prog.scratch.na_unverified_live.get(real_path) or ({} as dict[any, any]);
+            _uv_record = self.prog.scratch.na_unverified_live.get(real_path) or {};
             _uv_pending = native_prune_live_record(
                 _uv_record, native_ir_live_externs(str(imported_ir.gen.llvm_ir))
             )
@@ -914,7 +914,7 @@ impl NativeCompilePass._compile_and_link_native_imports(
                     _uv_failed = "No LLVM IR generated on re-emission";
                     break;
                 }
-                _uv_record = self.prog.scratch.na_unverified_live.get(real_path) or ({} as dict[any, any]);
+                _uv_record = self.prog.scratch.na_unverified_live.get(real_path) or {};
                 _uv_pending = native_prune_live_record(
                     _uv_record, native_ir_live_externs(str(imported_ir.gen.llvm_ir))
                 )

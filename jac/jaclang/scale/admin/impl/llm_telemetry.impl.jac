@@ -566,7 +566,7 @@ impl JacAPIServerLLMTelemetry.register_llm_telemetry_endpoints -> None {
                 end_time: any
             ) {
                 try {
-                    slp = kwargs.get("standard_logging_object", {}) or ({} as dict[any, any]);
+                    slp = kwargs.get("standard_logging_object", {}) or {};
                     metadata = kwargs.get("litellm_params", {}).get("metadata", {})
                         or {};
                     self.store.record_llm_event(
@@ -601,7 +601,7 @@ impl JacAPIServerLLMTelemetry.register_llm_telemetry_endpoints -> None {
                 end_time: any
             ) {
                 try {
-                    slp = kwargs.get("standard_logging_object", {}) or ({} as dict[any, any]);
+                    slp = kwargs.get("standard_logging_object", {}) or {};
                     metadata = kwargs.get("litellm_params", {}).get("metadata", {})
                         or {};
                     self.store.record_llm_event(
