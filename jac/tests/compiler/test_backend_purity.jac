@@ -42,7 +42,11 @@ glob FORBIDDEN: dict[str, str] = {
      # at sites where the declaration IS the fact.
      SANCTIONED: dict[tuple[any, ...], tuple[any, ...]] = {
          ("es/esast_gen_pass.impl/calls.impl.jac", "symbol_utils"): (
-             3,
+             4,
+             "return_type_is_jsx (#8314) reads the declared return annotation "
+             "to pick a component's call ABI; the declaration is the fact, "
+             "and the type checker keys component-hood off the same "
+             "predicate so the two cannot disagree. "
              "symbol-FACT readers over already-resolved symbols at call "
              "lowering: resolve_import_source_module (#7632, the delegated "
              "body of the former local _resolve_source_module, shared with "
@@ -56,6 +60,12 @@ glob FORBIDDEN: dict[str, str] = {
              "check path cannot disagree about what is bound. The former "
              "classify_call fallback is deleted (#7418): call_kind is "
              "stamped authoritatively by the required inference schedule"
+         ),
+         ("es/esast_gen_pass.impl/decls.impl.jac", "symbol_utils"): (
+             1,
+             "return_type_is_jsx (#8314) reads the declared return annotation "
+             "to record a component export; same declaration-surface "
+             "predicate the type checker uses"
          ),
          ("es/esast_gen_pass.impl/module.impl.jac", "symbol_utils"): (
              1,
@@ -148,7 +158,9 @@ glob FORBIDDEN: dict[str, str] = {
              "stamped Expr.ct_value"
          ),
          ("native/na_ir_gen_pass.impl/calls.impl.jac", "symbol_utils"): (
-             2,
+             3,
+             "resolved_callee consumes the resolved call declaration for "
+             "ownership transfer and raises-effect lowering. "
              "classify_call as the shadowing-aware builtin test for the "
              "`type(None)` isinstance argument form (#6957) - consuming the "
              "central classification instead of re-implementing name "

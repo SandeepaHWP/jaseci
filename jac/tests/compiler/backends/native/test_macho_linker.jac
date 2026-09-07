@@ -287,8 +287,8 @@ def absolute_text_relocs(relobj: bytes) -> int {
 }
 
 
-"""Link an executable the way `jac nacompile` does; return (object, image)."""
-def link_exec(triple: str) -> tuple[any, ...] {
+"""Link an executable the way `jac build --native` does; return (object, image)."""
+def link_exec(triple: str) -> tuple {
     relobj = emit_large_object(
         literal_ir(triple, "exec-literal", "jac_exec_ptr"), triple
     );
