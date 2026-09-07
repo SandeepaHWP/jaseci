@@ -128,7 +128,7 @@ def:pub ServiceDetail(
         {"label": "Age", "value": formatAge(service["created"] or 0)}
     ];
 
-    traffic = service["traffic"] or {};
+    traffic = service["traffic"] or ({} as dict[any, any]);
     isRouted = traffic["routed"] or False;
     trafficStats = [
         {

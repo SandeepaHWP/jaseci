@@ -39,9 +39,9 @@ def:pub MetricsPage -> JsxElement {
         result = await getMetrics(auth["authToken"]);
         if result["ok"] and result["data"] {
             metricsEnabled = result["data"]["enabled"];
-            summary = result["data"]["summary"] or {};
-            metrics = result["data"]["metrics"] or [];
-            prevBuf = histRef.current or [];
+            summary = result["data"]["summary"] or ({} as dict[any, any]);
+            metrics = result["data"]["metrics"] or ([] as list[any]);
+            prevBuf = histRef.current or ([] as list[any]);
             newReqsTotal = summary["total_requests"] or 0;
             # Bars plot per-interval traffic (delta of the cumulative counter),
             # so an idle window reads ~0 instead of a flat full-height block.
@@ -139,7 +139,7 @@ def:pub MetricsPage -> JsxElement {
             if not labelKey {
                 return v["value"] or 0.0;
             }
-            labels = v["labels"] or {};
+            labels = v["labels"] or ({} as dict[any, any]);
             if labels[labelKey] == labelVal {
                 return v["value"] or 0.0;
             }
@@ -171,7 +171,7 @@ def:pub MetricsPage -> JsxElement {
         }
         result = [];
         for v in m["values"] {
-            labels = v["labels"] or {};
+            labels = v["labels"] or ({} as dict[any, any]);
             result.append(
                 {
                     "method": labels["method"] or "?",
@@ -192,7 +192,7 @@ def:pub MetricsPage -> JsxElement {
         sumVal = 0.0;
         countVal = 0.0;
         for v in m["values"] {
-            labels = v["labels"] or {};
+            labels = v["labels"] or ({} as dict[any, any]);
             if labels["path"] == path {
                 if v["suffix"] == "_sum" {
                     sumVal = v["value"] or 0.0;
@@ -289,7 +289,7 @@ def:pub MetricsPage -> JsxElement {
     jacInfo = getMetricByName("jac_info");
     jacVersion = "N/A";
     if jacInfo and jacInfo["values"] and len(jacInfo["values"]) > 0 {
-        jacLabels = jacInfo["values"][0]["labels"] or {};
+        jacLabels = jacInfo["values"][0]["labels"] or ({} as dict[any, any]);
         jacVersion = jacLabels["version"] or "N/A";
     }
 

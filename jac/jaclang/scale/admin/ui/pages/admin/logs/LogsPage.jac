@@ -59,7 +59,7 @@ def:pub LogsPage -> JsxElement {
         try {
             result = await getLogServices(auth["authToken"]);
             if result["ok"] and result["data"] {
-                services = result["data"]["services"] or [];
+                services = result["data"]["services"] or ([] as list[any]);
             }
         } except Exception as e {
             console.error("loadServices error:", e);
@@ -82,7 +82,7 @@ def:pub LogsPage -> JsxElement {
                 ""
             );
             if result["ok"] and result["data"] {
-                lines = result["data"]["lines"] or [];
+                lines = result["data"]["lines"] or ([] as list[any]);
                 nextBefore = String(result["data"]["next_before"] or "");
                 errorMsg = "";
             } elif result["error"] {
@@ -117,7 +117,7 @@ def:pub LogsPage -> JsxElement {
                 nextBefore
             );
             if result["ok"] and result["data"] {
-                older = result["data"]["lines"] or [];
+                older = result["data"]["lines"] or ([] as list[any]);
                 # Append: newer page is already at the top, older
                 # entries land beneath - the display stays
                 # newest-first end-to-end.
@@ -138,8 +138,8 @@ def:pub LogsPage -> JsxElement {
         try {
             result = await getTraceLogs(auth["authToken"], tid);
             if result["ok"] and result["data"] {
-                traceLines = result["data"]["lines"] or [];
-                traceServices = result["data"]["services_touched"] or [];
+                traceLines = result["data"]["lines"] or ([] as list[any]);
+                traceServices = result["data"]["services_touched"] or ([] as list[any]);
             } elif result["error"] {
                 errorMsg = getErrorMessage(result, "Failed to load trace");
             }

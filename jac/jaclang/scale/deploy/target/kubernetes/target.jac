@@ -401,7 +401,7 @@ obj KubernetesTarget(KubernetesTargetBase) {
                     continue;
                 }
                 pod_name = str(p.metadata.name);
-                labels = p.metadata.labels or {};
+                labels = p.metadata.labels or ({} as dict[any, any]);
                 app = str(labels.get("app", ""));
                 in_fleet = (app in fleet_app_names) if fleet_app_names else True;
                 if current_hashes and app in fleet_app_names {

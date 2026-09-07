@@ -77,14 +77,14 @@ def complete_identity(
     if linked.get("error") {
         return OAuthLogin(error="Could not connect that SSO account.");
     }
-    user = manager.get_user(user_id) or {};
+    user = manager.get_user(user_id) or ({} as dict[any, any]);
     if not user
         or user.get("status", "active") != "active"
         or user.get("role") == "system" {
         return OAuthLogin(error="This account cannot sign in.");
     }
-    profile = user.get("profile") or {};
-    profiles = profile.get("sso") or {};
+    profile = user.get("profile") or ({} as dict[any, any]);
+    profiles = profile.get("sso") or ({} as dict[any, any]);
     profiles[platform] = info.profile_fields();
     profile["sso"] = profiles;
     manager.update_user_fields(user_id, {"profile": profile});

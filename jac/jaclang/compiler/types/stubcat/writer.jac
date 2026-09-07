@@ -1219,7 +1219,7 @@ obj CatalogWriter {
                 tps.append(tv);
             }
             put_refs(out, self.ref_types(tps));
-            params = t.parameters or [];
+            params = t.parameters or ([] as list[any]);
             put_uvar(out, len(params));
             for p in params {
                 put_uvar(out, self.sid(p.name or ""));
@@ -1400,26 +1400,26 @@ obj CatalogWriter {
         }
         put_refs(out, self.ref_types(tps));
         put_refs(out, self.ref_types(sh.base_classes));
-        fields = sh.typeddict_fields or {};
+        fields = sh.typeddict_fields or ({} as dict[any, any]);
         put_uvar(out, len(fields));
         for (fname, ftype) in fields.items() {
             put_uvar(out, self.sid(fname));
             put_ref(out, self.ref_type(ftype));
         }
         put_ref(out, self.ref_type(sh.enum_value_type));
-        members = sh.enum_members or {};
+        members = sh.enum_members or ({} as dict[any, any]);
         put_uvar(out, len(members));
         for (mname, info) in members.items() {
             put_uvar(out, self.sid(mname));
             put_ref(out, self.ref_type(info.value_type));
             self.put_literal(out, info.literal_value);
         }
-        ct_params = sh.ct_params or [];
+        ct_params = sh.ct_params or ([] as list[any]);
         put_uvar(out, len(ct_params));
         for name in ct_params {
             put_uvar(out, self.sid(name));
         }
-        derived = sh._derived_special_types or {};
+        derived = sh._derived_special_types or ({} as dict[any, any]);
         put_uvar(out, len(derived));
         for (dname, dtype) in derived.items() {
             put_uvar(out, self.sid(dname));

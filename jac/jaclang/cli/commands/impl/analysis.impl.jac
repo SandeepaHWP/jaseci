@@ -1869,7 +1869,7 @@ def _iter_jac_files(
     paths: list[any], ignore_list: (list[any] | None) = None, include_annex: bool = True
 ) -> tuple[list[str], bool] {
     import os;
-    ignore_list = ignore_list or [];
+    ignore_list = ignore_list or ([] as list[any]);
     result: list[str] = [];
     explicit: set[str] = set();
     had_errors = False;

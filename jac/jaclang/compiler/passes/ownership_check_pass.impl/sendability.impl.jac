@@ -53,7 +53,7 @@ impl OwnershipCheckPass._flow_reduce_shape(asgn: Assignment, sid: SymId) -> str 
             return "";
         }
     }
-    _params = fc.params or [];
+    _params = fc.params or ([] as list[any]);
     if len(_params) != 2 {
         return "";
     }

@@ -18,7 +18,7 @@ def _render_tool(tool: object) -> str {
         return "";
     }
     desc = str(fn.get("description", "") or "");
-    params = fn.get("parameters", {}) or {};
+    params = fn.get("parameters", {}) or ({} as dict[any, any]);
     props = params.get("properties", {}) if isinstance(params, dict) else {};
     required = params.get("required", []) if isinstance(params, dict) else [];
     if not isinstance(props, dict) {

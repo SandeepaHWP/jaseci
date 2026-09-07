@@ -37,7 +37,7 @@ def buildChartStyle(config: any) -> any {
 
 def:pub ChartContainer(props: any) -> JsxElement {
     attrs: dict[str, any] = {** props};
-    config = props["config"] or {};
+    config = props["config"] or ({} as dict[any, any]);
     colorStyle = buildChartStyle(config);
     ctxValue = {"config": config};
     <ChartContext.Provider value={ctxValue}>

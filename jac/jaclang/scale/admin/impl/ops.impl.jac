@@ -279,7 +279,7 @@ async def _loki_recent_count -> int {
         if not resp.ok() {
             raise ConnectionError(f"loki returned {resp.status_code}");
         }
-        data = resp.json().get("data", {}) or {};
+        data = resp.json().get("data", {}) or ({} as dict[any, any]);
         total = 0;
         for stream in (data.get("result", []) or []) {
             total += len(stream.get("values", []) or []);

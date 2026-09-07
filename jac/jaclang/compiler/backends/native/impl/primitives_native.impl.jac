@@ -3069,7 +3069,7 @@ impl NativeListEmitter.emit_sort(
     one = ir.Constant(i64, 1);
     elem_type = helpers["elem_type"];
 
-    _kw = ctx?.call_kwargs or {};
+    _kw = ctx?.call_kwargs or ({} as dict[any, any]);
     _key_node = _kw.get("key");
     _rev_node = _kw.get("reverse");
     _unknown_kw = [

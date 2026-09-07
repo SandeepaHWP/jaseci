@@ -24,12 +24,12 @@ def _s(v: any) -> str {
 
 
 def _rollout_status(dep: dict[any, any]) -> dict[any, any] {
-    spec = dep.get("spec", {}) or {};
-    status = dep.get("status", {}) or {};
+    spec = dep.get("spec", {}) or ({} as dict[any, any]);
+    status = dep.get("status", {}) or ({} as dict[any, any]);
     desired = int(spec.get("replicas", 0) or 0);
     updated = int(status.get("updated_replicas", 0) or 0);
     available = int(status.get("available_replicas", 0) or 0);
-    conditions = status.get("conditions", []) or [];
+    conditions = status.get("conditions", []) or ([] as list[any]);
 
     for c in conditions {
         if c.get("type") == "Progressing"
@@ -54,9 +54,9 @@ def _rollout_status(dep: dict[any, any]) -> dict[any, any] {
 
 
 def summarize_deployment(dep: dict[any, any]) -> dict[any, any] {
-    meta = dep.get("metadata", {}) or {};
-    spec = dep.get("spec", {}) or {};
-    status = dep.get("status", {}) or {};
+    meta = dep.get("metadata", {}) or ({} as dict[any, any]);
+    spec = dep.get("spec", {}) or ({} as dict[any, any]);
+    status = dep.get("status", {}) or ({} as dict[any, any]);
     containers = ((spec.get("template", {}) or {}).get("spec", {}) or {}).get(
         "containers", []
     )
@@ -81,16 +81,16 @@ def summarize_deployment(dep: dict[any, any]) -> dict[any, any] {
 
 
 def _container_state(cs: dict[any, any]) -> dict[any, any] {
-    state = cs.get("state", {}) or {};
+    state = cs.get("state", {}) or ({} as dict[any, any]);
     if state.get("running") {
         return {"state": "running", "reason": ""};
     }
     if state.get("waiting") {
-        w = state.get("waiting", {}) or {};
+        w = state.get("waiting", {}) or ({} as dict[any, any]);
         return {"state": "waiting", "reason": _s(w.get("reason"))};
     }
     if state.get("terminated") {
-        t = state.get("terminated", {}) or {};
+        t = state.get("terminated", {}) or ({} as dict[any, any]);
         return {"state": "terminated", "reason": _s(t.get("reason"))};
     }
     return {"state": "unknown", "reason": ""};

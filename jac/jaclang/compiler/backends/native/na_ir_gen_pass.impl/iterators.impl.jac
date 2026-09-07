@@ -725,7 +725,7 @@ impl NaIRGenPass._build_iter_from_expr(expr: uni.UniNode) -> (tuple[any, ...] | 
     self._ensure_iter_types();
     if isinstance(expr, uni.FuncCall) {
         cname = self._get_name(expr.target);
-        params = expr.params or [];
+        params = expr.params or ([] as list[any]);
 
         if cname in ("map", "filter", "enumerate", "zip", "iter")
             and expr.call_kind != "builtin" {
@@ -1244,7 +1244,7 @@ impl NaIRGenPass._make_user_iter_from_obj(
 }
 
 impl NaIRGenPass._codegen_next(nd: uni.FuncCall) -> (ir.Value | None) {
-    params = nd.params or [];
+    params = nd.params or ([] as list[any]);
     if len(params) != 1 {
         self._emit_unsupported_builtin_call(nd, "next");
         return None;
@@ -1339,7 +1339,7 @@ impl NaIRGenPass._try_iter_protocol_for(nd: uni.InForStmt) -> bool {
     a0: (ir.Value | None) = None;
     a1: (ir.Value | None) = None;
     if is_tuple_target {
-        targets = nd.target.values or [];
+        targets = nd.target.values or ([] as list[any]);
         if len(targets) != 2 {
             return False;
         }

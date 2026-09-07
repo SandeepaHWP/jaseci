@@ -9,7 +9,7 @@ async def _jsonBody(resp: any) -> dict[str, any] {
 async def:pub fetchApi(
     endpoint: str, options: dict[str, any] = {}, token: str = ""
 ) -> dict[str, any] {
-    headers = options["headers"] or {};
+    headers = options["headers"] or ({} as dict[any, any]);
     if token {
         headers["Authorization"] = "Bearer " + token;
     }

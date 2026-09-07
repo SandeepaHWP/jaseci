@@ -385,7 +385,7 @@ impl NaIRGenPass._codegen_compr_walk(
     inner = comprs[idx];
     loop_target = inner.target;
     collection = inner.collection;
-    conditionals = inner.conditional or [];
+    conditionals = inner.conditional or ([] as list[any]);
 
     if isinstance(collection, uni.FuncCall) {
         call_name = self._get_name(collection.target);
@@ -554,7 +554,7 @@ impl NaIRGenPass._codegen_compr_range_walk(
     if not isinstance(collection, uni.FuncCall) {
         return;
     }
-    params = collection.params or [];
+    params = collection.params or ([] as list[any]);
     start_val: (ir.Value | None) = None;
     stop_val: (ir.Value | None) = None;
     if len(params) == 1 {

@@ -323,7 +323,7 @@ obj JacScaleTestRunner {
         }
 
         files = {file_field: (filename, io.BytesIO(content), content_type)};
-        data = extra_data or {};
+        data = extra_data or ({} as dict[any, any]);
 
         response = requests.post(
             url, headers=headers, files=files, data=data, timeout=timeout

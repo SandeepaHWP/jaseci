@@ -203,7 +203,7 @@ def _flatten_loki_response(
     payload: dict[any, any], ascending: bool = True
 ) -> list[dict[any, any]] {
     out: list[dict[any, any]] = [];
-    data = payload.get("data") or {};
+    data = payload.get("data") or ({} as dict[any, any]);
     for stream in (data.get("result") or []) {
         labels: dict[any, any] = stream.get("stream") or {};
         for `entry in (stream.get("values") or []) {

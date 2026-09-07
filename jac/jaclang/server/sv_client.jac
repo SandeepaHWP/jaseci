@@ -274,7 +274,7 @@ def _unwrap_envelope(data: any, app: str, name: str) -> any {
     if isinstance(data, dict) and data.get("ok") {
         return data.get("data");
     }
-    err = (data.get("error") if isinstance(data, dict) else None) or {};
+    err = (data.get("error") if isinstance(data, dict) else None) or ({} as dict[any, any]);
     msg = err.get("message") if isinstance(err, dict) else str(err);
     raise BridgeError(app=app, name=name, detail=str(msg or "unknown error"));
 }

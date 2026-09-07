@@ -394,7 +394,7 @@ impl JacBuiltin.printgraph(
     format: str
 ) -> str {
     import from jaclang.runtime.graph_utils { traverse_graph }
-    edge_type = edge_type or [];
+    edge_type = edge_type or ([] as list[any]);
     visited_nodes: list[NodeArchetype] = [];
     node_depths: dict[(NodeArchetype, int)] = {nd: 0};
     queue: list[tuple[NodeArchetype, int]] = [(nd, 0)];

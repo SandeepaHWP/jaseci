@@ -254,7 +254,7 @@ obj KubernetesPostgresProvider {
                     'random_page_cost': '1.1'
                 }
             );
-            overrides = self._db_cfg().get('postgres_settings') or {};
+            overrides = self._db_cfg().get('postgres_settings') or ({} as dict[any, any]);
             if isinstance(overrides, dict) {
                 for (key, value) in overrides.items() {
                     settings[str(key)] = str(value);

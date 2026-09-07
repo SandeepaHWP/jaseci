@@ -43,7 +43,7 @@ def:pub OpsPage -> JsxElement {
         try {
             result = await getOpsHealth(auth["authToken"]);
             if result["ok"] and result["data"] {
-                signals = result["data"]["signals"] or {};
+                signals = result["data"]["signals"] or ({} as dict[any, any]);
                 errorMsg = "";
             } elif result["error"] {
                 errorMsg = getErrorMessage(result, "Failed to load self-check");

@@ -42,7 +42,7 @@ impl __getEndpointEffects -> dict[any, any] {
     if initText {
         try {
             data: any = JSON.parse(initText);
-            effects = data["endpointEffects"] or {};
+            effects = data["endpointEffects"] or ({} as dict[any, any]);
         } except Exception as e {
             console.warn(
                 "[jac-client] Failed to parse __jac_init__ data, using empty effects:",

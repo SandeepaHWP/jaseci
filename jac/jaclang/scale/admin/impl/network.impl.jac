@@ -37,8 +37,8 @@ def endpoint_ready_counts(ep: dict[any, any]) -> dict[any, any] {
 def summarize_service(
     svc: dict[any, any], ready_by_name: dict[any, any]
 ) -> dict[any, any] {
-    meta = svc.get("metadata", {}) or {};
-    spec = svc.get("spec", {}) or {};
+    meta = svc.get("metadata", {}) or ({} as dict[any, any]);
+    spec = svc.get("spec", {}) or ({} as dict[any, any]);
     name = _s(meta.get("name"));
     ports: list[any] = [];
     for p in (spec.get("ports", []) or []) {
@@ -63,17 +63,17 @@ def summarize_service(
 
 
 def summarize_ingress(ing: dict[any, any]) -> dict[any, any] {
-    meta = ing.get("metadata", {}) or {};
-    spec = ing.get("spec", {}) or {};
-    status = ing.get("status", {}) or {};
+    meta = ing.get("metadata", {}) or ({} as dict[any, any]);
+    spec = ing.get("spec", {}) or ({} as dict[any, any]);
+    status = ing.get("status", {}) or ({} as dict[any, any]);
     rules_out: list[any] = [];
     for rule in (spec.get("rules", []) or []) {
         host = _s(rule.get("host"));
-        http = rule.get("http", {}) or {};
+        http = rule.get("http", {}) or ({} as dict[any, any]);
         for path in (http.get("paths", []) or []) {
-            backend = path.get("backend", {}) or {};
-            svc = backend.get("service", {}) or {};
-            svc_port = svc.get("port", {}) or {};
+            backend = path.get("backend", {}) or ({} as dict[any, any]);
+            svc = backend.get("service", {}) or ({} as dict[any, any]);
+            svc_port = svc.get("port", {}) or ({} as dict[any, any]);
             rules_out.append(
                 {
                     "host": host,
@@ -85,7 +85,7 @@ def summarize_ingress(ing: dict[any, any]) -> dict[any, any] {
         }
     }
     lb: list[any] = [];
-    ingress_status = (status.get("load_balancer", {}) or {}).get("ingress", []) or [];
+    ingress_status = (status.get("load_balancer", {}) or {}).get("ingress", []) or ([] as list[any]);
     for `entry in ingress_status {
         addr = `entry.get("hostname") or `entry.get("ip");
         if addr {
@@ -99,8 +99,8 @@ def summarize_ingress(ing: dict[any, any]) -> dict[any, any] {
 def pvc_claimants(pods: list[any]) -> dict[any, any] {
     out: dict[any, any] = {};
     for pod in pods {
-        meta = pod.get("metadata", {}) or {};
-        spec = pod.get("spec", {}) or {};
+        meta = pod.get("metadata", {}) or ({} as dict[any, any]);
+        spec = pod.get("spec", {}) or ({} as dict[any, any]);
         pod_name = _s(meta.get("name"));
         for vol in (spec.get("volumes", []) or []) {
             pvc = vol.get("persistent_volume_claim");
@@ -122,9 +122,9 @@ def pvc_claimants(pods: list[any]) -> dict[any, any] {
 def summarize_pvc(
     pvc: dict[any, any], claimants_by_name: dict[any, any]
 ) -> dict[any, any] {
-    meta = pvc.get("metadata", {}) or {};
-    spec = pvc.get("spec", {}) or {};
-    status = pvc.get("status", {}) or {};
+    meta = pvc.get("metadata", {}) or ({} as dict[any, any]);
+    spec = pvc.get("spec", {}) or ({} as dict[any, any]);
+    status = pvc.get("status", {}) or ({} as dict[any, any]);
     name = _s(meta.get("name"));
     capacity = (status.get("capacity", {}) or {}).get("storage");
     return {
