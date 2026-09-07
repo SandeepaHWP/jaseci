@@ -64,7 +64,7 @@ def parse_args -> argparse.Namespace {
 def main -> None {
     args = parse_args();
     repo_root = Path(__file__).resolve().parent.parent;
-    releases: list[dict] = [];
+    releases: list[dict[any, any]] = [];
     for (pkg_name, pkg_info) in PACKAGES.items() {
         attr_name = pkg_name.replace("-", "_");
         bump_type = getattr(args, attr_name);
