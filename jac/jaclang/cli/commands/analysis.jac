@@ -121,10 +121,10 @@ comptime SPEC_CHECK: CommandSpec = CommandSpec(
      );
 
 def check(
-    paths: list,
+    paths: list[any],
     print_errs: bool = True,
-    ignore: (list | None) = None,
-    disable_error_code: (list | None) = None,
+    ignore: (list[any] | None) = None,
+    disable_error_code: (list[any] | None) = None,
     parse_only: bool = False,
     nowarn: bool = False,
     lint_only: bool = False,
@@ -135,7 +135,9 @@ def check(
     app: str = ""
 ) -> int;
 
-def lint(paths: list, fix: bool = False, ignore: (list | None) = None) -> int;
+def lint(
+    paths: list[any], fix: bool = False, ignore: (list[any] | None) = None
+) -> int;
 
 comptime SPEC_FORMAT: CommandSpec = CommandSpec(
          name="fmt",
@@ -196,14 +198,14 @@ comptime SPEC_FORMAT: CommandSpec = CommandSpec(
      );
 
 def format(
-    paths: list,
+    paths: list[any],
     to_screen: bool = False,
     lintfix: bool = False,
     check: bool = False,
     cache: bool = False,
     cache_anchor: str = "",
-    path_map: dict | None = None,
-    cache_stats: dict | None = None,
+    path_map: dict[any, any] | None = None,
+    cache_stats: dict[any, any] | None = None,
     jobs: str = ""
 ) -> int;
 
@@ -260,12 +262,12 @@ comptime SPEC_PRECOMMIT: CommandSpec = CommandSpec(
      );
 
 def precommit(
-    paths: (list | None) = None,
+    paths: (list[any] | None) = None,
     staged: bool = False,
     verify: bool = False,
     install: bool = False,
     force: bool = False,
-    cache_stats: dict | None = None
+    cache_stats: dict[any, any] | None = None
 ) -> int;
 
 comptime SPEC_TEST: CommandSpec = CommandSpec(
@@ -378,7 +380,7 @@ comptime SPEC_TEST: CommandSpec = CommandSpec(
 
 def `test(
     target: str = "",
-    paths: list = [],
+    paths: list[any] = [],
     test_name: str = "",
     filter: str = "",
     xit: bool = False,
@@ -388,7 +390,7 @@ def `test(
     pct_range: str = "",
     resume: bool = False,
     verbose: bool = False,
-    ignore: (list | None) = None,
+    ignore: (list[any] | None) = None,
     jobs: str = ""
 ) -> int;
 

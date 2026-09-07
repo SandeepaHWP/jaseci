@@ -302,7 +302,7 @@ obj TelemetryStore {
         status: str | None = None,
         caller: str | None = None,
         root_only: bool = False
-    ) -> dict {
+    ) -> dict[any, any] {
         with self._lock {
             all_traces: list[Trace] = list(reversed(self._traces.values()));
             for t in all_traces {
@@ -389,7 +389,7 @@ obj TelemetryStore {
                 }
 
                 child_traces = children_lookup.get(invocation_id, []);
-                enriched_children: list = [];
+                enriched_children: list[any] = [];
                 for ct in child_traces {
                     self._backfill_streaming_response(ct);
                     cd = ct.to_dict(include_detail=True);
@@ -424,7 +424,7 @@ obj TelemetryStore {
         }
     }
 
-    def get_summary -> dict {
+    def get_summary -> dict[any, any] {
         with self._lock {
             traces_list = list(self._traces.values());
             if not traces_list {
@@ -506,7 +506,7 @@ obj TelemetryStore {
         }
     }
 
-    def get_available_filters -> dict {
+    def get_available_filters -> dict[any, any] {
         with self._lock {
             models = list(
                 set(

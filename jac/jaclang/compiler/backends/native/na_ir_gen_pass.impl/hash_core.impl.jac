@@ -1060,7 +1060,7 @@ impl NaIRGenPass._tuple_key_fields(key_type: ir.Type) -> (list | None) {
         return None;
     }
     i8p = ir.IntType(8).as_pointer();
-    out: list = [];
+    out: list[any] = [];
     for (i, ety) in enumerate(pointee.elements) {
         if isinstance(ety, ir.IntType) {
             out.append((i, "int"));

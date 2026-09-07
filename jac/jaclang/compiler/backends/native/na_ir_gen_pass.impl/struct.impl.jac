@@ -44,7 +44,7 @@ impl NaIRGenPass._emit_struct_call(name: str, nd: uni.FuncCall) -> (ir.Value | N
     };
     signed_codes = {"b", "h", "i", "l", "q", "n"};
     float_sizes = {"f": 4, "d": 8};
-    fields: list = [];
+    fields: list[any] = [];
     total = 0;
     i = 0;
     count_str = "";
@@ -127,7 +127,7 @@ impl NaIRGenPass._emit_struct_pack(
         );
         return None;
     }
-    arg_vals: list = [];
+    arg_vals: list[any] = [];
     for p in params[1:] {
         v = self._codegen_expr(p);
         if v is not None {
@@ -207,8 +207,8 @@ impl NaIRGenPass._emit_struct_unpack(
     );
     data = self._bytes_data_ptr(data_val);
 
-    values: list = [];
-    elem_types: list = [];
+    values: list[any] = [];
+    elem_types: list[any] = [];
     off = 0;
     for (kind, sz, signed) in fields {
         if kind == "pad" {

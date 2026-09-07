@@ -152,7 +152,7 @@ obj JacCompiler {
     ) -> (tuple[bytes, bytes] | None);
 
     def _sealed_jir_data(full_target: str) -> (tuple[bytes, str] | None);
-    def _build_interop_dict(result: uni.Module) -> dict;
+    def _build_interop_dict(result: uni.Module) -> dict[any, any];
     def _deserialize_interop_table(cached_interop: dict[str, any]) -> InteropManifest;
     def parse_str(
         source_str: str,

@@ -46,7 +46,7 @@ def _clock_gettime(st: _HostState, clk: int, ts: int) -> int {
     return 0;
 }
 
-def:pub make_jac_host(sh: any) -> dict {
+def:pub make_jac_host(sh: any) -> dict[any, any] {
     st = _HostState(sh=sh);
     return {
         "write": lambda (fd: int, ptr: int, n: int) {
@@ -109,8 +109,8 @@ async def:pub instantiate_na_wasm(url: str, sh: any, extra_imports: any = None) 
     return inst;
 }
 
-glob _na_env_cfg: dict = {},
-     _na_pending: dict = {};
+glob _na_env_cfg: dict[any, any] = {},
+     _na_pending: dict[any, any] = {};
 
 def:pub set_na_env(module_stem: str, sh: any, extra_imports: any = None) {
     _na_env_cfg[module_stem] = [sh, extra_imports];
@@ -145,7 +145,7 @@ def _na_caller(module_stem: str, fn_name: str) -> any {
     return _call;
 }
 
-def:pub __na_bind(module_stem: str, names: list) -> any {
+def:pub __na_bind(module_stem: str, names: list[any]) -> any {
     out: any = {};
     for nm in names {
         out[nm] = _na_caller(module_stem, nm);

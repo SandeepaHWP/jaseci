@@ -13,7 +13,7 @@ import shutil;
 import tempfile;
 import from jaclang.compiler.driver.program { JacProgram }
 
-def _proj(files: dict, pins: str = "") -> str {
+def _proj(files: dict[any, any], pins: str = "") -> str {
     d = tempfile.mkdtemp(prefix="jacplace_");
     toml = "[project]\nname = \"t\"\nentry-point = \"main.jac\"\n";
     if pins != "" {

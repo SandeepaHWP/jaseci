@@ -31,7 +31,7 @@ glob llm = MockLLM(
              ]
          }
      ),
-     history: list = [];
+     history: list[any] = [];
 
 
 def ask(message: str) -> str by llm(tools=[get_weather], conversation=history);

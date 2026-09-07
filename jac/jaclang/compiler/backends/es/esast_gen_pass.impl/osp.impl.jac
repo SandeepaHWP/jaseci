@@ -328,8 +328,8 @@ impl EsastGenPass._build_osp_setup_js -> str {
     arch_kinds = self._osp_arch_kinds();
     tags = _model.tags;
 
-    entry_by_owner: dict[str, list] = {};
-    exit_by_owner: dict[str, list] = {};
+    entry_by_owner: dict[str, list[any]] = {};
+    exit_by_owner: dict[str, list[any]] = {};
     for slot in _model.local_slots() {
         bucket = entry_by_owner if slot.is_entry else exit_by_owner;
         if slot.owner not in bucket {
@@ -791,7 +791,7 @@ impl EsastGenPass._build_osp_graph_call(
         }
     }
     if co.conn_assign is not None {
-        props: list = [];
+        props: list[any] = [];
         for kw in co.conn_assign.assigns {
             if kw.key is None {
                 continue;

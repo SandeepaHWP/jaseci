@@ -305,8 +305,8 @@ impl JacCompiler._load_native_from_cache(
         }
         gen = CodeGenTarget();
         gen.native_engine = engine;
-        py_func_table: dict = {};
-        callbacks_list: list = [];
+        py_func_table: dict[any, any] = {};
+        callbacks_list: list[any] = [];
         gen.interop_py_funcs = py_func_table;
         gen._interop_callbacks = callbacks_list;
         if cached_interop {
@@ -373,8 +373,8 @@ impl JacCompiler._load_native_from_bitcode(
     }
     gen = CodeGenTarget();
     gen.native_engine = engine;
-    py_func_table: dict = {};
-    callbacks_list: list = [];
+    py_func_table: dict[any, any] = {};
+    callbacks_list: list[any] = [];
     gen.interop_py_funcs = py_func_table;
     gen._interop_callbacks = callbacks_list;
     if cached_interop {
@@ -569,7 +569,7 @@ impl JacCompiler._build_interop_dict(result: uni.Module) -> dict {
     if manifest is None {
         return {};
     }
-    interop_data: dict = {'bindings': {}};
+    interop_data: dict[any, any] = {'bindings': {}};
     for (name, binding) in manifest.bindings.items() {
         interop_data['bindings'][name] = {
             'source_context': binding.source_context.value,
@@ -1253,7 +1253,7 @@ impl JacCompiler.compile(
         if _depth_prev == 0 {
             self._closure_opts = options;
         }
-        _gc_prev: (tuple | None) = None;
+        _gc_prev: (tuple[any, ...] | None) = None;
         if _depth_prev == 0 and not os.environ.get('JAC_GC_NO_COMPILE_BOOST') {
             import gc;
             _gc_prev = gc.get_threshold();
@@ -1749,7 +1749,7 @@ impl JacCompiler._compile_pipeline(
     ) {
         import from jaclang.compiler.frontend.module_facts { ModuleFacts as _PtyMcp }
         if is_native_mod or _PtyMcp.has_native_context_stmts(mod_targ) {
-            _parity_passes: list = [];
+            _parity_passes: list[any] = [];
             try {
                 import from jaclang.compiler.passes.rc_facts_pass {
                     RcFactsPass as _PtyRcFacts
@@ -1780,7 +1780,7 @@ impl JacCompiler._compile_pipeline(
     ) {
         import os as _cb_os;
         cb_seen: set[str] = set();
-        cb_worklist: list = [mod_targ];
+        cb_worklist: list[any] = [mod_targ];
         cb_paths: list[str] = [];
 
         cb_opts = CompileOptions(

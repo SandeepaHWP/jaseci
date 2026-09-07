@@ -27,7 +27,7 @@ def _as_any(v: any) -> any {
     return v;
 }
 
-def mock_sso_config_with_credentials -> dict {
+def mock_sso_config_with_credentials -> dict[any, any] {
     return {
         "host": "http://localhost:8000",
         "google": {
@@ -45,7 +45,7 @@ def mock_sso_config_with_credentials -> dict {
     };
 }
 
-def mock_sso_config_without_credentials -> dict {
+def mock_sso_config_without_credentials -> dict[any, any] {
     return {
         "host": "http://localhost:8000",
         "google": {"client_id": "", "client_secret": ""},
@@ -54,7 +54,7 @@ def mock_sso_config_without_credentials -> dict {
     };
 }
 
-def mock_sso_config_partial_credentials -> dict {
+def mock_sso_config_partial_credentials -> dict[any, any] {
     return {
         "host": "http://localhost:8000",
         "google": {"client_id": "test_id", "client_secret": ""},
@@ -97,7 +97,7 @@ def _callback_request(code: str = "auth-code-123") -> Request {
 
 """Stand in for a JSON response from a provider's token or userinfo endpoint."""
 obj _OAuthResp {
-    has payload: dict,
+    has payload: dict[any, any],
         status_code: int = 200;
 
     def json -> any {
@@ -114,8 +114,8 @@ obj _OAuthResp {
 }
 
 """Serve canned JSON per request, in call order."""
-def _oauth_responder(payloads: list) -> any {
-    seen: dict = {"n": 0};
+def _oauth_responder(payloads: list[any]) -> any {
+    seen: dict[any, any] = {"n": 0};
 
     async def _fake_arequest(method: str, url: str, **kwargs: any) -> _OAuthResp {
         i = seen["n"];
@@ -253,34 +253,34 @@ obj MockGithubSSO {
 }
 
 obj MockScaleConfig {
-    has sso_config: dict | None = None,
-        _sso_config: dict postinit;
+    has sso_config: dict[any, any] | None = None,
+        _sso_config: dict[any, any] postinit;
 
     def postinit {
         self._sso_config = self.sso_config or mock_sso_config_with_credentials();
     }
 
-    def get_sso_config -> dict {
+    def get_sso_config -> dict[any, any] {
         return self._sso_config;
     }
 
-    def get_jwt_config -> dict {
+    def get_jwt_config -> dict[any, any] {
         return {"secret": "test_secret", "algorithm": "HS256", "exp_delta_days": 1};
     }
 
-    def get_database_config -> dict {
+    def get_database_config -> dict[any, any] {
         return {"redis_url": None, "shelf_db_path": ".jac/data/anchor_store.db"};
     }
 
-    def get_kubernetes_config -> dict {
+    def get_kubernetes_config -> dict[any, any] {
         return {"namespace": "default"};
     }
 
-    def get_monitoring_config -> dict {
+    def get_monitoring_config -> dict[any, any] {
         return {"enabled": False};
     }
 
-    def get_events_config -> dict {
+    def get_events_config -> dict[any, any] {
         return {"enabled": False};
     }
 }
@@ -339,7 +339,7 @@ def _setup_user_manager -> tuple[str, SSOAuth] {
     return (test_dir, sso);
 }
 
-def _parse_body(result: JSONResponse | TransportResponse) -> dict {
+def _parse_body(result: JSONResponse | TransportResponse) -> dict[any, any] {
     return json.loads(_get_response_body(result));
 }
 
@@ -874,7 +874,7 @@ test "register sso endpoints" {
     assert ("/sso/firebase/token", "POST") in sso_paths;
 }
 
-def _setup_callback_wrapper_server(sso_config: dict) -> tuple {
+def _setup_callback_wrapper_server(sso_config: dict[any, any]) -> tuple[any, ...] {
     mock_config = MockScaleConfig(sso_config);
     host = RecordingHost(users=_as_any(unittest.mock.Mock()));
     ext = SSOExtension();

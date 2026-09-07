@@ -10,9 +10,9 @@ import from jaclang.scale.events.streams.local { LocalEventStream }
 
 
 def _make_broker(
-    group: str = "test_group", retry: dict | None = None
+    group: str = "test_group", retry: dict[any, any] | None = None
 ) -> LocalEventStream {
-    cfg: dict = {
+    cfg: dict[any, any] = {
         "consumer_group": group,
         "retry": retry
             or {

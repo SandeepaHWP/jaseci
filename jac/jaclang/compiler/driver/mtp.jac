@@ -31,7 +31,7 @@ obj Info {
 }
 
 obj VarInfo(Info) {
-    has type_info: (ClassInfo | EnumInfo | str | tuple | None) = None;
+    has type_info: (ClassInfo | EnumInfo | str | tuple[any, ...] | None) = None;
 }
 
 obj ParamInfo(VarInfo) {}
@@ -52,7 +52,7 @@ obj ClassInfo(Info) {
 
 obj FunctionInfo(Info) {
     has params: (list[ParamInfo] | None) = None,
-        return_type: (str | ClassInfo | EnumInfo | tuple | None) = None,
+        return_type: (str | ClassInfo | EnumInfo | tuple[any, ...] | None) = None,
         tools: (list[FunctionInfo] | None) = None,
         by_call: bool = False;
 

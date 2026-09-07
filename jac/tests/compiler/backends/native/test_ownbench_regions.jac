@@ -58,7 +58,7 @@ def _nacompile(src: str, mode: str, out_bin: str) {
 }
 
 """Run a kernel binary; return (digest, metrics dict)."""
-def _run(out_bin: str, args: list[str]) -> tuple[str, dict] {
+def _run(out_bin: str, args: list[str]) -> tuple[str, dict[any, any]] {
     proc = subprocess.run(
         [out_bin] + args, capture_output=True, text=True, timeout=120
     );
@@ -66,7 +66,7 @@ def _run(out_bin: str, args: list[str]) -> tuple[str, dict] {
         f"{os.path.basename(out_bin)} exited {proc.returncode}"
         f" (a crash here is a region-codegen regression)"
     );
-    metrics: dict = {};
+    metrics: dict[any, any] = {};
     lines: list[str] = [];
     for ln in proc.stdout.splitlines() {
         if ln.startswith("ns=") {

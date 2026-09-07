@@ -263,7 +263,7 @@ node ClassType(TypeBase) {
     def specialize_generics(type_args: list[TypeBase]) -> ClassType;
     def get_class_symbol -> (Symbol | None);
     def lookup_member_symbol(
-        member: str, r_overloaded: list | None = None
+        member: str, r_overloaded: list[any] | None = None
     ) -> (Symbol | None);
 
     def is_builtin(class_name: (str | list[str] | None) = None) -> bool;

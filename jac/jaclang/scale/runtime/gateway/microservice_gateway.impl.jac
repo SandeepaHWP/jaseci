@@ -253,7 +253,7 @@ impl MicroserviceGateway.serve_admin_asset(asset_path: str) -> Response | None {
     return Response(content=target.read_bytes(), media_type=content_type);
 }
 
-glob _BUILTIN_PREFIXES: tuple = GATEWAY_BUILTIN_PREFIXES,
+glob _BUILTIN_PREFIXES: tuple[any, ...] = GATEWAY_BUILTIN_PREFIXES,
      _BUILTIN_EXACT: set[str] = GATEWAY_BARE_API_PATHS,
      _DISCOVERY_SEGMENTS: set[str] = set(GATEWAY_DISCOVERY_SEGMENTS),
      _REPLICATED_SEGMENTS: set[str] = set(GATEWAY_REPLICATED_SEGMENTS);
@@ -316,9 +316,9 @@ impl MicroserviceGateway.aggregate_graph_data(request: Request) -> Response | No
     fwd_headers = self.build_forward_headers(request);
     query: str = str(request.url.query);
 
-    merged_nodes: dict[str, dict] = {};
+    merged_nodes: dict[str, dict[any, any]] = {};
     edge_keys: set = set();
-    merged_edges: list[dict] = [];
+    merged_edges: list[dict[any, any]] = [];
     fragments: int = 0;
 
     for (svc_name, svc_entry) in self.eligible_services() {
@@ -406,7 +406,7 @@ impl MicroserviceGateway.handle_builtin_passthrough(
     if owner is not None {
         return await self.forward_root_path(request, owner, path);
     }
-    unknown: list = [
+    unknown: list[any] = [
         (name, svc)
         for (name, svc) in self.eligible_services()
         if not self.route_table.is_learned(name)
@@ -841,7 +841,9 @@ impl MicroserviceGateway.setup -> ServingApp {
                 ROUTE_PROXY,
                 ROUTE_CLIENT_PAGE
             }
-            service_prefixes: list = [e.prefix for e in gw.registry.entries.values()];
+            service_prefixes: list[any] = [
+                e.prefix for e in gw.registry.entries.values()
+            ];
             decision = classify_route(
                 path, service_prefixes, client_pages=gw.has_client_bundle()
             );

@@ -325,7 +325,7 @@ impl _ws_positive(ws_config: dict, key: str, fallback: (int | float)) -> float {
 
 impl JacScaleConfig.get_websocket_config(self: JacScaleConfig) -> dict[str, any] {
     config = self.load();
-    ws_config: dict = config.get('websocket', {});
+    ws_config: dict[any, any] = config.get('websocket', {});
     backplane = ws_config.get('backplane');
     if backplane is not None {
         backplane = str(backplane).lower();

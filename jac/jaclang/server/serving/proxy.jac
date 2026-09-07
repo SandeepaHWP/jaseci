@@ -32,8 +32,8 @@ def parse_ip(raw: str) -> any {
 }
 
 
-def _parse_networks(entries: list[str]) -> list {
-    networks: list = [];
+def _parse_networks(entries: list[str]) -> list[any] {
+    networks: list[any] = [];
     for item in entries {
         try {
             networks.append(ipaddress.ip_network(str(item).strip(), strict=False));
@@ -71,7 +71,7 @@ def _forwarded_pairs(headers: Headers) -> list[dict[str, str]] {
 
 obj ProxyResolver {
     has trusted: list[str] = [],
-        _networks: list = [];
+        _networks: list[any] = [];
 
     def postinit {
         self._networks = _parse_networks(self.trusted);

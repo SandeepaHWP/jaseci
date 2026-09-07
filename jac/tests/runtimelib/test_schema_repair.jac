@@ -20,7 +20,7 @@ import from jaclang.data.schema_rules {
 
 
 """Upgrade callback: legacy comma-string tags become list[str]."""
-def _split_tags(doc: dict) -> dict {
+def _split_tags(doc: dict[any, any]) -> dict[any, any] {
     doc['tags'] = [
         t.strip()
         for t in doc['tags'].split(',')
@@ -66,7 +66,7 @@ obj _FactoryDefaults(Root) {
 
 
 """Build a raw stored dict shaped like a pre-rename _DriftUser document."""
-def _old_user_raw -> dict {
+def _old_user_raw -> dict[any, any] {
     return {
         '__type__': '_DriftUser',
         '__module__': getattr(_DriftUser, '__module__'),

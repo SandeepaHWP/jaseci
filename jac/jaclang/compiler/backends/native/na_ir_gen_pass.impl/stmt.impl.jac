@@ -8,7 +8,7 @@ impl NaIRGenPass._codegen_body(stmts: (list | tuple)) -> None {
         _di_instr_snap = 0;
         _di_line_snap = 0;
         _di_blk_snap = None;
-        _di_blk_instr_counts: dict = {};
+        _di_blk_instr_counts: dict[any, any] = {};
         if self._di_current_sp is not None and stmt?.loc {
             _di_blk_snap = self.builder.block;
             _di_instr_snap = len(self.builder.block.instructions);
@@ -556,7 +556,7 @@ impl NaIRGenPass._codegen_switch(nd: uni.SwitchStmt) -> None {
     merge_bb = func.append_basic_block(name="switch.end");
 
     default_case: (uni.SwitchCase | None) = None;
-    value_cases: list = [];
+    value_cases: list[any] = [];
     for sc in nd.cases {
         if sc.pattern is None {
             default_case = sc;
@@ -936,8 +936,8 @@ impl NaIRGenPass._match_subj_ty(expr: (uni.UniNode | None)) -> (object | None) {
 }
 
 impl NaIRGenPass._match_seq_parts(pat: uni.MatchSequence) -> tuple {
-    heads: list = [];
-    tails: list = [];
+    heads: list[any] = [];
+    tails: list[any] = [];
     star: (uni.MatchStar | None) = None;
     for sub in pat.values {
         if isinstance(sub, uni.MatchStar) {
@@ -1177,7 +1177,7 @@ impl NaIRGenPass._match_map_cond(
 impl NaIRGenPass._match_arch_fields(
     pat: uni.MatchArch, arch_name: str
 ) -> (list | None) {
-    out: list = [];
+    out: list[any] = [];
     args = list(pat.arg_patterns) if pat.arg_patterns else [];
     if args {
         order = self.struct_field_order.get(arch_name);
@@ -1253,7 +1253,7 @@ impl NaIRGenPass._match_arch_cond(
         return None;
     }
     vt_mode = False;
-    target_vtables: list = [];
+    target_vtables: list[any] = [];
     if static_name == arch_name and not self._arch_has_vtable(static_name) {
         vt_mode = False;
     } elif self._arch_has_vtable(static_name) {
@@ -1498,7 +1498,7 @@ impl NaIRGenPass._bind_match_map(
     helpers = self.dict_helpers[f"{kspec}:{vspec}"];
     val_ty = self._match_elem_ty_of(subj_ty, "dict[", 1);
     star: (uni.MatchStar | None) = None;
-    matched_keys: list = [];
+    matched_keys: list[any] = [];
     for kv in pat.values {
         if isinstance(kv, uni.MatchStar) {
             star = kv;
@@ -1707,7 +1707,7 @@ impl NaIRGenPass._codegen_assignment(nd: uni.Assignment) -> None {
             );
         }
 
-        _unbound: list = list(nd.target)
+        _unbound: list[any] = list(nd.target)
             if isinstance(nd.target, (list, tuple))
             else [nd.target];
         while _unbound {
@@ -1735,7 +1735,7 @@ impl NaIRGenPass._codegen_assignment(nd: uni.Assignment) -> None {
                         name=type(target_expr).__name__
                     );
                 }
-                _unbound: list = [target_expr];
+                _unbound: list[any] = [target_expr];
                 while _unbound {
                     _t = _unbound.pop();
                     if isinstance(_t, uni.Name) {
@@ -3448,7 +3448,7 @@ impl NaIRGenPass._try_flow_for_parallel(nd: uni.InForStmt) -> bool {
     if loop_var is None or not isinstance(nd.collection, uni.UnaryExpr) {
         return False;
     }
-    _reds: list = [];
+    _reds: list[any] = [];
     _red_names: set[str] = set();
     for st in (nd.body or []) {
         _r_asgns = ([st] if isinstance(st, uni.Assignment) else [])
@@ -3532,7 +3532,7 @@ impl NaIRGenPass._try_flow_for_parallel(nd: uni.InForStmt) -> bool {
             }
         }
     }
-    _cap_vals: list = [];
+    _cap_vals: list[any] = [];
     for _cn in _caps {
         _cap_vals.append(
             self.builder.load(self.local_vars[_cn], name=f"ffor.cap.{_cn}")
@@ -3664,7 +3664,7 @@ impl NaIRGenPass._try_flow_for_parallel(nd: uni.InForStmt) -> bool {
         }
     }
     self.local_vars[loop_var] = _lv_alloca;
-    _red_slots: list = [];
+    _red_slots: list[any] = [];
     for (_ri, _red) in enumerate(_reds) {
         _rslot = self._entry_alloca(i64, _red[0]);
         self.builder.store(ir.Constant(i64, _red_identity[_red[1]]), _rslot);

@@ -16,7 +16,7 @@ glob RESET: str = "\033[0m",
      BRIGHT_WHITE: str = "\033[97m",
      BRIGHT_BLUE: str = "\033[94m";
 
-glob _ANSI_ROLES: dict = {
+glob _ANSI_ROLES: dict[any, any] = {
          'success': GREEN,
          'error': RED,
          'warning': YELLOW,
@@ -28,7 +28,7 @@ glob _ANSI_ROLES: dict = {
          'bright_white': BRIGHT_WHITE
      };
 
-glob _ANSI_STYLE_TOKENS: dict = {
+glob _ANSI_STYLE_TOKENS: dict[any, any] = {
          'bold': BOLD,
          'dim': DIM,
          'underline': UNDERLINE,
@@ -189,7 +189,7 @@ impl ConsoleRenderer.emit_raw(
 
     if sys.platform == 'win32' and not os.environ.get('WT_SESSION') {
         encoding: str = str(out?.encoding or 'cp1252');
-        processed_args: list = [];
+        processed_args: list[any] = [];
         for arg in args {
             if isinstance(arg, str) {
                 try {
@@ -461,7 +461,7 @@ impl JacConsole.print(*args: any, **kwargs: any) -> None {
     file = kwargs.pop('file', None);
     kwargs.pop('markup', None);
     kwargs.pop('highlight', None);
-    processed: list = [(a.text if isinstance(a, Content) else a) for a in args];
+    processed: list[any] = [(a.text if isinstance(a, Content) else a) for a in args];
     self._renderer.emit_raw(processed, self._resolve_stream(file), style, kwargs);
 }
 

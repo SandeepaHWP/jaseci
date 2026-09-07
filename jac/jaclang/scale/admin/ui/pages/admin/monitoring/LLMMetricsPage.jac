@@ -7,7 +7,7 @@ import from ....services.llmService { getLLMSummary }
 
 def:pub LLMMetricsPage -> JsxElement {
     has isLoading: bool = True,
-        summary: dict = {},
+        summary: dict[any, any] = {},
         autoRefresh: bool = True,
         errorMsg: str = "";
 

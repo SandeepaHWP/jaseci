@@ -21,8 +21,8 @@ def:pub PodEnvPage -> JsxElement {
         available: bool = True,
         detail: str = "",
         namespace: str = "",
-        thisPod: list = [],
-        pods: list = [],
+        thisPod: list[any] = [],
+        pods: list[any] = [],
         selected: str = "__self__",
         errorMsg: str = "",
         loadedOnce: bool = False;
@@ -61,7 +61,7 @@ def:pub PodEnvPage -> JsxElement {
     );
 
     # Resolve the currently-selected env list (this pod vs a named pod).
-    def selectedEnv -> list {
+    def selectedEnv -> list[any] {
         if selected == "__self__" {
             return thisPod;
         }

@@ -19,7 +19,7 @@ walker RegionInferPass(Transform) {
     has ir_in: Module,
         _use_index: (dict[int, list[NameAtom]] | None) = None;
 
-    static has PROVIDES: tuple = ('region-infer', );
+    static has PROVIDES: tuple[any, ...] = ('region-infer', );
 
     def transform(ir_in: Module) -> Module;
     can run_walk with Module entry;

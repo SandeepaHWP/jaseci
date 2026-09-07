@@ -7,7 +7,7 @@ import from ..utils.api { getErrorMessage }
 
 glob:pub AuthContext = createContext(None);
 
-async def _jsonBody(resp: Response) -> dict {
+async def _jsonBody(resp: Response) -> dict[any, any] {
     body = await resp.json();
     return body as dict;
 }

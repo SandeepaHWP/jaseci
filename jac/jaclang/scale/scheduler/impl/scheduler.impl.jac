@@ -81,7 +81,7 @@ impl TriggerSpec.apscheduler_kwargs -> dict {
     return {'run_date': self.date};
 }
 
-def _doc_row(raw: any) -> dict {
+def _doc_row(raw: any) -> dict[any, any] {
     return raw if isinstance(raw, dict) else json.loads(str(raw));
 }
 
@@ -95,7 +95,7 @@ def _fire_lease_ttl(spec: TriggerSpec) -> int {
     return 300;
 }
 
-def _where_sql(where: dict | None, params: dict) -> str {
+def _where_sql(where: dict[any, any] | None, params: dict[any, any]) -> str {
     sql = '';
     n = 0;
     for (k, v) in (where or {}).items() {
@@ -216,7 +216,7 @@ impl MemoryJobStore.find_active(
     trigger: str | None = None,
     created_by: str | None = None
 ) -> tuple[list[dict], int] {
-    matches: list[dict] = [];
+    matches: list[dict[any, any]] = [];
     for j in self._jobs.values() {
         if j.get('status') != 'active' {
             continue;
@@ -489,7 +489,7 @@ impl JacScaleScheduler.create_job(
     introspector = self._server.introspector if self._server else None;
     is_walker = name in (introspector._walkers or {}) if introspector else False;
 
-    job_data: dict = {
+    job_data: dict[any, any] = {
         'job_id': job_id,
         'name': name,
         'created_by': created_by,

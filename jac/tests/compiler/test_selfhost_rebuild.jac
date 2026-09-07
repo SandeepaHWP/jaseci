@@ -51,7 +51,7 @@ def _peak_children_mb -> int {
     return int(peak // 1024);
 }
 
-def _cold_rebuild -> tuple[int, dict, int] {
+def _cold_rebuild -> tuple[int, dict[any, any], int] {
     work = tempfile.mkdtemp();
     probe = os.path.join(work, "probe.jac");
     with open(probe, "w") as fh {

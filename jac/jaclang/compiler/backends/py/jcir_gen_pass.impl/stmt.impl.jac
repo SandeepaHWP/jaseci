@@ -214,7 +214,9 @@ impl JcirGenPass.exit_open_stmt with OpenStmt exit {
         ],
         jac_node=here
     );
-    body_stmts: list = self._flatten_ast_list([self.outs(item) for item in here.body]);
+    body_stmts: list[any] = self._flatten_ast_list(
+        [self.outs(item) for item in here.body]
+    );
     if not body_stmts {
         body_stmts = [self.nod('Pass', [], [], jac_node=here)];
     }

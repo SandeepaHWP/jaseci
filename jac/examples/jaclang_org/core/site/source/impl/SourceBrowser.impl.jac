@@ -23,7 +23,7 @@ impl _dir_paths(rows: list[dict]) -> list[str] {
 }
 
 impl _build_rows(tree: list[SourceFile]) -> list[dict] {
-    rows: list[dict] = [];
+    rows: list[dict[any, any]] = [];
     seen: list[str] = [];
     for f in tree {
         chain = _ancestors_of(f.dir);

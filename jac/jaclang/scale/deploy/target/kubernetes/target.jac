@@ -792,7 +792,7 @@ obj KubernetesTarget(KubernetesTargetBase) {
             statuses = (pod.status.init_container_statuses or [])
                 + (pod.status.container_statuses or []);
             for cs in statuses {
-                states: list = [];
+                states: list[any] = [];
                 if cs.state and cs.state.terminated {
                     states.append(("terminated", cs.state.terminated));
                 }
@@ -868,7 +868,7 @@ obj KubernetesTarget(KubernetesTargetBase) {
         gate_label = "elbv2.k8s.aws/pod-readiness-gate-inject";
         try {
             ns = core_v1.read_namespace(name=namespace);
-            labels: dict = dict(getattr(ns.metadata, "labels", {}) or {});
+            labels: dict[any, any] = dict(getattr(ns.metadata, "labels", {}) or {});
             if labels.get(gate_label) == "enabled" {
                 return;
             }
@@ -898,7 +898,7 @@ obj KubernetesTarget(KubernetesTargetBase) {
     def _ensure_privileged_namespace(core_v1: any, namespace: str) -> None {
         try {
             ns = core_v1.read_namespace(name=namespace);
-            labels: dict = dict(getattr(ns.metadata, "labels", {}) or {});
+            labels: dict[any, any] = dict(getattr(ns.metadata, "labels", {}) or {});
             new_labels = privileged_pss_labels(labels);
             if new_labels is None {
                 if self.logger {

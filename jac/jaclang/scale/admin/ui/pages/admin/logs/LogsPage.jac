@@ -28,8 +28,8 @@ import from ....utils.api { getErrorMessage }
 def:pub LogsPage -> JsxElement {
     has isLoading: bool = True,
         isLoadingMore: bool = False,
-        lines: list[dict] = [],
-        services: list = [],
+        lines: list[dict[any, any]] = [],
+        services: list[any] = [],
         filterService: str = "",
         filterLevel: str = "",
         filterSearch: str = "",
@@ -47,10 +47,10 @@ def:pub LogsPage -> JsxElement {
         # for the header section, and if the line has a trace_id we
         # kick off loadTrace() to populate the journey list below.
         panelIdx: int = -1,
-        panelLine: dict = {},
+        panelLine: dict[any, any] = {},
         traceId: str = "",
-        traceLines: list[dict] = [],
-        traceServices: list = [],
+        traceLines: list[dict[any, any]] = [],
+        traceServices: list[any] = [],
         traceLoading: bool = False;
 
     auth = useAuth();
@@ -149,7 +149,7 @@ def:pub LogsPage -> JsxElement {
         traceLoading = False;
     }
 
-    def openPanel(idx: int, line: dict) {
+    def openPanel(idx: int, line: dict[any, any]) {
         panelIdx = idx;
         panelLine = line;
         tid = String(line["trace_id"] or "");

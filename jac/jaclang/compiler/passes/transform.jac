@@ -72,8 +72,8 @@ obj Transform(BaseTransform) {
     has cur_node: UniNode postinit,
         policy: (DiagnosticPolicy | None) = None;
 
-    static has PROVIDES: tuple = (),
-        REQUIRES: tuple = (),
+    static has PROVIDES: tuple[any, ...] = (),
+        REQUIRES: tuple[any, ...] = (),
         HOST_PASS: bool = False;
 
     def postinit -> None;

@@ -428,8 +428,8 @@ def _in_annotation_position(nm: Name, stop: UniNode) -> bool {
     return False;
 }
 
-def _bare_py_import_bindings(mod: Module) -> dict[str, tuple] {
-    out: dict[str, tuple] = {};
+def _bare_py_import_bindings(mod: Module) -> dict[str, tuple[any, ...]] {
+    out: dict[str, tuple[any, ...]] = {};
     for imp in mod.get_all_sub_nodes(Import) {
         if imp.is_service_import or imp.is_typed {
             continue;
@@ -626,7 +626,7 @@ def client_value_ref_targets(
 ) -> list[tuple[Name, UniNode]] {
     bound = extra_bound if extra_bound is not None else set();
     out: list[tuple[Name, UniNode]] = [];
-    seen: set[tuple] = set();
+    seen: set[tuple[any, ...]] = set();
     for stmt in mod.body {
         if not _client_emitted_top(stmt, bound) {
             continue;

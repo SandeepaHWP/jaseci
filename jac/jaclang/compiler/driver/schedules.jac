@@ -33,8 +33,8 @@ glob _ir_sched_loading = ContextVar('jac_ir_sched_loading', `default=False),
      _codegen_sched_loading = ContextVar('jac_codegen_sched_loading', `default=False),
      _analysis_sched_loading = ContextVar('jac_analysis_sched_loading', `default=False);
 
-glob SYMTAB_SCHED_DEPS: tuple = ('jaclang.compiler.symbol_utils', ),
-     IR_SCHED_DEPS: tuple = (
+glob SYMTAB_SCHED_DEPS: tuple[any, ...] = ('jaclang.compiler.symbol_utils', ),
+     IR_SCHED_DEPS: tuple[any, ...] = (
          'jaclang.compiler.symbol_utils',
          'jaclang.compiler.expr_keys',
          'jaclang.compiler.type_registry',
@@ -50,7 +50,7 @@ glob SYMTAB_SCHED_DEPS: tuple = ('jaclang.compiler.symbol_utils', ),
          'jaclang.compiler.passes.comptime_resolve_pass',
          'jaclang.project.mobui_scope'
      ),
-     ANALYSIS_SCHED_DEPS: tuple = (
+     ANALYSIS_SCHED_DEPS: tuple[any, ...] = (
          'jaclang.compiler.passes.type_checker_pass',
          'jaclang.compiler.types.type_evaluator',
          'jaclang.compiler.passes.pyast_load_pass',
@@ -75,16 +75,16 @@ glob SYMTAB_SCHED_DEPS: tuple = ('jaclang.compiler.symbol_utils', ),
          'jaclang.compiler.passes.region_infer_pass',
          'jaclang.compiler.tools.jac_auto_lint_pass'
      ),
-     CODEGEN_SCHED_DEPS: tuple = (
+     CODEGEN_SCHED_DEPS: tuple[any, ...] = (
          'jaclang.compiler.backends.es',
          'jaclang.compiler.passes.freeze_structure_pass'
      ),
-     NATIVE_CODEGEN_DEPS: tuple = (
+     NATIVE_CODEGEN_DEPS: tuple[any, ...] = (
          'jaclang.compiler.passes.rc_facts_pass',
          'jaclang.compiler.backends.native'
      );
 
-def module_in_flight(names: tuple) -> str {
+def module_in_flight(names: tuple[any, ...]) -> str {
     import sys;
     for name in names {
         spec = sys.modules.get(name)?.__spec__;
@@ -95,7 +95,7 @@ def module_in_flight(names: tuple) -> str {
     return '';
 }
 
-def _import_all(names: tuple) {
+def _import_all(names: tuple[any, ...]) {
     import importlib;
     for name in names {
         importlib.import_module(name);
@@ -124,11 +124,11 @@ def _codegen_tier_reason -> str {
     return schedule_tier_reason();
 }
 
-def pass_requires(p: type[Transform]) -> tuple {
+def pass_requires(p: type[Transform]) -> tuple[any, ...] {
     return getattr(p, 'REQUIRES', ()) or ();
 }
 
-def pass_provides(p: type[Transform]) -> tuple {
+def pass_provides(p: type[Transform]) -> tuple[any, ...] {
     return getattr(p, 'PROVIDES', ()) or ();
 }
 

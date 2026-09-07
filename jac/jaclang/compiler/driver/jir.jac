@@ -175,7 +175,7 @@ def _module_codespace_mode(source_path: str) -> str {
     }
 }
 
-glob COMPILER_DIGEST_ROOTS: tuple = (
+glob COMPILER_DIGEST_ROOTS: tuple[any, ...] = (
          "jac0.py",
          "bootstrap_manifest.py",
          "meta_importer.py",
@@ -187,9 +187,9 @@ glob COMPILER_DIGEST_ROOTS: tuple = (
          "project/tomlio.jac",
          "dist/precompile_bytecode.jac"
      ),
-     COMPILER_DIGEST_SUFFIXES: tuple = (".jac", ".py"),
-     COMPILER_DIGEST_SKIP_DIRS: tuple = ("tests", "test", "__pycache__"),
-     COMPILER_DIGEST_SKIP: tuple = ();
+     COMPILER_DIGEST_SUFFIXES: tuple[any, ...] = (".jac", ".py"),
+     COMPILER_DIGEST_SKIP_DIRS: tuple[any, ...] = ("tests", "test", "__pycache__"),
+     COMPILER_DIGEST_SKIP: tuple[any, ...] = ();
 
 def compiler_source_files(pkg_dir: str) -> list[str] {
     base = str(Path(pkg_dir));
@@ -253,7 +253,7 @@ def _manifest_compiler_digest(pkg_dir: str) -> str {
     base = str(Path(pkg_dir));
     rels = compiler_source_files(base);
     manifest_path = _digest_manifest_path(base);
-    entries: dict = {};
+    entries: dict[any, any] = {};
     stored_digest = "";
     try {
         raw = json.loads(manifest_path.read_text());
@@ -264,7 +264,7 @@ def _manifest_compiler_digest(pkg_dir: str) -> str {
         stored_digest = "";
     }
     changed = False;
-    new_entries: dict = {};
+    new_entries: dict[any, any] = {};
     h = hashlib.sha256();
     for rel in rels {
         full = os.path.join(base, rel.replace("/", os.sep));

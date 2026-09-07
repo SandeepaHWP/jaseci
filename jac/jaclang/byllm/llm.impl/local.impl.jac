@@ -49,7 +49,7 @@ impl LocalLLM._ensure_llama -> object {
     chat_format = self.config.get("chat_format") or self.spec.get("chat_format");
     verbose = bool(self.config.get("verbose", False));
     n_threads_cfg = int(self.config.get("n_threads", 0));
-    kwargs: dict = {
+    kwargs: dict[any, any] = {
         "model_path": model_path,
         "n_ctx": n_ctx,
         "n_gpu_layers": n_gpu_layers,

@@ -108,8 +108,8 @@ walker OwnershipCheckPass(Transform) {
         view_elision_fns: dict[int, int] = {},
         nogc_prov: (str | None) = None;
 
-    static has PROVIDES: tuple = ('ownership', ),
-        REQUIRES: tuple = ('CfgSucc', 'TypeOf'),
+    static has PROVIDES: tuple[any, ...] = ('ownership', ),
+        REQUIRES: tuple[any, ...] = ('CfgSucc', 'TypeOf'),
         HOST_PASS: bool = True;
 
     def postinit -> None;
@@ -180,7 +180,7 @@ walker OwnershipCheckPass(Transform) {
     def _seal_connect_handle(bx: BinaryExpr) -> (Name | None);
     def _flow_for_stmts -> list[InForStmt];
     def _emit_flow_for_diagnostics -> None;
-    def _chunks_shape_of(expr: Expr | None) -> (tuple | None);
+    def _chunks_shape_of(expr: Expr | None) -> (tuple[any, ...] | None);
     def _emit_chunk_view_diagnostics -> None;
     def _flow_reduce_shape(asgn: Assignment, sid: SymId) -> str;
     def _collect_flow_reductions(lp: InForStmt) -> dict[SymId, str];

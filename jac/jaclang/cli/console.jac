@@ -102,16 +102,19 @@ obj ConsoleRenderer {
     def configure(use_emoji: bool, use_color: bool) -> None;
     def clear_status -> None;
     def emit(spans: list[Span], stream: any = None) -> None;
-    def emit_raw(args: list, stream: any, style: str | None, kwargs: dict) -> None;
+    def emit_raw(
+        args: list[any], stream: any, style: str | None, kwargs: dict[any, any]
+    ) -> None;
+
     def header(title: str, version: str | None = None) -> None;
-    def urls(items: list, symbol: str = '') -> None;
+    def urls(items: list[any], symbol: str = '') -> None;
     def next_steps(steps: list[str], title: str = 'Next Steps') -> None;
     def table(
         headers: list[str], rows: list[list[str]], title: str | None = None
     ) -> None;
 
     @contextmanager
-    def status_ctx(args: list, kwargs: dict) -> object;
+    def status_ctx(args: list[any], kwargs: dict[any, any]) -> object;
 
     @contextmanager
     def spinner_ctx(text: str) -> object;

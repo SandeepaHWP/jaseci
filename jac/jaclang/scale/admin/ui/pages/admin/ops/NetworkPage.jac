@@ -22,9 +22,9 @@ def:pub NetworkPage -> JsxElement {
         available: bool = True,
         detail: str = "",
         namespace: str = "",
-        services: list = [],
-        ingresses: list = [],
-        pvcs: list = [],
+        services: list[any] = [],
+        ingresses: list[any] = [],
+        pvcs: list[any] = [],
         errorMsg: str = "",
         loadedOnce: bool = False;
 
@@ -62,7 +62,7 @@ def:pub NetworkPage -> JsxElement {
         []
     );
 
-    def portsLabel(ports: list) -> str {
+    def portsLabel(ports: list[any]) -> str {
         parts: list[str] = [];
         for p in ports {
             parts.append(String(p["port"]) + "->" + String(p["target"]));
@@ -70,7 +70,7 @@ def:pub NetworkPage -> JsxElement {
         return ", ".join(parts);
     }
 
-    def joinLabels(values: list) -> str {
+    def joinLabels(values: list[any]) -> str {
         return ", ".join([String(v) for v in values]);
     }
 
@@ -84,7 +84,7 @@ def:pub NetworkPage -> JsxElement {
 
     # ExternalName / headless (clusterIP None) services have no Endpoints by
     # design, so 0 ready backends is expected for them - don't flag red.
-    def backendCls(s: dict) -> str {
+    def backendCls(s: dict[any, any]) -> str {
         base = "py-1.5 pr-3 ";
         if s["type"] == "ExternalName" or s["cluster_ip"] == "None" {
             return base + "text-muted";

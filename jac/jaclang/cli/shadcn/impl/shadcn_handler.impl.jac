@@ -349,7 +349,7 @@ impl add_shadcn_components(config: any, component_names: list[str]) -> bool {
 
     ui_dir.mkdir(parents=True, exist_ok=True);
 
-    all_npm_deps: dict = {};
+    all_npm_deps: dict[any, any] = {};
     shared_deps = registry_data.get("sharedDeps", {});
     all_npm_deps.update(shared_deps);
     dep_versions = registry_data.get("depVersions", {});

@@ -1,6 +1,6 @@
 import from jaclang.compiler.frontend.constant { OwnershipKind }
 
-glob _NA_ABC_REDUCTIONS: dict[str, tuple] = {
+glob _NA_ABC_REDUCTIONS: dict[str, tuple[any, ...]] = {
          "Sequence": ("list", "tuple", "str", "bytes", "bytearray"),
          "MutableSequence": ("list", "bytearray"),
          "Mapping": ("dict", ),
@@ -10,7 +10,7 @@ glob _NA_ABC_REDUCTIONS: dict[str, tuple] = {
          "MutableSet": ("set", ),
          "ByteString": ("bytes", "bytearray")
      },
-     _NA_ABC_OPAQUE: tuple = (
+     _NA_ABC_OPAQUE: tuple[any, ...] = (
          "Iterable",
          "Iterator",
          "Reversible",
@@ -134,10 +134,10 @@ impl NaIRGenPass._codegen_bound_args(
     nd: uni.FuncCall, func: ir.Function, self_offset: int = 0
 ) -> list {
     raw = nd.params or [];
-    positional: list = [];
-    kw_map: dict = {};
-    kw_spreads: list = [];
-    kw_order: list = [];
+    positional: list[any] = [];
+    kw_map: dict[any, any] = {};
+    kw_spreads: list[any] = [];
+    kw_order: list[any] = [];
     _unpack_names: list = [];
     for param in raw {
         if isinstance(param, uni.KWPair) {
@@ -178,7 +178,7 @@ impl NaIRGenPass._codegen_bound_args(
             }
             if (_tup_ptr or _tup_val) and _tv is not None {
                 _sp32 = ir.IntType(32);
-                _tup_elems: tuple = ();
+                _tup_elems: tuple[any, ...] = ();
                 if _tup_ptr and isinstance(_tt, ir.PointerType) {
                     _tup_elems = _tt.pointee.elements;
                 } elif isinstance(_tt, ir.LiteralStructType) {
@@ -237,7 +237,7 @@ impl NaIRGenPass._codegen_bound_args(
         kw_spreads = [];
         kw_order = [];
     }
-    args: list = [];
+    args: list[any] = [];
 
     if callee_sig is None {
         for p in positional {
@@ -404,7 +404,7 @@ impl NaIRGenPass._codegen_bound_args(
             _fixed = _fixed[1:];
             _n_posonly = _n_posonly - 1 if _n_posonly > 0 else 0;
         }
-        _bind_records: list = [];
+        _bind_records: list[any] = [];
         for (pix, sp) in enumerate(_fixed) {
             slot = self_offset + pix;
             expected_type = func.args[slot].type
@@ -779,7 +779,7 @@ impl NaIRGenPass._codegen_kwargs_dict(
     );
 
     _skip_dv: (ir.Value | None) = None;
-    _unbound: list = [];
+    _unbound: list[any] = [];
     for _br in (bind_records or []) {
         if _br["alloca"] is not None {
             _unbound.append(_br);
@@ -1126,7 +1126,7 @@ impl NaIRGenPass._codegen_intrinsic(
 ) -> (ir.Value | None) {
     import from jaclang.compiler.intrinsic_registry { IntrinsicDispatch }
 
-    positional: list = [];
+    positional: list[any] = [];
     _has_kw = False;
     for p in (nd.params or []) {
         if isinstance(p, uni.KWPair) {
@@ -1731,7 +1731,7 @@ impl NaIRGenPass._codegen_call(nd: uni.FuncCall) -> (ir.Value | None) {
             in ("abs", "min", "max", "pow", "divmod", "sum", "any", "all", "format") {
             params_l = nd.params or [];
             arg_vals: list[ir.Value] = [];
-            arg_nodes: list = [];
+            arg_nodes: list[any] = [];
             for param in params_l {
                 v = self._codegen_expr(param);
                 if v is not None {
@@ -2117,7 +2117,7 @@ impl NaIRGenPass._codegen_call(nd: uni.FuncCall) -> (ir.Value | None) {
                 );
                 return None;
             }
-            param_ir_types: list = [];
+            param_ir_types: list[any] = [];
             for p in sig.get_parameters() {
                 param_ir_types.append(
                     self._resolve_jac_type(p.type_tag)
@@ -2280,14 +2280,14 @@ impl NaIRGenPass._codegen_call(nd: uni.FuncCall) -> (ir.Value | None) {
             }
         }
         if _skip_own {
-            _kept: list = [];
+            _kept: list[any] = [];
             for (_ri, _rv) in enumerate(release_args) {
                 if _ri not in _skip_own {
                     _kept.append(_rv);
                 }
             }
             release_args = _kept;
-            _param_idx: dict = {};
+            _param_idx: dict[any, any] = {};
             for (_pi2, _p2) in enumerate(_sig_params) {
                 _param_idx[_p2.name.sym_name] = _pi2;
             }
@@ -2486,7 +2486,7 @@ impl NaIRGenPass._isinstance_target_names(
     archetype names it in an MRO, so a user type registered under the ABC still
     answers through the vtable arm. `None` means a diagnostic was emitted.
     """;
-    raw: list = list(type_arg.values or [])
+    raw: list[any] = list(type_arg.values or [])
         if isinstance(type_arg, uni.TupleVal)
         else [type_arg];
     pyb_operand = self._isinstance_operand_is_pyb(nd, operand);
@@ -2615,7 +2615,7 @@ impl NaIRGenPass._enum_union_tags(
         return ([], names, );
     }
     t = operand_expr.type if isinstance(operand_expr, uni.Expr) else None;
-    members: list = [];
+    members: list[any] = [];
     if isinstance(t, _EnUnionType) {
         members = list(t.types or []);
     } elif t is not None {
@@ -2624,7 +2624,7 @@ impl NaIRGenPass._enum_union_tags(
     if not members {
         return ([], names, );
     }
-    member_rows: list = [];
+    member_rows: list[any] = [];
     for m in members {
         cls = m.enum_class if isinstance(m, _EnMemberType) else m;
         if not isinstance(cls, _EnClassType) or cls._shared is None {
@@ -3239,7 +3239,7 @@ impl NaIRGenPass._try_flow_future(nd: uni.ConcurrentExpr) -> (ir.Value | None) {
     if h is None {
         return None;
     }
-    _argv: list = [];
+    _argv: list[any] = [];
     for p in (call.params or []) {
         if isinstance(p, uni.KWPair) {
             return None;
@@ -3253,7 +3253,7 @@ impl NaIRGenPass._try_flow_future(nd: uni.ConcurrentExpr) -> (ir.Value | None) {
     if len(_argv) != len(callee.args) {
         return None;
     }
-    _cargs: list = [];
+    _cargs: list[any] = [];
     for (i, a) in enumerate(_argv) {
         _cargs.append(self._coerce_type(a, callee.args[i].type));
     }
@@ -3266,7 +3266,7 @@ impl NaIRGenPass._try_flow_future(nd: uni.ConcurrentExpr) -> (ir.Value | None) {
     _task_fn.linkage = "private";
     _tb = ir.IRBuilder(_task_fn.append_basic_block("entry"));
     _tf = _tb.bitcast(_task_fn.args[0], fut_ty.as_pointer(), name="t.fut");
-    _t_args: list = [];
+    _t_args: list[any] = [];
     for i in range(len(_cargs)) {
         _t_args.append(
             _tb.load(
@@ -3448,7 +3448,7 @@ impl NaIRGenPass._prep_kwbind_record(
     bound_kind: (str | None),
     required_kind: (str | None)
 ) -> dict {
-    rec: dict = {};
+    rec: dict[any, any] = {};
     rec["name"] = name;
     rec["slot_type"] = slot_type;
     rec["args_idx"] = args_idx;

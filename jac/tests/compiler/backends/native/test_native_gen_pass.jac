@@ -75,7 +75,7 @@ def get_sfunc(
     assert addr != 0 , f"Function '{name}' not found in JIT engine";
     real_res: any = JacStrABI if restype == ctypes.c_char_p else restype;
     str_slots: list = [];
-    real_args: list = [];
+    real_args: list[any] = [];
     for a in argtypes {
         if a == ctypes.c_char_p {
             str_slots.append(True);
@@ -104,9 +104,9 @@ def get_sfunc(
             if sn_addr
             else None
     );
-    _str_buf_cache: dict = {};
+    _str_buf_cache: dict[any, any] = {};
     def _call(*args: any) -> any {
-        c_args: list = [];
+        c_args: list[any] = [];
         for (a, is_str) in zip(args, str_slots) {
             if is_str {
                 assert mkstr is not None , "jac_str_new not found in JIT engine";

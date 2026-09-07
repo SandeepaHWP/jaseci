@@ -227,7 +227,7 @@ impl _type_to_schema(
             }
             base_desc = enum_info_to_use.semstr or semstr or "";
             full_desc = f"{base_desc}{enum_desc}";
-            schema_out: dict = {
+            schema_out: dict[any, any] = {
                 "description": full_desc,
                 "type": "integer" if enum_type == "int" else "string",
 
@@ -260,7 +260,7 @@ impl _type_to_schema(
                 "Only int and str enums are supported for schema generation."
             );
         }
-        schema_fb: dict = {
+        schema_fb: dict[any, any] = {
             "description": semstr + fb_desc,
             "type": "integer" if fb_type is int else "string",
 
@@ -505,7 +505,7 @@ impl schema_to_hint_text(rf: dict | None) -> str {
         return "";
     }
 
-    schema: dict | None = None;
+    schema: dict[any, any] | None = None;
     rf_type = rf.get("type");
     if rf_type == "json_schema" {
         js = rf.get("json_schema");
@@ -549,7 +549,7 @@ impl attach_schema_hint(messages: list, rf: dict | None) -> list {
     last_user_idx: int = -1;
     for (i, m) in enumerate(messages) {
         if isinstance(m, dict) {
-            mdict: dict = m;
+            mdict: dict[any, any] = m;
             if mdict.get("role") == "user" {
                 last_user_idx = i;
             }
@@ -558,12 +558,12 @@ impl attach_schema_hint(messages: list, rf: dict | None) -> list {
     if last_user_idx < 0 {
         return messages;
     }
-    out: list = list(messages);
+    out: list[any] = list(messages);
     target_raw = out[last_user_idx];
     if not isinstance(target_raw, dict) {
         return messages;
     }
-    target: dict = dict(target_raw);
+    target: dict[any, any] = dict(target_raw);
     body = target.get("content", "");
     if isinstance(body, str) {
         body_str: str = body;
@@ -572,7 +572,7 @@ impl attach_schema_hint(messages: list, rf: dict | None) -> list {
         }
         target["content"] = body_str.rstrip() + "\n\n" + hint;
     } elif isinstance(body, list) {
-        body_list: list = body;
+        body_list: list[any] = body;
         for part in body_list {
             if isinstance(part, dict) and part.get("type") == "text" {
                 if hint in str(part.get("text", "")) {
@@ -598,7 +598,7 @@ impl inject_schema_hint(params: dict) -> dict {
     if new_msgs is msgs {
         return params;
     }
-    out: dict = dict(params);
+    out: dict[any, any] = dict(params);
     out["messages"] = new_msgs;
     return out;
 }

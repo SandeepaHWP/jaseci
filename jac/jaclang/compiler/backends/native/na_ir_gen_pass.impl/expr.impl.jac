@@ -355,7 +355,7 @@ impl NaIRGenPass._codegen_lambda(nd: uni.LambdaExpr) -> (ir.Value | None) {
         ret_type = self._resolve_jac_type(sig.return_type);
     }
 
-    captures: list[tuple] = [];
+    captures: list[tuple[any, ...]] = [];
     free_var_names: list[str] = [];
     for cap_sym in nd.captures {
         if cap_sym.sym_name not in free_var_names {
@@ -484,7 +484,7 @@ impl NaIRGenPass._codegen_lambda(nd: uni.LambdaExpr) -> (ir.Value | None) {
             }
         }
         if _all_cells {
-            cap_info: list = [];
+            cap_info: list[any] = [];
             for (cap_name, _cap_val, cap_type) in captures {
                 cap_info.append((cap_name, "val", cap_type));
             }
@@ -495,7 +495,7 @@ impl NaIRGenPass._codegen_lambda(nd: uni.LambdaExpr) -> (ir.Value | None) {
                 return _clos_val;
             }
         }
-        capture_info: list[tuple] = [];
+        capture_info: list[tuple[any, ...]] = [];
         for (cap_name, _cap_val, _cap_type) in captures {
             capture_info.append((cap_name, self.local_vars[cap_name]));
         }
@@ -1469,7 +1469,7 @@ impl NaIRGenPass._codegen_compare_chain(
         _name = _o.name if isinstance(_o, uni.Token) else str(_o);
         op_names.append(_name);
     }
-    operands: list = [left];
+    operands: list[any] = [left];
     result: (ir.Value | None) = None;
     cur = left;
     for (i, op_name) in enumerate(op_names) {

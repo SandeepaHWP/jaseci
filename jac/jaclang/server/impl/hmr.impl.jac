@@ -78,7 +78,7 @@ impl HotReloader.record_client_event(slot: str, payload: (dict | None)) -> None 
     if slot not in ('vite', 'client', 'runtime', 'ready') {
         return;
     }
-    fresh: list = [];
+    fresh: list[any] = [];
     if slot != 'ready' and isinstance(payload, dict) and payload.get('message') {
         channel = 'vite' if slot == 'vite' else 'browser';
         try {

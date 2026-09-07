@@ -173,7 +173,7 @@ impl NaIRGenPass._elem_keys_of_annotation(ann: (uni.UniNode | None)) -> (list | 
             or self._elem_keys_of_annotation(ann.right)
         );
     }
-    elems: list = [];
+    elems: list[any] = [];
     if isinstance(ann, uni.TupleVal) {
         elems = list(ann.values or []);
     } elif ann?.right and ann.right?.slices {
@@ -189,7 +189,7 @@ impl NaIRGenPass._elem_keys_of_annotation(ann: (uni.UniNode | None)) -> (list | 
     if not elems {
         return None;
     }
-    keys: list = [];
+    keys: list[any] = [];
     for e in elems {
         while (isinstance(e, uni.BinaryExpr) and getattr(e.op, 'value', '') == "|") {
             e = e.left;
@@ -245,7 +245,7 @@ impl NaIRGenPass._declare_clib_ability(nd: uni.Ability) -> None {
     _decl_params = sig.get_parameters();
 
     is_variadic = sig.varargs is not None;
-    plan: (dict | None) = None;
+    plan: (dict[any, any] | None) = None;
     if _abi_supported {
         _fdecl = self._foreign_fns().get(name);
         if _fdecl is not None {
@@ -347,7 +347,7 @@ impl NaIRGenPass._declare_clib_ability(nd: uni.Ability) -> None {
         return;
     }
 
-    fixed_params: list = [];
+    fixed_params: list[any] = [];
     for p in sig.get_parameters() {
         if p.is_vararg or p.is_kwargs {
             continue;
@@ -623,7 +623,7 @@ impl NaIRGenPass._codegen_nested_ability(nd: uni.Ability) -> None {
         return;
     }
 
-    param_types: list = [];
+    param_types: list[any] = [];
     param_names: list = [];
     sig_params = sig.get_parameters() if sig is not None else [];
     for (i, p) in enumerate(sig_params) {
@@ -646,7 +646,7 @@ impl NaIRGenPass._codegen_nested_ability(nd: uni.Ability) -> None {
         self._predeclare_nested_siblings(nd);
         _pre = self._nested_predecl.get(nd);
     }
-    captures: list[tuple] = [];
+    captures: list[tuple[any, ...]] = [];
     if _pre is not None {
         (fn, captures, param_names, ret_type) = _pre;
     } else {
@@ -813,7 +813,7 @@ impl NaIRGenPass._predeclare_nested_siblings(nd: uni.Ability) -> None {
     if not _fbody {
         return;
     }
-    sibs: list = [];
+    sibs: list[any] = [];
     for _st in _fbody {
         if (
             isinstance(_st, uni.Ability)
@@ -836,14 +836,14 @@ impl NaIRGenPass._predeclare_nested_siblings(nd: uni.Ability) -> None {
     if not _found_self {
         return;
     }
-    _sib_by_name: dict = {};
+    _sib_by_name: dict[any, any] = {};
     for s in sibs {
         _sib_by_name[s.name_ref.sym_name] = s;
     }
-    _cap_order: dict = {};
-    _cap_modes: dict = {};
-    _sib_refs: dict = {};
-    _cap_syms: dict = {};
+    _cap_order: dict[any, any] = {};
+    _cap_modes: dict[any, any] = {};
+    _sib_refs: dict[any, any] = {};
+    _cap_syms: dict[any, any] = {};
     for s in sibs {
         _reb: set = set();
         for _scope in ([s] + s.get_all_sub_nodes(typ=uni.UniScopeNode)) {
@@ -851,8 +851,8 @@ impl NaIRGenPass._predeclare_nested_siblings(nd: uni.Ability) -> None {
                 _reb.add(_rn);
             }
         }
-        _ord: list = [];
-        _md: dict = {};
+        _ord: list[any] = [];
+        _md: dict[any, any] = {};
         for _sym in s.get_enclosing_captures() {
             if _sym.sym_name in _md or _sym.sym_name in _sib_by_name {
                 continue;
@@ -904,7 +904,7 @@ impl NaIRGenPass._predeclare_nested_siblings(nd: uni.Ability) -> None {
         _ssig = s.signature;
 
         _defer = False;
-        _cap_types: dict = {};
+        _cap_types: dict[any, any] = {};
         for _cn in _cap_order[s] {
             _slot = self.local_vars.get(_cn);
             if _slot is not None {
@@ -934,8 +934,8 @@ impl NaIRGenPass._predeclare_nested_siblings(nd: uni.Ability) -> None {
         if _defer {
             continue;
         }
-        _ptypes: list = [];
-        _pnames: list = [];
+        _ptypes: list[any] = [];
+        _pnames: list[any] = [];
         _sparams = _ssig.get_parameters() if _ssig is not None else [];
         for (i, p) in enumerate(_sparams) {
             _pn = p.name.value if p?.name and p.name else f"arg{i}";
@@ -949,7 +949,7 @@ impl NaIRGenPass._predeclare_nested_siblings(nd: uni.Ability) -> None {
         if _ssig is not None and _ssig.return_type is not None {
             _rt = self._resolve_jac_type(_ssig.return_type);
         }
-        _caps: list[tuple] = [];
+        _caps: list[tuple[any, ...]] = [];
         for _cn in _cap_order[s] {
             _ct0 = _cap_types.get(_cn);
             if _ct0 is None {
@@ -1073,7 +1073,7 @@ impl NaIRGenPass._codegen_generator(nd: uni.Ability, func: ir.Function) -> None 
     self.closure_cell_handles = {};
     self._gen_try_stack = [];
 
-    gc: dict = {
+    gc: dict[any, any] = {
         "resume_fn": resume_fn,
         "frame_i8": resume_fn.args[0],
         "out_i8": resume_fn.args[1],
@@ -1091,7 +1091,7 @@ impl NaIRGenPass._codegen_generator(nd: uni.Ability, func: ir.Function) -> None 
         self._scan_closure_escapes(nd, _gen_scan_body);
     }
 
-    param_slots: list[tuple] = [];
+    param_slots: list[tuple[any, ...]] = [];
     sig = nd.signature;
     sig_params = sig.get_parameters() if sig is not None else [];
     for (i, p) in enumerate(sig_params) {

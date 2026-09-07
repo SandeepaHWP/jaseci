@@ -7,7 +7,7 @@ import from jaclang.scale.config.firebase_env {
 }
 import os;
 
-glob APP_SCALE_KEYS: tuple = (
+glob APP_SCALE_KEYS: tuple[any, ...] = (
          "rpc_timeout",
          "http_forward_timeout",
          "replicas",
@@ -25,7 +25,7 @@ glob APP_SCALE_KEYS: tuple = (
          "workers",
          "threads"
      ),
-     GATEWAY_POD_KEYS: tuple = (
+     GATEWAY_POD_KEYS: tuple[any, ...] = (
          "replicas",
          "cpu_request",
          "cpu_limit",
@@ -36,7 +36,7 @@ glob APP_SCALE_KEYS: tuple = (
          "pdb",
          "deployment_overlay"
      ),
-     GATEWAY_BOOT_KEYS: tuple = (
+     GATEWAY_BOOT_KEYS: tuple[any, ...] = (
          "boot_health_timeout",
          "boot_max_wait",
          "health_monitor_interval",
@@ -78,7 +78,10 @@ glob _scale_config_instance: JacScaleConfig | None = None,
      _app_scale_cache: dict[str, dict[str, any]] = {};
 
 def sanitize_prometheus_namespace(name: str) -> str;
-def _ws_positive(ws_config: dict, key: str, fallback: (int | float)) -> float;
+def _ws_positive(
+    ws_config: dict[any, any], key: str, fallback: (int | float)
+) -> float;
+
 def get_scale_config(project_dir: Path | None = None) -> JacScaleConfig;
 def peek_scale_config -> JacScaleConfig | None;
 def reset_scale_config -> None;

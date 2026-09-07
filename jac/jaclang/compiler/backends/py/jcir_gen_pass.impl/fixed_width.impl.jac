@@ -220,7 +220,7 @@ impl JcirGenPass._fw_call(nd: FuncCall) -> None {
     if row is None or not row.sized or row.is_float or name is None {
         return;
     }
-    call_args: list = [
+    call_args: list[any] = [
         self.const_of(name, jac_node=nd),
         self.const_of(op, jac_node=nd)
     ];

@@ -49,7 +49,7 @@ def get_sfunc(eng: any, name: str, restype: type | None, *argtypes: type) -> any
     assert addr != 0 , f"Function '{name}' not found in JIT engine";
     real_res: any = JacStrABI if restype == ctypes.c_char_p else restype;
     str_slots: list = [];
-    real_args: list = [];
+    real_args: list[any] = [];
     for a in argtypes {
         if a == ctypes.c_char_p {
             str_slots.append(True);
@@ -78,9 +78,9 @@ def get_sfunc(eng: any, name: str, restype: type | None, *argtypes: type) -> any
             if sn_addr
             else None
     );
-    keepalive: list = [];
+    keepalive: list[any] = [];
     def _call(*args: any) -> any {
-        c_args: list = [];
+        c_args: list[any] = [];
         for (a, is_str) in zip(args, str_slots) {
             if is_str {
                 b = a.encode("utf-8") if isinstance(a, str) else a;

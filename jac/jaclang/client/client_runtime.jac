@@ -109,15 +109,16 @@ glob:pub ErrorFallback = ___ErrorFallback,
      __unwrapFormSchema = ___unwrapFormSchema;
 
 def:pub navigate(path: str) -> None;
-def:pub jacSpawn(left: str, right: str = "", fields: dict = {}) -> any;
+def:pub jacSpawn(left: str, right: str = "", fields: dict[any, any] = {}) -> any;
 async def:pub jacSignup(
-    identities_or_username: (str | list),
-    credential_or_password: (str | dict),
-    profile: (dict | None) = None
-) -> dict;
+    identities_or_username: (str | list[any]),
+    credential_or_password: (str | dict[any, any]),
+    profile: (dict[any, any] | None) = None
+) -> dict[any, any];
 
 async def:pub jacLogin(
-    identity_or_username: (str | dict), credential_or_password: (str | dict)
+    identity_or_username: (str | dict[any, any]),
+    credential_or_password: (str | dict[any, any])
 ) -> bool;
 
 def:pub jacLogout -> None;
@@ -128,7 +129,9 @@ async def:pub jacSsoLogin(
 
 def:pub jacSetToken(token: str) -> None;
 
-def:pub __jacJsx(tag: any, props: dict = {}, children: any = []) -> JsxElement;
+def:pub __jacJsx(
+    tag: any, props: dict[any, any] = {}, children: any = []
+) -> JsxElement;
 
 def:pub useJacState(initial: any) -> any;
 
@@ -146,7 +149,7 @@ glob:pub useState = reactUseState,
      JacClientErrorBoundary = ErrorBoundary,
      JacSchema = __createJacSchema(z);
 
-def:pub useRouter -> dict;
+def:pub useRouter -> dict[any, any];
 def:pub AuthGuard(redirect: str = "/login", children: any = None) -> JsxElement;
 
 def:pub JacAwaiting(props: dict[str, any]) -> JsxElement;

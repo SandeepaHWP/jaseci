@@ -6,7 +6,7 @@ import importlib;
 import from pathlib { Path }
 
 
-glob PLUGIN_BOOTSTRAP_MODULES: list = [
+glob PLUGIN_BOOTSTRAP_MODULES: list[any] = [
          "manifest",
          "desktop_plugin",
          "webview_lib",
@@ -77,7 +77,7 @@ def _apply_extra_deps {
 }
 
 
-def _bootstrap_plugin_host(plugin_configs: dict) -> any {
+def _bootstrap_plugin_host(plugin_configs: dict[any, any]) -> any {
     import jaclang;
     pdir = os.path.join(
         os.path.dirname(str(jaclang.__file__)), "client", "targets", "desktop", "plugin"
@@ -100,7 +100,7 @@ def _ensure_jac_meta_importer {
 }
 
 
-def resolve_program(program: dict, app_dir: str) -> str {
+def resolve_program(program: dict[any, any], app_dir: str) -> str {
     jab = str(program.get("jab") or "");
     if jab {
         import from jaclang.dist.jab { jab_app_meta, materialize_jab }

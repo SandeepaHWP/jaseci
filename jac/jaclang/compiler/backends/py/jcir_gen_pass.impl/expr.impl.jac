@@ -541,7 +541,7 @@ impl JcirGenPass.exit_multi_string with MultiString exit {
         self.set_out(here, self.outs(lone));
         return;
     }
-    combined_multi: list = [];
+    combined_multi: list[any] = [];
     for item in self._multi_string_pieces(here.strings) {
         if (
             combined_multi

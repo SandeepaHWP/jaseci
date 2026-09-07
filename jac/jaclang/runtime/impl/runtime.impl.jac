@@ -294,7 +294,7 @@ impl JacWalker.spawn_call(
     import from jaclang.runtime.osp_kernel { osp_spawn }
     import from jaclang.runtime.osp_kernel_sv { desc_for, make_sv_runtime }
     warch = `walker.archetype;
-    starts: list = [a.archetype for a in `walker.next];
+    starts: list[any] = [a.archetype for a in `walker.next];
     osp_spawn(make_sv_runtime(), warch, desc_for(`type(warch)), starts);
     return warch;
 }

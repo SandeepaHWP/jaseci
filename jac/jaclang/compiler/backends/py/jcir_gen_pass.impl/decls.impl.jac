@@ -69,7 +69,7 @@ impl JcirGenPass.enter_archetype with Archetype entry {
 impl JcirGenPass.exit_archetype with Archetype exit {
     inner = ModuleFacts.unwrap_body(here);
     decorators = [self.val(i) for i in here.decorators] if here.decorators else [];
-    body: list = self.resolve_stmt_block(inner, doc=here.doc);
+    body: list[any] = self.resolve_stmt_block(inner, doc=here.doc);
     if (not body and not isinstance(here.body, Expr)) {
         self.emit(E5003, node_override=here);
         body = [self.nod('Pass', [], [], jac_node=here)];

@@ -124,10 +124,10 @@ impl EsastGenPass._ct_ctor_slots(nd: uni.UniNode) -> (list[tuple] | None) {
     }
     s0 = nd.right.slices[0] if nd.right.slices else None;
     head = s0.start if s0 is not None else None;
-    vals: list = `list(head.values)
+    vals: list[any] = `list(head.values)
         if isinstance(head, uni.TupleVal)
         else ([head] if head else []);
-    out: list[tuple] = [];
+    out: list[tuple[any, ...]] = [];
     for (i, tp) in enumerate(arch.type_params or []) {
         if tp.is_comptime and i < len(vals) {
             out.append((tp.name.value, vals[i], ));

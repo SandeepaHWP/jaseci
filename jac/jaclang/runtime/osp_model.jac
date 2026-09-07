@@ -235,7 +235,7 @@ obj OspAnalysis {
     static def _uses_construct(
         module: uni.Module, context: (CodeContext | None)
     ) -> bool {
-        roots: list = list(ModuleFacts.iter_context_stmts(module, context));
+        roots: list[any] = list(ModuleFacts.iter_context_stmts(module, context));
         for stmt in roots {
             work: list[any] = [stmt];
             while work {

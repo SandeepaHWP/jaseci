@@ -59,7 +59,7 @@ walker EndpointEffectPass(UniPass) {
         ] = self._classify(self._resolved_body(here));
     }
 
-    def _classify(body_nodes: list) -> dict {
+    def _classify(body_nodes: list[any]) -> dict[any, any] {
         self._is_writer = False;
         self._touches.clear();
         self._visited.clear();
@@ -167,7 +167,7 @@ walker EndpointEffectPass(UniPass) {
         return None;
     }
 
-    def _callee_body(call: FuncCall) -> list {
+    def _callee_body(call: FuncCall) -> list[any] {
         sym = self._call_target_symbol(call);
         if not sym or not sym.defn {
             return [];
@@ -185,7 +185,7 @@ walker EndpointEffectPass(UniPass) {
         return [];
     }
 
-    def _resolved_body(owner: UniNode) -> list {
+    def _resolved_body(owner: UniNode) -> list[any] {
         if isinstance(owner, Archetype) {
             return owner._get_impl_resolved_body();
         }

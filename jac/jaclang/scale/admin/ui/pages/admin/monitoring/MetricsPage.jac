@@ -23,9 +23,9 @@ import from ....utils.format { formatBytes }
 def:pub MetricsPage -> JsxElement {
     has isLoading: bool = True,
         metricsEnabled: bool = False,
-        summary: dict = {},
-        metrics: list = [],
-        history: list = [],
+        summary: dict[any, any] = {},
+        metrics: list[any] = [],
+        history: list[any] = [],
         autoRefresh: bool = True;
 
     auth = useAuth();
@@ -112,7 +112,7 @@ def:pub MetricsPage -> JsxElement {
         return str(int(pct)) + "%";
     }
 
-    def getMetricByName(name: str) -> dict {
+    def getMetricByName(name: str) -> dict[any, any] {
         for m in metrics {
             if m["name"] == name {
                 return m;
@@ -121,7 +121,7 @@ def:pub MetricsPage -> JsxElement {
         return {};
     }
 
-    def getMetricBySuffix(suffix: str) -> dict {
+    def getMetricBySuffix(suffix: str) -> dict[any, any] {
         for m in metrics {
             if str(m["name"]).endswith(suffix) {
                 return m;
@@ -164,7 +164,7 @@ def:pub MetricsPage -> JsxElement {
         return str(hours) + "h " + str(mins) + "m";
     }
 
-    def getHttpRequestsData -> list {
+    def getHttpRequestsData -> list[any] {
         m = getMetricBySuffix("_http_requests_total");
         if not m or not m["values"] {
             return [];

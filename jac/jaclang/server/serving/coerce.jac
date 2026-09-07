@@ -280,7 +280,7 @@ def _fresh_default(value: any) -> any {
 
 def bind_parameters(ep: JEndPoint, request: Request, body_json: any) -> dict[str, any] {
     kwargs: dict[str, any] = {};
-    errors: list[dict] = [];
+    errors: list[dict[any, any]] = [];
     declared: set[str] = set();
     for param in (ep.parameters or []) {
         declared.add(param.name);

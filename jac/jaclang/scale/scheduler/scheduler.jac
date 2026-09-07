@@ -18,17 +18,20 @@ glob _jaclang_scale_scheduler: (JacScaleScheduler | None) = None,
      logger = logging.getLogger(__name__);
 
 obj JobStore {
-    def insert(job: dict) -> str;
+    def insert(job: dict[any, any]) -> str;
     def find_active(
         limit: int | None = None,
         offset: int = 0,
         trigger: str | None = None,
         created_by: str | None = None
-    ) -> tuple[list[dict], int];
+    ) -> tuple[list[dict[any, any]], int];
 
-    def find_active_one(job_id: str) -> dict | None;
-    def update(job_id: str, updates: dict, where: dict | None = None) -> bool;
-    def delete(job_id: str, where: dict | None = None) -> bool;
+    def find_active_one(job_id: str) -> dict[any, any] | None;
+    def update(
+        job_id: str, updates: dict[any, any], where: dict[any, any] | None = None
+    ) -> bool;
+
+    def delete(job_id: str, where: dict[any, any] | None = None) -> bool;
     def record_run(job_id: str, status: str, error: str | None = None) -> None;
 }
 
@@ -36,35 +39,41 @@ obj PgJobStore(JobStore) {
     has store: any,
         _collection: str;
 
-    def insert(job: dict) -> str;
+    def insert(job: dict[any, any]) -> str;
     def find_active(
         limit: int | None = None,
         offset: int = 0,
         trigger: str | None = None,
         created_by: str | None = None
-    ) -> tuple[list[dict], int];
+    ) -> tuple[list[dict[any, any]], int];
 
-    def find_active_one(job_id: str) -> dict | None;
-    def update(job_id: str, updates: dict, where: dict | None = None) -> bool;
-    def delete(job_id: str, where: dict | None = None) -> bool;
+    def find_active_one(job_id: str) -> dict[any, any] | None;
+    def update(
+        job_id: str, updates: dict[any, any], where: dict[any, any] | None = None
+    ) -> bool;
+
+    def delete(job_id: str, where: dict[any, any] | None = None) -> bool;
     def record_run(job_id: str, status: str, error: str | None = None) -> None;
 }
 
 obj MemoryJobStore(JobStore) {
-    has _jobs: dict[str, dict] postinit;
+    has _jobs: dict[str, dict[any, any]] postinit;
 
     def postinit -> None;
-    def insert(job: dict) -> str;
+    def insert(job: dict[any, any]) -> str;
     def find_active(
         limit: int | None = None,
         offset: int = 0,
         trigger: str | None = None,
         created_by: str | None = None
-    ) -> tuple[list[dict], int];
+    ) -> tuple[list[dict[any, any]], int];
 
-    def find_active_one(job_id: str) -> dict | None;
-    def update(job_id: str, updates: dict, where: dict | None = None) -> bool;
-    def delete(job_id: str, where: dict | None = None) -> bool;
+    def find_active_one(job_id: str) -> dict[any, any] | None;
+    def update(
+        job_id: str, updates: dict[any, any], where: dict[any, any] | None = None
+    ) -> bool;
+
+    def delete(job_id: str, where: dict[any, any] | None = None) -> bool;
     def record_run(job_id: str, status: str, error: str | None = None) -> None;
 }
 
@@ -81,9 +90,9 @@ obj TriggerSpec {
         date: str | None = None
     ) -> TriggerSpec;
 
-    static def from_dict(d: dict) -> TriggerSpec;
-    def to_dict -> dict;
-    def apscheduler_kwargs -> dict;
+    static def from_dict(d: dict[any, any]) -> TriggerSpec;
+    def to_dict -> dict[any, any];
+    def apscheduler_kwargs -> dict[any, any];
 }
 
 obj JacScaleScheduler {
@@ -100,18 +109,18 @@ obj JacScaleScheduler {
     def start -> None;
     def stop(drain: bool = False) -> None;
     def register_dynamic_tasks_from_db -> None;
-    def create_job(name: str, spec: TriggerSpec, created_by: str) -> dict;
+    def create_job(name: str, spec: TriggerSpec, created_by: str) -> dict[any, any];
     def list_jobs(
         limit: int | None = None,
         offset: int = 0,
         trigger: str | None = None,
         created_by: str | None = None
-    ) -> tuple[list[dict], int];
+    ) -> tuple[list[dict[any, any]], int];
 
-    def get_job(job_id: str) -> (dict | None);
+    def get_job(job_id: str) -> (dict[any, any] | None);
     def update_job(
         job_id: str, spec: TriggerSpec, acting_as: str | None = None
-    ) -> (dict | None);
+    ) -> (dict[any, any] | None);
 
     def delete_job(job_id: str, acting_as: str | None = None) -> bool;
     def _acquire_fire_lease(job_id: str, spec: TriggerSpec) -> bool;

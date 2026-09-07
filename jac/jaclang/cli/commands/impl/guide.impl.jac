@@ -125,7 +125,7 @@ def _print_nav(as_json: bool) -> int {
         return 0;
     }
 
-    def walk(items: list, depth: int) {
+    def walk(items: list[any], depth: int) {
         pad = "  " * (depth + 1);
         for item in items {
             if not isinstance(item, dict) {
@@ -157,7 +157,7 @@ def _print_nav(as_json: bool) -> int {
     return 0;
 }
 
-def _index_payload -> list[dict] {
+def _index_payload -> list[dict[any, any]] {
     payload = [
         {
             "name": g.name,

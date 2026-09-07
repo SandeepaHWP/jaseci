@@ -2,7 +2,7 @@ import os;
 import from jaclang.cli.console { console }
 
 
-def service_apps(cfg: any, served: any) -> list {
+def service_apps(cfg: any, served: any) -> list[any] {
     return [
         a
         for a in cfg.serving_apps()

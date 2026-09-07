@@ -18,7 +18,7 @@ impl JcirGenPass.exit_atom_trailer with AtomTrailer exit {
     }
     ct_slots = self._ct_ctor_slots(here);
     if ct_slots is not None {
-        kws: list = [];
+        kws: list[any] = [];
         for pair in ct_slots {
             pname: str = pair[0];
             pexpr: UniNode = pair[1];

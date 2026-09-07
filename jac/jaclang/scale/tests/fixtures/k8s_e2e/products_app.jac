@@ -7,7 +7,7 @@ Exposes public functions for browsing products. Callable via:
 
 import from shared.models { Products, Product, Cart, Order }
 
-glob CATALOG: list[dict] = [
+glob CATALOG: list[dict[any, any]] = [
          {
              "id": "prod_1",
              "name": "Wireless Headphones",
@@ -64,9 +64,9 @@ def _get_or_seed_anchor -> Products {
 }
 
 
-def:pub list_products -> list[dict] {
+def:pub list_products -> list[dict[any, any]] {
     anchor = _get_or_seed_anchor();
-    items: list = [];
+    items: list[any] = [];
     for p in [anchor-->][?:Product] {
         items.append(
             {
@@ -81,7 +81,7 @@ def:pub list_products -> list[dict] {
     return items;
 }
 
-def:pub get_product(product_id: str) -> dict {
+def:pub get_product(product_id: str) -> dict[any, any] {
     anchor = _get_or_seed_anchor();
     for p in [anchor-->][?:Product] {
         if p.id == product_id {

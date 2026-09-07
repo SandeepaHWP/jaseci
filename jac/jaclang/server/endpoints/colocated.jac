@@ -32,7 +32,7 @@ def provider_route(config: any, provider_app: str) -> str {
 }
 
 
-def _body(request: Request) -> (dict | None) {
+def _body(request: Request) -> (dict[any, any] | None) {
     if not request.body {
         return {};
     }

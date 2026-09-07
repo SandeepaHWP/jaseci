@@ -88,7 +88,7 @@ impl Tool.get_json_schema -> dict[str, object] {
 }
 
 impl Tool.parse_arguments(args_json: dict | str) -> dict {
-    annotations: dict = {};
+    annotations: dict[any, any] = {};
     try {
         annotations = self.func.__annotations__;
     } except AttributeError {
@@ -135,7 +135,7 @@ impl Tool.parse_arguments(args_json: dict | str) -> dict {
 impl Tool._parse_finish_arguments(args_json: dict, params: dict) -> dict {
     resp_type = params.get("final_output", object);
 
-    candidates: list = [];
+    candidates: list[any] = [];
     if "final_output" in args_json {
         candidates.append(args_json["final_output"]);
     } elif len(args_json) == 1 {

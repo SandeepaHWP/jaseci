@@ -52,7 +52,7 @@ impl run_with_timeout(func: object, timeout: int = 10) -> tuple[bool, any] {
     return (True, result_holder[0]);
 }
 
-def _cap_read(stream: IO[bytes], holder: list, cap: int) {
+def _cap_read(stream: IO[bytes], holder: list[any], cap: int) {
     try {
         chunks: list[str] = [];
         total: int = 0;
@@ -119,7 +119,7 @@ impl CompilerBridge.parse_snippet(
 
         ir = program.parse_str(code, tmp_path);
 
-        errors: list[dict] = [];
+        errors: list[dict[any, any]] = [];
         for e in program.errors_had {
             errors.append(_extract_error_info(e));
         }
@@ -162,8 +162,8 @@ impl CompilerBridge.typecheck_snippet(
 
         ir = compiler.compile(tmp_path, program);
 
-        errors: list[dict] = [];
-        warnings: list[dict] = [];
+        errors: list[dict[any, any]] = [];
+        warnings: list[dict[any, any]] = [];
         for e in program.errors_had {
             errors.append(_extract_error_info(e));
         }
@@ -279,7 +279,7 @@ impl CompilerBridge.get_ast_snippet(code: str, fmt: str = "tree") -> dict[str, a
 
         ir = program.parse_str(code, tmp_path);
 
-        errors: list[dict] = [];
+        errors: list[dict[any, any]] = [];
         for e in program.errors_had {
             errors.append(_extract_error_info(e));
         }
@@ -324,7 +324,7 @@ impl CompilerBridge.lint_snippet(code: str, auto_fix: bool = False) -> dict[str,
             prog = JacCompiler.jac_file_linter(file_path=tmp_path);
         }
 
-        violations: list[dict] = [];
+        violations: list[dict[any, any]] = [];
         for w in prog.warnings_had {
             violations.append(_extract_error_info(w));
         }

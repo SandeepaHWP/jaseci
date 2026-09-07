@@ -109,8 +109,8 @@ def clib_to_archive_name(clib_path: str) -> str {
 }
 
 def collect_floor_archives(
-    clib_paths: list, clib_symbol_lib: dict, triple: str, is_macos: bool
-) -> tuple {
+    clib_paths: list[any], clib_symbol_lib: dict[any, any], triple: str, is_macos: bool
+) -> tuple[any, ...] {
     import os;
     import from jaclang.compiler.backends.native.linker_common { select_ar_members }
     member_bytes: list[bytes] = [];

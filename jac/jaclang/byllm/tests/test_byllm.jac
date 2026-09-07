@@ -867,7 +867,7 @@ test "dispatch heals a misnamed finish argument and recovers an unusable one" {
 # Some backends downgrade json_schema to json_object and reject requests whose
 # messages lack the word "json" (issue #8114).
 test "response format requests always carry the json word" {
-    def _params(resp_type: type, tools: list) -> dict {
+    def _params(resp_type: type, tools: list[any]) -> dict[any, any] {
         model = Model(model_name="test-model");
         mt_run = MTRuntime(
             messages=[
@@ -956,7 +956,7 @@ import from loguru { logger as _loguru_logger }
 test "provider errors map to byllm exceptions and log at ERROR regardless of debug" {
     # Rows carry byllm's classes; litellm's AuthenticationError and RateLimitError
     # share those names, so matching by name would let an unmapped error through.
-    rows: list = [
+    rows: list[any] = [
         (False, "AuthenticationError", AuthenticationError, "Invalid API key"),
         (True, "RateLimitError", RateLimitError, "Rate limit exceeded"),
         (False, "RateLimitError", RateLimitError, "quota exceeded"),

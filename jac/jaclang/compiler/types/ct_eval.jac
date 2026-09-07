@@ -193,7 +193,7 @@ def _scope_of(nd: UniNode) -> any {
     }
 }
 
-def _impl_body(nd: UniNode) -> list {
+def _impl_body(nd: UniNode) -> list[any] {
     body = nd?.body;
     if isinstance(body, ImplDef) {
         body = body.body;
@@ -207,17 +207,17 @@ def _impl_body(nd: UniNode) -> list {
 obj CtEvaluator {
     has evaluator: TypeEvaluator,
         fuel: int = CT_FUEL_DEFAULT,
-        frames: list[dict] = [],
+        frames: list[dict[any, any]] = [],
         barriers: list[bool] = [],
         call_stack: list[str] = [],
         last_error: (str | None) = None,
         demand: bool = False,
         _failed: set[int] = set(),
         _active: set[any] = set(),
-        _enum_cache: dict[int, list] = {},
+        _enum_cache: dict[int, list[any]] = {},
         _ret: any = None,
         _ct_root: (Module | None) = None,
-        _builtins: dict = {};
+        _builtins: dict[any, any] = {};
 
     def postinit {
         self._builtins = {
@@ -259,28 +259,28 @@ obj CtEvaluator {
         };
     }
 
-    def _ct_enumerate(it: any, start: int = 0) -> list {
+    def _ct_enumerate(it: any, start: int = 0) -> list[any] {
         return `list(enumerate(it, start));
     }
 
-    def _ct_zip(*its: any) -> list {
+    def _ct_zip(*its: any) -> list[any] {
         return `list(zip(*its));
     }
 
-    def _ct_reversed(it: any) -> list {
+    def _ct_reversed(it: any) -> list[any] {
         return `list(reversed(it));
     }
 
-    def _ct_map(fn: any, *its: any) -> list {
-        out: list = [];
+    def _ct_map(fn: any, *its: any) -> list[any] {
+        out: list[any] = [];
         for items in zip(*its) {
             out.append(self._call_value(fn, `list(items), {}));
         }
         return out;
     }
 
-    def _ct_filter(fn: any, it: any) -> list {
-        out: list = [];
+    def _ct_filter(fn: any, it: any) -> list[any] {
+        out: list[any] = [];
         for item in it {
             keep = bool(item) if fn is None else self._call_value(fn, [item], {});
             if keep {
@@ -419,7 +419,7 @@ obj CtEvaluator {
         }
     }
 
-    def frame_lookup(name: str) -> tuple {
+    def frame_lookup(name: str) -> tuple[any, ...] {
         idx = len(self.frames) - 1;
         while idx >= 0 {
             if name in self.frames[idx] {
@@ -521,7 +521,7 @@ obj CtEvaluator {
             return [self.eval(v) for v in nd.values];
         }
         if isinstance(nd, TupleVal) {
-            out: list = [];
+            out: list[any] = [];
             for v in nd.values {
                 if isinstance(v, KWPair) {
                     raise CtError("keyword pairs are not values in comptime tuples");
@@ -538,7 +538,7 @@ obj CtEvaluator {
         }
         if isinstance(nd, DictCompr) {
             pairs = self._compr_items(nd.compr, 0, None, nd.kv_pair);
-            out2: dict = {};
+            out2: dict[any, any] = {};
             for (k, v) in pairs {
                 out2[k] = v;
             }
@@ -615,8 +615,8 @@ obj CtEvaluator {
         return out;
     }
 
-    def _eval_dict(nd: DictVal) -> dict {
-        out: dict = {};
+    def _eval_dict(nd: DictVal) -> dict[any, any] {
+        out: dict[any, any] = {};
         for kv in nd.kv_pairs {
             if kv.key is None {
                 spread = self.eval(kv.value);
@@ -632,8 +632,8 @@ obj CtEvaluator {
     }
 
     def _compr_items(
-        comprs: list, depth: int, out_expr: (Expr | None), kv_pair: (KVPair | None)
-    ) -> list {
+        comprs: list[any], depth: int, out_expr: (Expr | None), kv_pair: (KVPair | None)
+    ) -> list[any] {
         if depth >= len(comprs) {
             if kv_pair is not None {
                 key_expr = kv_pair.key;
@@ -650,7 +650,7 @@ obj CtEvaluator {
         }
         c: InnerCompr = comprs[depth];
         coll = self.eval(c.collection);
-        out: list = [];
+        out: list[any] = [];
         for item in coll {
             self.burn(2);
             self.push_frame();
@@ -1464,7 +1464,7 @@ obj CtEvaluator {
         );
     }
 
-    def intrinsic_fields(t: any) -> list {
+    def intrinsic_fields(t: any) -> list[any] {
         if isinstance(t, CtDeferred) {
             raise CtDeferredSignal();
         }
@@ -1472,7 +1472,7 @@ obj CtEvaluator {
         if ct is None {
             raise CtError("fields() needs an archetype type");
         }
-        out: list = [];
+        out: list[any] = [];
         for hv in self._has_vars_of(ct) {
             if hv.accessors {
                 continue;
@@ -1482,7 +1482,7 @@ obj CtEvaluator {
         return out;
     }
 
-    def intrinsic_members(t: any) -> list {
+    def intrinsic_members(t: any) -> list[any] {
         if isinstance(t, CtDeferred) {
             raise CtDeferredSignal();
         }
@@ -1532,7 +1532,9 @@ obj CtEvaluator {
         return None;
     }
 
-    def _intrinsic(name: str, nd: FuncCall, args: list, kwargs: dict) -> any {
+    def _intrinsic(
+        name: str, nd: FuncCall, args: list[any], kwargs: dict[any, any]
+    ) -> any {
         if name == "set_fuel" {
             if len(args) != 1 or not isinstance(args[0], int) {
                 raise CtError("set_fuel() takes one int argument");
@@ -1695,9 +1697,9 @@ obj CtEvaluator {
         return _mod_dotted(sym.decl.find_parent_of_type(Module));
     }
 
-    def _call_args(nd: FuncCall) -> tuple {
-        args: list = [];
-        kwargs: dict = {};
+    def _call_args(nd: FuncCall) -> tuple[any, ...] {
+        args: list[any] = [];
+        kwargs: dict[any, any] = {};
         for p in (nd.params or []) {
             if isinstance(p, KWPair) {
                 if p.key is None {
@@ -1768,7 +1770,7 @@ obj CtEvaluator {
     }
 
     def _ct_subscript(base: CtType, head: (Expr | None)) -> CtType {
-        vals: list = [];
+        vals: list[any] = [];
         if isinstance(head, TupleVal) {
             vals = `list(head.values);
         } elif head is not None {
@@ -1808,7 +1810,9 @@ obj CtEvaluator {
         return None;
     }
 
-    def _call_attr(recv: any, attr: str, args: list, kwargs: dict) -> any {
+    def _call_attr(
+        recv: any, attr: str, args: list[any], kwargs: dict[any, any]
+    ) -> any {
         if isinstance(recv, CtDeferred) {
             raise CtDeferredSignal();
         }
@@ -1853,7 +1857,7 @@ obj CtEvaluator {
         return fn(*args, **kwargs);
     }
 
-    def _call_value(callee: any, args: list, kwargs: dict) -> any {
+    def _call_value(callee: any, args: list[any], kwargs: dict[any, any]) -> any {
         if isinstance(callee, CtDeferred) {
             raise CtDeferredSignal();
         }
@@ -1881,7 +1885,7 @@ obj CtEvaluator {
         raise CtError(f"{callee!r} is not callable in comptime code");
     }
 
-    def _construct(t: CtType, args: list, kwargs: dict) -> any {
+    def _construct(t: CtType, args: list[any], kwargs: dict[any, any]) -> any {
         if t.module == "builtins" {
             if t.name in CT_PY_TYPES {
                 self.burn(5);
@@ -1980,7 +1984,7 @@ obj CtEvaluator {
     }
 
     def call_ability(
-        ability: Ability, args: list, kwargs: dict, self_val: any = None
+        ability: Ability, args: list[any], kwargs: dict[any, any], self_val: any = None
     ) -> any {
         self.burn(20);
         if not self.frames and not self.demand {
@@ -2102,7 +2106,7 @@ obj CtEvaluator {
         }
     }
 
-    def _scalar_size_align(t: any) -> (tuple | None) {
+    def _scalar_size_align(t: any) -> (tuple[any, ...] | None) {
         name = t.name if isinstance(t, CtType) else str(t);
         if isinstance(t, `type) {
             name = t.__name__;
@@ -2121,7 +2125,7 @@ obj CtEvaluator {
         return None;
     }
 
-    def _size_align(t: any) -> tuple {
+    def _size_align(t: any) -> tuple[any, ...] {
         if isinstance(t, CtDeferred) {
             raise CtDeferredSignal();
         }
@@ -2140,7 +2144,7 @@ obj CtEvaluator {
             if hv.accessors {
                 continue;
             }
-            inner: (tuple | None) = None;
+            inner: (tuple[any, ...] | None) = None;
             if hv.type_tag is not None and hv.type_tag.tag is not None {
                 try {
                     ftype = self.ct_type_of_class(
@@ -2174,7 +2178,7 @@ obj CtEvaluator {
         return None;
     }
 
-    def _exec_block(stmts: list) -> int {
+    def _exec_block(stmts: list[any]) -> int {
         for s in stmts {
             sig = self._exec_stmt(s);
             if sig != 0 {

@@ -48,6 +48,6 @@ async def:pub put(
     );
 }
 
-async def:pub `del(endpoint: str, token: str = "") -> dict {
+async def:pub `del(endpoint: str, token: str = "") -> dict[any, any] {
     return await fetchApi(endpoint, {"method": "DELETE"}, token);
 }

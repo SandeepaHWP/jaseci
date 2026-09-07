@@ -44,7 +44,7 @@ import from jaclang.compiler.passes.layout_pass { get_layout_registry }
 glob FIXTURES = os.path.join(
          TESTS_DIR, "compiler", "backends", "native", "fixtures"
      ),
-     EXPECTED: tuple = (
+     EXPECTED: tuple[any, ...] = (
          "0",
          "1",
          "2",
@@ -61,7 +61,7 @@ glob FIXTURES = os.path.join(
      );
 
 """Compile a fixture natively and hand back the program and the module."""
-def compile_native(fixture: str) -> tuple {
+def compile_native(fixture: str) -> tuple[any, ...] {
     prog = JacProgram();
     ir = prog.compile(
         file_path=os.path.join(FIXTURES, fixture), options=native_force_opts()
@@ -70,7 +70,7 @@ def compile_native(fixture: str) -> tuple {
 }
 
 
-def sv_lines(fixture: str) -> list {
+def sv_lines(fixture: str) -> list[any] {
     proc = subprocess.run(
         [sys.executable, "-m", "jaclang", "run", os.path.join(FIXTURES, fixture)],
         capture_output=True,
@@ -86,7 +86,7 @@ def sv_lines(fixture: str) -> list {
 }
 
 
-def na_lines(fixture: str) -> list {
+def na_lines(fixture: str) -> list[any] {
     out_bin = os.path.join(tempfile.mkdtemp(), "probe.bin");
     comp = subprocess.run(
         [

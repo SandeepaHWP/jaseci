@@ -8,7 +8,7 @@ obj ClusterProvider {
     def prometheus_scrape_port(container_port: int) -> int;
     def ingress_controller_service(
         service_name: str, namespace: str, controller_name: str, ingress_node_port: int
-    ) -> dict;
+    ) -> dict[any, any];
 
     def log_ingress_deployed(
         logger: (Logger | None), app_name: str, ingress_node_port: int
@@ -36,7 +36,7 @@ obj AWSProvider(ClusterProvider) {
 
     def ingress_controller_service(
         service_name: str, namespace: str, controller_name: str, ingress_node_port: int
-    ) -> dict {
+    ) -> dict[any, any] {
         return {
             'apiVersion': 'v1',
             'kind': 'Service',
@@ -116,7 +116,7 @@ obj LocalProvider(ClusterProvider) {
 
     def ingress_controller_service(
         service_name: str, namespace: str, controller_name: str, ingress_node_port: int
-    ) -> dict {
+    ) -> dict[any, any] {
         return {
             'apiVersion': 'v1',
             'kind': 'Service',

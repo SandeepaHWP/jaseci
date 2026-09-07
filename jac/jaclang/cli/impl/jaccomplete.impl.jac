@@ -115,7 +115,7 @@ impl _static_zsh(commands: list[dict[str, any]], exe: str) -> str {
 }
 
 impl _static_fish(commands: list[dict[str, any]], exe: str) -> str {
-    lines: list = ["# Fish completions for " + exe];
+    lines: list[any] = ["# Fish completions for " + exe];
     lines.append("complete -c %s -f" % exe);
 
     for c in commands {

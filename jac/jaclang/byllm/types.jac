@@ -62,9 +62,12 @@ obj Tool {
     static def make_finish_tool(resp_type: type) -> Tool;
     def is_finish_tool -> bool;
     def get_json_schema -> dict[str, object];
-    def parse_arguments(args_json: dict | str) -> dict;
-    def _parse_finish_arguments(args_json: dict, params: dict) -> dict;
-    def _required_params(params: dict) -> list;
+    def parse_arguments(args_json: dict[any, any] | str) -> dict[any, any];
+    def _parse_finish_arguments(
+        args_json: dict[any, any], params: dict[any, any]
+    ) -> dict[any, any];
+
+    def _required_params(params: dict[any, any]) -> list[any];
 }
 
 obj ToolCall {
@@ -303,7 +306,7 @@ def _split_tool_msg_images(
     text_only = all(
         isinstance(b, dict) and b.get("type") == "text" for b in text_blocks
     );
-    stripped_content: str | list = "";
+    stripped_content: str | list[any] = "";
     if text_only {
         stripped_content = " ".join(b.get("text", "") for b in text_blocks).strip();
         if not stripped_content {

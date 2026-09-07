@@ -151,7 +151,7 @@ walker TypeCheckPass(UniPass) {
 
     def postinit -> None;
 
-    static has PROVIDES: tuple = ('TypeOf', ),
+    static has PROVIDES: tuple[any, ...] = ('TypeOf', ),
         HOST_PASS: bool = True;
 
     def init(prog: JacProgram, **kwargs: any) -> None;

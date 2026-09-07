@@ -33,12 +33,12 @@ node Product {
 }
 
 node Cart {
-    has items: list[dict] = [];
+    has items: list[dict[any, any]] = [];
 }
 
 node Order {
     has id: str,
-        items: list[dict] = [],
+        items: list[dict[any, any]] = [],
         total: float = 0.0,
         status: str = "pending",
         created_at: str = "";

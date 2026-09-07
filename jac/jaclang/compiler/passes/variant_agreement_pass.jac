@@ -16,7 +16,7 @@ import from jaclang.compiler.frontend.diagnostics { E5105 }
 import type from jaclang.compiler.driver.program { JacProgram }
 
 glob VARIANT_SUFFIX: str = ".native.jac",
-     ANNEX_MARKERS: tuple = (".impl.jac", ".test.jac");
+     ANNEX_MARKERS: tuple[any, ...] = (".impl.jac", ".test.jac");
 
 def variant_sibling(mod_path: str) -> (str | None);
 def annotation_text(nd: (UniNode | None)) -> str;
@@ -27,7 +27,7 @@ walker VariantAgreementPass(Transform) {
         ir_in: Module,
         cancel_token: any = None;
 
-    static has PROVIDES: tuple = ('variant-agreement', ),
+    static has PROVIDES: tuple[any, ...] = ('variant-agreement', ),
         HOST_PASS: bool = True;
 
     def postinit -> None;

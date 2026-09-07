@@ -137,7 +137,7 @@ impl invoke_native_test(
             }
         }
     }
-    mirrors: list = [];
+    mirrors: list[any] = [];
     for (fd, name) in ((1, "stdout"), (2, "stderr")) {
         stream = getattr(sys, name, None);
         stream_fd: (int | None) = None;
@@ -160,8 +160,8 @@ impl invoke_native_test(
         }
         return;
     }
-    saved: dict = {};
-    sinks: dict = {};
+    saved: dict[any, any] = {};
+    sinks: dict[any, any] = {};
     for (fd, name) in mirrors {
         saved[fd] = os.dup(fd);
         sink = tempfile.TemporaryFile();

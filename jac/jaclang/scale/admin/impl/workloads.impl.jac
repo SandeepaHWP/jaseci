@@ -25,7 +25,7 @@ import from jaclang.scale.admin.workload_helpers {
 
 glob logger = logging.getLogger(__name__);
 
-def _index_by(rows: list, label: str, as_int: bool = False) -> dict[str, float] {
+def _index_by(rows: list[any], label: str, as_int: bool = False) -> dict[str, float] {
     out: dict[str, float] = {};
     for `entry in rows {
         key = `entry.get("metric", {}).get(label, "");
@@ -41,7 +41,7 @@ def _index_by(rows: list, label: str, as_int: bool = False) -> dict[str, float] 
     return out;
 }
 
-def _finite(v: list) -> float {
+def _finite(v: list[any]) -> float {
     try {
         val = float(v[1]) if len(v) > 1 else 0.0;
     } except Exception {
@@ -71,7 +71,7 @@ def _metrics_namespace -> str {
     return 'jaclang_scale';
 }
 
-def _traffic_queries -> dict {
+def _traffic_queries -> dict[any, any] {
     if prom_query('count({__name__=~".+_gateway_requests_total"})') {
         return {
             'rate': 'sum(rate({__name__=~".+_gateway_requests_total"}[1m]))',
@@ -335,8 +335,8 @@ impl JacAPIServerWorkloads.admin_workloads_list(
     sts_created_by = _index_by(sts_created, "statefulset", True);
     ds_created_by = _index_by(ds_created, "daemonset", True);
 
-    entries: list = [];
-    wl_names: list = [];
+    entries: list[any] = [];
+    wl_names: list[any] = [];
     for `entry in dep_available_raw {
         m = `entry.get("metric", {});
         v = `entry.get("value", [0, "0"]);
@@ -395,9 +395,9 @@ impl JacAPIServerWorkloads.admin_workloads_list(
         wl_names.append(name);
     }
 
-    cpu_by_owner: dict = {};
-    mem_by_owner: dict = {};
-    restarts_by_owner: dict = {};
+    cpu_by_owner: dict[any, any] = {};
+    mem_by_owner: dict[any, any] = {};
+    restarts_by_owner: dict[any, any] = {};
     for `entry in cpu_by_pod {
         pod = `entry.get("metric", {}).get("pod", "");
         v = `entry.get("value", [0, "0"]);
@@ -452,7 +452,7 @@ impl JacAPIServerWorkloads.admin_workloads_list(
         }
     }
 
-    workloads: list = [];
+    workloads: list[any] = [];
     for e in entries {
         name = e["name"];
         restarts = restarts_by_owner.get(name, 0);
@@ -550,7 +550,7 @@ impl JacAPIServerWorkloads.admin_workloads_pods(
     mem = _index_by(mem_by_pod, "pod");
     restarts = _index_by(restarts_by_pod, "pod");
     started = _index_by(started_by_pod, "pod");
-    node_for: dict = {};
+    node_for: dict[any, any] = {};
     for `entry in node_by_pod {
         m = `entry.get("metric", {});
         pod = m.get("pod", "");
@@ -559,7 +559,7 @@ impl JacAPIServerWorkloads.admin_workloads_pods(
             node_for[pod] = node_name;
         }
     }
-    pods: list = [];
+    pods: list[any] = [];
     for `entry in phase_by_pod {
         m = `entry.get("metric", {});
         pod = m.get("pod", "");
@@ -590,8 +590,8 @@ impl JacAPIServerWorkloads.admin_workloads_pods(
     );
 }
 
-def _rollup_range(rows: list, names: list) -> dict {
-    out: dict = {};
+def _rollup_range(rows: list[any], names: list[any]) -> dict[any, any] {
+    out: dict[any, any] = {};
     for `entry in rows {
         pod = `entry.get("metric", {}).get("pod", "");
         owner = match_owner(pod, names);
@@ -611,8 +611,8 @@ def _rollup_range(rows: list, names: list) -> dict {
     return out;
 }
 
-def _series_points(tsmap: dict) -> list {
-    pts: list = [];
+def _series_points(tsmap: dict[any, any]) -> list[any] {
+    pts: list[any] = [];
     for ts in sorted(tsmap.keys()) {
         pts.append({'t': ts, 'v': round(tsmap[ts], 4)});
     }
@@ -644,7 +644,7 @@ impl JacAPIServerWorkloads.admin_workloads_timeseries(
     ns_filter = f'namespace="{namespace}"' if namespace else '';
     ns_and = f',{ns_filter}' if ns_filter else '';
 
-    names: list = [];
+    names: list[any] = [];
     for spec in [
         ('kube_deployment_created', 'deployment'),
         ('kube_statefulset_created', 'statefulset'),
@@ -709,7 +709,7 @@ impl JacAPIServerWorkloads.admin_workloads_timeseries(
     for nm in mem_by_wl {
         all_names.add(nm);
     }
-    workloads: list = [];
+    workloads: list[any] = [];
     for nm in sorted(all_names) {
         workloads.append(
             {

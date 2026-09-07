@@ -1041,7 +1041,7 @@ impl Serializer._deserialize_archetype(
         arch: object = cls.__new__(cls);
         field_types = get_field_types(cls);
         known = set(field_types.keys());
-        attic: dict = {};
+        attic: dict[any, any] = {};
 
         stored_attic = data.get(ATTIC_KEY);
         if isinstance(stored_attic, dict) {

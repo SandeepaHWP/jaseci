@@ -37,7 +37,7 @@ glob CHECKER_DIRS: dict[(str, str)] = {
          "main": FIXTURES,
          "lang": LANG_FIXTURES
      },
-     CHECKER_CASES: list[tuple] = [
+     CHECKER_CASES: list[tuple[any, ...]] = [
          (
              "explicit_type_annotation_in_assignment",
              "main",
@@ -1169,7 +1169,7 @@ glob CHECKER_DIRS: dict[(str, str)] = {
              True,
              []
          ),
-          (
+         (
              "callable_narrowing",
              "checker",
              "checker_callable_narrowing.jac",
@@ -1332,7 +1332,7 @@ glob CHECKER_DIRS: dict[(str, str)] = {
          )
      ];
 
-def _checker_case(row: tuple) {
+def _checker_case(row: tuple[any, ...]) {
     (name, dirkey, fixture, count, no_tc, pretty) = row;
     program = JacProgram();
     program.compile(
@@ -1349,7 +1349,10 @@ def _checker_case(row: tuple) {
 
 with entry {
     parametrize(
-        "checker", CHECKER_CASES, _checker_case, id_fn=lambda (c: tuple) { c[0]; }
+        "checker",
+        CHECKER_CASES,
+        _checker_case,
+        id_fn=lambda (c: tuple[any, ...]) { c[0]; }
     );
 }
 
@@ -1548,7 +1551,7 @@ test "class_construct" {
     assert square_ty is not None;
     assert square_ty.shared is not None;
     square_shared: any = square_ty.shared;
-    square_mro: list = list(square_shared.mro);
+    square_mro: list[any] = list(square_shared.mro);
     mro_class_names = [
         cls.shared.class_name
         for cls in square_mro

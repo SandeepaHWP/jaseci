@@ -41,7 +41,7 @@ def _next_or_stop(gen: any) -> object {
 }
 
 # Path A: consume the whole generator inside a fresh, foreign Context.
-def consume_in_copied_context -> list {
+def consume_in_copied_context -> list[any] {
     gen = stream_answer();
     ctx = contextvars.copy_context();
     return ctx.run(list, gen);
@@ -49,7 +49,7 @@ def consume_in_copied_context -> list {
 
 # Path B: drive each next() on a thread-pool worker -- the exact asyncio +
 # run_in_executor shape the scale backend's SSE microservice uses.
-async def consume_in_thread_pool -> list {
+async def consume_in_thread_pool -> list[any] {
     gen = stream_answer();
     loop = asyncio.get_event_loop();
     chunks = [];

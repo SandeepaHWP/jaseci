@@ -38,7 +38,7 @@ glob GATEWAY_NAME: str = "__gateway__",
          "network request failed",
 
      ),
-     _VITE_BUILD_ENV_FILES: tuple = (
+     _VITE_BUILD_ENV_FILES: tuple[any, ...] = (
          ".env",
          ".env.local",
          ".env.production",
@@ -199,7 +199,7 @@ def pdb_spec(
 }
 
 
-def _is_named_list(items: list) -> bool {
+def _is_named_list(items: list[any]) -> bool {
     if not items {
         return False;
     }
@@ -1055,7 +1055,7 @@ obj ManifestBuilder {
             env.append({"name": "JAC_SV_FILE", "value": svc_file});
         }
 
-        trace_cfg: dict = dict(self._gateway_cfg().get("tracing", {}));
+        trace_cfg: dict[any, any] = dict(self._gateway_cfg().get("tracing", {}));
         if trace_cfg.get("enabled", False) {
             env.append(
                 {

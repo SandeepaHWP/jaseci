@@ -7,14 +7,14 @@ import from ....services.llmService { getLLMTraces, getLLMTraceDetail }
 
 def:pub LLMTracesPage -> JsxElement {
     has isLoading: bool = True,
-        traces: list = [],
-        selectedTrace: dict = {},
+        traces: list[any] = [],
+        selectedTrace: dict[any, any] = {},
         showDetail: bool = False,
         detailLoading: bool = False,
         autoRefresh: bool = True,
         errorMsg: str = "",
         expandedIds: list[str] = [],
-        childrenMap: dict = {};
+        childrenMap: dict[any, any] = {};
 
     auth = useAuth();
 
@@ -56,7 +56,7 @@ def:pub LLMTracesPage -> JsxElement {
             if not childrenMap[traceId] {
                 tResult = await getLLMTraceDetail(auth["authToken"], traceId);
                 if tResult["ok"] and tResult["data"] {
-                    newMap: dict = {** childrenMap};
+                    newMap: dict[any, any] = {** childrenMap};
                     newMap[traceId] = tResult["data"]["child_traces"] or [];
                     childrenMap = newMap;
                 }
@@ -484,7 +484,9 @@ def:pub LLMTracesPage -> JsxElement {
             </div>;
     }
 
-    def appendChildren(parentId: str, depth: int, items: list, visited: list[str]) {
+    def appendChildren(
+        parentId: str, depth: int, items: list[any], visited: list[str]
+    ) {
         if parentId in visited {
             return;
         }
@@ -499,8 +501,8 @@ def:pub LLMTracesPage -> JsxElement {
         }
     }
 
-    def getDisplayItems -> list {
-        items: list = [];
+    def getDisplayItems -> list[any] {
+        items: list[any] = [];
         for i in traces {
             items.append({"trace": i, "depth": 0});
             traceId = i["invocation_id"] or "";

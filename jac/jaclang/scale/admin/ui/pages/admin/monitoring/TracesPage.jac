@@ -25,8 +25,8 @@ import from ....utils.api { getErrorMessage }
 def:pub TracesPage -> JsxElement {
     has isLoading: bool = False,
         isLoadingTrace: bool = False,
-        traces: list = [],
-        services: list = [],
+        traces: list[any] = [],
+        services: list[any] = [],
         filterService: str = "",
         filterStatus: str = "",
         filterMinDuration: int = 0,
@@ -34,7 +34,7 @@ def:pub TracesPage -> JsxElement {
         errorMsg: str = "",
         backendOffline: bool = False,
         selectedTraceId: str = "",
-        spans: list = [],
+        spans: list[any] = [],
         traceStartNs: int = 0,
         traceTotalMs: float = 0.0;
 
@@ -154,7 +154,7 @@ def:pub TracesPage -> JsxElement {
 
     # Span depth from the parent_span_id chain, so the waterfall can
     # indent children. Capped to avoid a cycle in malformed data.
-    def spanDepth(span: dict, byId: dict) -> int {
+    def spanDepth(span: dict[any, any], byId: dict[any, any]) -> int {
         depth: int = 0;
         parent = String(span["parent_span_id"] or "");
         guard: int = 0;
@@ -166,8 +166,8 @@ def:pub TracesPage -> JsxElement {
         return depth;
     }
 
-    def buildById -> dict {
-        byId: dict = {};
+    def buildById -> dict[any, any] {
+        byId: dict[any, any] = {};
         for s in spans {
             byId[String(s["span_id"] or "")] = s;
         }
@@ -175,7 +175,7 @@ def:pub TracesPage -> JsxElement {
     }
 
     # Percent offset + width of a span bar within the trace window.
-    def barLeft(span: dict) -> float {
+    def barLeft(span: dict[any, any]) -> float {
         if traceTotalMs <= 0 {
             return 0.0;
         }
@@ -187,7 +187,7 @@ def:pub TracesPage -> JsxElement {
         return pct;
     }
 
-    def barWidth(span: dict) -> float {
+    def barWidth(span: dict[any, any]) -> float {
         if traceTotalMs <= 0 {
             return 100.0;
         }

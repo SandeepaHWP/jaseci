@@ -20,7 +20,7 @@ obj KubernetesPostgresProvider {
         self.app_name = self.config.get('app_name', 'jaseci');
     }
 
-    def _db_cfg -> dict {
+    def _db_cfg -> dict[any, any] {
         return get_scale_config().get_deploy_database_config();
     }
 

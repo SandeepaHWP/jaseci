@@ -697,7 +697,7 @@ impl __getApiBaseUrl -> str {
     return "";
 }
 
-def _nativeStorageCache -> dict {
+def _nativeStorageCache -> dict[any, any] {
     cache: any = globalThis.__jacNativeStorageCache__;
     if not cache {
         cache = {};
@@ -880,7 +880,7 @@ def _unwrapZodSchema(schema_obj: any, depth: int = 0) -> any {
     return schema_obj;
 }
 
-def _getEnumOptions(field_schema: any) -> list {
+def _getEnumOptions(field_schema: any) -> list[any] {
     unwrapped = _unwrapZodSchema(field_schema);
     if unwrapped and unwrapped._def and unwrapped._def.entries {
         return Object.keys(unwrapped._def.entries);
@@ -911,7 +911,11 @@ def _fieldErrorMessage(errors: any, field_name: str) -> str {
 }
 
 def _renderSelectField(
-    form: any, field_name: str, selected_value: str, options: list, placeholder: str
+    form: any,
+    field_name: str,
+    selected_value: str,
+    options: list[any],
+    placeholder: str
 ) -> JsxElement {
     option_children = [];
     if placeholder and selected_value == "" {
@@ -957,7 +961,7 @@ def _renderSelectField(
 }
 
 def _renderRadioField(
-    form: any, field_name: str, selected_value: str, options: list
+    form: any, field_name: str, selected_value: str, options: list[any]
 ) -> JsxElement {
     option_children = [];
     for opt in options {

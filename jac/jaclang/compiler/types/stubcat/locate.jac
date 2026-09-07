@@ -20,7 +20,7 @@ glob ENV_FILE: str = "JAC_STUBCAT_FILE",
      ),
      DIGEST_SUFFIXES: tuple[str, ...] = (".jac", ".pyi", ".py", "PIN"),
      _DIGEST_CACHE: list = [],
-     _CATALOG_CACHE: list = [];
+     _CATALOG_CACHE: list[any] = [];
 
 def jaclang_pkg_dir -> str {
     import jaclang;

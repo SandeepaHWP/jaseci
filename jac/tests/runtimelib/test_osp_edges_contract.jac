@@ -35,7 +35,7 @@ glob SCAN_ROOTS: list[str] = [
          "scale",
          "byllm"
      ],
-     SANCTIONED: dict[str, tuple] = {
+     SANCTIONED: dict[str, tuple[any, ...]] = {
          "runtime/impl/archetype.impl.jac": (
              6,
              "the field's own primitives: __getstate__ stubs the list for "
@@ -147,7 +147,7 @@ edge RoundTripEdge {
     has w: int = 0;
 }
 
-def _transcript(origin: any) -> list {
+def _transcript(origin: any) -> list[any] {
     out: list = [];
     for n in [origin-->] {
         if isinstance(n, RoundTripNode) {

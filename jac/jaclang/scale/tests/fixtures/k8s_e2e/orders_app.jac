@@ -21,7 +21,7 @@ import from cart_app { view_cart, clear_cart }
 glob _order_counter: int = 0;
 
 
-def:pub create_order -> dict {
+def:pub create_order -> dict[any, any] {
     # 1. Fetch cart from cart service via sv import (HTTP under the hood)
     cart = view_cart();
     items = cart.get("items", []) if cart else [];
@@ -59,8 +59,8 @@ def:pub create_order -> dict {
     };
 }
 
-def:pub list_orders -> list[dict] {
-    result: list[dict] = [];
+def:pub list_orders -> list[dict[any, any]] {
+    result: list[dict[any, any]] = [];
     for o in [root-->][?:Order] {
         result.append(
             {
@@ -75,7 +75,7 @@ def:pub list_orders -> list[dict] {
     return result;
 }
 
-def:pub get_order(order_id: str) -> dict {
+def:pub get_order(order_id: str) -> dict[any, any] {
     for o in [root-->][?:Order] {
         if o.id == order_id {
             return {
@@ -90,7 +90,7 @@ def:pub get_order(order_id: str) -> dict {
     return {"error": "Order not found"};
 }
 
-def:pub cancel_order(order_id: str) -> dict {
+def:pub cancel_order(order_id: str) -> dict[any, any] {
     for o in [root-->][?:Order] {
         if o.id == order_id {
             if o.status == "confirmed" {

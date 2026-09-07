@@ -14,7 +14,7 @@ import from jaclang.compiler.placement.placement {
     summarize_module
 }
 
-glob _na_scan_memo: dict[tuple, tuple] = {},
+glob _na_scan_memo: dict[tuple[any, ...], tuple[any, ...]] = {},
      _SPACE_BY_NAME: dict[str, CodeContext] = {
          'server': CodeContext.SERVER,
          'client': CodeContext.CLIENT,
@@ -956,14 +956,14 @@ def demote_client_pulled_elements(
 }
 
 walker PlacementApplyPass(Transform) {
-    static has PROVIDES: tuple = ('PlacedIn', 'DecidedCodespace'),
-        REQUIRES: tuple = ('SymOf', );
+    static has PROVIDES: tuple[any, ...] = ('PlacedIn', 'DecidedCodespace'),
+        REQUIRES: tuple[any, ...] = ('SymOf', );
 
     has prog: JacProgram,
         ir_in: uni.Module,
         cancel_token: any = None;
 
-    static has PROVIDES: tuple = ('codespace-pull', ),
+    static has PROVIDES: tuple[any, ...] = ('codespace-pull', ),
         HOST_PASS: bool = True;
 
     def postinit -> None;

@@ -75,7 +75,7 @@ walker ComptimeResolvePass(TypeCheckPass) {
     has _armed: bool = False,
         _keep: set[int] = set();
 
-    static has PROVIDES: tuple = ('comptime', ),
+    static has PROVIDES: tuple[any, ...] = ('comptime', ),
         HOST_PASS: bool = True;
 
     def init(prog: JacProgram, **kwargs: any) {

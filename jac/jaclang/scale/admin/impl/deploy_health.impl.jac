@@ -23,7 +23,7 @@ def _s(v: any) -> str {
 }
 
 
-def _rollout_status(dep: dict) -> dict {
+def _rollout_status(dep: dict[any, any]) -> dict[any, any] {
     spec = dep.get("spec", {}) or {};
     status = dep.get("status", {}) or {};
     desired = int(spec.get("replicas", 0) or 0);
@@ -53,7 +53,7 @@ def _rollout_status(dep: dict) -> dict {
 }
 
 
-def summarize_deployment(dep: dict) -> dict {
+def summarize_deployment(dep: dict[any, any]) -> dict[any, any] {
     meta = dep.get("metadata", {}) or {};
     spec = dep.get("spec", {}) or {};
     status = dep.get("status", {}) or {};
@@ -80,7 +80,7 @@ def summarize_deployment(dep: dict) -> dict {
 }
 
 
-def _container_state(cs: dict) -> dict {
+def _container_state(cs: dict[any, any]) -> dict[any, any] {
     state = cs.get("state", {}) or {};
     if state.get("running") {
         return {"state": "running", "reason": ""};
@@ -106,7 +106,7 @@ def summarize_pod(pod: dict[str, any]) -> dict[str, any] {
 
     ready_count = 0;
     restart_total = 0;
-    containers: list = [];
+    containers: list[any] = [];
     for cs in cstatuses {
         is_ready = bool(cs.get("ready", False));
         if is_ready {
@@ -142,7 +142,9 @@ def summarize_pod(pod: dict[str, any]) -> dict[str, any] {
 }
 
 
-def build_deploy_health(namespace: str, deployments: list, pods: list) -> dict {
+def build_deploy_health(
+    namespace: str, deployments: list[any], pods: list[any]
+) -> dict[any, any] {
     deps = [summarize_deployment(d) for d in deployments];
     pds = [summarize_pod(p) for p in pods];
     deps.sort(key=lambda (d) { d.get("name", ""); });
@@ -156,7 +158,7 @@ def build_deploy_health(namespace: str, deployments: list, pods: list) -> dict {
 }
 
 
-def _collect_deploy_health -> dict {
+def _collect_deploy_health -> dict[any, any] {
     if not k8s_available() {
         return {"available": False, "detail": unavailable_detail()};
     }

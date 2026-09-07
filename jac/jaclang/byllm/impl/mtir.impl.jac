@@ -50,7 +50,7 @@ impl MTRuntime.factory(mtir: MTIR) -> MTRuntime {
     }
 
     inputs_detail: list[str] = [];
-    media_inputs: list = [];
+    media_inputs: list[any] = [];
     if fn_info is not None and fn_info.params is not None {
         params = [param for param in fn_info.params];
         for (key, value) in args.items() {
@@ -234,7 +234,7 @@ impl MTRuntime.write_back_conversation -> None {
     if self._conversation_list is None {
         return;
     }
-    out: list = [];
+    out: list[any] = [];
     for msg in self.get_history_for_persist() {
         m: any = msg;
         if hasattr(m, "to_dict") {
@@ -269,7 +269,7 @@ def _is_finish_tool_call(tc: any) -> bool {
 
 impl MTRuntime.get_history_for_persist -> list[MessageType] {
     scaff_ids = set(self._scaffolding_ids);
-    out: list = [];
+    out: list[any] = [];
     for msg in self.messages {
         if id(msg) in scaff_ids {
             continue;

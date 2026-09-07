@@ -1,4 +1,4 @@
-glob _NOGC_OSP_ENGINE_STRUCTS: tuple = (
+glob _NOGC_OSP_ENGINE_STRUCTS: tuple[any, ...] = (
          "Slot",
          "Plan",
          "WalkerDesc",
@@ -11,7 +11,7 @@ glob _NOGC_OSP_ENGINE_STRUCTS: tuple = (
          "Adj",
          "EdgeRow"
      ),
-     _NOGC_CONTAINER_DROP_OPS: tuple = (
+     _NOGC_CONTAINER_DROP_OPS: tuple[any, ...] = (
          "scope_exit",
          "iter_end",
          "overwrite",
@@ -25,7 +25,7 @@ glob _NOGC_OSP_ENGINE_STRUCTS: tuple = (
          "last_use",
          "del_stmt"
      ),
-     _NOGC_TEMP_FREE_OPS: tuple = (
+     _NOGC_TEMP_FREE_OPS: tuple[any, ...] = (
          "binop_lhs",
          "binop_rhs",
          "binop_list",
@@ -1740,7 +1740,7 @@ impl NaIRGenPass._nogc_stamp_elem_drops(
         return;
     }
     _base = _layout["drop_base"];
-    _slot_specs: list = [
+    _slot_specs: list[any] = [
         (_base + _k, elem_mangles[_k])
         for _k in range(len(_layout["data_fields"]))
         if _k < len(elem_mangles)
@@ -1769,8 +1769,8 @@ impl NaIRGenPass._emit_jacval_slot_drop_fn(elem_mangle: str) -> (ir.Function | N
     i32 = ir.IntType(32);
     i64 = ir.IntType(64);
     _members = [_m.strip() for _m in elem_mangle.split("|")];
-    _list_drops: list = [];
-    _struct_drops: list = [];
+    _list_drops: list[any] = [];
+    _struct_drops: list[any] = [];
     for _m in _members {
         if _m == "list[int]" {
             self._emit_list_helpers("i64", i64);
@@ -2019,7 +2019,7 @@ impl NaIRGenPass._emit_scope_cleanup(
         return;
     }
     self._emit_region_leaves(len(self.region_open_stack));
-    _region_handles: list = [];
+    _region_handles: list[any] = [];
     for (var_name, alloca) in self.local_vars.items() {
         if var_name == "self" {
             continue;
@@ -2102,7 +2102,7 @@ impl NaIRGenPass._emit_loop_iter_cleanup(body_locals: list, loc: str = "") -> No
     if self._builder is None or self._builder.block.is_terminated {
         return;
     }
-    _region_handles: list = [];
+    _region_handles: list[any] = [];
     for var_name in body_locals {
         if var_name == "self" or var_name in self.param_vars {
             continue;

@@ -135,7 +135,7 @@ impl NaIRGenPass._codegen_tuple_unpack(
     }
 
     rc_ok = (not is_value) or not self._nogc_headerless();
-    pending_old: list = [];
+    pending_old: list[any] = [];
     for (i, target) in enumerate(targets) {
         if i >= len(struct_type.elements) {
             break;
@@ -246,7 +246,7 @@ impl NaIRGenPass._rc_slot_ref(val: ir.Value) -> (ir.Value | None) {
 }
 
 impl NaIRGenPass._tuple_managed_fields(struct_type: ir.LiteralStructType) -> list {
-    out: list = [];
+    out: list[any] = [];
     for (i, ety) in enumerate(struct_type.elements) {
         if self?.jacval_type and ety == self.jacval_type {
             continue;
@@ -529,7 +529,9 @@ impl NaIRGenPass._tuple_iter_seq(
             return None;
         }
     }
-    elem_types: list = [] if struct_type is None else [e for e in struct_type.elements];
+    elem_types: list[any] = []
+        if struct_type is None
+        else [e for e in struct_type.elements];
     flavor = self._tuple_seq_flavor(elem_types);
     if flavor is None {
         return None;

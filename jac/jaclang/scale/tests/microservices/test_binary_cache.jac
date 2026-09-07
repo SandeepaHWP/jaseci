@@ -130,7 +130,7 @@ test "two pins downloading at once keep their own cache entries" {
     saved_http = binmod._http_get_bytes;
     os.environ["JAC_SCALE_CACHE_DIR"] = cache_dir;
     binmod._http_get_bytes = _fake_stable_http;
-    got: dict = {};
+    got: dict[any, any] = {};
     gate = threading.Barrier(len(versions));
 
     def _fetch(version: str) {

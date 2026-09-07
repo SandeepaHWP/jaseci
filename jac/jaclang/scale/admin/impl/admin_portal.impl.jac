@@ -1056,8 +1056,8 @@ impl JacAPIServerAdmin.admin_graph_data(
         visited_nodes: set = set();
         connections: set = set();
         edge_ids: set = set();
-        nodes: list[dict] = [];
-        edges: list[dict] = [];
+        nodes: list[dict[any, any]] = [];
+        edges: list[dict[any, any]] = [];
 
         collect_node_connections(user_root, visited_nodes, connections, edge_ids);
 
@@ -1070,7 +1070,7 @@ impl JacAPIServerAdmin.admin_graph_data(
             }
         }
         for (_, source_node, target_node, edge_arch) in connections {
-            edge_data: dict = {
+            edge_data: dict[any, any] = {
                 'from': Jac.object_ref(source_node),
                 'to': Jac.object_ref(target_node)
             };
@@ -1221,8 +1221,8 @@ def _parse_prometheus_text(raw_metrics: str) -> list[dict[str, any]] {
     return metrics_data;
 }
 
-def _calculate_metrics_summary(metrics_data: list[dict[str, any]]) -> dict {
-    summary: dict = {
+def _calculate_metrics_summary(metrics_data: list[dict[str, any]]) -> dict[any, any] {
+    summary: dict[any, any] = {
         'total_requests': 0,
         'active_requests': 0,
         'error_count': 0,

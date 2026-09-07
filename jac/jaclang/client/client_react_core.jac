@@ -32,23 +32,29 @@ def:pub __bridgeErrorFor(
 ) -> BridgeError;
 
 def:pub __bridgeErrorFromFetch(err: any, app: str = "", name: str = "") -> BridgeError;
-def:pub __bridgeApiBase(opts: (dict | None) = None) -> str;
+def:pub __bridgeApiBase(opts: (dict[any, any] | None) = None) -> str;
 
 def:pub __createJacSchema(zodLib: any) -> any;
 async def:pub __jacSpawn(
-    left: str, right: str = "", fields: dict = {}, opts: (dict | None) = None
+    left: str,
+    right: str = "",
+    fields: dict[any, any] = {},
+    opts: (dict[any, any] | None) = None
 ) -> any;
 
 def:pub jacSpawn(
-    left: str, right: str = "", fields: dict = {}, opts: (dict | None) = None
+    left: str,
+    right: str = "",
+    fields: dict[any, any] = {},
+    opts: (dict[any, any] | None) = None
 ) -> any;
 
 async def:pub __jacCallFunction(
-    function_name: str, args: dict = {}, opts: (dict | None) = None
+    function_name: str, args: dict[any, any] = {}, opts: (dict[any, any] | None) = None
 ) -> any;
 
-def:pub __normalizeIdentity(x: any) -> dict;
-def:pub __normalizeCredential(x: any) -> dict;
+def:pub __normalizeIdentity(x: any) -> dict[any, any];
+def:pub __normalizeCredential(x: any) -> dict[any, any];
 async def:pub jacSignup(
     identities_or_username: (str | list[any]),
     credential_or_password: (str | dict[str, any]),
@@ -65,18 +71,21 @@ def:pub jacIsLoggedIn -> bool;
 
 def:pub useJacForm(form_mode: str = "onTouched", schema: any) -> any;
 
-def:pub __getEndpointEffects -> dict;
-def:pub __getCacheState -> dict;
-def:pub __isFresh(`entry: dict) -> bool;
-def:pub __cacheGet(key: str) -> dict | None;
+def:pub __getEndpointEffects -> dict[any, any];
+def:pub __getCacheState -> dict[any, any];
+def:pub __isFresh(`entry: dict[any, any]) -> bool;
+def:pub __cacheGet(key: str) -> dict[any, any] | None;
 def:pub __cacheSet(key: str, data: any, ttl: int) -> None;
 def:pub __evictOldest -> None;
 async def:pub __doWalkerFetch(
-    `walker: str, nodeId: str, fields: dict, opts: (dict | None) = None
+    `walker: str,
+    nodeId: str,
+    fields: dict[any, any],
+    opts: (dict[any, any] | None) = None
 ) -> any;
 
 async def:pub __doFuncFetch(
-    function_name: str, args: dict, opts: (dict | None) = None
+    function_name: str, args: dict[any, any], opts: (dict[any, any] | None) = None
 ) -> any;
 
 async def:pub __cachedEndpointCall(

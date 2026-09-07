@@ -46,7 +46,11 @@ def stream_answer(question: str) -> str by pool(stream=True);
 glob _models_tried: list = [];
 
 def mock_completion(
-    model: str, messages: list, stream: bool, fallbacks: list, **_kwargs: object
+    model: str,
+    messages: list[any],
+    stream: bool,
+    fallbacks: list[any],
+    **_kwargs: object
 ) -> object {
     _models_tried.append(model);
     if model == "pool-primary" {
@@ -76,7 +80,11 @@ def stream_answer_mid(question: str) -> str by pool_mid(stream=True);
 glob _tried_mid: list = [];
 
 def mock_midstream_completion(
-    model: str, messages: list, stream: bool, fallbacks: list, **_kwargs: object
+    model: str,
+    messages: list[any],
+    stream: bool,
+    fallbacks: list[any],
+    **_kwargs: object
 ) -> object {
     _tried_mid.append(model);
     if model == "pool-primary" {

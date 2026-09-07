@@ -1,6 +1,6 @@
 import from "@jac/runtime" { Link }
 
-glob _COLS: list[dict] = [
+glob _COLS: list[dict[any, any]] = [
          {
              "title": "Language",
              "links": [

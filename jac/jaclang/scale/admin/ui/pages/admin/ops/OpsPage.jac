@@ -32,7 +32,7 @@ glob SIGNAL_ORDER = ["traces", "logs", "metrics", "postgres", "admin_api"],
 
 def:pub OpsPage -> JsxElement {
     has isLoading: bool = False,
-        signals: dict = {},
+        signals: dict[any, any] = {},
         errorMsg: str = "",
         loadedOnce: bool = False;
 
@@ -110,9 +110,9 @@ def:pub OpsPage -> JsxElement {
     # rung is true) so the render comprehension needs no index/enumerate
     # (avoided: enumerate has no cl.jac/JS equivalent). Names are unique
     # within a chain, so `name` doubles as the React key.
-    def annotate(chain: list) -> list {
+    def annotate(chain: list[any]) -> list[any] {
         seenFail = False;
-        out: list = [];
+        out: list[any] = [];
         for step in chain {
             first = (not seenFail) and (step["ok"] == False);
             if first {
@@ -134,8 +134,8 @@ def:pub OpsPage -> JsxElement {
     # would compile to a React component and drop its positional arg
     # (the navIcon trap), so the card markup is inlined in the render
     # comprehension below and this only assembles data.
-    def cardData -> list {
-        out: list = [];
+    def cardData -> list[any] {
+        out: list[any] = [];
         for name in SIGNAL_ORDER {
             sig = signals[name];
             if not sig {

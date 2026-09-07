@@ -35,7 +35,7 @@ walker AccessCheckPass(Transform) {
         _bridged_syms: set[int] = set(),
         _bridged_mods: set[str] = set();
 
-    static has PROVIDES: tuple = ('access-checks', );
+    static has PROVIDES: tuple[any, ...] = ('access-checks', );
 
     def postinit -> None;
     def transform(ir_in: Module) -> Module;

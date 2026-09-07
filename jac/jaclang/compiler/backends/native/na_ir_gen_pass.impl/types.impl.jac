@@ -37,7 +37,7 @@ impl NaIRGenPass._lower_type(t: any) -> (ir.Type | None) {
         lowered = self._lower_class_type(t);
     } elif isinstance(t, _UnionType) {
         lowered = ir.VoidType();
-        _members: list = [];
+        _members: list[any] = [];
         for m in (t.types or []) {
             if isinstance(m, _ClassType)
                 and m.shared.class_name in ("NoneType", "None") {
@@ -47,7 +47,7 @@ impl NaIRGenPass._lower_type(t: any) -> (ir.Type | None) {
         }
         _had_none = len(_members) < len(t.types or []);
         if _members {
-            _mreprs: list = [];
+            _mreprs: list[any] = [];
             for _m in _members {
                 _mr = self._lower_type(_m);
                 if self._str_desc_ty is not None and _mr == self._str_desc_ty {
@@ -589,7 +589,7 @@ impl NaIRGenPass._elem_storage_llvm(t: any) -> (ir.Type | None) {
     if not _members {
         return self._lower_type(t);
     }
-    _lowered: list = [];
+    _lowered: list[any] = [];
     for m in _members {
         _ml = self._lower_type(m);
         if _ml is None {
@@ -4047,7 +4047,7 @@ impl NaIRGenPass._lower_untyped_annotation(nd: uni.UniNode) -> (ir.Type | None) 
         if not _live {
             return None;
         }
-        _lreprs: list = [];
+        _lreprs: list[any] = [];
         for _lv in _live {
             _lr = self._lower_untyped_annotation(_lv);
             if _lr is None {
@@ -4093,7 +4093,7 @@ impl NaIRGenPass._lower_untyped_annotation(nd: uni.UniNode) -> (ir.Type | None) 
                         if isinstance(_tvals, uni.TupleVal)
                         else [_tvals]
                 );
-                _tlow: list = [];
+                _tlow: list[any] = [];
                 _tok = True;
                 for _tv in _telems {
                     _lt = self._lower_untyped_annotation(_tv);

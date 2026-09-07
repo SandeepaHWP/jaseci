@@ -203,7 +203,7 @@ impl JcirGenPass._sort_order_specs(
     if body is None {
         return None;
     }
-    parts: list = list(body.values) if isinstance(body, TupleVal) else [body];
+    parts: list[any] = list(body.values) if isinstance(body, TupleVal) else [body];
     out: list[tuple[str, bool, bool]] = [];
     for part in parts {
         if not isinstance(part, Expr) {

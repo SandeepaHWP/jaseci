@@ -21,7 +21,7 @@ import from jaclang.scale.runtime.cli.diagnostics { PlanValidator }
 import from jaclang.scale.runtime.fleet { fleet_of }
 
 
-def _pdbs(services: dict) -> dict {
+def _pdbs(services: dict[any, any]) -> dict[any, any] {
     import tempfile;
     import from pathlib { Path }
     with tempfile.TemporaryDirectory() as project {

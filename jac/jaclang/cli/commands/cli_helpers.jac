@@ -3,7 +3,7 @@ import from jaclang.cli.console { console }
 import from jaclang.jac0core.ext_registry { base_stem, is_jac, is_python }
 
 
-def proc_file(filename: str) -> tuple {
+def proc_file(filename: str) -> tuple[any, ...] {
     import from jaclang.runtime.runtime { JacRuntime as Jac }
     (base, mod) = os.path.split(filename);
     base = base or './';

@@ -7,7 +7,7 @@ import from jaclang.compiler.driver.program { JacProgram }
 glob FIXTURES = str(Path(__file__).resolve().parent / "fixtures");
 
 """Compile a .jac fixture; return (prog, ir) without asserting on errors."""
-def _compile(fixture: str) -> tuple {
+def _compile(fixture: str) -> tuple[any, ...] {
     prog = JacProgram();
     ir = prog.compile(
         file_path=str(os.path.join(FIXTURES, fixture)), options=native_force_opts()

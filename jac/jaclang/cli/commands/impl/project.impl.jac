@@ -479,7 +479,7 @@ def _toml_apps(toml_path: Path) -> set[str] {
     return _toml_apps_and_default(toml_path)[0];
 }
 
-def _stamp_kind(config: dict, kind: str) -> None {
+def _stamp_kind(config: dict[any, any], kind: str) -> None {
     if not kind or kind == "workspace" or "apps" in config {
         return;
     }
@@ -493,7 +493,7 @@ def _stamp_kind(config: dict, kind: str) -> None {
     }
 }
 
-def _stamp_jac_version(config: dict) {
+def _stamp_jac_version(config: dict[any, any]) {
     proj = config.get("project");
     if not isinstance(proj, dict) {
         proj = {};
@@ -651,7 +651,7 @@ def _quote_toml_key(k: str) -> str {
     return f'"{k}"';
 }
 
-def _render_config_to_toml(config: dict, project_name: str) -> str {
+def _render_config_to_toml(config: dict[any, any], project_name: str) -> str {
     lines: list[str] = [];
 
     def render_value(v: any) -> str {
@@ -670,9 +670,11 @@ def _render_config_to_toml(config: dict, project_name: str) -> str {
         }
     }
 
-    def render_section(section_name: str, section_data: dict, indent: str = "") {
-        simple_values: dict = {};
-        nested_sections: dict = {};
+    def render_section(
+        section_name: str, section_data: dict[any, any], indent: str = ""
+    ) {
+        simple_values: dict[any, any] = {};
+        nested_sections: dict[any, any] = {};
 
         for (k, v) in section_data.items() {
             if isinstance(v, dict) {
@@ -754,7 +756,7 @@ impl install(
     if shadcn or npm {
         channel = "--shadcn" if shadcn else "--npm";
 
-        flag_checks: list = [(no_save, "--no-save"), (dry_run, "--dry-run")];
+        flag_checks: list[any] = [(no_save, "--no-save"), (dry_run, "--dry-run")];
         if shadcn {
             flag_checks.append((install_global, "--global"));
         }
@@ -792,7 +794,7 @@ impl install(
         resolve_plan
     }
 
-    flag_defs: list = [
+    flag_defs: list[any] = [
         (force_reinstall, "--force-reinstall"),
         (no_cache_dir, "--no-cache-dir"),
         (pre, "--pre"),
@@ -835,7 +837,7 @@ impl install(
             );
         }
         if install_global {
-            specs: list = list(packages);
+            specs: list[any] = list(packages);
             if git {
                 specs.append(make_git_spec(git));
             }
@@ -939,7 +941,7 @@ impl install(
     if editable {
         import from jaclang.dist.publish.builder { WheelBuilder }
 
-        editable_targets: list = [];
+        editable_targets: list[any] = [];
         all_dep_specs: list[str] = [];
         for editable_path in editable {
             src_dir: Path = Path(editable_path).resolve();

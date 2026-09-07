@@ -283,7 +283,7 @@ impl NaIRGenPass._codegen_virtual_call(
     i32 = ir.IntType(32);
     i8_ptr = ir.IntType(8).as_pointer();
 
-    _vd_variants: list[tuple] = [];
+    _vd_variants: list[tuple[any, ...]] = [];
     _vd_uniform = True;
     import from jaclang.compiler.passes.layout_pass { get_layout_registry as _vd_glr }
     _vd_reg = _vd_glr(self.ir_in, self.prog);
@@ -316,7 +316,7 @@ impl NaIRGenPass._codegen_virtual_call(
         _vd_vtp = self.builder.load(vtable_ptr_ptr, name="vt.id");
         _vd_fnc = self.builder.function;
         _vd_done = _vd_fnc.append_basic_block(name=f"vd.{method_name}.done");
-        _vd_incoming: list[tuple] = [];
+        _vd_incoming: list[tuple[any, ...]] = [];
         for (_vc, _vt, _vf) in _vd_variants {
             _vd_hit = _vd_fnc.append_basic_block(name=f"vd.{method_name}.{_vc}");
             _vd_next = _vd_fnc.append_basic_block(name=f"vd.{method_name}.n.{_vc}");
@@ -612,7 +612,7 @@ impl NaIRGenPass._is_enum_arch(name: str) -> bool {
     if name in self.enum_types {
         return True;
     }
-    _cands: list = [self.ir_in];
+    _cands: list[any] = [self.ir_in];
     for _fm in (self?._foreign_modules or []) {
         _cands.append(_fm);
     }
@@ -637,7 +637,7 @@ impl NaIRGenPass._emit_isa_fn -> ir.Function {
     row_ty = ir.LiteralStructType([i8p, i8p]);
 
     reg = get_layout_registry(self.ir_in, self.prog);
-    rows: list = [];
+    rows: list[any] = [];
     for cls in sorted(reg.mro_order) {
         for anc in self._mro_of(cls) {
             if anc == cls {

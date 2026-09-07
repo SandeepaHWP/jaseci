@@ -70,7 +70,7 @@ def schedule(**kwargs: any) -> Callable;
 
 def new(cls: any, *args: any) -> any;
 
-def unsafe_html(html: any) -> dict;
+def unsafe_html(html: any) -> dict[any, any];
 
 def managed(x: any) -> any;
 
@@ -101,7 +101,7 @@ obj JacListView {
     def __iter__ -> any;
 }
 
-def _jac_chunks(xs: any, n: int) -> list;
+def _jac_chunks(xs: any, n: int) -> list[any];
 
 
 glob __all__ = [

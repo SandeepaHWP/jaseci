@@ -7,7 +7,7 @@ test instead of being silently skipped).
 """
 
 # --- Issue 1: list.pop(index) must honor the index (kernel FIFO pop(0)) ---
-def pop_index_py() -> dict {
+def pop_index_py() -> dict[any, any] {
     a: list[int] = [];
     a.append(11);
     a.append(22);
@@ -56,7 +56,7 @@ def pop_index_na() -> dict[str, any] {
 
 
 # --- Issue 2: list[tuple[...]] round-trip (append -> pop -> unpack) ---
-def tuple_roundtrip_py() -> dict {
+def tuple_roundtrip_py() -> dict[any, any] {
     s: list[tuple[int, int]] = [(10, 0)];
     s.append((20, 1));
     (a, p1) = s.pop();  # (20, 1)
@@ -80,10 +80,10 @@ def tuple_roundtrip_na() -> dict[str, any] {
 # native helpers (the literal's boxed JacVal must not be stored into an `i64`
 # slot). Value round-trip of `any` dict reads is a separate concern, so this
 # pins only that both lists coexist with correct lengths.
-def any_literal_py() -> dict {
+def any_literal_py() -> dict[any, any] {
     nums: list[int] = [1, 2, 3];
     d: dict[str, any] = {"v": 7};
-    st: list = [d["v"]];
+    st: list[any] = [d["v"]];
     return {"n": len(nums), "m": len(st)};
 }
 
@@ -91,16 +91,16 @@ def any_literal_py() -> dict {
 def any_literal_na() -> dict[str, any] {
     nums: list[int] = [1, 2, 3];
     d: dict[str, any] = {"v": 7};
-    st: list = [d["v"]];
+    st: list[any] = [d["v"]];
     return {"n": len(nums), "m": len(st)};
 }
 
 
 # --- Issue 4: unpacking pop() of a bare `list` (any element) must type-check
 #     in native codespace and round-trip at runtime (kernel DFS tuple-stack). ---
-def any_stack_py() -> dict {
+def any_stack_py() -> dict[any, any] {
     loc: int = 5;
-    stack: list = [(loc, 0)];
+    stack: list[any] = [(loc, 0)];
     stack.append((20, 1));
     (cur, phase) = stack.pop();  # (20, 1)
     (cur0, phase0) = stack.pop();  # (5, 0)
@@ -110,7 +110,7 @@ def any_stack_py() -> dict {
 
 def any_stack_na() -> dict[str, any] {
     loc: int = 5;
-    stack: list = [(loc, 0)];
+    stack: list[any] = [(loc, 0)];
     stack.append((20, 1));
     (cur, phase) = stack.pop();
     (cur0, phase0) = stack.pop();
@@ -123,11 +123,11 @@ def any_stack_na() -> dict[str, any] {
 #     kernel's `while stack` / `while scope.next` otherwise loop forever and
 #     pop() runs past empty into garbage (the `tag_of` segfault). Mirrors the
 #     kernel's FIFO `scope.next.pop(0)` + `(loc, phase)` tuple-stack DFS. ---
-def dfs_stack_py() -> dict {
+def dfs_stack_py() -> dict[any, any] {
     queue: list[int] = [100, 200, 300];
     first_out: int = queue.pop(0);
     second_out: int = queue.pop(0);
-    stack: list = [(first_out, 0)];
+    stack: list[any] = [(first_out, 0)];
     stack.append((second_out, 1));
     n0: int = 0;
     n1: int = 0;
@@ -157,7 +157,7 @@ def dfs_stack_na() -> dict[str, any] {
     queue: list[int] = [100, 200, 300];
     first_out: int = queue.pop(0);
     second_out: int = queue.pop(0);
-    stack: list = [(first_out, 0)];
+    stack: list[any] = [(first_out, 0)];
     stack.append((second_out, 1));
     n0: int = 0;
     n1: int = 0;
@@ -189,7 +189,7 @@ def dfs_stack_na() -> dict[str, any] {
 #     (b) reading scalar/str values out of a `dict[str, any]` *local*, and
 #     (c) a tuple whose element is `any` stored in a list, popped, unpacked
 #     (the titled bug; also exercises i64 -> `any` boxing at the call site). ---
-def any_scalar_box_py() -> dict {
+def any_scalar_box_py() -> dict[any, any] {
     x: any = 555;
     y: any = 3.5;
     z: any = "hi";
@@ -205,8 +205,8 @@ def any_scalar_box_na() -> dict[str, any] {
 }
 
 
-def any_dict_local_py() -> dict {
-    d: dict = {"l": 555, "s": "hi"};
+def any_dict_local_py() -> dict[any, any] {
+    d: dict[any, any] = {"l": 555, "s": "hi"};
     li: int = d["l"];
     return {"l": li, "s": d["s"]};
 }
@@ -219,19 +219,19 @@ def any_dict_local_na() -> dict[str, any] {
 }
 
 
-def any_tuple_helper_py(loc: any) -> dict {
-    s: list = [(loc, 0)];
+def any_tuple_helper_py(loc: any) -> dict[any, any] {
+    s: list[any] = [(loc, 0)];
     (cur, phase) = s.pop();
     return {"cur": cur, "phase": phase};
 }
 
-def any_tuple_roundtrip_py() -> dict {
+def any_tuple_roundtrip_py() -> dict[any, any] {
     return any_tuple_helper_py(555);
 }
 
 
 def any_tuple_helper_na(loc: any) -> dict[str, any] {
-    s: list = [(loc, 0)];
+    s: list[any] = [(loc, 0)];
     (cur, phase) = s.pop();
     return {"cur": cur, "phase": phase};
 }

@@ -9,21 +9,21 @@ obj Shim {
         game: any = None,
         mem: any = None,
         heap: any = 0,
-        proj: list = [],
-        mv: list = [],
-        pstack: list = [],
-        mvstack: list = [],
+        proj: list[any] = [],
+        mv: list[any] = [],
+        pstack: list[any] = [],
+        mvstack: list[any] = [],
         mode: int = 0x1700,
-        verts: list = [],
-        color: list = [1.0, 1.0, 1.0, 1.0],
+        verts: list[any] = [],
+        color: list[any] = [1.0, 1.0, 1.0, 1.0],
         bmode: int = 4,
         vbo: any = None,
         aPos: int = 0,
         aCol: int = 0,
         uMVP: any = None,
-        keys: dict = {},
-        pressed: dict = {},
-        mpressed: dict = {},
+        keys: dict[any, any] = {},
+        pressed: dict[any, any] = {},
+        mpressed: dict[any, any] = {},
         mouseX: float = 0.0,
         mouseY: float = 0.0,
         locked: bool = False,
@@ -45,7 +45,7 @@ obj Shim {
 # the object those env closures captured rather than mint a new one.
 glob _shim: any = None;
 
-def _m_ident -> list {
+def _m_ident -> list[any] {
     return [
         1.0,
         0.0,
@@ -66,7 +66,7 @@ def _m_ident -> list {
     ];
 }
 
-def _m_mul(a: list, b: list) -> list {
+def _m_mul(a: list[any], b: list[any]) -> list[any] {
     c = [
         0.0,
         0.0,
@@ -103,7 +103,7 @@ def _m_mul(a: list, b: list) -> list {
     return c;
 }
 
-def _m_translate(x: float, y: float, z: float) -> list {
+def _m_translate(x: float, y: float, z: float) -> list[any] {
     m = _m_ident();
     m[12] = x;
     m[13] = y;
@@ -111,7 +111,7 @@ def _m_translate(x: float, y: float, z: float) -> list {
     return m;
 }
 
-def _m_rotate(ang: float, x: float, y: float, z: float) -> list {
+def _m_rotate(ang: float, x: float, y: float, z: float) -> list[any] {
     a = ang * 3.141592653589793 / 180.0;
     c = Math.cos(a);
     s = Math.sin(a);
@@ -143,7 +143,9 @@ def _m_rotate(ang: float, x: float, y: float, z: float) -> list {
     ];
 }
 
-def _m_frustum(l: float, r: float, b: float, t: float, n: float, f: float) -> list {
+def _m_frustum(
+    l: float, r: float, b: float, t: float, n: float, f: float
+) -> list[any] {
     return [
         2.0 * n / (r - l),
         0.0,
@@ -164,7 +166,7 @@ def _m_frustum(l: float, r: float, b: float, t: float, n: float, f: float) -> li
     ];
 }
 
-def _m_ortho(l: float, r: float, b: float, t: float, n: float, f: float) -> list {
+def _m_ortho(l: float, r: float, b: float, t: float, n: float, f: float) -> list[any] {
     return [
         2.0 / (r - l),
         0.0,
@@ -185,11 +187,11 @@ def _m_ortho(l: float, r: float, b: float, t: float, n: float, f: float) -> list
     ];
 }
 
-def _cur(sh: any) -> list {
+def _cur(sh: any) -> list[any] {
     return sh.proj if sh.mode == 0x1701 else sh.mv;
 }
 
-def _setcur(sh: any, m: list) {
+def _setcur(sh: any, m: list[any]) {
     if sh.mode == 0x1701 {
         sh.proj = m;
     } else {
@@ -217,7 +219,7 @@ def _flush(sh: any) -> None {
     sh.verts = [];
 }
 
-def _build_env(sh: any) -> dict {
+def _build_env(sh: any) -> dict[any, any] {
     return {
         "InitWindow": lambda (w: int, h: int, t: int) {},
         "WindowShouldClose": lambda { return 0; },

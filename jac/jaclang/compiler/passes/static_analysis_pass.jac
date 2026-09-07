@@ -260,7 +260,7 @@ walker StaticAnalysisPass(Transform) {
         cancel_token: any = None,
         _checked_scopes: set[int] = set();
 
-    static has PROVIDES: tuple = ('static-checks', ),
+    static has PROVIDES: tuple[any, ...] = ('static-checks', ),
         HOST_PASS: bool = True;
 
     def postinit -> None;

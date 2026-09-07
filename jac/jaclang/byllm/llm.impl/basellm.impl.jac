@@ -1,4 +1,4 @@
-def _tool_call_fragments(chunk: object) -> list[dict] {
+def _tool_call_fragments(chunk: object) -> list[dict[any, any]] {
     raw: (list[object] | None) = None;
     try {
         if chunk?.choices and chunk?.choices?[0]?.delta {
@@ -16,7 +16,7 @@ def _tool_call_fragments(chunk: object) -> list[dict] {
     if not raw {
         return [];
     }
-    out: list[dict] = [];
+    out: list[dict[any, any]] = [];
     for (pos, tc) in enumerate(raw) {
         try {
             if isinstance(tc, dict) {
@@ -53,13 +53,13 @@ def _tool_call_fragments(chunk: object) -> list[dict] {
 
 
 obj _ToolDeltaCoalescer {
-    has out: list[dict],
-        state: dict = {},
+    has out: list[dict[any, any]],
+        state: dict[any, any] = {},
         min_chars: int = _TOOL_DELTA_MIN_CHARS,
         min_interval: float = _TOOL_DELTA_MIN_INTERVAL_S,
         max_per_call: int = _TOOL_DELTA_MAX_PER_CALL;
 
-    def observe(frag: dict) -> None {
+    def observe(frag: dict[any, any]) -> None {
         idx = frag.get("index", 0);
         st = self.state.get(idx);
         if st is None {
@@ -110,7 +110,7 @@ obj _ToolDeltaCoalescer {
         }
     }
 
-    def _publish(idx: int, st: dict) -> None {
+    def _publish(idx: int, st: dict[any, any]) -> None {
         if not st["buf"] and st["sent"] > 0 {
             return;
         }
@@ -138,7 +138,7 @@ obj _ToolDeltaCoalescer {
 }
 
 
-def _tool_stream_settings(mt_run: MTRuntime) -> dict {
+def _tool_stream_settings(mt_run: MTRuntime) -> dict[any, any] {
     settings = dict(get_byllm_config().get_tool_stream_config());
     per_call = mt_run.call_params.get("stream_tool_args");
     if per_call is True or per_call is False {
@@ -197,7 +197,7 @@ def _is_prompt_caching_eligible(model_name: str) -> bool {
 }
 
 
-def _mark_message_for_caching(msg: dict) {
+def _mark_message_for_caching(msg: dict[any, any]) {
     content = msg.get("content");
     if isinstance(content, str) {
         msg["cache_control"] = _CACHE_CONTROL_EPHEMERAL;
@@ -243,7 +243,7 @@ def _usage_int(usage: any, key: str) -> int {
 }
 
 
-def _apply_prompt_caching(messages: list[object], tools: list | None) {
+def _apply_prompt_caching(messages: list[object], tools: list[any] | None) {
     last_sys_idx = -1;
     last_nonsys_idx = -1;
     for (i, msg) in enumerate(messages) {
@@ -288,7 +288,7 @@ def _existing_cost(usage_obj: object) -> object {
 }
 
 
-def _rebuild_stream_chunks(chunks: list, logging_obj: object) -> dict {
+def _rebuild_stream_chunks(chunks: list[any], logging_obj: object) -> dict[any, any] {
     rebuilt: any = (
         litellm.stream_chunk_builder(chunks, logging_obj=logging_obj)
             if _STREAM_CHUNK_BUILDER_ACCEPTS_LOGGING_OBJ
@@ -334,7 +334,7 @@ def _attach_call_cost(
 }
 
 
-def _usage_to_dict(usage_obj: object) -> dict {
+def _usage_to_dict(usage_obj: object) -> dict[any, any] {
     if usage_obj is None {
         return {};
     }
@@ -403,16 +403,16 @@ def _copy_for_compaction(model: BaseLLM) -> BaseLLM {
 
 
 def _default_compact(
-    messages: list,
+    messages: list[any],
     keep_recent: int,
     model: BaseLLM,
     parent_mt_run: MTRuntime | None = None
-) -> list {
+) -> list[any] {
     if len(messages) < 4 {
         return messages;
     }
 
-    kept_tail: list = [];
+    kept_tail: list[any] = [];
     assistant_rounds = 0;
     i = len(messages) - 1;
     while i >= 2 and assistant_rounds < keep_recent {
@@ -1083,7 +1083,7 @@ impl BaseLLM._invoke_react_loop(mt_run: MTRuntime) -> object {
 
         just_compacted = self._maybe_compact(mt_run, usage, just_compacted, _cp);
         if resp.tool_calls {
-            non_finish_calls: list = [];
+            non_finish_calls: list[any] = [];
             finish_tc: (ToolCall | None) = None;
             for tc in resp.tool_calls {
                 if tc.is_finish_call() {
@@ -1100,8 +1100,8 @@ impl BaseLLM._invoke_react_loop(mt_run: MTRuntime) -> object {
                         else [[tc] for tc in non_finish_calls]
                 );
                 for batch in batches {
-                    raw_results: list = list(dispatch_batch(batch));
-                    ordered: dict = {};
+                    raw_results: list[any] = list(dispatch_batch(batch));
+                    ordered: dict[any, any] = {};
                     for r in raw_results {
                         idx = _index_by_identity(batch, r[0]);
                         ordered[idx] = r;
@@ -1176,8 +1176,8 @@ impl BaseLLM.make_model_params(mt_run: MTRuntime) -> dict {
         and mt_run.call_params.get("parallel_hint", True)
         and messages
         and len(messages) > 0 {
-        annotated: list = [];
-        serial_names: list = [];
+        annotated: list[any] = [];
+        serial_names: list[any] = [];
         for (i, schema) in enumerate(tools) {
             tool_obj = mt_run.tools[i] if i < len(mt_run.tools) else None;
             is_serial = bool(getattr(tool_obj, "serialize", False));
@@ -1346,7 +1346,7 @@ def _error_tool_call(call_id: str, tool_name: str, reason: str) -> ToolCall {
 
 def _parse_tool_calls(
     mt_run: MTRuntime,
-    tool_calls_list: list,
+    tool_calls_list: list[any],
     truncated_ids: set | None = None,
     damaged_ids: set | None = None
 ) -> list[ToolCall] {
@@ -1499,7 +1499,7 @@ impl BaseLLM.dispatch_no_streaming(mt_run: MTRuntime) -> CompletionResult {
     truncated_ids = _truncated_call_ids(message, finish_reason);
     tool_calls: list[ToolCall] = [];
     _tc_raw = (message or {}).get("tool_calls") or [];
-    tool_calls_list: list = _tc_raw if isinstance(_tc_raw, list) else [];
+    tool_calls_list: list[any] = _tc_raw if isinstance(_tc_raw, list[any]) else [];
     tool_calls = _parse_tool_calls(mt_run, tool_calls_list, truncated_ids, damaged_ids);
 
     output_value = mt_run.parse_response(output_content)
@@ -1584,7 +1584,7 @@ impl BaseLLM.dispatch_streaming_with_tools(
     );
     self.api_base = params.pop("api_base", DEFAULT_BASE_URL);
     params.pop("api_key", None);
-    chunks: list = [];
+    chunks: list[any] = [];
     content_buf = "";
     no_stream = False;
     finish_reason = "";
@@ -1654,7 +1654,7 @@ impl BaseLLM.dispatch_streaming_with_tools(
     }
 
     message: (LiteLLMMessage | dict | None) = None;
-    usage_data: dict = {};
+    usage_data: dict[any, any] = {};
     actual_model = self.model_name;
     try {
         rebuilt = _rebuild_stream_chunks(chunks, _stream_resp?.logging_obj);
@@ -1690,7 +1690,7 @@ impl BaseLLM.dispatch_streaming_with_tools(
     truncated_ids = _truncated_call_ids(message, finish_reason);
     tool_calls: list[ToolCall] = [];
     _tc_raw = (message or {}).get("tool_calls") or [];
-    tool_calls_list: list = _tc_raw if isinstance(_tc_raw, list) else [];
+    tool_calls_list: list[any] = _tc_raw if isinstance(_tc_raw, list[any]) else [];
     tool_calls = _parse_tool_calls(mt_run, tool_calls_list, truncated_ids, damaged_ids);
     output_value = mt_run.parse_response(output_content)
         if not tool_calls_list
@@ -1744,7 +1744,7 @@ impl BaseLLM.adispatch_no_streaming(mt_run: MTRuntime) -> CompletionResult {
     truncated_ids = _truncated_call_ids(message, finish_reason);
     tool_calls: list[ToolCall] = [];
     _tc_raw = (message or {}).get("tool_calls") or [];
-    tool_calls_list: list = _tc_raw if isinstance(_tc_raw, list) else [];
+    tool_calls_list: list[any] = _tc_raw if isinstance(_tc_raw, list[any]) else [];
     tool_calls = _parse_tool_calls(mt_run, tool_calls_list, truncated_ids, damaged_ids);
     output_value = mt_run.parse_response(output_content)
         if not tool_calls_list
@@ -2166,7 +2166,7 @@ impl BaseLLM._invoke_streaming(
             _usage_base = len(mt_run._usage_history);
 
             if resp.tool_calls {
-                non_finish_calls: list = [];
+                non_finish_calls: list[any] = [];
                 finish_tc: (ToolCall | None) = None;
                 for tc in resp.tool_calls {
                     if tc.is_finish_call() {
@@ -2203,7 +2203,7 @@ impl BaseLLM._invoke_streaming(
                             );
                         }
 
-                        raw_results: list = [];
+                        raw_results: list[any] = [];
                         for bres in dispatch_batch(batch) {
                             btc: ToolCall = bres[0];
                             result_msg: Message = bres[1];
@@ -2234,7 +2234,7 @@ impl BaseLLM._invoke_streaming(
                             raw_results.append((btc, result_msg, tool_ms));
                         }
 
-                        ordered: dict = {};
+                        ordered: dict[any, any] = {};
                         for r in raw_results {
                             idx = _index_by_identity(batch, r[0]);
                             ordered[idx] = r;

@@ -72,7 +72,7 @@ impl EsastGenPass.exit_import with uni.Import exit {
         here.gen.es_ast = None;
         return;
     }
-    emit_items: list = list(here.items);
+    emit_items: list[any] = list(here.items);
     if (here.from_loc and here.items) {
         resolved_path = here.from_loc.resolve_relative_path();
         partition = self._partition_client_import_items(here);
@@ -211,8 +211,8 @@ impl EsastGenPass._partition_client_import_items(
     if source_mod is None {
         return ([], list(nd.items)) if pinned_server else None;
     }
-    kept: list = [];
-    bridged: list = [];
+    kept: list[any] = [];
+    bridged: list[any] = [];
     for item in nd.items {
         verdict = classify_client_import_item(source_mod, item);
         if pinned_server and verdict != ClientImportVerdict.DEAD {

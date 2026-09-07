@@ -27,7 +27,7 @@ obj KubernetesTargetBase(DeploymentTarget) {
     has config: KubernetesConfig,
         logger: (Logger | None) = None,
         k8s_config: KubernetesConfig postinit,
-        env_list: list = [],
+        env_list: list[any] = [],
         secrets: dict[str, str] = {},
         env: dict[str, str] = {},
         events: EventSink = NoopSink(),
@@ -469,7 +469,7 @@ obj KubernetesTargetBase(DeploymentTarget) {
         }
     }
 
-    def get_full_status(app_name: str) -> dict {
+    def get_full_status(app_name: str) -> dict[any, any] {
         try {
             self._load_cluster_config();
             apps_v1 = client.AppsV1Api();

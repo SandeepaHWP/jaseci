@@ -382,8 +382,8 @@ impl NativeCompilePass._run_impl(ir_in: uni.Module) -> uni.Module {
         native_imports = manifest.native_imports;
         if native_imports {
             import from jaclang.runtime.interop_bridge { register_py_callbacks }
-            py_func_table: dict = {};
-            callbacks_list: list = [];
+            py_func_table: dict[any, any] = {};
+            callbacks_list: list[any] = [];
             register_py_callbacks(manifest, py_func_table, callbacks_list);
             module.gen.interop_py_funcs = py_func_table;
             module.gen._interop_callbacks = callbacks_list;
@@ -519,7 +519,7 @@ impl NativeCompilePass._run_impl(ir_in: uni.Module) -> uni.Module {
         if _native_debug and _debug_obj_path and _all_fn_names {
             try {
                 _text_addr = 0;
-                _fn_addrs: list = [];
+                _fn_addrs: list[any] = [];
                 for _fn_name in _all_fn_names {
                     _addr = engine.get_function_address(_fn_name);
                     if _addr != 0 {
@@ -629,14 +629,14 @@ impl NativeCompilePass._compile_and_link_native_imports(
     _link_opts = self.prog?.options or _LinkOpts();
     _link_fp = _link_opts.codegen_fingerprint();
 
-    linked_modules: dict = {};
+    linked_modules: dict[any, any] = {};
     if module.loc {
         linked_modules[os.path.realpath(module.loc.mod_path)] = None;
     }
 
-    symbol_origins: dict = {};
+    symbol_origins: dict[any, any] = {};
 
-    symbol_owned: dict = {};
+    symbol_owned: dict[any, any] = {};
     _MAIN_ORIGIN = "(main module)";
 
     _main_imported_names: set = set();
@@ -679,7 +679,7 @@ impl NativeCompilePass._compile_and_link_native_imports(
             self.source_module = sm;
         }
     }
-    work_queue: list = [];
+    work_queue: list[any] = [];
     base_dir = os.path.dirname(module.loc.mod_path) if module.loc else ".";
     for binding in imports {
         work_queue.append((binding, base_dir));
@@ -1060,8 +1060,8 @@ impl NativeCompilePass._compile_and_link_native_imports(
             exported_funcs: list[str] = [];
 
             has_real_collision = False;
-            _benign_dup_funcs: list = [];
-            _benign_dup_gvs: list = [];
+            _benign_dup_funcs: list[any] = [];
+            _benign_dup_gvs: list[any] = [];
             for func in _mod_functions(imported_mod) {
                 _func_name = str(func.name);
                 if _func_name.startswith("llvm.") or func.is_declaration {
@@ -1400,7 +1400,7 @@ impl NativeCompilePass._link_osp_kernel(main_mod: ModuleRef) -> None {
     }
 }
 
-glob _FMT_KERNEL_IR_CACHE: dict = {};
+glob _FMT_KERNEL_IR_CACHE: dict[any, any] = {};
 
 def _compile_fmt_kernel_ir -> (str | None) {
     import from jaclang.compiler.backends.common.kernel_units {

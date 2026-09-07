@@ -9,7 +9,7 @@ import from core.site.landing.diagrams.TopokineticDiagram { TopokineticDiagram }
 import from core.site.landing.diagrams.GradualBorrowDiagram { GradualBorrowDiagram }
 import from core.site.landing.diagrams.PolypilerDiagram { PolypilerDiagram }
 
-glob GROUPS: list[dict] = [
+glob GROUPS: list[dict[any, any]] = [
          {
              "key": "synechic",
              "pre": "",
@@ -290,7 +290,7 @@ glob GROUPS: list[dict] = [
          },
 
      ],
-     ABSENT: list[dict] = [
+     ABSENT: list[dict[any, any]] = [
          {
              "thing": "a database",
              "why": "The docs and the leaderboard live in a persistent graph. root outlives every request with no schema, no connection string, no setup."
@@ -345,7 +345,7 @@ glob GROUPS: list[dict] = [
          },
 
      ],
-     NAV_ITEMS: list[dict] = [
+     NAV_ITEMS: list[dict[any, any]] = [
          {"id": "g-absent", "label": "won't see"},
          {"id": "g-synechic", "label": "synechic"},
          {"id": "g-topokinetic", "label": "topokinetic"},
@@ -354,7 +354,7 @@ glob GROUPS: list[dict] = [
          {"id": "g-lexicon", "label": "lexicon"},
 
      ],
-     DEFS: dict = {
+     DEFS: dict[any, any] = {
          "synechic": {
              "term": "synechic",
              "ipa": "/sɪˈnɛk.ɪk/",
@@ -396,7 +396,7 @@ glob GROUPS: list[dict] = [
              "num": 5
          }
      },
-     LEX_ORDER: list = ["synechic", "substrate", "topokinetic", "osp", "borrow"];
+     LEX_ORDER: list[any] = ["synechic", "substrate", "topokinetic", "osp", "borrow"];
 
 def Definition(
     term: str, pos: str, body: str, ipa: str = "", ety: str = "", num: int = 0
@@ -548,7 +548,7 @@ def GroupHeader(gkey: str, pre: str, hot: str, post: str, blurb: str) -> JsxElem
         </div>;
 }
 
-def FeatureSection(idx: int, data: dict, on_pop: any) -> JsxElement {
+def FeatureSection(idx: int, data: dict[any, any], on_pop: any) -> JsxElement {
     flipped = idx % 2 == 1;
     return
         <section className="border-t border-border/40 pt-14 pb-14">

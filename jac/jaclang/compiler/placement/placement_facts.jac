@@ -5,8 +5,13 @@ glob SPACE_SERVER: str = 'server',
      SPACE_CLIENT: str = 'client',
      SPACE_NATIVE: str = 'native';
 
-glob TOOLCHAIN_NATIVE_ONLY_REL: tuple = ("runtime", "na_stdlib"),
-     TOOLCHAIN_MIXED_NATIVE_REL: tuple = ("client", "targets", "desktop", "native");
+glob TOOLCHAIN_NATIVE_ONLY_REL: tuple[any, ...] = ("runtime", "na_stdlib"),
+     TOOLCHAIN_MIXED_NATIVE_REL: tuple[any, ...] = (
+         "client",
+         "targets",
+         "desktop",
+         "native"
+     );
 
 
 def project_root_of(source_path: str) -> (str | None) {

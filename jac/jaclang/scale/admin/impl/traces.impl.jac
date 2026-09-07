@@ -63,11 +63,13 @@ def _build_traceql(service: str, status: str, min_duration_ms: int) -> str {
 }
 
 
-async def _tempo_request(path: str, params: dict, accept_json: bool = False) -> dict {
+async def _tempo_request(
+    path: str, params: dict[any, any], accept_json: bool = False
+) -> dict[any, any] {
     import from jaclang.server.serving.client { ClientConnectionError, arequest }
     base = _tempo_base_url();
     url = base + path;
-    headers: dict = {};
+    headers: dict[any, any] = {};
     if accept_json {
         headers["Accept"] = "application/json";
     }
@@ -83,7 +85,7 @@ async def _tempo_request(path: str, params: dict, accept_json: bool = False) -> 
 }
 
 
-def _otlp_value(value: dict) -> any {
+def _otlp_value(value: dict[any, any]) -> any {
     if "stringValue" in value {
         return value["stringValue"];
     }
@@ -100,8 +102,8 @@ def _otlp_value(value: dict) -> any {
 }
 
 
-def _otlp_attrs(attrs: list) -> dict {
-    out: dict = {};
+def _otlp_attrs(attrs: list[any]) -> dict[any, any] {
+    out: dict[any, any] = {};
     for a in (attrs or []) {
         k = a.get("key", "");
         if k {
@@ -112,8 +114,8 @@ def _otlp_attrs(attrs: list) -> dict {
 }
 
 
-def _flatten_tempo_trace(payload: dict) -> dict {
-    spans: list[dict] = [];
+def _flatten_tempo_trace(payload: dict[any, any]) -> dict[any, any] {
+    spans: list[dict[any, any]] = [];
     min_start: int = 0;
     max_end: int = 0;
     batches = payload.get("batches", []) or [];
@@ -253,7 +255,7 @@ impl JacAPIServerTraces.register_traces_endpoints -> None {
         }
 
         raw_traces = payload.get("traces", []) or [];
-        traces: list[dict] = [];
+        traces: list[dict[any, any]] = [];
         for t in raw_traces {
             traces.append(
                 {

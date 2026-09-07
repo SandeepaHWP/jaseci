@@ -69,7 +69,7 @@ def _workspace(tmp: str, toml: str = WORKSPACE_TOML) -> dict[str, str] {
 }
 
 
-def _codes(prog: JacProgram, code: str) -> list {
+def _codes(prog: JacProgram, code: str) -> list[any] {
     return [
         e
         for e in (prog.errors_had + prog.warnings_had)

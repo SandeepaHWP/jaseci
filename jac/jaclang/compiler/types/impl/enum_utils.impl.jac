@@ -78,7 +78,7 @@ impl build_enum_members(
     int_type = evaluator.prefetch.int_class if evaluator.prefetch else None;
     auto_value = 1;
 
-    all_stmts: list = [
+    all_stmts: list[any] = [
         sym.decl.parent if isinstance(sym.decl.parent, Assignment) else sym.decl
         for (name, sym) in enum_node.names_in_scope.items()
         if not is_excluded_enum_member_name(name)

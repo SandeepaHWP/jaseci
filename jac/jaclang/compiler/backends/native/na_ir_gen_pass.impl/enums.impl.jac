@@ -65,7 +65,7 @@ impl NaIRGenPass._codegen_enum_layout(
     }
 
     import from jaclang.compiler.passes.layout_pass { get_layout_registry }
-    candidates: list = [];
+    candidates: list[any] = [];
     if owner is not None {
         candidates.append(owner);
     }
@@ -92,7 +92,7 @@ impl NaIRGenPass._codegen_enum_layout(
 
     i64 = ir.IntType(64);
     if lay.is_string_enum {
-        entries: list = [];
+        entries: list[any] = [];
         for m in lay.members {
             full_name = f"{enum_name}.{m.name}";
             self.enum_values[full_name] = ir.Constant(i64, m.ordinal);
@@ -102,8 +102,8 @@ impl NaIRGenPass._codegen_enum_layout(
         self.enum_string_values[enum_name] = entries;
         self._build_enum_string_table(enum_name, entries);
     } else {
-        name_entries: list = [];
-        int_entries: list = [];
+        name_entries: list[any] = [];
+        int_entries: list[any] = [];
         for m in lay.members {
             full_name = f"{enum_name}.{m.name}";
             self.enum_values[full_name] = ir.Constant(i64, m.int_value);
@@ -121,8 +121,8 @@ impl NaIRGenPass._build_enum_string_table(
 ) -> None {
     i8p = ir.IntType(8).as_pointer();
     i32 = ir.IntType(32);
-    value_ptrs: list = [];
-    name_ptrs: list = [];
+    value_ptrs: list[any] = [];
+    name_ptrs: list[any] = [];
     for (mname, str_val, ordinal) in entries {
         if with_values {
             (val_struct_type, val_struct) = self._static_str_struct_const(
@@ -227,7 +227,7 @@ impl NaIRGenPass._enum_ordinal_fn(enum_name: str) -> (ir.Function | None) {
     fn.args[0].name = "val";
     b = ir.IRBuilder(fn.append_basic_block("entry"));
     seen: set = set();
-    ordered: list = [];
+    ordered: list[any] = [];
     for (_iv, _ord) in entries {
         if _iv in seen {
             continue;
@@ -280,7 +280,7 @@ impl NaIRGenPass._codegen_enum_attr_runtime(
 
 impl NaIRGenPass._enum_ctor_layout(enum_name: str) -> (any | None) {
     import from jaclang.compiler.passes.layout_pass { get_layout_registry }
-    candidates: list = [];
+    candidates: list[any] = [];
     _arch = self.arch_ast_map.get(enum_name);
     if _arch is not None {
         _own = _arch.find_parent_of_type(uni.Module);

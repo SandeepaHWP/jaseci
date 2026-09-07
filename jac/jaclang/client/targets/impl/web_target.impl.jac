@@ -211,7 +211,7 @@ def _build_css_link(bundler: ViteBundler) -> str {
     return '';
 }
 
-def _get_app_meta_data -> dict {
+def _get_app_meta_data -> dict[any, any] {
     import from jaclang.project.config { get_config }
 
     config = get_config();

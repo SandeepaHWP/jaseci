@@ -1,7 +1,7 @@
 """User management service functions."""
 
 import from .api { get, post, put, `del }
-async def:pub getUsers(token: str) -> dict {
+async def:pub getUsers(token: str) -> dict[any, any] {
     return await get("/admin/users", token);
 }
 
@@ -25,7 +25,7 @@ async def:pub updateUser(
     );
 }
 
-async def:pub deleteUser(username: str, token: str) -> dict {
+async def:pub deleteUser(username: str, token: str) -> dict[any, any] {
     return await `del("/admin/users/" + encodeURIComponent(username), token);
 }
 

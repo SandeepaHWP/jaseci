@@ -86,8 +86,8 @@ glob logger = getLogger(__name__),
      _default_full_target_path: list[str | None] = [None],
      _shared_root_resolver: list[any] = [None, None];
 
-glob _scale_provider_cache: list = [],
-     _scale_provider_error: list = [None];
+glob _scale_provider_cache: list[any] = [],
+     _scale_provider_error: list[any] = [None];
 
 glob _persistent_memory_provider: list[any] = [None];
 
@@ -327,12 +327,12 @@ class JacGraph {
         target: NodeAnchor,
         conn_type: type[EdgeArchetype] | EdgeArchetype | None,
         is_undirected: bool,
-        conn_assign: (tuple[(tuple, tuple)] | None)
+        conn_assign: (tuple[(tuple[any, ...], tuple[any, ...])] | None)
     ) -> EdgeArchetype;
 
     static def hop(
         origin: any, dir: int, edge_type: (type | None) = None, edges_only: bool = False
-    ) -> list;
+    ) -> list[any];
 
     static def clear_edges(
         origin: any, dir: int, edge_type: (type | None) = None

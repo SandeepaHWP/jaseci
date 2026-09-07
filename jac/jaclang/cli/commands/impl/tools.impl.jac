@@ -144,7 +144,7 @@ impl completions(shell: str = "bash", install: bool = False) -> int {
     return 0;
 }
 
-def _extract_commands(specs: list) -> list {
+def _extract_commands(specs: list[any]) -> list[any] {
     import from jaclang.cli.command { ArgKind }
     commands = [];
     for spec in sorted(specs, key=lambda (s: any) { s.name; }) {

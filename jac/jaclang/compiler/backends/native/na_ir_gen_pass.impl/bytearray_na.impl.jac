@@ -266,7 +266,7 @@ impl NaIRGenPass._emit_struct_pack_into(
         );
         return None;
     }
-    arg_vals: list = [];
+    arg_vals: list[any] = [];
     for p in params[3:] {
         v = self._codegen_expr(p);
         if v is not None {

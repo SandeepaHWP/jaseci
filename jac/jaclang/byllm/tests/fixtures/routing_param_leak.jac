@@ -14,7 +14,7 @@ import from jaclang.byllm.lib { MockLLM }
 import from jaclang.byllm.types { CompletionResult }
 import from jaclang.byllm.mtir { MTRuntime }
 
-glob captured_params: dict = {};
+glob captured_params: dict[any, any] = {};
 
 obj ParamCaptureMock(MockLLM) {
     """Records the `call_params` that reach the runtime for the routing call."""

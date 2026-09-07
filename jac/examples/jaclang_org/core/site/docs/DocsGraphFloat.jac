@@ -14,7 +14,7 @@ def _short(t: str) -> str {
     return t;
 }
 
-def _edge_d(e: dict) -> str {
+def _edge_d(e: dict[any, any]) -> str {
     x1 = e["x1"] as float;
     y1 = e["y1"] as float;
     x2 = e["x2"] as float;
@@ -38,10 +38,10 @@ def _edge_d(e: dict) -> str {
         + str(y2);
 }
 
-def _push(n: TreeNode, depth: int, acc: dict, px: float, py: float) {
-    nodes: list = acc["nodes"] as list;
-    edges: list = acc["edges"] as list;
-    index: dict = acc["index"] as dict;
+def _push(n: TreeNode, depth: int, acc: dict[any, any], px: float, py: float) {
+    nodes: list[any] = acc["nodes"] as list[any];
+    edges: list[any] = acc["edges"] as list[any];
+    index: dict[any, any] = acc["index"] as dict[any, any];
     x = PAD_X + (depth as float) * COL_W;
     y = PAD_Y + (acc["row"] as float) * ROW_H;
     acc["row"] = (acc["row"] as float) + 1.0;
@@ -66,8 +66,14 @@ def _push(n: TreeNode, depth: int, acc: dict, px: float, py: float) {
     }
 }
 
-def _model(tree: list[TreeNode], version: str) -> dict {
-    acc: dict = {"row": 1.0, "nodes": [], "edges": [], "index": {"": 0}, "w": 234.0};
+def _model(tree: list[TreeNode], version: str) -> dict[any, any] {
+    acc: dict[any, any] = {
+        "row": 1.0,
+        "nodes": [],
+        "edges": [],
+        "index": {"": 0},
+        "w": 234.0
+    };
     (acc["nodes"] as list).append(
         {"i": 0, "path": "", "label": version, "kind": "root", "x": PAD_X, "y": PAD_Y}
     );
@@ -78,8 +84,8 @@ def _model(tree: list[TreeNode], version: str) -> dict {
     return acc;
 }
 
-def _chain(index: dict, cur_path: str) -> list {
-    chain: list = [0];
+def _chain(index: dict[any, any], cur_path: str) -> list[any] {
+    chain: list[any] = [0];
     walk = "";
     for seg in cur_path.split("/") {
         if seg == "" {
@@ -129,7 +135,7 @@ def:pub DocsGraphFloat(
             dot.setAttribute("opacity", "1");
             return;
         }
-        segs: list = [];
+        segs: list[any] = [];
         total = 0.0;
         k = 1;
         while k < len(chain) {
@@ -147,8 +153,8 @@ def:pub DocsGraphFloat(
             return;
         }
         dot.setAttribute("opacity", "1");
-        st: dict = {"t0": -1.0};
-        fns: dict = {"step": None};
+        st: dict[any, any] = {"t0": -1.0};
+        fns: dict[any, any] = {"step": None};
         fns["step"] = lambda (ts: any) {
             if (st["t0"] as float) < 0.0 {
                 st["t0"] = ts as float;

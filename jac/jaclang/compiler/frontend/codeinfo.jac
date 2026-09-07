@@ -20,9 +20,9 @@ import type from jaclang.compiler.backends.native.llvm.binding {
 }
 
 obj ClientManifest {
-    has exports: list = [],
-        globals: list = [],
-        params: dict[(str, list)] = field(default_factory=`dict),
+    has exports: list[any] = [],
+        globals: list[any] = [],
+        params: dict[(str, list[any])] = field(default_factory=`dict),
         globals_values: dict[(str, any)] = field(default_factory=`dict),
         has_client: bool = False,
         imports: dict[(str, str)] = field(default_factory=`dict),

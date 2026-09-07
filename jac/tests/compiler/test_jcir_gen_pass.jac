@@ -39,7 +39,7 @@ import from jaclang.compiler.backends.py.jcir_gen_pass { JcirGenPass }
 import from jaclang.compiler.backends.py.codegen_shim { compile_ir, transcribe }
 
 """Compile a source string, then re-emit it: (pipeline tree, fresh tree, bytes)."""
-def dual_compile(src: str, path: str) -> tuple {
+def dual_compile(src: str, path: str) -> tuple[any, ...] {
     prog = JacProgram();
     mod = prog.compile(
         use_str=src,
@@ -63,7 +63,7 @@ def dual_compile(src: str, path: str) -> tuple {
 }
 
 """The same double emission, for a fixture that must be compiled from disk."""
-def dual_compile_file(path: str) -> tuple {
+def dual_compile_file(path: str) -> tuple[any, ...] {
     prog = JacProgram();
     mod = prog.compile(path, options=CompileOptions(no_ir_cache=True));
     assert len(prog.errors_had) == 0 , str([str(e) for e in prog.errors_had]);
@@ -97,7 +97,7 @@ def assert_dump_equal(ref_tree: any, got_tree: any) {
     }
 }
 
-def code_diffs(a: any, b: any, path: str, out: list) -> list {
+def code_diffs(a: any, b: any, path: str, out: list[any]) -> list[any] {
     for attr in [
         "co_name",
         "co_qualname",
@@ -144,9 +144,9 @@ def assert_bytecode_equal(ref_tree: any, mod_path: str, bytecode: bytes) {
     assert diffs == [] , "\n".join(diffs);
 }
 
-def exec_both(ref_tree: any, got_tree: any, path: str, names: list) {
-    ref_ns: dict = {};
-    got_ns: dict = {};
+def exec_both(ref_tree: any, got_tree: any, path: str, names: list[any]) {
+    ref_ns: dict[any, any] = {};
+    got_ns: dict[any, any] = {};
     pyexec(pycompile(ref_tree, path, "exec"), ref_ns);
     pyexec(pycompile(got_tree, path, "exec"), got_ns);
     for name in names {

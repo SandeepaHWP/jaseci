@@ -1897,7 +1897,7 @@ impl PyastBuildPass.proc_class_def(nd: py_ast.ClassDef) -> (Archetype | Enum) {
         raise RuntimeError(self.ice('Length mismatch in decorators on class'));
     }
     valid_decorators = decorators or None;
-    kid: list = [];
+    kid: list[any] = [];
     if valid_decorators {
         kid.extend(valid_decorators);
     }

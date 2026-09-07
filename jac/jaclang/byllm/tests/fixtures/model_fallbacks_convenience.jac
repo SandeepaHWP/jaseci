@@ -19,7 +19,7 @@ glob model1 = MockLLM(model_name="gpt-4o", config={"outputs": []}),
 
 def get_answer(question: str) -> str by pool();
 
-async def mock_acompletion(**_kwargs: object) -> dict {
+async def mock_acompletion(**_kwargs: object) -> dict[any, any] {
     return {
         "model": "gpt-4o-mini",
         "choices": [

@@ -55,7 +55,7 @@ glob _byllm_config = get_byllm_config(),
      _model_config = _byllm_config.get_model_config(),
      _call_params_config = _byllm_config.get_call_params_config(),
      _streaming_config = _byllm_config.get_streaming_config(),
-     _CACHE_CONTROL_EPHEMERAL: dict = {"type": "ephemeral"};
+     _CACHE_CONTROL_EPHEMERAL: dict[any, any] = {"type": "ephemeral"};
 
 with entry {
     if _litellm_config['local_cost_map'] {
@@ -89,7 +89,7 @@ glob _STREAM_CHUNK_BUILDER_ACCEPTS_LOGGING_OBJ: bool = (
 
 obj BaseLLM {
     has model_name: str,
-        config: dict = {},
+        config: dict[any, any] = {},
         api_key: str = "",
         api_base: str = "",
         call_params: dict[(str, object)] = {},
@@ -109,16 +109,19 @@ obj BaseLLM {
     async def _ainvoke_typed_retry(mt_run: MTRuntime) -> object;
     def _typed_retry_reset(
         mt_run: MTRuntime,
-        base_msgs: list,
-        base_scaffolding: list,
+        base_msgs: list[any],
+        base_scaffolding: list[any],
         reason: str,
         output: str
     ) -> None;
 
-    def _parse_failure_feedback(attempt: int, max_attempts: int, err: object) -> tuple;
+    def _parse_failure_feedback(
+        attempt: int, max_attempts: int, err: object
+    ) -> tuple[any, ...];
+
     def _nonconforming_feedback(
         attempt: int, max_attempts: int, mt_run: MTRuntime, result: object
-    ) -> tuple;
+    ) -> tuple[any, ...];
 
     def _typed_retry_exhausted(
         attempts: int, cause: object, raw: str
@@ -134,9 +137,9 @@ obj BaseLLM {
         mt_run: MTRuntime
     ) -> Generator[object, None, None];
 
-    def make_model_params(mt_run: MTRuntime) -> dict;
+    def make_model_params(mt_run: MTRuntime) -> dict[any, any];
     def log_info(message: str) -> None;
-    def format_prompt(params: dict) -> str;
+    def format_prompt(params: dict[any, any]) -> str;
     def dispatch_no_streaming(mt_run: MTRuntime) -> CompletionResult;
     def dispatch_streaming(mt_run: MTRuntime) -> Generator[str, None, None];
     def dispatch_streaming_with_tools(
@@ -145,11 +148,14 @@ obj BaseLLM {
 
     async def adispatch_no_streaming(mt_run: MTRuntime) -> CompletionResult;
     async def adispatch_streaming(mt_run: MTRuntime);
-    def model_call_no_stream(params: dict) -> dict;
-    def model_call_with_stream(params: dict) -> Generator[object, None, None];
-    async def model_call_no_stream_async(params: dict) -> dict;
+    def model_call_no_stream(params: dict[any, any]) -> dict[any, any];
+    def model_call_with_stream(
+        params: dict[any, any]
+    ) -> Generator[object, None, None];
+
+    async def model_call_no_stream_async(params: dict[any, any]) -> dict[any, any];
     async def model_call_with_stream_async(
-        params: dict
+        params: dict[any, any]
     ) -> AsyncGenerator[object, None];
 
     def _stream_final_answer(mt_run: MTRuntime) -> Generator[str, None, None];
@@ -164,14 +170,14 @@ obj BaseLLM {
 
     def _invoke_streaming(mt_run: MTRuntime) -> Generator[StreamEvent, None, None];
     def _invoke_with_handler(mt_run: MTRuntime, on_event: Callable) -> object;
-    def _get_ctx_window(call_params: dict) -> int;
-    def _resolve_compaction_params(mt_run: MTRuntime) -> dict;
+    def _get_ctx_window(call_params: dict[any, any]) -> int;
+    def _resolve_compaction_params(mt_run: MTRuntime) -> dict[any, any];
     def _maybe_compact(
-        mt_run: MTRuntime, usage: object, just_compacted: bool, cp: dict
+        mt_run: MTRuntime, usage: object, just_compacted: bool, cp: dict[any, any]
     ) -> bool;
 
     def _emergency_compact_retry(
-        mt_run: MTRuntime, just_compacted: bool, cp: dict
+        mt_run: MTRuntime, just_compacted: bool, cp: dict[any, any]
     ) -> CompletionResult;
 
     def _compact_messages(
@@ -180,7 +186,7 @@ obj BaseLLM {
 }
 
 obj MockLLM(BaseLLM) {
-    has seen_prompts: list = [];
+    has seen_prompts: list[any] = [];
 
     def postinit -> None;
     override def dispatch_no_streaming(mt_run: MTRuntime) -> CompletionResult;
@@ -190,14 +196,17 @@ obj MockLLM(BaseLLM) {
 
 obj LocalLLM(BaseLLM) {
     has alias: str = "",
-        spec: dict = {},
+        spec: dict[any, any] = {},
         _llama: object = None;
 
     def postinit -> None;
     def _ensure_llama -> object;
-    override def model_call_no_stream(params: dict) -> dict;
-    override def model_call_with_stream(params: dict) -> Generator[object, None, None];
-    override def _get_ctx_window(call_params: dict) -> int;
+    override def model_call_no_stream(params: dict[any, any]) -> dict[any, any];
+    override def model_call_with_stream(
+        params: dict[any, any]
+    ) -> Generator[object, None, None];
+
+    override def _get_ctx_window(call_params: dict[any, any]) -> int;
 }
 
 obj ModelPool(BaseLLM) {
@@ -207,12 +216,15 @@ obj ModelPool(BaseLLM) {
         num_retries: int | None = None,
         timeout: float | None = None,
         _router: object = None,
-        _fallback_model_names: list = [];
+        _fallback_model_names: list[any] = [];
 
     def postinit -> None;
-    override def model_call_no_stream(params: dict) -> dict;
-    override def model_call_with_stream(params: dict) -> Generator[object, None, None];
-    override def _get_ctx_window(call_params: dict) -> int;
+    override def model_call_no_stream(params: dict[any, any]) -> dict[any, any];
+    override def model_call_with_stream(
+        params: dict[any, any]
+    ) -> Generator[object, None, None];
+
+    override def _get_ctx_window(call_params: dict[any, any]) -> int;
 }
 
 obj Model(BaseLLM) {
@@ -226,15 +238,15 @@ obj Model(BaseLLM) {
     override def invoke(mt_run: MTRuntime) -> any;
     override async def ainvoke(mt_run: MTRuntime) -> object;
     def _raise_mapped_provider_error(e: Exception) -> None;
-    def model_call_no_stream(params: dict) -> dict;
-    async def model_call_no_stream_async(params: dict) -> dict;
-    def model_call_with_stream(params: dict);
-    async def model_call_with_stream_async(params: dict);
+    def model_call_no_stream(params: dict[any, any]) -> dict[any, any];
+    async def model_call_no_stream_async(params: dict[any, any]) -> dict[any, any];
+    def model_call_with_stream(params: dict[any, any]);
+    async def model_call_with_stream_async(params: dict[any, any]);
     def model_call_http(
-        url: str, token: str, payload: dict, ca_bundle: (str | bool | None)
+        url: str, token: str, payload: dict[any, any], ca_bundle: (str | bool | None)
     ) -> object;
 
     async def model_call_http_async(
-        url: str, token: str, payload: dict, ca_bundle: (str | bool | None)
+        url: str, token: str, payload: dict[any, any], ca_bundle: (str | bool | None)
     ) -> object;
 }

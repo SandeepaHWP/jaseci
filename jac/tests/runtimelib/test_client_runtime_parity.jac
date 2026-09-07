@@ -79,14 +79,14 @@ Non-public helpers are excluded on purpose: parsing pulls in the `impl/` annex,
 and targets may name internal arguments after whatever library they wrap
 (react-form's `field` vs solid-form's `fieldApi`). Parity covers the public
 surface, not private plumbing."""
-def _signatures(path: Path) -> dict[str, list] {
+def _signatures(path: Path) -> dict[str, list[any]] {
     src = path.read_text(encoding="utf-8");
     prog = JacProgram();
     mod = prog.parse_str(src, str(path));
     assert not prog.errors_had , (
         f"{path.name} failed to parse: {[str(e) for e in prog.errors_had]}"
     );
-    out: dict[str, list] = {};
+    out: dict[str, list[any]] = {};
     for abl in mod.get_all_sub_nodes(uni.Ability) {
         name = abl.name_ref?.value;
         if not name or not _is_public(abl) {
@@ -136,7 +136,7 @@ def _compiled_body(path: Path, backend: any, name: str) -> str {
 }
 
 """Render one signature for a failure message."""
-def _render(name: str, params: list) -> str {
+def _render(name: str, params: list[any]) -> str {
     parts = [];
     for (pname, ptype, pdefault) in params {
         text = pname;

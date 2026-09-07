@@ -23,7 +23,7 @@ def _s(v: any) -> str {
 }
 
 
-def endpoint_ready_counts(ep: dict) -> dict {
+def endpoint_ready_counts(ep: dict[any, any]) -> dict[any, any] {
     ready = 0;
     not_ready = 0;
     for subset in (ep.get("subsets", []) or []) {
@@ -34,11 +34,13 @@ def endpoint_ready_counts(ep: dict) -> dict {
 }
 
 
-def summarize_service(svc: dict, ready_by_name: dict) -> dict {
+def summarize_service(
+    svc: dict[any, any], ready_by_name: dict[any, any]
+) -> dict[any, any] {
     meta = svc.get("metadata", {}) or {};
     spec = svc.get("spec", {}) or {};
     name = _s(meta.get("name"));
-    ports: list = [];
+    ports: list[any] = [];
     for p in (spec.get("ports", []) or []) {
         ports.append(
             {
@@ -60,11 +62,11 @@ def summarize_service(svc: dict, ready_by_name: dict) -> dict {
 }
 
 
-def summarize_ingress(ing: dict) -> dict {
+def summarize_ingress(ing: dict[any, any]) -> dict[any, any] {
     meta = ing.get("metadata", {}) or {};
     spec = ing.get("spec", {}) or {};
     status = ing.get("status", {}) or {};
-    rules_out: list = [];
+    rules_out: list[any] = [];
     for rule in (spec.get("rules", []) or []) {
         host = _s(rule.get("host"));
         http = rule.get("http", {}) or {};
@@ -94,8 +96,8 @@ def summarize_ingress(ing: dict) -> dict {
 }
 
 
-def pvc_claimants(pods: list) -> dict {
-    out: dict = {};
+def pvc_claimants(pods: list[any]) -> dict[any, any] {
+    out: dict[any, any] = {};
     for pod in pods {
         meta = pod.get("metadata", {}) or {};
         spec = pod.get("spec", {}) or {};
@@ -117,7 +119,9 @@ def pvc_claimants(pods: list) -> dict {
 }
 
 
-def summarize_pvc(pvc: dict, claimants_by_name: dict) -> dict {
+def summarize_pvc(
+    pvc: dict[any, any], claimants_by_name: dict[any, any]
+) -> dict[any, any] {
     meta = pvc.get("metadata", {}) or {};
     spec = pvc.get("spec", {}) or {};
     status = pvc.get("status", {}) or {};
@@ -136,13 +140,13 @@ def summarize_pvc(pvc: dict, claimants_by_name: dict) -> dict {
 
 def build_network(
     namespace: str,
-    services: list,
-    endpoints: list,
-    ingresses: list,
-    pvcs: list,
-    pods: list
-) -> dict {
-    ready_by_name: dict = {};
+    services: list[any],
+    endpoints: list[any],
+    ingresses: list[any],
+    pvcs: list[any],
+    pods: list[any]
+) -> dict[any, any] {
+    ready_by_name: dict[any, any] = {};
     for ep in endpoints {
         nm = _s((ep.get("metadata", {}) or {}).get("name"));
         if nm {
@@ -165,7 +169,7 @@ def build_network(
 }
 
 
-def _collect_network -> dict {
+def _collect_network -> dict[any, any] {
     if not k8s_available() {
         return {"available": False, "detail": unavailable_detail()};
     }

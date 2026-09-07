@@ -1248,7 +1248,7 @@ impl PgStore._listen_loop -> None {
         return;
     }
     while not stop.is_set() {
-        pending: list = [];
+        pending: list[any] = [];
         sock: any = None;
         try {
             with self._lock {

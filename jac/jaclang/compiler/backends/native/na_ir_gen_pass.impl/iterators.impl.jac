@@ -198,7 +198,7 @@ impl NaIRGenPass._get_char_cache_gv -> ir.Value {
         return self.llvm_module.globals[sym];
     }
     char_struct_type = None;
-    entries: list = [];
+    entries: list[any] = [];
     for _bi in range(256) {
         (char_struct_type, _entry) = self._static_str_struct_const(bytes([_bi, 0]));
         entries.append(_entry);
@@ -1280,10 +1280,10 @@ impl NaIRGenPass._try_iter_protocol_for(nd: uni.InForStmt) -> bool {
 
     _ustruct = self._struct_name_of(coll) if not is_adapter_call else None;
     is_user_iterable = _ustruct is not None and self._arch_implements_iter(_ustruct);
-    built: (tuple | None) = None;
+    built: (tuple[any, ...] | None) = None;
     owns_iter = False;
     _saved_srcs = self._iter_owned_srcs;
-    _iter_srcs: list = [];
+    _iter_srcs: list[any] = [];
     if is_adapter_call or is_user_iterable {
         self._iter_owned_srcs = _iter_srcs;
         built = self._build_iter_from_expr(coll);

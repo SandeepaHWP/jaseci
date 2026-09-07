@@ -68,7 +68,7 @@ impl LayoutPass._collect_archetypes(module: Module) -> dict[str, Archetype] {
 impl LayoutPass._collect_isinstance_targets(module: Module) -> None {
     import from jaclang.compiler.frontend.module_facts { ModuleFacts }
     import from jaclang.compiler.frontend.constant { CodeContext }
-    calls: list = [];
+    calls: list[any] = [];
     for stmt in ModuleFacts.iter_context_stmts(module, CodeContext.NATIVE) {
         if isinstance(stmt, FuncCall) {
             calls.append(stmt);
@@ -85,7 +85,7 @@ impl LayoutPass._collect_isinstance_targets(module: Module) -> None {
             continue;
         }
         type_arg = params[1];
-        cands: list = [];
+        cands: list[any] = [];
         if isinstance(type_arg, TupleVal) {
             for v in (type_arg.values or []) {
                 cands.append(v);
@@ -212,7 +212,7 @@ impl LayoutPass._topo_sort(arch_map: dict[str, Archetype]) -> list[str] {
         if aname in visited {
             continue;
         }
-        stack: list[tuple] = [(aname, False)];
+        stack: list[tuple[any, ...]] = [(aname, False)];
         while stack {
             (name, processed) = stack.pop();
             if name in visited {

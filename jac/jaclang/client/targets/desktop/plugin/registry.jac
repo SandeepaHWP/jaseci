@@ -10,7 +10,7 @@ import from built_in.dialog_plugin { DialogPlugin }
 import from built_in.shell_plugin { ShellPlugin }
 
 
-glob BUILTIN_PLUGINS: list = [
+glob BUILTIN_PLUGINS: list[any] = [
          PathPlugin.manifest(),
          WindowPlugin.manifest(),
          FsPlugin.manifest(),
@@ -21,7 +21,7 @@ glob BUILTIN_PLUGINS: list = [
      ];
 
 
-def bootstrap_plugins(configs: dict, modules: dict) -> PluginHost {
+def bootstrap_plugins(configs: dict[any, any], modules: dict[any, any]) -> PluginHost {
     ctx = PluginContext();
 
     ctx.path_plugin = PathPlugin();

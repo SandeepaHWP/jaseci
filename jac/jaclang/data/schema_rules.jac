@@ -53,7 +53,7 @@ def validate_rules(rules: SchemaRules, cls: type) -> None;
 
 def repair_mode -> str;
 
-def apply_rules(data: dict, rules: SchemaRules) -> tuple;
+def apply_rules(data: dict[any, any], rules: SchemaRules) -> tuple[any, ...];
 
 def _require_collector -> SchemaRules;
 def _owner_key(cls: type) -> str;

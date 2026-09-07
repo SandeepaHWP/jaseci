@@ -8,7 +8,7 @@ import from jaclang.jac0core.ext_registry {
     language_of
 }
 
-glob _project_root_cache: dict = {},
+glob _project_root_cache: dict[any, any] = {},
      _import_base_stack: list = [],
      COMPILER_PACKAGE: str = 'jaclang';
 
@@ -93,7 +93,7 @@ def _find_spec_no_exec(target: str) -> (ModuleSpec | None) {
     return spec;
 }
 
-def find_project_root(start: (Path | None) = None) -> (tuple | None) {
+def find_project_root(start: (Path | None) = None) -> (tuple[any, ...] | None) {
     if start is None {
         start = Path.cwd();
     }
@@ -549,8 +549,13 @@ def resolve_relative_path(
     return path;
 }
 
-glob NPM_RUNTIME_CONDITIONS: tuple = ('browser', 'module', 'import', 'default'),
-     NPM_TYPES_CONDITIONS: tuple = ('types', 'import', 'default'),
+glob NPM_RUNTIME_CONDITIONS: tuple[any, ...] = (
+         'browser',
+         'module',
+         'import',
+         'default'
+     ),
+     NPM_TYPES_CONDITIONS: tuple[any, ...] = ('types', 'import', 'default'),
      NPM_DTS_SUFFIXES: tuple[str, ...] = ('.d.ts', '.d.mts', '.d.cts');
 
 def _find_npm_package(

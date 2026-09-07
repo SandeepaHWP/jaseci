@@ -1872,7 +1872,7 @@ def build_osp_core_js -> str {
     );
     import from jaclang.compiler.driver.pass_driver { run_pass }
     program = run_pass(EsastGenPass, ir, prog).ir_out.gen.es_ast;
-    kept: list = [];
+    kept: list[any] = [];
     if isinstance(program, es.Program) {
         for stmt in program.body {
             is_jac_rt = (

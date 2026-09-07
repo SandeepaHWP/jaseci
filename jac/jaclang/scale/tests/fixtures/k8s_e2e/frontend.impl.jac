@@ -8,7 +8,7 @@ In microservice mode, the client calls gateway function endpoints:
 
 impl app.apiCall(service: str, endpoint: str, body: dict = {}) -> any {
     token = localStorage.getItem("jac_token");
-    options: dict = {
+    options: dict[any, any] = {
         "method": "POST",
         "headers": {
             "Content-Type": "application/json",

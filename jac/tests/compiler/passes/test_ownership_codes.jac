@@ -18,7 +18,7 @@ import from jaclang.testing.test { parametrize }
 import from tests.ownership_helpers { compile_fixture, expect_ownership_codes }
 
 # (group, case name, fixture, expected E13xx codes, [enforce nogc])
-glob OWNERSHIP_CASES: list[tuple] = [
+glob OWNERSHIP_CASES: list[tuple[any, ...]] = [
          # -- affine_walkers --------------------------------------------------
          (
              "affine_walkers",
@@ -713,11 +713,11 @@ glob OWNERSHIP_CASES: list[tuple] = [
          )
      ];
 
-def _case_id(row: tuple) -> str {
+def _case_id(row: tuple[any, ...]) -> str {
     return f"{row[0]}: {row[1]}";
 }
 
-def _ownership_case(row: tuple) {
+def _ownership_case(row: tuple[any, ...]) {
     enforce = row[4] if len(row) > 4 else False;
     prog = compile_fixture(row[2], enforce=enforce);
     expect_ownership_codes(prog, row[3]);

@@ -72,7 +72,7 @@ def emit_wasm_object(fixture: str) -> bytes {
 }
 
 """Top-level section spans -> list of (id, payload_start, payload_end)."""
-def sections(b: bytes) -> list {
+def sections(b: bytes) -> list[any] {
     o = 8;
     out = [];
     while o < len(b) {
@@ -95,7 +95,7 @@ def has_section(b: bytes, want: int) -> bool {
 }
 
 """Names of imported functions (kind 0) in the module's import section."""
-def func_imports(b: bytes) -> list {
+def func_imports(b: bytes) -> list[any] {
     out = [];
     for (sid, s, e) in sections(b) {
         if sid != 2 {
@@ -134,7 +134,7 @@ def func_imports(b: bytes) -> list {
 }
 
 """Names exported by the module."""
-def export_names(b: bytes) -> list {
+def export_names(b: bytes) -> list[any] {
     out = [];
     for (sid, s, e) in sections(b) {
         if sid != 7 {

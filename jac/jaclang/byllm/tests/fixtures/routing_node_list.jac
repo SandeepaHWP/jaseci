@@ -57,7 +57,7 @@ node Target {
 }
 
 walker picker {
-    has options: list = [];
+    has options: list[any] = [];
 
     can pick with Here entry {
         visit self.options by llm(select=1, intent="Pick one target");

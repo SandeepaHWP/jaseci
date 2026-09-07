@@ -88,12 +88,12 @@ obj PgRuntime {
     def is_running -> bool;
     def conninfo -> ConnInfo;
     def drop_database(database: str, force: bool = False) -> bool;
-    def databases -> list;
+    def databases -> list[any];
     def fetch_dist -> str;
     def _sock_dir -> str;
     def _priv_plan -> PgPrivPlan;
     def _run_as -> (PgRunAs | None);
-    def _as_user -> dict;
+    def _as_user -> dict[any, any];
     def _grant_dir(path: str) -> None;
     def _resolve_binaries -> str;
     def _resolve_from_env -> (str | None);

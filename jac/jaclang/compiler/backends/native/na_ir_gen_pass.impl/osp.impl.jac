@@ -1,4 +1,4 @@
-glob _NA_OSP_KERNEL_MOD: list = [];
+glob _NA_OSP_KERNEL_MOD: list[any] = [];
 
 def _load_native_osp_kernel_module -> (uni.Module | None) {
     if _NA_OSP_KERNEL_MOD {
@@ -204,7 +204,7 @@ impl NaIRGenPass._osp_make_immortal(ptr: ir.Value) -> None {
 }
 
 impl NaIRGenPass._osp_collect_slots(arch_name: str, is_entry: bool) -> list {
-    slots: list = [];
+    slots: list[any] = [];
     _model = self.ir_in.gen.osp_model;
     if _model is None {
         return slots;
@@ -313,7 +313,7 @@ impl NaIRGenPass._osp_emit_callbacks -> dict {
     i8p = i8.as_pointer();
     _fields = self.struct_field_types.get("OspRuntime", {});
     _saved = self._builder;
-    out: dict = {};
+    out: dict[any, any] = {};
 
     _tf = self._define_function("__osp_tag_of", _fields["tag_of"].pointee);
     _tf.linkage = "internal";
@@ -632,7 +632,7 @@ impl NaIRGenPass._codegen_connect(nd: uni.BinaryExpr) -> (ir.Value | None) {
     }
     osp_conn_fn = self.func_symtab.get("osp_conn");
 
-    _xnames: list = [
+    _xnames: list[any] = [
         self._spawn_operand_name(nd.left),
         self._spawn_operand_name(nd.right),
 
@@ -748,7 +748,7 @@ impl NaIRGenPass._codegen_disconnect(nd: uni.BinaryExpr) -> (ir.Value | None) {
     }
     disc_fn = self.func_symtab.get("osp_disconn_between");
     _fcond = dop.edge_spec.filter_cond;
-    _xnames: list = [
+    _xnames: list[any] = [
         self._spawn_operand_name(nd.left),
         self._spawn_operand_name(nd.right),
 
@@ -771,7 +771,7 @@ impl NaIRGenPass._codegen_disconnect(nd: uni.BinaryExpr) -> (ir.Value | None) {
     }
     _left_is_list = self._osp_disc_list_operand(nd.left);
     _right_is_list = self._osp_disc_list_operand(nd.right);
-    _disc_compares: list = [];
+    _disc_compares: list[any] = [];
     if (_fcond is not None) and _fcond.compares {
         _disc_compares = [
             _c
@@ -979,7 +979,7 @@ impl NaIRGenPass._codegen_edge_ref_trailer(
                 }
             }
         }
-        _ec_compares: list = [];
+        _ec_compares: list[any] = [];
         if (_fcond is not None) and _fcond.compares {
             _ec_compares = list(_fcond.compares);
         }
@@ -1288,7 +1288,7 @@ impl NaIRGenPass._osp_pred_pair(
             return None;
         }
     }
-    _rhs_vals: list = [];
+    _rhs_vals: list[any] = [];
     for cmp in compares {
         _rv = self._codegen_expr(cmp.rights[0]);
         if _rv is None {

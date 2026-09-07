@@ -24,7 +24,7 @@ glob OWNFIELD_DIR = os.path.join(
          "cycles": ["--gc", "cycles"]
      };
 
-def _compile(path: str) -> tuple {
+def _compile(path: str) -> tuple[any, ...] {
     prev = os.environ.get("JAC_NATIVE_TARGET", None);
     os.environ["JAC_NATIVE_TARGET"] = "wasm32-unknown-unknown";
     try {

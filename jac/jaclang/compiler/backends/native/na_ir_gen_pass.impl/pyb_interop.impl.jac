@@ -107,7 +107,7 @@ impl NaIRGenPass._pyb_shadow_postinit_owner(arch_name: str) -> (str | None) {
         return None;
     }
     seen: set = {arch_name};
-    queue: list = list(arch.base_classes or []);
+    queue: list[any] = list(arch.base_classes or []);
     while queue {
         base_expr = queue.pop(0);
         if isinstance(base_expr, uni.AtomTrailer)
@@ -187,7 +187,7 @@ impl NaIRGenPass._pyb_shadowed_dispatch(
         return None;
     }
     seen: set = {arch_name};
-    queue: list = list(arch.base_classes or []);
+    queue: list[any] = list(arch.base_classes or []);
     while queue {
         base_expr = queue.pop(0);
         if isinstance(base_expr, uni.AtomTrailer)
@@ -800,8 +800,8 @@ impl NaIRGenPass._pyb_build_args(
     """;
     i64 = ir.IntType(64);
     i8p = ir.IntType(8).as_pointer();
-    pos: list = [];
-    kwp: list = [];
+    pos: list[any] = [];
+    kwp: list[any] = [];
     for p in (params or []) {
         if isinstance(p, uni.KWPair) {
             if p.key is None {
@@ -815,7 +815,7 @@ impl NaIRGenPass._pyb_build_args(
     if skip_kwargs and kwp {
         return None;
     }
-    marshalled: list = [];
+    marshalled: list[any] = [];
     for p in pos {
         v = self._codegen_expr(p);
         if v is None {
@@ -827,7 +827,7 @@ impl NaIRGenPass._pyb_build_args(
         }
         marshalled.append(o);
     }
-    kw_pairs: list = [];
+    kw_pairs: list[any] = [];
     for p in kwp {
         v = self._codegen_expr(p.value);
         if v is None {
@@ -1139,7 +1139,7 @@ impl NaIRGenPass._codegen_pyb_shadow_init(
         }
         self.builder.call(self._pyb_helper("dict_set"), [kwd, self._pyb_cstr(kn), o]);
     }
-    args: list = [
+    args: list[any] = [
         self.builder.call(
             self._pyb_helper("from_cstr"), [self._pyb_cstr(bpath)], name="pyb.ctor.path"
         ),

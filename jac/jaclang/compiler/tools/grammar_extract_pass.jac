@@ -22,14 +22,14 @@ obj GExpr {
 }
 
 obj GSeq(GExpr) {
-    has items: list;
+    has items: list[any];
 
     def __eq__(other: object) -> bool;
     def __repr__ -> str;
 }
 
 obj GAlt(GExpr) {
-    has choices: list;
+    has choices: list[any];
 
     def __eq__(other: object) -> bool;
     def __repr__ -> str;
@@ -124,7 +124,7 @@ glob METHOD_TABLE: dict[str, MethodSemantics] = {
          "synchronize": MethodSemantics(kind="ignore", token_args=False),
          "prune": MethodSemantics(kind="ignore", token_args=False)
      },
-     SPECIAL_LOOKAHEAD_TOKENS: dict[str, list] = {
+     SPECIAL_LOOKAHEAD_TOKENS: dict[str, list[any]] = {
          "check_name": ["NAME", "KWESC_NAME"],
          "is_keyword_token": ["NAME"],
          "is_builtin_type_token": sorted(kind.name for kind in BUILTIN_TYPE_KINDS)
@@ -133,86 +133,89 @@ glob METHOD_TABLE: dict[str, MethodSemantics] = {
 obj ConditionResult {
     has method: str,
         kind: str,
-        tokens: list;
+        tokens: list[any];
 }
 
 walker GrammarExtractPass(UniPass) {
-    has rules: list = [],
+    has rules: list[any] = [],
         target_class: str = "Parser",
-        diagnostics: list = [],
-        _parse_impls: list = [],
-        _rule_firsts: dict = {},
+        diagnostics: list[any] = [],
+        _parse_impls: list[any] = [],
+        _rule_firsts: dict[any, any] = {},
         _current_rule: str = "",
-        _none_returning: dict = {},
-        _helper_bodies: dict = {};
+        _none_returning: dict[any, any] = {},
+        _helper_bodies: dict[any, any] = {};
 
     def before_pass -> None;
     can enter_impl_def with uni.ImplDef entry;
     def after_pass -> None;
-    def _interpret_all -> list;
-    def _compute_rule_firsts(rules: list) -> dict;
-    def _compute_rule_firsts_deep(rules: list) -> dict;
+    def _interpret_all -> list[any];
+    def _compute_rule_firsts(rules: list[any]) -> dict[any, any];
+    def _compute_rule_firsts_deep(rules: list[any]) -> dict[any, any];
     def _returns_none(nd: uni.ImplDef) -> bool;
-    def _has_diag_call(stmts: list) -> bool;
-    def _always_returns(stmts: list) -> bool;
+    def _has_diag_call(stmts: list[any]) -> bool;
+    def _always_returns(stmts: list[any]) -> bool;
     def _chain_is_exhaustive(stmt: uni.IfStmt) -> bool;
-    def _tok_set_expr(tokens: list) -> GExpr | None;
-    def _collect_strict_diags(rule_name: str, stmts: list) -> None;
+    def _tok_set_expr(tokens: list[any]) -> GExpr | None;
+    def _collect_strict_diags(rule_name: str, stmts: list[any]) -> None;
     def _walk_strict(rule_name: str, nd: uni.UniNode) -> None;
     def emit_diagnostics -> str;
     static def format_ebnf(expr: GExpr) -> str;
     static def simplify_expr(expr: GExpr) -> GExpr;
-    def interpret_stmts(stmts: list) -> GExpr | None;
+    def interpret_stmts(stmts: list[any]) -> GExpr | None;
     def interpret_stmt(stmt: uni.UniNode) -> GExpr | None;
     def interpret_call(call: uni.FuncCall) -> GExpr | None;
     def interpret_if(stmt: uni.IfStmt) -> GExpr | None;
     def interpret_while(stmt: uni.WhileStmt) -> GExpr | None;
     def interpret_condition(cond: uni.Expr) -> ConditionResult | None;
-    def collect_dispatch_chain(stmt: uni.IfStmt) -> list;
-    def has_early_return(stmts: list) -> bool;
+    def collect_dispatch_chain(stmt: uni.IfStmt) -> list[any];
+    def has_early_return(stmts: list[any]) -> bool;
     def is_negated_check(cond: uni.Expr) -> bool;
-    def find_break_match_tok(stmts: list) -> tuple | None;
-    def find_break_none_check(stmts: list) -> tuple | None;
+    def find_break_match_tok(stmts: list[any]) -> tuple[any, ...] | None;
+    def find_break_none_check(stmts: list[any]) -> tuple[any, ...] | None;
     def _is_self_pos_access(expr: uni.Expr) -> bool;
-    def _extract_savepoint_delegation(stmts: list) -> GExpr | None;
-    def _find_post_restore_delegation(stmts: list) -> GExpr | None;
-    def compute_first_set(expr: GExpr) -> tuple;
+    def _extract_savepoint_delegation(stmts: list[any]) -> GExpr | None;
+    def _find_post_restore_delegation(stmts: list[any]) -> GExpr | None;
+    def compute_first_set(expr: GExpr) -> tuple[any, ...];
     def all_paths_start_with(expr: GExpr, tok_set: set) -> bool;
     def should_suppress_guard(
         guard_tokens: set, body: GExpr, body_stmt_count: int
     ) -> bool;
 
-    def _stage_simplify(rules: list) -> list;
-    def _stage_unwrap_top_opt(rules: list) -> list;
-    def _stage_dedup_tokens(rules: list) -> list;
-    def _stage_elide_covered_guards(rules: list) -> list;
+    def _stage_simplify(rules: list[any]) -> list[any];
+    def _stage_unwrap_top_opt(rules: list[any]) -> list[any];
+    def _stage_dedup_tokens(rules: list[any]) -> list[any];
+    def _stage_elide_covered_guards(rules: list[any]) -> list[any];
     def _elide_guards_in_expr(expr: GExpr) -> GExpr;
     def _guard_tok_set(expr: GExpr) -> set | None;
-    def _stage_inline_aliases(rules: list) -> list;
-    def _replace_refs(expr: GExpr, mapping: dict) -> GExpr;
-    def _stage_fold_token_sets(rules: list) -> list;
-    def _fold_tokens_in_expr(expr: GExpr, candidates: list, current: str) -> GExpr;
-    def _stage_remove_errors(rules: list) -> list;
+    def _stage_inline_aliases(rules: list[any]) -> list[any];
+    def _replace_refs(expr: GExpr, mapping: dict[any, any]) -> GExpr;
+    def _stage_fold_token_sets(rules: list[any]) -> list[any];
+    def _fold_tokens_in_expr(
+        expr: GExpr, candidates: list[any], current: str
+    ) -> GExpr;
+
+    def _stage_remove_errors(rules: list[any]) -> list[any];
     def _is_redundant_slot_wrap_recovery(expr: GExpr) -> bool;
     def _strip_lambda_body_recovery(body: GExpr) -> GExpr;
-    def _stage_remove_unreachable(rules: list) -> list;
-    def _dedup_parent_child_tokens(expr: GExpr, rule_map: dict) -> GExpr;
+    def _stage_remove_unreachable(rules: list[any]) -> list[any];
+    def _dedup_parent_child_tokens(expr: GExpr, rule_map: dict[any, any]) -> GExpr;
     def _collect_refs(body: GExpr) -> set;
     def expr_contains_tok(expr: GExpr, tok_name: str) -> bool;
-    def _resolve_tokens(method: str, call: uni.FuncCall | None) -> list;
-    def _merge_or_conditions(exprs: list) -> ConditionResult | None;
+    def _resolve_tokens(method: str, call: uni.FuncCall | None) -> list[any];
+    def _merge_or_conditions(exprs: list[any]) -> ConditionResult | None;
     def extract_token_kind(expr: uni.Expr) -> str | None;
     def get_self_method(nd: uni.Expr) -> str | None;
-    def get_token_args(call: uni.FuncCall) -> list;
+    def get_token_args(call: uni.FuncCall) -> list[any];
     def get_call_from_expr(expr: (uni.Expr | uni.KWPair)) -> uni.FuncCall | None;
-    def get_impl_target_names(nd: uni.ImplDef) -> list;
+    def get_impl_target_names(nd: uni.ImplDef) -> list[any];
     def format_rule_pretty(
         rule: GrammarRule, sep: str = "::=", max_line: int = 88
     ) -> str;
 
     def format_expr_pretty(expr: GExpr, indent: int, max_line: int) -> str;
-    def format_alt_pretty(choices: list, indent: int, max_line: int) -> str;
-    def format_seq_pretty(items: list, indent: int, max_line: int) -> str;
+    def format_alt_pretty(choices: list[any], indent: int, max_line: int) -> str;
+    def format_seq_pretty(items: list[any], indent: int, max_line: int) -> str;
     def format_group_pretty(
         inner: GExpr, indent: int, max_line: int, suffix: str
     ) -> str;

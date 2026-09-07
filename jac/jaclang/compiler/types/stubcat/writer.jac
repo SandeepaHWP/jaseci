@@ -778,7 +778,7 @@ obj CatalogWriter {
                 );
             }
             if isinstance(t, FunctionType) {
-                params: list = [];
+                params: list[any] = [];
                 for p in (t.parameters or []) {
                     params.append(
                         (
@@ -876,8 +876,8 @@ obj CatalogWriter {
         }
     }
 
-    def _types_ident(ts: (list | None)) -> tuple {
-        out: list = [];
+    def _types_ident(ts: (list[any] | None)) -> tuple[any, ...] {
+        out: list[any] = [];
         for x in (ts or []) {
             out.append(self._type_ident(x) if x is not None else -1);
         }
@@ -1482,7 +1482,7 @@ obj CatalogWriter {
         ambient_sid = self.sid(json.dumps(ambient_json, sort_keys=True));
 
         recblob = bytearray();
-        def lay(recs: list) -> bytes {
+        def lay(recs: list[any]) -> bytes {
             offsets: list[bytes] = [];
             for r in recs {
                 offsets.append(len(recblob).to_bytes(4, "little"));

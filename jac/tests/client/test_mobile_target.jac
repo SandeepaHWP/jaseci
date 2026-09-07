@@ -1291,7 +1291,7 @@ test "node tooling runs installs and tools on the bundled bun only" {
 
     calls: list[list[str]] = [];
 
-    def _fake_run(cmd: list[str], **kwargs: dict) -> object {
+    def _fake_run(cmd: list[str], **kwargs: dict[any, any]) -> object {
         class _Res {
             has returncode: int = 0,
                 stdout: str = "",
@@ -1393,7 +1393,7 @@ test "expo prebuild runs even when native tree and prebuild state exist" {
 
     calls: list[list[str]] = [];
 
-    def _fake_run(cmd: list[str], **kwargs: dict) -> object {
+    def _fake_run(cmd: list[str], **kwargs: dict[any, any]) -> object {
         class _Res {
             has returncode: int = 0,
                 stdout: str = "",

@@ -172,7 +172,7 @@ async def _do_call_tool(
     return "\n".join(parts) if parts else "MCP tool returned no content.";
 }
 
-async def _open_transport(client: McpClient, transport_type: str) -> tuple {
+async def _open_transport(client: McpClient, transport_type: str) -> tuple[any, ...] {
     import from mcp.client.stdio { StdioServerParameters, stdio_client }
     import from mcp.client.sse { sse_client }
     import from mcp.client.streamable_http { streamablehttp_client }

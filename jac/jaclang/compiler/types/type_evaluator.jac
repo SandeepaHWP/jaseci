@@ -337,7 +337,7 @@ walker TypeEvaluator {
     def _scope_is_current(scope: UniScopeNode) -> bool;
 
     has program: JacProgram,
-        _shared_intern: dict[tuple, ClassDetailsShared] = {},
+        _shared_intern: dict[tuple[any, ...], ClassDetailsShared] = {},
         _BUILTINS_STUB_FILE_PATH: str postinit,
         _TYPING_STUB_FILE_PATH: str postinit,
         _TYPES_STUB_FILE_PATH: str postinit,
@@ -488,7 +488,7 @@ walker TypeEvaluator {
     def _extract_ct_params(node_: Archetype) -> (list[str] | None);
     def _ct_args_for_class(
         base_type: ClassType, slot_vals: list[Expr]
-    ) -> (tuple | None);
+    ) -> (tuple[any, ...] | None);
 
     def _is_class_scoped_type_param(node_: TypeParam) -> bool;
     def _collect_typevars_from_base(
@@ -815,7 +815,7 @@ walker TypeEvaluator {
     ) -> TypeBase;
 
     def _type_matches_isinstance(t: TypeBase, target_type: TypeBase) -> bool;
-    def _union_narrowed_types(types_list: list) -> TypeBase;
+    def _union_narrowed_types(types_list: list[any]) -> TypeBase;
     def _if_exit_type(
         target: NarrowingTarget,
         stmt: IfStmt,

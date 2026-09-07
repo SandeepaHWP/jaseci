@@ -26,7 +26,7 @@ obj _ContextStack {
         self._var = ContextVar('osp_walk_stack', `default=None);
     }
 
-    def _list -> list {
+    def _list -> list[any] {
         v = self._var.get();
         return v if v is not None else [];
     }
@@ -99,8 +99,8 @@ def _slots_from(funcs: list[ObjectSpatialFunction]) -> list[Slot] {
     return slots;
 }
 
-def _mro_funcs(cls: any, attr: str) -> list {
-    merged: dict = {};
+def _mro_funcs(cls: any, attr: str) -> list[any] {
+    merged: dict[any, any] = {};
     for c in reversed(cls.__mro__) {
         clsfns = c.__dict__.get(attr);
         if clsfns {
@@ -209,7 +209,7 @@ def make_sv_runtime -> OspRuntime {
 }
 
 async def osp_spawn_async(
-    rt: OspRuntime, wlk: any, wdesc: WalkerDesc, starts: list
+    rt: OspRuntime, wlk: any, wdesc: WalkerDesc, starts: list[any]
 ) -> any {
     eng = _kernel.DEFAULT;
     scope = eng.begin(wlk, starts);

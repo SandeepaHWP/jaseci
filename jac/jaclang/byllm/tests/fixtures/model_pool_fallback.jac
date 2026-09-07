@@ -17,7 +17,7 @@ glob model1 = MockLLM(model_name="gpt-3.5-turbo", config={"outputs": []}),
 
 def get_answer(question: str) -> str by pool();
 
-def mock_completion(**_kwargs: object) -> dict {
+def mock_completion(**_kwargs: object) -> dict[any, any] {
     return {
         "model": "mock-pool-model",
         "choices": [

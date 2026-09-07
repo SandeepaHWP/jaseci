@@ -12,7 +12,7 @@ import from "@hugeicons/core-free-icons" {
     Alert01Icon
 }
 
-glob _ICON_MAP: dict = {
+glob _ICON_MAP: dict[any, any] = {
          "octicons-arrow-right-24": ArrowRight01Icon,
          "octicons-arrow-left-24": ArrowLeft01Icon,
          "octicons-check-16": CheckmarkCircle01Icon,
@@ -22,7 +22,7 @@ glob _ICON_MAP: dict = {
          "material-check": CheckmarkCircle01Icon,
 
      },
-     _ADMON_STYLES: dict = {
+     _ADMON_STYLES: dict[any, any] = {
          "note": ["border-sky-500/50", "bg-sky-500/5", "text-sky-400"],
          "info": ["border-sky-500/50", "bg-sky-500/5", "text-sky-400"],
          "abstract": ["border-sky-500/50", "bg-sky-500/5", "text-sky-400"],
@@ -93,8 +93,10 @@ def _split_row(s: str) -> list[str] {
     return [c.strip() for c in t.split("|")];
 }
 
-def _parse_blocks(lines: list[str], anchors: list[str] | None = None) -> list[dict] {
-    blocks: list[dict] = [];
+def _parse_blocks(
+    lines: list[str], anchors: list[str] | None = None
+) -> list[dict[any, any]] {
+    blocks: list[dict[any, any]] = [];
     seen_headings = 0;
     i = 0;
     n = len(lines);
@@ -150,7 +152,7 @@ def _parse_blocks(lines: list[str], anchors: list[str] | None = None) -> list[di
             continue;
         }
         if s.startswith('=== "') {
-            tabs: list[dict] = [];
+            tabs: list[dict[any, any]] = [];
             while i < n and lines[i].strip().startswith('=== "') {
                 tt = lines[i].strip()[4:].strip().strip('"');
                 i = i + 1;
@@ -198,7 +200,7 @@ def _parse_blocks(lines: list[str], anchors: list[str] | None = None) -> list[di
             continue;
         }
         if _is_list_line(ln) {
-            items: list[dict] = [];
+            items: list[dict[any, any]] = [];
             while i < n
                 and (
                     _is_list_line(lines[i])
@@ -291,8 +293,8 @@ def _icon_name_ok(name: str) -> bool {
     return True;
 }
 
-def _parse_inline(t: str) -> list[dict] {
-    spans: list[dict] = [];
+def _parse_inline(t: str) -> list[dict[any, any]] {
+    spans: list[dict[any, any]] = [];
     buf = "";
     i = 0;
     n = len(t);
@@ -486,7 +488,7 @@ def:pub MDSpans(text: str) -> JsxElement {
         </span>;
 }
 
-def:pub MDBlocks(blocks: list[dict]) -> JsxElement {
+def:pub MDBlocks(blocks: list[dict[any, any]]) -> JsxElement {
     return
         <div>
             {for (bi, b) in enumerate(blocks) {

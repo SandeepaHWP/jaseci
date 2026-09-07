@@ -156,7 +156,7 @@ def _resolve_pairs(
 
 
 def _materialize_ids(
-    mem: Session, ids: list, local: dict[any, Anchor]
+    mem: Session, ids: list[any], local: dict[any, Anchor]
 ) -> list[Anchor] {
     missing = [
         i
@@ -175,9 +175,9 @@ def _materialize_ids(
 }
 
 
-def _unique_nodes(pairs: list[tuple[any, any]]) -> list {
+def _unique_nodes(pairs: list[tuple[any, any]]) -> list[any] {
     seen: set = set();
-    out: list = [];
+    out: list[any] = [];
     for (nid, _) in pairs {
         if nid is not None and nid not in seen {
             seen.add(nid);
@@ -278,8 +278,8 @@ impl resolve_query_edges(mem: Session, q: GraphQuery) -> list[Anchor] {
         return walk_edges(origins, q, gated);
     }
     (pairs, local, tail) = _resolve_pairs(mem, q, len(q.hops));
-    edge_ids: list = [];
-    node_of: dict = {};
+    edge_ids: list[any] = [];
+    node_of: dict[any, any] = {};
     seen: set = set();
     for (nid, eid) in pairs {
         if eid is None or eid in seen {

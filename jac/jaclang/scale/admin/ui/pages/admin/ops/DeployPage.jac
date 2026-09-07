@@ -24,8 +24,8 @@ def:pub DeployPage -> JsxElement {
         available: bool = True,
         detail: str = "",
         namespace: str = "",
-        deployments: list = [],
-        pods: list = [],
+        deployments: list[any] = [],
+        pods: list[any] = [],
         errorMsg: str = "",
         loadedOnce: bool = False;
 
@@ -85,7 +85,7 @@ def:pub DeployPage -> JsxElement {
         return base + "bg-danger-weak text-danger";
     }
 
-    def containerSummary(containers: list) -> str {
+    def containerSummary(containers: list[any]) -> str {
         parts: list[str] = [];
         for c in containers {
             tag = c["state"];
@@ -97,7 +97,7 @@ def:pub DeployPage -> JsxElement {
         return ", ".join(parts);
     }
 
-    def joinLabels(values: list) -> str {
+    def joinLabels(values: list[any]) -> str {
         return ", ".join([String(v) for v in values]);
     }
 

@@ -1,6 +1,6 @@
 import from jaclang.compiler.backends.native.llvm { ir }
 
-def scalar_layout(llt: (ir.Type | None)) -> tuple {
+def scalar_layout(llt: (ir.Type | None)) -> tuple[any, ...] {
     if isinstance(llt, ir.DoubleType) {
         return (8, 8, [(0, True, 64)]);
     }
@@ -22,7 +22,7 @@ def scalar_layout(llt: (ir.Type | None)) -> tuple {
     return (8, 8, [(0, False, 64)]);
 }
 
-def classify_struct_sysv(size: int, align: int, scalars: list) -> dict {
+def classify_struct_sysv(size: int, align: int, scalars: list[any]) -> dict[any, any] {
     if size == 0 {
         return {
             "size": 0,
@@ -74,7 +74,7 @@ def classify_struct_sysv(size: int, align: int, scalars: list) -> dict {
             }
         }
     }
-    coerce: list = [];
+    coerce: list[any] = [];
     for eb in range(num_eb) {
         used = size - (eb * 8);
         if used > 8 {
@@ -110,7 +110,7 @@ def classify_struct_sysv(size: int, align: int, scalars: list) -> dict {
     };
 }
 
-def classify_struct_aapcs(size: int, align: int, scalars: list) -> dict {
+def classify_struct_aapcs(size: int, align: int, scalars: list[any]) -> dict[any, any] {
     if size == 0 {
         return {
             "size": 0,
@@ -153,9 +153,9 @@ def classify_struct_aapcs(size: int, align: int, scalars: list) -> dict {
     }
 
     if size <= 8 {
-        coerce: list = [ir.IntType(64)];
+        coerce: list[any] = [ir.IntType(64)];
     } else {
-        coerce: list = [ir.ArrayType(ir.IntType(64), 2)];
+        coerce: list[any] = [ir.ArrayType(ir.IntType(64), 2)];
     }
     return {
         "size": size,
@@ -167,7 +167,9 @@ def classify_struct_aapcs(size: int, align: int, scalars: list) -> dict {
     };
 }
 
-def classify_struct(size: int, align: int, scalars: list, triple: str) -> dict {
+def classify_struct(
+    size: int, align: int, scalars: list[any], triple: str
+) -> dict[any, any] {
     if "aarch64" in triple or "arm64" in triple {
         return classify_struct_aapcs(size, align, scalars);
     }
@@ -175,11 +177,11 @@ def classify_struct(size: int, align: int, scalars: list, triple: str) -> dict {
 }
 
 def classify_foreign_fn(
-    structs: dict,
+    structs: dict[any, any],
     params: list[tuple[(str | None), (str | None)]],
     ret_tname: (str | None),
     triple: str
-) -> (dict | None) {
+) -> (dict[any, any] | None) {
     import from jaclang.compiler.backends.native.foreign { foreign_struct_layout }
     has_struct = ret_tname is not None and ret_tname in structs;
     for (_pn, _tn) in params {
@@ -190,8 +192,8 @@ def classify_foreign_fn(
     if not has_struct {
         return None;
     }
-    sig: list = [];
-    param_plan: list = [];
+    sig: list[any] = [];
+    param_plan: list[any] = [];
     for (i, (pname, tname)) in enumerate(params) {
         pn = pname or f"arg{i}";
         if tname is not None and tname in structs {
@@ -233,8 +235,8 @@ def classify_foreign_fn(
         }
     }
     sret = False;
-    sig_ret: tuple = ("scalar", );
-    ret_plan: dict = {"kind": "scalar"};
+    sig_ret: tuple[any, ...] = ("scalar", );
+    ret_plan: dict[any, any] = {"kind": "scalar"};
     if ret_tname is not None and ret_tname in structs {
         (rsz, ral, rleaves) = foreign_struct_layout(structs, ret_tname);
         rcls = classify_struct(rsz, ral, rleaves, triple);

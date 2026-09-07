@@ -18,7 +18,7 @@ def finish_tool(final_output: str) -> str {
 }
 
 
-def outputs -> list {
+def outputs -> list[any] {
     return [
         MockToolCall(tool=get_weather, args={"city": "Paris"}),
         MockToolCall(tool=finish_tool, args={"final_output": "Paris is sunny."}),
@@ -27,7 +27,7 @@ def outputs -> list {
 }
 
 
-def outputs_two_turns -> list {
+def outputs_two_turns -> list[any] {
     return [
         # Turn 1: tool call + finish + streamed answer
         MockToolCall(tool=get_weather, args={"city": "Paris"}),
@@ -45,10 +45,10 @@ glob llm_empty = MockLLM(model_name="mockllm", config={"outputs": outputs()}),
      llm_msg = MockLLM(model_name="mockllm", config={"outputs": outputs()}),
      llm_multi = MockLLM(model_name="mockllm", config={"outputs": outputs_two_turns()});
 
-glob h_empty: list = [],
-     h_dict: list = [{"role": "user", "content": "PRIOR_DICT"}],
-     h_msg: list = [Message(role=MessageRole.USER, content="PRIOR_MESSAGE")],
-     h_multi: list = [];
+glob h_empty: list[any] = [],
+     h_dict: list[any] = [{"role": "user", "content": "PRIOR_DICT"}],
+     h_msg: list[any] = [Message(role=MessageRole.USER, content="PRIOR_MESSAGE")],
+     h_multi: list[any] = [];
 
 
 def ask_e(message: str) -> str by llm_empty(
@@ -68,7 +68,7 @@ def ask_multi(message: str) -> str by llm_multi(
 );
 
 
-def assert_dict_history_with_assistant(label: str, history: list, expected: str) {
+def assert_dict_history_with_assistant(label: str, history: list[any], expected: str) {
     for m in history {
         assert isinstance(m, dict) , f"[{label}] expected dict, got {type(m).__name__}";
     }

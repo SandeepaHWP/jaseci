@@ -17,11 +17,11 @@ def _maybe_malloc_trim {
 
 glob _CHECK_STATE: dict[(str, any)] = {"prog": None, "coverage_on": False};
 
-def _wire_list(value: any) -> list {
+def _wire_list(value: any) -> list[any] {
     return value if isinstance(value, list) else [];
 }
 
-def _wire_dict(value: any) -> dict {
+def _wire_dict(value: any) -> dict[any, any] {
     return value if isinstance(value, dict) else {};
 }
 
@@ -67,7 +67,7 @@ def _reached_by_imports(prog: any, root_mod: any) -> list[str] {
             seen.add(os.path.realpath(str(m.loc.mod_path)));
         }
     }
-    stack: list = [root_mod] if root_mod is not None else [];
+    stack: list[any] = [root_mod] if root_mod is not None else [];
     visited: set[int] = set();
     while stack {
         mod = stack.pop();
@@ -373,8 +373,8 @@ impl check(
     results: list[dict[(str, any)]] = [];
     reached: set[str] = set();
     plan: dict[(str, int)] = {'total': len(units)};
-    placement_report: dict = {};
-    coverage_report: dict = {};
+    placement_report: dict[any, any] = {};
+    coverage_report: dict[any, any] = {};
 
     def run_units(batch: list[dict[(str, any)]]) -> None {
         if not batch {
@@ -594,7 +594,7 @@ impl check(
     }
 
     multi = len({r['label'] for r in results}) > 1;
-    failed_results: list[dict] = [];
+    failed_results: list[dict[any, any]] = [];
     total_errors = failed_files=0;
     for res in results {
         errs = _wire_list(res.get('errors'));
@@ -813,14 +813,14 @@ def _format_single_file_worker(
     cache_stamp: str = "",
     cache_anchor: str = "",
     logical_path: str = ""
-) -> dict {
+) -> dict[any, any] {
     import os;
     import from jaclang.compiler.driver.program { JacProgram }
     import from jaclang.compiler.frontend.helpers { read_file_with_encoding }
     path_obj = Path(file_path);
 
     effective_logical = logical_path or file_path;
-    result: dict = {
+    result: dict[any, any] = {
         'path': file_path,
         'success': False,
         'changed': False,
@@ -1120,7 +1120,7 @@ impl format(
     }
 
     unformatted_files: list[str] = [];
-    failed_results: list = [];
+    failed_results: list[any] = [];
 
     (all_files, had_path_errors) = _iter_jac_files(paths);
     total_files = len(all_files);
@@ -1143,7 +1143,7 @@ impl format(
         and total_files > 1
     );
 
-    results_by_idx: dict[(int, dict)] = {};
+    results_by_idx: dict[(int, dict[any, any])] = {};
 
     progress: dict[(str, any)] = {"pooled": use_pool, "done": 0};
 
@@ -1211,7 +1211,7 @@ impl format(
     } else {
         pool.run_inline();
     }
-    results: list[dict] = [];
+    results: list[dict[any, any]] = [];
     for idx in range(total_files) {
         if idx not in results_by_idx {
             on_record(idx, {'error': 'no result'});
@@ -1422,7 +1422,7 @@ impl precommit(
 
     fmt_targets = targets;
     tmp_root: (str | None) = None;
-    path_map: dict = {};
+    path_map: dict[any, any] = {};
     if staged and verify {
         dirty = _staged_dirty_files(git_root, rel_targets);
         if dirty {
@@ -1864,7 +1864,7 @@ impl grammar(output: str = "", strict: bool = False) -> int {
 }
 
 def _iter_jac_files(
-    paths: list, ignore_list: (list | None) = None, include_annex: bool = True
+    paths: list[any], ignore_list: (list[any] | None) = None, include_annex: bool = True
 ) -> tuple[list[str], bool] {
     import os;
     ignore_list = ignore_list or [];
@@ -1926,7 +1926,7 @@ def _drop_covered_annexes(files: list[str], explicit: set[str]) -> list[str] {
     return kept;
 }
 
-def _normalize_ignore_patterns(ignore: list) -> list {
+def _normalize_ignore_patterns(ignore: list[any]) -> list[any] {
     import from jaclang.compiler.frontend.helpers { normalize_exclude_patterns }
     return normalize_exclude_patterns(ignore);
 }
@@ -1967,7 +1967,7 @@ def _drop_git_ignored(paths: list[str]) -> list[str] {
 }
 
 
-def _should_ignore(file_path: str, ignore_patterns: list) -> bool {
+def _should_ignore(file_path: str, ignore_patterns: list[any]) -> bool {
     import from jaclang.compiler.frontend.helpers { path_matches_exclude }
     return path_matches_exclude(file_path, ignore_patterns);
 }

@@ -35,25 +35,28 @@ obj DepClibMeta {
         ct_deps: str = "",
         options_fingerprint: str = "",
         unverified_live_calls: dict[str, list[str]] = {},
-        coverage: dict = {};
+        coverage: dict[any, any] = {};
 
-    def to_meta -> dict;
-    static def from_meta(meta: dict) -> DepClibMeta;
+    def to_meta -> dict[any, any];
+    static def from_meta(meta: dict[any, any]) -> DepClibMeta;
     def propagate_to(gen: CodeGenTarget) -> None;
 }
 
 def native_compiler_fingerprint(options: any) -> str;
-def native_dep_cache_paths(real_path: str, options: any) -> tuple;
+def native_dep_cache_paths(real_path: str, options: any) -> tuple[any, ...];
 def native_demoted_ir_symbols(llvm_ir_text: str) -> list[str];
 def native_linked_ir_text(module: uni.Module) -> str;
 def native_ir_live_externs(llvm_ir_text: str) -> set[str];
-def native_prune_live_record(pending: dict, declared: set[str]) -> dict[str, set[str]];
+def native_prune_live_record(
+    pending: dict[any, any], declared: set[str]
+) -> dict[str, set[str]];
+
 def native_unit_demotions(
     prog: any, real_path: str, options: any
 ) -> (set[str] | None);
 
 def native_live_call_conflicts(
-    prog: any, pending: dict, options: any
+    prog: any, pending: dict[any, any], options: any
 ) -> dict[str, set[str]];
 
 glob NATIVE_VERDICT_TAINT_BOUND: int = 2048,
@@ -76,7 +79,7 @@ walker NativeCompilePass(Transform) {
     def _compile_and_link_native_imports(
         module: uni.Module,
         main_mod: ModuleRef,
-        imports: list,
+        imports: list[any],
         target_machine: TargetMachine
     ) -> None;
 

@@ -21,7 +21,7 @@ impl NaIRGenPass._foreign_fns -> dict {
 impl NaIRGenPass._foreign_fields_of(name: str) -> list {
     model = self._foreign_model();
     indices = self.struct_field_indices.get(name, {});
-    out: list = [];
+    out: list[any] = [];
     for (i, (fn, tn)) in enumerate(model.get(name, [])) {
         assert fn not in indices or indices[fn] == i , f"foreign field order mismatch for {name}.{fn}";
         out.append((fn, tn if (tn is not None and tn in model) else None));
@@ -54,7 +54,7 @@ impl NaIRGenPass._clib_c_type(name: str) -> ir.Type {
     ct = self.llvm_module.context.get_identified_type(key);
     self.struct_types[key] = ct;
     ftypes = self.struct_field_types.get(name, {});
-    body: list = [];
+    body: list[any] = [];
     for (fn, nested) in self._foreign_fields_of(name) {
         if nested is not None {
             body.append(self._clib_c_type(nested));
@@ -184,9 +184,9 @@ impl NaIRGenPass._codegen_clib_call(
     plan = self.clib_fn_abi[func_name];
     param_plans = plan["params"];
     ret_plan = plan["ret"];
-    call_args: list = [];
+    call_args: list[any] = [];
 
-    arg_attrs: dict = {};
+    arg_attrs: dict[any, any] = {};
     sret_buf = None;
     if plan["sret"] {
         sret_ct = self._clib_c_type(ret_plan["sname"]);

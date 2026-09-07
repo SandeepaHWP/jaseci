@@ -1199,7 +1199,7 @@ impl ViteBundler.create_npmrc(self: ViteBundler) -> Optional[Path] {
     return npmrc_path;
 }
 
-def _toml_config_to_js(config_data: dict) -> str {
+def _toml_config_to_js(config_data: dict[any, any]) -> str {
     return f"module.exports = {json.dumps(
         {
             k: v
@@ -1210,7 +1210,7 @@ def _toml_config_to_js(config_data: dict) -> str {
     )};\n";
 }
 
-def _toml_config_from_raw(config_data: dict) -> str {
+def _toml_config_from_raw(config_data: dict[any, any]) -> str {
     content = str(config_data.get('raw', '')).strip();
     return content + '\n' if content else '';
 }

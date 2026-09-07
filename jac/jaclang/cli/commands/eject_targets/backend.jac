@@ -6,12 +6,12 @@ import from jaclang.cli.console { console }
 def emit_backend(
     backend_dir: Path,
     project_name: str,
-    compiled: list,
-    walkers: list,
-    functions: list,
-    remap: dict,
-    db: dict,
-    project_deps: (list | None) = None,
+    compiled: list[any],
+    walkers: list[any],
+    functions: list[any],
+    remap: dict[any, any],
+    db: dict[any, any],
+    project_deps: (list[any] | None) = None,
     has_env: bool = False,
     entry_module: str = ""
 ) -> int {
@@ -26,8 +26,8 @@ def emit_backend(
         func_names.add(str(f["name"]));
     }
 
-    walker_fields: dict = {};
-    func_params: dict = {};
+    walker_fields: dict[any, any] = {};
+    func_params: dict[any, any] = {};
     emitted_codes: list = [];
     written = 0;
     for unit in compiled {
@@ -75,7 +75,7 @@ def emit_backend(
         return 1;
     }
 
-    walkers_full: list = [];
+    walkers_full: list[any] = [];
     for w in walkers {
         wn = str(w["name"]);
         walkers_full.append(
@@ -87,7 +87,7 @@ def emit_backend(
             }
         );
     }
-    functions_full: list = [];
+    functions_full: list[any] = [];
     for f in functions {
         fn = str(f["name"]);
         functions_full.append(
@@ -178,7 +178,7 @@ def _capability_requirements(caps: set) -> list[str] {
 }
 
 
-def _first_duplicate(names: list) -> str {
+def _first_duplicate(names: list[any]) -> str {
     seen: set = set();
     for n in names {
         s = str(n);
@@ -191,7 +191,7 @@ def _first_duplicate(names: list) -> str {
 }
 
 
-def _uses_llm(codes: list) -> bool {
+def _uses_llm(codes: list[any]) -> bool {
     for code in codes {
         for raw in str(code).splitlines() {
             line = raw.strip();
@@ -210,7 +210,7 @@ def _uses_llm(codes: list) -> bool {
 }
 
 
-def _rewrite_imports(py_code: str, remap: dict) -> str {
+def _rewrite_imports(py_code: str, remap: dict[any, any]) -> str {
     if not remap {
         return py_code;
     }
@@ -248,8 +248,8 @@ glob _RUNTIME_ARCH_BASES: set = {
      };
 
 
-def _extract_walker_fields(py_code: str, walker_names: set) -> dict {
-    result: dict = {};
+def _extract_walker_fields(py_code: str, walker_names: set) -> dict[any, any] {
+    result: dict[any, any] = {};
     try {
         tree = ast.parse(py_code);
     } except Exception {
@@ -263,7 +263,7 @@ def _extract_walker_fields(py_code: str, walker_names: set) -> dict {
     }
     for node in tree.body {
         if isinstance(node, ast.ClassDef) and (node.name in walker_names) {
-            ordered: dict = {};
+            ordered: dict[any, any] = {};
             unresolved: set = set();
             _collect_walker_fields(node, class_map, ordered, unresolved, set());
             result[node.name] = list(ordered.values());
@@ -283,7 +283,7 @@ def _extract_walker_fields(py_code: str, walker_names: set) -> dict {
 def _collect_walker_fields(
     cls_node: ast.ClassDef,
     class_map: dict[str, ast.ClassDef],
-    ordered: dict,
+    ordered: dict[any, any],
     unresolved: set,
     visited: set
 ) {
@@ -324,8 +324,8 @@ def _collect_walker_fields(
 }
 
 
-def _extract_func_params(py_code: str, func_names: set) -> dict {
-    result: dict = {};
+def _extract_func_params(py_code: str, func_names: set) -> dict[any, any] {
+    result: dict[any, any] = {};
     try {
         tree = ast.parse(py_code);
     } except Exception {
@@ -338,7 +338,7 @@ def _extract_func_params(py_code: str, func_names: set) -> dict {
             defaults = node.args.defaults;
 
             first_default = len(all_args) - len(defaults);
-            params: list = [];
+            params: list[any] = [];
             for i in range(len(all_args)) {
                 arg = all_args[i];
                 if arg.arg == "self" {
@@ -455,8 +455,8 @@ def _safe_model_default(default_src: str) -> str {
 def _emit_main_py(
     backend_dir: Path,
     project_name: str,
-    walkers: list,
-    functions: list,
+    walkers: list[any],
+    functions: list[any],
     has_env: bool,
     entry_module: str
 ) {
@@ -901,7 +901,7 @@ def _req_key(req: str) -> str {
 }
 
 
-def _emit_requirements(backend_dir: Path, extra_reqs: list) {
+def _emit_requirements(backend_dir: Path, extra_reqs: list[any]) {
     lines: list[str] = ["fastapi>=0.121", "uvicorn[standard]>=0.38"];
     seen: set = {_req_key(r) for r in lines};
     for req in extra_reqs {

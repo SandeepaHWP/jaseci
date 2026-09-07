@@ -4704,7 +4704,7 @@ impl NativeBuiltinEmitter.emit_sum(
     i64 = ir.IntType(64);
     list_val = args[0];
 
-    helpers: (dict | None) = None;
+    helpers: (dict[any, any] | None) = None;
     elem_key: (str | None) = None;
     for (lk, lt) in p.list_types.items() {
         if list_val.type == lt.as_pointer() {
@@ -4750,7 +4750,7 @@ impl NativeBuiltinEmitter.emit_sorted(
     p = ctx.pass_ref;
     list_val = args[0];
 
-    helpers: (dict | None) = None;
+    helpers: (dict[any, any] | None) = None;
     elem_key: (str | None) = None;
     for (lk, lt) in p.list_types.items() {
         if list_val.type == lt.as_pointer() {
@@ -4789,7 +4789,7 @@ impl NativeBuiltinEmitter.emit_reversed(
     p = ctx.pass_ref;
     list_val = args[0];
 
-    helpers: (dict | None) = None;
+    helpers: (dict[any, any] | None) = None;
     elem_key: (str | None) = None;
     for (lk, lt) in p.list_types.items() {
         if list_val.type == lt.as_pointer() {
@@ -4849,7 +4849,7 @@ impl NativeBuiltinEmitter.emit_any(
     b = get_builder(p);
     i64 = ir.IntType(64);
     list_val = args[0];
-    helpers: (dict | None) = None;
+    helpers: (dict[any, any] | None) = None;
     for (lk, lt) in p.list_types.items() {
         if list_val.type == lt.as_pointer() {
             helpers = p.list_helpers.get(lk);
@@ -4901,7 +4901,7 @@ impl NativeBuiltinEmitter.emit_all(
     b = get_builder(p);
     i64 = ir.IntType(64);
     list_val = args[0];
-    helpers: (dict | None) = None;
+    helpers: (dict[any, any] | None) = None;
     for (lk, lt) in p.list_types.items() {
         if list_val.type == lt.as_pointer() {
             helpers = p.list_helpers.get(lk);

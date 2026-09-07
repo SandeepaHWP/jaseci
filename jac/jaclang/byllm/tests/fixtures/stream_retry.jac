@@ -14,7 +14,9 @@ import types;
 
 def make_chunk(text: str) -> object {
     delta = types.SimpleNamespace(content=text);
-    return types.SimpleNamespace(choices=[types.SimpleNamespace(delta=delta)], usage=None);
+    return types.SimpleNamespace(
+        choices=[types.SimpleNamespace(delta=delta)], usage=None
+    );
 }
 
 def make_mt_run(stream: bool = True) -> MTRuntime {
@@ -23,13 +25,16 @@ def make_mt_run(stream: bool = True) -> MTRuntime {
             {"role": "system", "content": "x"},
             {"role": "user", "content": "hi"}
         ],
-        resp_type=str, stream=stream, tools=[], call_params={}
+        resp_type=str,
+        stream=stream,
+        tools=[],
+        call_params={}
     );
 }
 
 glob _drop_calls = {"n": 0};
 
-def drop_then_recover(params: dict) -> object {
+def drop_then_recover(params: dict[any, any]) -> object {
     _drop_calls["n"] += 1;
     if _drop_calls["n"] == 1 {
         yield make_chunk("PARTIAL-DISCARDED ");
@@ -43,7 +48,7 @@ def drop_then_recover(params: dict) -> object {
 
 glob _auth_calls = {"n": 0};
 
-def auth_fail(params: dict) -> object {
+def auth_fail(params: dict[any, any]) -> object {
     _auth_calls["n"] += 1;
     raise AuthenticationError(message="bad key", llm_provider="anthropic", model="m");
     yield make_chunk("");
@@ -51,7 +56,7 @@ def auth_fail(params: dict) -> object {
 
 glob _always_calls = {"n": 0};
 
-def always_drop(params: dict) -> object {
+def always_drop(params: dict[any, any]) -> object {
     _always_calls["n"] += 1;
     raise APIConnectionError(
         message="incomplete chunked read", llm_provider="anthropic", model="m"
@@ -66,7 +71,7 @@ with entry {
     mt = make_mt_run();
     events = list(model._invoke_streaming(mt));
     kinds = [ev.event_type for ev in events];
-    buf: list = [];
+    buf: list[any] = [];
     for ev in events {
         if ev.event_type == "stream_reset" {
             buf = [];

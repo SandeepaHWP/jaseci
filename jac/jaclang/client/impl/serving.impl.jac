@@ -167,7 +167,7 @@ impl HeaderBuilder._script_tag(spec: dict) -> str {
     if not src and not body {
         return "";
     }
-    attrs: list = [f'src="{html.escape(src)}"'] if src else [];
+    attrs: list[any] = [f'src="{html.escape(src)}"'] if src else [];
     for (key, val) in spec.items() {
         if key in ("src", "content") or val is None {
             continue;

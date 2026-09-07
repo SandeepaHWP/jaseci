@@ -147,7 +147,7 @@ impl _collect_local_imports(
 ) -> tuple[dict, dict] {
     staged: dict[str, str] = {};
     merged_imports: dict[str, str] = {};
-    requested: dict = {};
+    requested: dict[any, any] = {};
     pending: list[str] = [module_js];
     while pending {
         js = pending.pop(0);

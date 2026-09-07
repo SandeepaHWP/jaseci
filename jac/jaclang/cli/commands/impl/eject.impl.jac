@@ -20,7 +20,7 @@ glob _SKIP_DIRS: set = {
      };
 
 
-def load_eject_project_metadata(src: Path) -> dict {
+def load_eject_project_metadata(src: Path) -> dict[any, any] {
     toml_path = src / "jac.toml";
     if not toml_path.exists() {
         raise FileNotFoundError(f"No jac.toml found in {src}");
@@ -137,10 +137,10 @@ impl eject(source: str = ".", output: str = "", force: bool = False) -> int {
     entry_has_app = False;
     error_count = 0;
     reserved: set = {"main"};
-    compiled: list = [];
-    remap: dict = {};
-    walkers: list = [];
-    functions: list = [];
+    compiled: list[any] = [];
+    remap: dict[any, any] = {};
+    walkers: list[any] = [];
+    functions: list[any] = [];
     for jac_file in jac_files {
         rel = Path(str(jac_file)).relative_to(src);
         try {
@@ -256,7 +256,7 @@ impl eject(source: str = ".", output: str = "", force: bool = False) -> int {
         );
     } else {
         reachable = reach["reachable"];
-        orig_by_bmod: dict = {};
+        orig_by_bmod: dict[any, any] = {};
         for unit in compiled {
             orig_by_bmod[str(unit["module"])] = str(unit["orig"]);
             if (str(unit["orig"]) == str(reach["entry"])) and unit["server"] {
@@ -467,8 +467,8 @@ def _dec_name(dec: any) -> str {
 }
 
 
-def _filtered_body(body: list) -> list {
-    kept: list = [];
+def _filtered_body(body: list[any]) -> list[any] {
+    kept: list[any] = [];
     for node in body {
         if isinstance(node, ast.ImportFrom) {
             mod = str(node?.module or "");
@@ -477,7 +477,7 @@ def _filtered_body(body: list) -> list {
                 continue;
             }
             aliases = getattr(node, "names", []);
-            new_names: list = [];
+            new_names: list[any] = [];
             for alias in aliases {
                 aname = getattr(alias, "name", "");
                 if (aname != "jac_test") and (aname != "impl_patch_filename") {
@@ -493,7 +493,7 @@ def _filtered_body(body: list) -> list {
         }
         decs = getattr(node, "decorator_list", []);
         drop = False;
-        keep_decs: list = [];
+        keep_decs: list[any] = [];
         for dec in decs {
             dname = _dec_name(dec);
             if dname == "jac_test" {
@@ -580,7 +580,9 @@ def _emit_frontend_package_json(src: Path, frontend_dir: Path, project_name: str
 }
 
 
-def _emit_vite_config(frontend_dir: Path, runtime_copied: bool, toml_data: dict) {
+def _emit_vite_config(
+    frontend_dir: Path, runtime_copied: bool, toml_data: dict[any, any]
+) {
     vite_cfg = dict(toml_data.get("client", {}).get("vite", {}));
     lib_imports = [str(i) for i in vite_cfg.get("lib_imports", [])];
     plugins = [str(p) for p in vite_cfg.get("plugins", [])];
@@ -869,9 +871,9 @@ def _emit_entry_js(frontend_src_dir: Path, entry_module: str) {
 
 
 def _keep_reachable(
-    items: list, orig_by_bmod: dict, reachable: set, dropped: set
-) -> list {
-    kept: list = [];
+    items: list[any], orig_by_bmod: dict[any, any], reachable: set, dropped: set
+) -> list[any] {
+    kept: list[any] = [];
     for it in items {
         orig = orig_by_bmod.get(str(it["module"]));
         if orig in reachable {
@@ -884,8 +886,10 @@ def _keep_reachable(
 }
 
 
-def _entry_reachable_modules(compiled: list, entry_module: str) -> (dict | None) {
-    units_by_orig: dict = {};
+def _entry_reachable_modules(
+    compiled: list[any], entry_module: str
+) -> (dict[any, any] | None) {
+    units_by_orig: dict[any, any] = {};
     for unit in compiled {
         units_by_orig[str(unit["orig"])] = unit;
     }
@@ -905,7 +909,7 @@ def _entry_reachable_modules(compiled: list, entry_module: str) -> (dict | None)
     }
     known: set = set(units_by_orig.keys());
     reachable: set = set();
-    queue: list = [`entry];
+    queue: list[any] = [`entry];
     while queue {
         cur = str(queue.pop(0));
         if cur in reachable {
@@ -987,7 +991,9 @@ def _resolve_project_python_deps(src: Path, project_name: str) -> list[str] {
 }
 
 
-def _emit_backend_jac_toml(backend_dir: Path, project_name: str, toml_data: dict) {
+def _emit_backend_jac_toml(
+    backend_dir: Path, project_name: str, toml_data: dict[any, any]
+) {
     byllm_cfg = toml_data.get("byllm", {});
     if (not isinstance(byllm_cfg, dict)) or (not byllm_cfg) {
         return;
@@ -1002,9 +1008,9 @@ def _emit_backend_jac_toml(backend_dir: Path, project_name: str, toml_data: dict
 }
 
 
-def _emit_toml_table(lines: list, header: str, table: dict) {
-    scalars: list = [];
-    subs: list = [];
+def _emit_toml_table(lines: list[any], header: str, table: dict[any, any]) {
+    scalars: list[any] = [];
+    subs: list[any] = [];
     for (k, v) in table.items() {
         if isinstance(v, dict) {
             subs.append((k, v));
@@ -1091,7 +1097,9 @@ def _emit_makefile(out: Path, has_frontend: bool) {
 }
 
 
-def _emit_readme(out: Path, project_name: str, has_frontend: bool, env_files: list) {
+def _emit_readme(
+    out: Path, project_name: str, has_frontend: bool, env_files: list[any]
+) {
     layout = "`backend/` (FastAPI)";
     if has_frontend {
         layout += " + `frontend/` (Vite)";

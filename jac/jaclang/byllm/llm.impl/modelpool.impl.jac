@@ -19,7 +19,7 @@ impl ModelPool.postinit -> None {
         self.timeout = _fallback_cfg.get('timeout', 60.0);
     }
     is_fallback = self.strategy == "fallback";
-    model_list: list = [];
+    model_list: list[any] = [];
     fallback_names: list = [];
     self._fallback_model_names = [];
     for (i, model) in enumerate(self.models) {
@@ -31,7 +31,7 @@ impl ModelPool.postinit -> None {
         if is_fallback {
             self._fallback_model_names.append(name);
         }
-        litellm_params: dict = {
+        litellm_params: dict[any, any] = {
             "model": model.model_name,
             "api_key": model.api_key or model.config.get("api_key", "") or None,
 
@@ -130,15 +130,15 @@ impl ModelPool.model_call_with_stream(params: dict) -> Generator[object, None, N
     }
 
     if self.strategy == "fallback" {
-        model_names: list = self._fallback_model_names;
+        model_names: list[any] = self._fallback_model_names;
         router = self._router;
         def _fallback_gen -> Generator[object, None, None] {
             for (idx, name) in enumerate(model_names) {
                 yielded: bool = False;
                 try {
-                    call_params: dict = dict(params);
+                    call_params: dict[any, any] = dict(params);
                     call_params.pop("model", None);
-                    messages: list = call_params.pop("messages", []);
+                    messages: list[any] = call_params.pop("messages", []);
                     response = router._completion(
                         model=name,
                         messages=messages,

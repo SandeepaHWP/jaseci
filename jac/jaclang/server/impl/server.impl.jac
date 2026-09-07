@@ -465,7 +465,7 @@ impl ModuleIntrospector._load_manifest -> None {
     if not self._module {
         return;
     }
-    base: dict = {};
+    base: dict[any, any] = {};
     mod_path: str = getattr(self._module, '__file__', '');
     if mod_path {
         import from jaclang.server.sealed_serve { serve_manifest_for }
@@ -497,7 +497,7 @@ impl ModuleIntrospector._load_manifest -> None {
         }
     }
 
-    aggregated: dict = {};
+    aggregated: dict[any, any] = {};
 
     for hub in Jac.get_program()._search_hubs() {
         for hub_mod in hub.values() {
@@ -550,7 +550,7 @@ impl ModuleIntrospector._extract_access_levels -> None {
         return;
     }
 
-    sources: list = [main_mod];
+    sources: list[any] = [main_mod];
     for item in main_mod.body {
         if isinstance(item, uni.Import) and item.is_jac and item.from_loc {
             try {

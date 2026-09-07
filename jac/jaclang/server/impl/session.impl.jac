@@ -1,4 +1,4 @@
-def _toml_section(base_path: (str | None), section: str) -> dict {
+def _toml_section(base_path: (str | None), section: str) -> dict[any, any] {
     if not base_path {
         return {};
     }

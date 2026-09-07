@@ -15,7 +15,7 @@ glob CODE_INT: int = 1,
      CODE_UNION: int = 8,
      CODE_OPTENUM: int = 9;
 
-glob CLASS_MODULES: tuple = (
+glob CLASS_MODULES: tuple[any, ...] = (
          "jaclang.compiler.frontend.unitree",
          "jaclang.compiler.frontend.codeinfo",
          "jaclang.compiler.frontend.srcloc",
@@ -43,12 +43,12 @@ def _enum_class(name: str) -> any {
 }
 
 
-def _enum_table(cls: any) -> (dict | None) {
+def _enum_table(cls: any) -> (dict[any, any] | None) {
     import enum as _enum;
     if not (isinstance(cls, `type) and issubclass(cls, _enum.Enum)) {
         return None;
     }
-    members: list = `list(cls);
+    members: list[any] = `list(cls);
     if not members {
         return None;
     }
@@ -143,7 +143,7 @@ class NativeCompiler {
         return stable_osp_tag(name);
     }
 
-    def _field_annotations(self: NativeCompiler, cls: any) -> dict {
+    def _field_annotations(self: NativeCompiler, cls: any) -> dict[any, any] {
         import dataclasses;
         out = {};
         try {
@@ -375,15 +375,15 @@ class NativeCompiler {
         return self._take(self.lib.jc_take_module());
     }
 
-    def take_diags(self: NativeCompiler) -> list {
+    def take_diags(self: NativeCompiler) -> list[any] {
         return self._take(self.lib.jc_take_diags()) or [];
     }
 
-    def take_lexdiags(self: NativeCompiler) -> list {
+    def take_lexdiags(self: NativeCompiler) -> list[any] {
         return self._take(self.lib.jc_take_lexdiags()) or [];
     }
 
-    def take_comments(self: NativeCompiler) -> list {
+    def take_comments(self: NativeCompiler) -> list[any] {
         return self._take(self.lib.jc_take_comments()) or [];
     }
 
@@ -401,8 +401,8 @@ class NativeCompiler {
 }
 
 
-glob _KERNEL_CELL: list = [],
-     _RESOLVED: list = [];
+glob _KERNEL_CELL: list[any] = [],
+     _RESOLVED: list[any] = [];
 
 
 def _lib_name -> str {

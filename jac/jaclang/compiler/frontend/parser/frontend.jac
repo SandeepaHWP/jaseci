@@ -29,7 +29,9 @@ def _replay_diags(diags: any, from_pass: type, prog: JacProgram, diag_src: Sourc
     }
 }
 
-def parse_diags(source: str, file_path: str = "<input>") -> tuple[(bool, list, list)] {
+def parse_diags(
+    source: str, file_path: str = "<input>"
+) -> tuple[(bool, list[any], list[any])] {
     (tokens, _comments, lex_diags, lex_errs) = na_lexer.tokenize_full(
         source, file_path
     );
@@ -109,8 +111,8 @@ def _finish_parse(
 }
 
 def _native_parse_woven(
-    source_str: str, file_path: str, prog: (JacProgram | None), annexes: list
-) -> (tuple | None) {
+    source_str: str, file_path: str, prog: (JacProgram | None), annexes: list[any]
+) -> (tuple[any, ...] | None) {
     import jaclang.compiler.native_compiler as _jc;
     kernel = _jc.ensure_loaded();
     if kernel is None {
@@ -138,8 +140,8 @@ def _native_parse_woven(
 }
 
 def parse_woven(
-    source_str: str, file_path: str, prog: (JacProgram | None), annexes: list
-) -> tuple {
+    source_str: str, file_path: str, prog: (JacProgram | None), annexes: list[any]
+) -> tuple[any, ...] {
     nat = _native_parse_woven(source_str, file_path, prog, annexes);
     if nat is not None {
         return nat;

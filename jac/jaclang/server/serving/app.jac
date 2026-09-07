@@ -147,7 +147,7 @@ obj ServingApp {
         docs_url: (str | None) = '/docs',
         openapi_url: (str | None) = '/openapi.json',
         openapi_security: dict[str, any] = {},
-        openapi_cache: (dict | None) = None,
+        openapi_cache: (dict[any, any] | None) = None,
         state: dict[str, any] = {},
         multipart_spool_bytes: int = 1048576;
 

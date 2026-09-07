@@ -28,7 +28,7 @@ def _section(sid: int, payload: bytes) -> bytes {
     return bytes([sid]) + encode_uleb128(len(payload)) + payload;
 }
 
-def _vec(items: list) -> bytes {
+def _vec(items: list[any]) -> bytes {
     return encode_uleb128(len(items)) + b"".join(items);
 }
 
@@ -227,7 +227,7 @@ impl WasmObj.parse_reloc(nm: str, o: int, end: int) -> None {
     }
 }
 
-def _parse_data_segments(b: bytes) -> list {
+def _parse_data_segments(b: bytes) -> list[any] {
     if not b {
         return [];
     }
@@ -257,7 +257,11 @@ def _parse_data_segments(b: bytes) -> list {
 }
 
 def _sym_val(
-    ob: WasmObj, si: int, old2new: dict, seg_base: list[int], heap_base: int = -1
+    ob: WasmObj,
+    si: int,
+    old2new: dict[any, any],
+    seg_base: list[int],
+    heap_base: int = -1
 ) -> int {
     e = ob.symtab[si];
     k = e[0];
@@ -283,7 +287,7 @@ def _sym_val(
 obj WasmLinker {
     static def link(
         obj_bytes: bytes,
-        export_funcs: list = [],
+        export_funcs: list[any] = [],
         mem_pages: int = 256,
         host_abi: (set | None) = None,
         host_module: str = "jac_host1",

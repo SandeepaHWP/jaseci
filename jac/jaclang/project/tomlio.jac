@@ -22,7 +22,7 @@ class MalformedJacTomlError(tomllib.TOMLDecodeError) {
 }
 
 
-def read_toml_with_encoding(file_path: str) -> dict {
+def read_toml_with_encoding(file_path: str) -> dict[any, any] {
     try {
         return tomllib.loads(read_file_with_encoding(file_path));
     } except tomllib.TOMLDecodeError as exc {

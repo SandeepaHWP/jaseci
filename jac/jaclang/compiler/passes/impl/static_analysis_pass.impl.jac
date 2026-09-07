@@ -457,7 +457,7 @@ impl StaticAnalysisPass._check_client_imports(mod: Module) -> None {
                 }
             }
         }
-        string_specs: list = [];
+        string_specs: list[any] = [];
         if (nd.from_loc is not None and nd.from_loc.string_path_value is not None) {
             string_specs.append((nd.from_loc.string_path_value, nd.from_loc));
         } elif nd.from_loc is None {

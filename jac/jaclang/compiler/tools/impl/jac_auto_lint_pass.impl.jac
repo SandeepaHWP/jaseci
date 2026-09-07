@@ -497,7 +497,7 @@ impl JacAutoLintPass.can_convert_to_glob(assignment: uni.Assignment) -> bool {
 impl JacAutoLintPass.names_unsafe_to_globalize(module: uni.Module) -> set[str] {
     counts: dict[str, int] = {};
     for stmt in module.body {
-        target_lists: list = [];
+        target_lists: list[any] = [];
         if isinstance(stmt, uni.GlobalVars) {
             for assign in stmt.assignments {
                 target_lists.append(assign.target);
@@ -2516,7 +2516,7 @@ impl JacAutoLintPass._strip_noise(nd: uni.Module) -> None {
     }
 
     if not self._is_suppressed(W3050) and nd.source.comments {
-        kept: list = [];
+        kept: list[any] = [];
         suppression_lines = nd.source.inline_suppressions;
         for comment in list(nd.source.comments) {
             if comment.line_no in suppression_lines {
@@ -2712,7 +2712,7 @@ impl JacAutoLintPass._convert_map_to_comprehension(nd: uni.FuncCall) -> bool {
     }
 
     target_node: uni.Expr = self._make_name_node(nd, item_name);
-    compr_kid: list = [
+    compr_kid: list[any] = [
         nd.gen_token(Tok.KW_FOR),
         target_node,
         nd.gen_token(Tok.KW_IN),
@@ -2802,7 +2802,7 @@ impl JacAutoLintPass._make_accessor_from_ability(
     if sig is not None {
         acc_kid.append(sig);
     }
-    body: (list | None) = None;
+    body: (list[any] | None) = None;
     if isinstance(src.body, list) {
         body = src.body;
         acc_kid.append(src.gen_token(Tok.LBRACE));

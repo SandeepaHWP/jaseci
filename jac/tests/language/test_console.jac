@@ -14,7 +14,9 @@ glob FIXTURES = os.path.join(JAC_ROOT, "tests", "language", "fixtures"),
      ESC = '\x1b[';
 
 """Run jac and return (stdout, stderr) tuple."""
-def run_jac(args: list[str], env_override: dict | None = None) -> tuple[str, str] {
+def run_jac(
+    args: list[str], env_override: dict[any, any] | None = None
+) -> tuple[str, str] {
     env = os.environ.copy();
     if env_override {
         env.update(env_override);

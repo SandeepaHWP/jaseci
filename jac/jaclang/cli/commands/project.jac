@@ -382,10 +382,10 @@ comptime SPEC_INSTALL: CommandSpec = CommandSpec(
      );
 
 def install(
-    packages: list = [],
-    editable: list = [],
+    packages: list[any] = [],
+    editable: list[any] = [],
     dev: bool = False,
-    extras: list = [],
+    extras: list[any] = [],
     no_save: bool = False,
     git: str = "",
     npm: bool | None = None,
@@ -447,7 +447,7 @@ comptime SPEC_REMOVE: CommandSpec = CommandSpec(
      );
 
 def remove(
-    packages: list = [], dev: bool = False, npm: bool = False, shadcn: bool = False
+    packages: list[any] = [], dev: bool = False, npm: bool = False, shadcn: bool = False
 ) -> int;
 
 comptime SPEC_UPDATE: CommandSpec = CommandSpec(
@@ -482,7 +482,7 @@ comptime SPEC_UPDATE: CommandSpec = CommandSpec(
          handler_name=ct_name(update)
      );
 
-def update(packages: list = [], dev: bool = False, verbose: bool = False) -> int;
+def update(packages: list[any] = [], dev: bool = False, verbose: bool = False) -> int;
 
 def deps(scale: bool = False, as_json: bool = False) -> int;
 

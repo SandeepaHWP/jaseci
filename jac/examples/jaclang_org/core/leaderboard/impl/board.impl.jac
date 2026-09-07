@@ -51,7 +51,7 @@ impl _board_list -> list[BoardEntry] {
 
 impl Scorer.score_repo(hub: BoardHub, owner: str, name: str) -> SubmitResult {
     def clean(raw: any) -> dict {
-        out: dict = {};
+        out: dict[any, any] = {};
         if isinstance(raw, dict) {
             for k in raw.keys() {
                 if not str(k).startswith("_") {

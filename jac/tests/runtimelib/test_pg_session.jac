@@ -60,7 +60,7 @@ def _root(ctx: ExecutionContext) -> NodeAnchor {
 }
 
 
-def _out_items(ctx: ExecutionContext, ranch: NodeAnchor) -> list {
+def _out_items(ctx: ExecutionContext, ranch: NodeAnchor) -> list[any] {
     q = GraphQuery(ranch.archetype, hops=[QHop(dir=2, nd=SItem)]);
     return resolve_query(cast(Session, ctx.mem), q);
 }

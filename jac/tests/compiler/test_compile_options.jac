@@ -19,7 +19,7 @@ import from jaclang.compiler.driver.jir { compute_module_key }
 
 
 def _pinned_opts(**overrides: any) -> CompileOptions {
-    base: dict = {
+    base: dict[any, any] = {
         "na_gc_mode": "cycles",
         "nogc_enforce_all": False,
         "nogc_cli_target": "",
@@ -41,7 +41,7 @@ test "identical codegen options produce an identical fingerprint" {
 
 test "every codegen option flip changes the fingerprint" {
     base_fp = _pinned_opts().codegen_fingerprint();
-    flips: list = [
+    flips: list[any] = [
         _pinned_opts(na_gc_mode="none"),
         _pinned_opts(na_gc_mode="rc"),
         _pinned_opts(nogc_enforce_all=True),

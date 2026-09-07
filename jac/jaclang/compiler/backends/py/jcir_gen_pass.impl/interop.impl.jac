@@ -32,7 +32,7 @@ impl JcirGenPass._native_import_registration_map -> dict {
     if not (manifest and manifest.bindings and manifest.native_imports) {
         return {};
     }
-    reg_map: dict = {};
+    reg_map: dict[any, any] = {};
     for binding in manifest.native_imports {
         if binding.name in reg_map {
             continue;
@@ -172,7 +172,7 @@ impl JcirGenPass._generate_sv_to_sv_stubs(nd: Import) -> bool {
     provider_route = manifest.provider_routes.get(provider_app, '')
         or import_provider_route(nd);
     boundary_types = manifest.boundary_types;
-    parts: list = [
+    parts: list[any] = [
         "from jaclang.server import sv_client as __jac_sv_client",
         "__jac_sv_client._declare_consumer_provider("
             + self._sv_consumer_app_expr()
@@ -182,7 +182,7 @@ impl JcirGenPass._generate_sv_to_sv_stubs(nd: Import) -> bool {
             + provider_route
             + "')"
     ];
-    names: list = ['__jac_sv_client'];
+    names: list[any] = ['__jac_sv_client'];
     for item in nd.items {
         if not isinstance(item, ModuleItem) {
             continue;

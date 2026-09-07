@@ -462,7 +462,7 @@ impl NaIRGenPass._codegen_archetype(nd: uni.Archetype) -> None {
     field_type_map: dict[(str, ir.Type)] = {};
     field_default_map: dict[(str, object)] = {};
     foreign_fields: set = set();
-    erased_tv_fields: dict[(str, list)] = {};
+    erased_tv_fields: dict[(str, list[any])] = {};
 
     if layout.vtable_ptr_slot is not None {
         field_types.append(ir.IntType(8).as_pointer().as_pointer());
@@ -608,7 +608,7 @@ impl NaIRGenPass._erased_sig_typevars(nd: uni.Archetype) -> dict {
     slots alongside the erased fields lets the construction site refuse both
     with one rule.
     """;
-    out: dict = {};
+    out: dict[any, any] = {};
     if nd.body is None {
         return out;
     }
@@ -727,7 +727,7 @@ impl NaIRGenPass._register_static_fields(arch_name: str, archhas: uni.ArchHas) -
 
         if var.value is not None and const_init is None {
             if not self?._global_init_nodes {
-                self._global_init_nodes: list = [];
+                self._global_init_nodes: list[any] = [];
             }
             self._global_init_nodes.append((full_name, var.value, ftype));
         }
@@ -793,7 +793,7 @@ impl NaIRGenPass._register_one_class_const(
 
     if const_init is None {
         if not self?._global_init_nodes {
-            self._global_init_nodes: list = [];
+            self._global_init_nodes: list[any] = [];
         }
         self._global_init_nodes.append((full_name, assign.value, ftype));
     }
@@ -1827,7 +1827,7 @@ impl NaIRGenPass._codegen_instantiation(
         f"{type_name}.init" in self.method_funcs
         or f"{type_name}.__init__" in self.method_funcs
     );
-    _pos_field_pairs: list = [];
+    _pos_field_pairs: list[any] = [];
     if not _has_init {
         _pos_args = [
             p
@@ -2028,7 +2028,7 @@ impl NaIRGenPass._codegen_instantiation(
     foreign_fields = self.struct_field_foreign.get(type_name, set());
 
     set_fields: set[str] = set();
-    _field_inits: list = list(_pos_field_pairs);
+    _field_inits: list[any] = list(_pos_field_pairs);
     for param in params {
         if isinstance(param, uni.KWPair) {
             _kn = param.key.sym_name if param.key else None;
@@ -2220,8 +2220,8 @@ impl NaIRGenPass._codegen_instantiation(
         init_args: list[ir.Value] = [obj_ptr];
         init_sig = self._arch_init_sig_of(_init_owner) if _is_call else None;
         if init_sig is not None {
-            _init_pos: list = [];
-            _init_kw: dict = {};
+            _init_pos: list[any] = [];
+            _init_kw: dict[any, any] = {};
             for param in params {
                 if isinstance(param, uni.KWPair) {
                     _k = param.key.sym_name if param.key is not None else None;
@@ -3322,7 +3322,7 @@ impl NaIRGenPass._emit_dispatched_field_ptr(
     if _base_idx is None and ftype is not None {
         return None;
     }
-    _variants: list[tuple] = [];
+    _variants: list[tuple[any, ...]] = [];
     _uniform = True;
     for _cls in reg.mro_order {
         _cls_mro = self._mro_of(_cls);
@@ -3397,7 +3397,7 @@ impl NaIRGenPass._emit_dispatched_field_ptr(
     _df_vtp = b.load(_df_vpp, name="df.vt");
     _df_fnc = b.block.function;
     _df_done = _df_fnc.append_basic_block(name=f"df.{field_name}.done");
-    _df_incoming: list[tuple] = [];
+    _df_incoming: list[tuple[any, ...]] = [];
     for (_vc, _vt, _ci, _vft) in _variants {
         _df_hit = _df_fnc.append_basic_block(name=f"df.{field_name}.{_vc}");
         _df_nxt = _df_fnc.append_basic_block(name=f"df.{field_name}.n.{_vc}");
@@ -3509,7 +3509,7 @@ impl NaIRGenPass._class_const_global(
 impl NaIRGenPass._class_const_variants(arch_name: str, field_name: str) -> tuple {
     import from jaclang.compiler.passes.layout_pass { get_layout_registry }
     reg = get_layout_registry(self.ir_in, self.prog);
-    out: list[tuple] = [];
+    out: list[tuple[any, ...]] = [];
     _whole = True;
     for _cls in reg.mro_order {
         if _cls == arch_name or arch_name not in self._mro_of(_cls) {
@@ -3564,7 +3564,7 @@ impl NaIRGenPass._codegen_class_const_read(
     _cc_vtp = b.load(_cc_vpp, name="cc.vt");
     _cc_fn = b.block.function;
     _cc_done = _cc_fn.append_basic_block(name=f"cc.{field_name}.done");
-    _cc_incoming: list[tuple] = [];
+    _cc_incoming: list[tuple[any, ...]] = [];
     for (_vc, _vt, _gv) in _variants {
         _cc_hit = _cc_fn.append_basic_block(name=f"cc.{field_name}.{_vc}");
         _cc_nxt = _cc_fn.append_basic_block(name=f"cc.{field_name}.n.{_vc}");
@@ -4179,7 +4179,7 @@ impl NaIRGenPass._jc_abi_offsets(field_types: list) -> tuple {
 
 impl NaIRGenPass._build_jc_layout -> str {
     import json;
-    out: dict = {"classes": {}};
+    out: dict[any, any] = {"classes": {}};
     _model = self.ir_in.gen.osp_model;
     _tags = _model.tags if _model is not None else {};
     for arch_name in self.struct_field_indices {
@@ -4191,7 +4191,7 @@ impl NaIRGenPass._build_jc_layout -> str {
         idx_map = self.struct_field_indices.get(arch_name, {});
         ftypes = self.struct_field_types.get(arch_name, {});
         enum_map = self.struct_field_enum_type.get(arch_name, {});
-        fields: dict = {};
+        fields: dict[any, any] = {};
         for (fname, fidx) in idx_map.items() {
             if fidx >= len(offsets) {
                 continue;
