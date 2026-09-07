@@ -352,7 +352,7 @@ def consumer_provider_edges(
     if edges {
         return _dedup_edges(edges);
     }
-    known = dict(entries or {});
+    known: dict[str, any] = dict(entries or {});
     for app in apps {
         entry_path = known.get(app.name) or app.entry_path(project_root);
         if not entry_path or not os.path.isfile(entry_path) {

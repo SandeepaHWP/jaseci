@@ -12,9 +12,9 @@ class Module(object) {
         self.scope = _utils.NameScope();
         self.triple = 'unknown-unknown-unknown';
         self.globals = collections.OrderedDict();
-        self.metadata = [];
-        self.namedmetadata = {};
-        self._metadatacache = {};
+        self.metadata: list[any] = [];
+        self.namedmetadata: dict[str, any] = {};
+        self._metadatacache: dict[any, any] = {};
     }
 
     def _fix_metadata_operands(self: Module, operands: any) -> list[any] {

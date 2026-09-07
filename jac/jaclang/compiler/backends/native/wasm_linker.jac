@@ -329,8 +329,8 @@ impl WasmLinker.link(
         for im in ob.imports
         if im[0] == "func"
     ];
-    kept = [];
-    old2new = {};
+    kept: list[any] = [];
+    old2new: dict[int, int] = {};
     oi = 0;
     for im in obj_func_imports {
         if im[2] in _PLACEHOLDER {} else {
@@ -369,7 +369,7 @@ impl WasmLinker.link(
         di += 1;
     }
 
-    slot_of = {};
+    slot_of: dict[int, int] = {};
     nslot = 1;
     needs_table = False;
     for r in ob.relocs {
@@ -486,7 +486,7 @@ impl WasmLinker.link(
     out += _section(7, _vec(exps));
 
     if nslot > 1 {
-        pairs = [];
+        pairs: list[tuple[int, int]] = [];
         for kv in slot_of.items() {
             pairs.append((kv[1], kv[0]));
         }
@@ -510,7 +510,7 @@ impl WasmLinker.link(
         out += _section(11, _vec(dsegs));
     }
 
-    nm_entries = [];
+    nm_entries: list[tuple[int, any]] = [];
     fi2 = 0;
     for im in kept {
         nm_entries.append((fi2, im[2]));

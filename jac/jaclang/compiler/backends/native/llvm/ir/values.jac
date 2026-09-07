@@ -1123,7 +1123,7 @@ class Function(GlobalValue) {
         super.init(module, ftype.as_pointer(), name=name);
         self.ftype = ftype;
         self.scope = _utils.NameScope();
-        self.blocks = [];
+        self.blocks: list[Block] = [];
         self.attributes = FunctionAttributes();
         self.args = `tuple([Argument(self, t) for t in ftype.args]);
         self.return_value = ReturnValue(self, ftype.return_type);
