@@ -5,11 +5,12 @@ import from jaclang.scale.injector.binary {
     host_seal_platform,
     node_arch,
     pack_binary_bytes,
+    resolve_console_version,
     resolve_deploy_version,
     stage_admin_dist,
     toolchain_object_key
 }
-import from jaclang.runtimelib.utils { host_arch }
+import from jaclang.runtime.graph_utils { host_arch }
 import from jaclang.scale.injector.bundle { bundle_object_key, content_address }
 import from jaclang.scale.config.dev_config { Channel }
 
@@ -27,7 +28,11 @@ obj BinaryInjector(PvcInjector) {
 
     def prepare(app_name: str, namespace: str, project_dir: str) {
         version = resolve_deploy_version(project_dir, self.channel.value);
-        stage_admin_dist(project_dir, self.channel.value, version);
+        stage_admin_dist(
+            project_dir,
+            self.channel.value,
+            resolve_console_version(project_dir, self.channel.value, version)
+        );
 
         pod_arch = node_arch();
         payload = download_release_binary(self.channel.value, pod_arch, version);
@@ -74,7 +79,8 @@ def select_injector(
     namespace: str,
     project_dir: str,
     dry_run: bool = False,
-    access_mode: str = "ReadWriteMany"
+    access_mode: str = "ReadWriteMany",
+    fleet: any = None
 ) -> tuple[PvcInjector, str] {
     import from jaclang.cli.console { console }
     import from jaclang.scale.config.dev_config { resolve_dev_channel }
@@ -88,7 +94,10 @@ def select_injector(
     };
     if dry_run {
         injector = BinaryInjector(
-            channel=channel, storage_class=storage_class, access_mode=access_mode
+            channel=channel,
+            storage_class=storage_class,
+            access_mode=access_mode,
+            _fleet=fleet
         );
         injector._object_key = bundle_object_key(app_name, DRY_RUN_DIGEST);
         injector._toolchain_object_key = toolchain_object_key(app_name, DRY_RUN_DIGEST);
@@ -101,7 +110,10 @@ def select_injector(
     try {
         console.print(f"Preparing the '{channel.value}' jac runtime for pods.");
         injector = BinaryInjector(
-            channel=channel, storage_class=storage_class, access_mode=access_mode
+            channel=channel,
+            storage_class=storage_class,
+            access_mode=access_mode,
+            _fleet=fleet
         );
         injector.prepare(app_name, namespace, project_dir);
         console.print(f"Ready: {blurbs[channel]}.");

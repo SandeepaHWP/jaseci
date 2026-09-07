@@ -122,6 +122,11 @@ Most file names are the underscored registry name (`jac install --shadcn alert-d
 | Keyboard key display | `Kbd` |
 | One-time password input | `InputOTP` + `InputOTPGroup` + `InputOTPSlot` + `InputOTPSeparator` (add `input-otp`, file `otp_input`) |
 | Generic list item | `Item` |
+| Chat / message thread | `MessageGroup` + `Message` + `MessageAvatar` + `MessageContent` (+ `MessageHeader`, `MessageFooter`); `align="start"`/`"end"` on `Message` |
+| Chat bubble | `BubbleGroup` + `Bubble` + `BubbleContent` (+ `BubbleReactions`); `variant` (default/secondary/muted/tinted/outline/ghost/destructive), `align="start"`/`"end"` |
+| Timeline / step marker | `Marker` + `MarkerIcon` + `MarkerContent`; `variant` (default/separator/border) |
+| File / upload attachment | `Attachment` + `AttachmentMedia` + `AttachmentContent` + `AttachmentTitle` (+ `AttachmentDescription`, `AttachmentActions`, `AttachmentAction`, `AttachmentTrigger`, `AttachmentGroup`); `state` (idle/uploading/processing/error/done), `size`, `orientation` |
+| RTL / LTR direction scope | `DirectionProvider` (+ `useDirection` hook), from file `direction` |
 
 ## Composition rules
 
@@ -150,10 +155,13 @@ Load `jac-cl-styling` for full conditional class patterns and cn() usage.
 ## Icon pattern
 
 ⚠ **Never guess an icon name.** The package exports ~5,500 icons and most are
-number-suffixed, so the obvious name is usually wrong: there is no `SearchIcon`,
-`DocumentIcon`, `FolderIcon`, `PlusIcon`, or `TrendUpIcon`. A wrong name is NOT a
-compile error - `jac check` and the build both pass, and it fails only when the
-page loads, with `SyntaxError: ... does not provide an export named 'DocumentIcon'`.
+number-suffixed, so the obvious name is usually wrong: there is no `DocumentIcon`,
+`PlusIcon`, or `TrendUpIcon`. A wrong name is NOT a compile error - `jac check`
+and the build both pass, and it fails only when the page loads, with
+`SyntaxError: ... does not provide an export named 'DocumentIcon'`.
+
+**Numeric suffixes are zero-padded** - `Calendar01Icon`, never `Calendar1Icon`.
+
 Use a name from the table below, or list the real ones:
 
 ```bash
@@ -167,7 +175,7 @@ ls .jac/client/node_modules/@hugeicons/core-free-icons/dist/esm/ | grep -v '\.ma
 | search / filter / download / upload | `Search01Icon`, `FilterIcon`, `Download01Icon`, `Upload01Icon` |
 | success / warning / info | `CheckmarkCircle01Icon`, `Alert01Icon`, `InformationCircleIcon` |
 | file / folder / message / mail | `File01Icon`, `Folder01Icon`, `Message01Icon`, `Mail01Icon` |
-| calendar / clock | `Calendar1Icon`, `Clock1Icon` (single digit, NOT `01`) |
+| calendar / clock | `Calendar01Icon`, `Clock01Icon` |
 | user / settings / logout / bell | `UserIcon`, `Settings01Icon`, `Logout01Icon`, `Notification01Icon` |
 | chart / analytics / dashboard / money | `ChartIcon`, `Analytics01Icon`, `DashboardSquare01Icon`, `DollarCircleIcon` |
 | star / eye / lock / sparkle | `StarIcon`, `EyeIcon`, `LockIcon`, `SparklesIcon` |
@@ -201,16 +209,33 @@ def:pub RadixTriggerExample() -> JsxElement {
 
 ## ⚠ `asChild` triggers and ref forwarding (silent no-open bug)
 
-`<DialogTrigger asChild={True}>`, `<DropdownMenuTrigger asChild={True}>`, `<PopoverTrigger asChild={True}>`, etc. render their **child** as the trigger and attach a positioning-anchor ref to it. The installed `components/ui/` primitives handle this. But if the child is a **hand-written composite of your own**, it MUST declare a trailing `ref: Ref[...]` parameter (which lowers to React `forwardRef`) - otherwise the anchor ref lands nowhere and the menu/popover/dialog **silently never opens**. No compile error, no console error.
+`<DialogTrigger asChild={True}>`, `<DropdownMenuTrigger asChild={True}>`, `<PopoverTrigger asChild={True}>`, etc. render their **child** as the trigger and attach a positioning-anchor ref to it. The installed `components/ui/` primitives handle this: each takes one `props` bundle and spreads it onto its host tag, and under React 19 `ref` rides that spread like any other prop.
+
+A **hand-written composite of your own** has to land the ref somewhere too, or the anchor stays null and the popper positions at the viewport origin instead of at the trigger. No compile error, no console error. Spread your props onto the host tag, or declare a trailing `ref: Ref[...]` parameter (which lowers to React `forwardRef`) if the component takes named params:
 
 ```jac
-# Usable as an asChild trigger child - the trailing ref param forwards the anchor
-def:pub MyMenuButton(label: str, ref: Ref[HTMLButtonElement]) -> JsxElement {
+# Usable as an asChild trigger child - the rest spread carries the anchor ref.
+# `children` is excluded and rendered explicitly, as the shipped button.jac does.
+# jac:ignore[W5015]
+def:pub MyMenuButton(props: dict) -> JsxElement {
+    restProps = {};
+    for key in Object.keys(props) {
+        if key != "children" {
+            restProps[key] = props[key];
+        }
+    }
+    <button className="..." {**restProps}>{props["children"]}</button>
+}
+
+# Named-param form: `ref` is not among the named props, so declare it
+def:pub MyLabeledButton(label: str, ref: Ref[HTMLButtonElement] = Ref()) -> JsxElement {
     <button ref={ref} className="...">{label}</button>
 }
 ```
 
-Prefer the installed `Button` (already handles this) or style the trigger directly with `buttonVariants()` as above. See `jac-npm-packages` for ref-forwarding details and its known `jac check` false positives.
+The `props` bundle is what makes the first form a ref target, and it is also what earns **W5015** (`jac-cl-components` says to default to named params) - ref forwarding is the intentional forwarding that warning leaves room for, so `# jac:ignore[W5015]` belongs on these and not on ordinary components.
+
+Prefer the installed `Button` (already handles this) or style the trigger directly with `buttonVariants()` as above. See `jac-npm-packages` for ref details and its known `jac check` false positives.
 
 ## Theming
 
@@ -228,7 +253,7 @@ The `[jac-shadcn]` block in `jac.toml` is the source of truth (no longer just sc
 
 ```toml
 [jac-shadcn]
-style = "nova"        # nova | vega | maia | lyra | mira  (--style also restyles installed components)
+style = "nova"        # nova | vega | maia | lyra | mira | luma | rhea | sera  (--style also restyles installed components)
 baseColor = "neutral" # neutral | stone | zinc | gray
 theme = "rose"        # accent: any base color or amber/blue/cyan/emerald/fuchsia/green/indigo/lime/orange/pink/purple/red/rose/sky/teal/violet/yellow
 font = "inter"        # figtree (default), inter, geist, geist-mono, roboto, raleway, dm-sans, public-sans, outfit, noto-sans, nunito-sans, jetbrains-mono
@@ -236,7 +261,7 @@ radius = "default"    # default | none | small | medium | large
 menuAccent = "subtle" # subtle | bold
 ```
 
-`jac retheme --font <name>` patches `[dependencies.npm]` automatically - no manual font package edit, and `jac install` runs before `jac start --dev`.
+`jac retheme --font <name>` patches `[dependencies.npm]` automatically - no manual font package edit, and `jac install` runs before `jac run --dev`.
 
 ### baseColor vs theme
 
@@ -301,7 +326,7 @@ menuAccent = "subtle" # subtle | bold
 jac retheme --style nova --baseColor neutral --theme indigo --font inter --radius default --menuAccent subtle
 
 # All supported flags (any combination, all optional):
-# --style       nova | vega | maia | lyra | mira
+# --style       nova | vega | maia | lyra | mira | luma | rhea | sera
 # --baseColor   neutral | stone | zinc | gray        (NOT --base-color)
 # --theme       <any theme name from table above>
 # --font        <any font name from table above>
@@ -438,6 +463,7 @@ def:pub EventListPage() -> JsxElement {
 | field | label, separator |
 | item | separator |
 | button-group | separator |
+| attachment | button |
 
 ## Extended component exports
 
@@ -456,6 +482,9 @@ These exports exist in the registry but are not listed in the component selectio
 | `ButtonGroup` | `ButtonGroupText` (text separator slot) |
 | `Kbd` | `KbdGroup` (grouped key sequence) |
 | `NativeSelect` | `NativeSelectOptGroup` (option group) |
+| `Bubble` | `BubbleGroup` (column wrapper), `BubbleContent` (`asChild` supported), `BubbleReactions` (`side` top/bottom, `align` start/end) |
+| `Attachment` | `AttachmentTrigger` (`asChild` supported, full-cover click target), `AttachmentGroup` (horizontal snap scroller), `AttachmentAction` (wraps `Button`) |
+| `Marker` | `markerVariants` (cva export); `Marker` supports `asChild` |
 
 ## Jac-shadcn gotchas
 

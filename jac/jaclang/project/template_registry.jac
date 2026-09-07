@@ -1,4 +1,3 @@
-import from typing { Callable }
 import from pathlib { Path }
 
 obj ProjectTemplate {
@@ -33,3 +32,5 @@ glob _registry: TemplateRegistry | None = None;
 def get_template_registry -> TemplateRegistry;
 
 def initialize_template_registry -> None;
+
+def template_kind_for(config: dict[str, any], explicit: str = "") -> str;

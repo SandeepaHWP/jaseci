@@ -65,8 +65,9 @@ def format_tools_for_prompt(tools: list[dict[str, any]]) -> str {
         + "- \"arguments\" must be a JSON object whose keys match the tool's "
         + "parameters.\n"
         + "- Emit nothing outside the <tool_call> tags when calling a tool.\n"
-        + "- After a tool result is returned, call the next tool, or call "
-        + "finish_tool with your final answer to end."
+        + "- After a tool result is returned, call the next tool, or end by "
+        + "calling finish_tool with your final answer as its 'final_output' "
+        + "argument."
     );
 }
 
@@ -151,7 +152,7 @@ def linearize_tool_messages(messages: list[dict[str, any]]) -> list[dict[str, an
             continue;
         }
         tool_calls = _field(m, "tool_calls");
-        if tool_calls {
+        if isinstance(tool_calls, list) and tool_calls {
             text = str(_field(m, "content") or "").strip();
             parts: list[str] = [];
             if text {
@@ -387,7 +388,7 @@ def _parse_value(token: str) -> object {
     }
     try {
         return json.loads(t);
-    } except Exception { }
+    } except Exception {}
     if len(t) >= 2 and t[0] == "'" and t[-1] == "'" {
         return t[1:-1];
     }
@@ -398,7 +399,7 @@ def _parse_value(token: str) -> object {
 def _parse_kwargs(argstr: str) -> dict[str, any] {
     out: dict[str, any] = {};
     for part in _split_top_level(argstr) {
-        m = re.match("\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*[:=]\\s*", part);
+        m = re.`match("\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*[:=]\\s*", part);
         if m is None {
             continue;
         }

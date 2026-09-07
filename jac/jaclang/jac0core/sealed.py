@@ -22,12 +22,14 @@ can load. jac0 stays the compiler for that tier; only the container is unified.
 This module is therefore **plain Python with no jaclang dependencies** (like the
 sibling ``cache_paths.py`` / ``ext_registry.py``).
 
-Manifest layout (``_precompiled/MANIFEST.json``, format 4; format 3 = the
-same without native_artifacts, format 2 also without
-kind/capabilities/entry/payloads -- both remain loadable)::
+Manifest layout (``_precompiled/MANIFEST.json``, format ``MANIFEST_FORMAT``
+below; every version in ``MANIFEST_FORMATS_ACCEPTED`` remains loadable --
+format 8 dropped the native seal record that formats 6 and 7
+carried, format 3 lacked native_artifacts, format 2 also lacked
+kind/capabilities/entry/payloads)::
 
     {
-      "format": 4,
+      "format": 7,
       "kind": "web-app",                # optional: project kind (app images)
       "capabilities": ["has-entry", "has-server", "has-client"],  # optional
       "entry": {"module": "app.main", "path": "main.jac"},        # optional
@@ -35,15 +37,19 @@ kind/capabilities/entry/payloads -- both remain loadable)::
       "python_tag": "cpython-314",
       "jir_format_version": 13,
       "jaclang_version": "0.8.7",
+      "compiler_digest": "409:9f2c...",  # optional: the compiler that built
+                                         # this image (jir.compiler_source_digest;
+                                         # informational -- the seal already
+                                         # verified every JIR against it, see #8178)
       "modules": {                      # key: source path relative to pkg dir
-        "compiler/program.jac": {
-          "module": "jaclang.compiler.program",
-          "jir": "compiler/program.jir",   # relative to _precompiled/<tag>/
+        "compiler/symbol_utils.jac": {
+          "module": "jaclang.compiler.symbol_utils",
+          "jir": "compiler/symbol_utils.jir",  # relative to _precompiled/<tag>/
           "package": false,
           "sha256": "..."                  # checked by register_image
         },
-        "jac0core/modresolver.jac": {
-          "module": "jaclang.jac0core.modresolver",
+        "compiler/driver/modresolver.jac": {
+          "module": "jaclang.compiler.driver.modresolver",
           "jir": "jac0core/modresolver.jir",
           "package": false,
           "sha256": "...",
@@ -77,42 +83,44 @@ from pathlib import Path
 from jaclang.jac0core import ext_registry
 
 MANIFEST_NAME = "MANIFEST.json"
-MANIFEST_FORMAT = 5
+MANIFEST_FORMAT = 8
 # Format 3 adds optional app metadata (kind / capabilities / entry) and
-# payloads on top of format 2's module map; format 4 adds the optional
-# ``native_artifacts`` map (AOT-compiled compiler modules: shared library +
-# marshal layout per fullname); format 5 adds the optional ``placement`` map
+# payloads on top of format 2's module map; format 4 added a per-fullname
+# ``native_artifacts`` map; format 5 adds the optional ``placement`` map
 # (pkg-relative source path -> list of codespaces the module emits into,
 # persisted by the seal so downstream tools read placement instead of
-# re-deriving it). Older images stay loadable -- they simply carry no
-# placement facts.
-MANIFEST_FORMATS_ACCEPTED = (2, 3, 4, MANIFEST_FORMAT)
-# Must match jaclang.jac0core.jir.* ; kept literal here because this module
+# re-deriving it). Formats 6 and 7 carried a native seal record for the
+# jaclang image; format 8 drops it (#8732): the image is the JIR tier only.
+# Older APP images stay loadable; a jaclang image must be current format --
+# the image ships with the very code that loads it, so skew means a stale or
+# partial install.
+MANIFEST_FORMATS_ACCEPTED = (2, 3, 4, 5, 6, 7, MANIFEST_FORMAT)
+# Must match jaclang.compiler.driver.jir.* ; kept literal here because this module
 # must import before any .jac module (including jir.jac) can. This is the whole
 # point of the bootstrap tier: jac0core modules are loaded from their JIR by the
 # pure-Python section reader below, so they need none of the .jac machinery
 # (jir.jac's reader is itself a jac0core module).
 PRECOMPILE_SENTINEL = "__PKG_ROOT__"
-JIR_FORMAT_VERSION = 18
-_HEADER_SIZE = 32
-_SECTIONS_MAGIC = b"JIRX"
-_SEC_BYTECODE = 0x02
-_SEC_DEBUG_SRC = 0x09
-_SEC_TERMINATOR = 0xFF
+JIR_FORMAT_VERSION = 24
+HEADER_SIZE = 32
+SECTIONS_MAGIC = b"JIRX"
+SEC_BYTECODE = 0x02
+SEC_DEBUG_SRC = 0x09
+SEC_TERMINATOR = 0xFF
 
 
 def _read_section(data: bytes, want: int) -> bytes | None:
     """Return the raw bytes of JIR section ``want``, or None. Pure-Python twin of
     ``jir.read_sections`` usable during bootstrap (before any .jac can load)."""
     try:
-        pos = data.find(_SECTIONS_MAGIC, _HEADER_SIZE)
+        pos = data.find(SECTIONS_MAGIC, HEADER_SIZE)
         if pos < 0:
             return None
-        pos += len(_SECTIONS_MAGIC)
+        pos += len(SECTIONS_MAGIC)
         while pos < len(data):
             sec_type = data[pos]
             pos += 1
-            if sec_type == _SEC_TERMINATOR or pos + 4 > len(data):
+            if sec_type == SEC_TERMINATOR or pos + 4 > len(data):
                 break
             (sec_len,) = struct.unpack_from("<I", data, pos)
             pos += 4
@@ -131,11 +139,19 @@ def python_tag() -> str:
     return f"cpython-{sys.version_info.major}{sys.version_info.minor}"
 
 
+_ARCH_ALIASES = {
+    "arm64": "aarch64",
+    "aarch64": "aarch64",
+    "x86_64": "x86_64",
+    "amd64": "x86_64",
+}
+
+
 def _patch_code_filenames(
     code: types.CodeType, find: str, replace: str
 ) -> types.CodeType:
     """Recursively rewrite ``co_filename`` (pure-Python twin of
-    ``jac0core.compiler.patch_co_filenames_bytes``, which is itself a .jac
+    ``compiler.driver.jir.patch_co_filenames_bytes``, which is itself a .jac
     module and therefore unavailable while bootstrapping)."""
     consts = tuple(
         _patch_code_filenames(c, find, replace) if isinstance(c, types.CodeType) else c
@@ -163,12 +179,6 @@ class SealedImage:
         self.kind: str = manifest.get("kind", "")
         self.capabilities: list[str] = manifest.get("capabilities") or []
         self.entry: dict = manifest.get("entry") or {}
-        # Optional AOT native artifacts (format 4): fullname -> entry with
-        # ``lib`` / ``layout`` (precompiled-dir-relative paths), ``triple``,
-        # and per-file sha256 digests.
-        self.native_artifacts: dict[str, dict] = (
-            manifest.get("native_artifacts") or {}
-        )
         # Optional placement facts (format 5): pkg-relative posix source path
         # -> codespaces the module emits into (["server"], ["client"], ...).
         # The compiler's verdict, persisted; consumers must not re-derive it.
@@ -233,7 +243,7 @@ class SealedImage:
         data = self._jir_bytes(fullname)
         if data is None:
             return None
-        sec = _read_section(data, _SEC_DEBUG_SRC)
+        sec = _read_section(data, SEC_DEBUG_SRC)
         return zlib.decompress(sec).decode("utf-8") if sec is not None else None
 
     def verify(self) -> None:
@@ -266,42 +276,6 @@ class SealedImage:
                     f"sealed image: payload {path} does not match its manifest sha256"
                 )
 
-    def native_artifact(self, fullname: str) -> tuple[str, dict] | None:
-        """Resolve a sealed AOT native artifact for ``fullname``.
-
-        Returns ``(lib_abspath, layout_dict)`` after hash-verifying both files
-        against the manifest, or None when the image carries no artifact for
-        the module (or it targets another platform). Any integrity or read
-        problem returns None -- callers fall back to the bytecode tier, which
-        is always present and semantically identical.
-        """
-        entry = self.native_artifacts.get(fullname)
-        if not entry:
-            return None
-        lib_rel = entry.get("lib", "")
-        layout_rel = entry.get("layout", "")
-        if not lib_rel or not layout_rel:
-            return None
-        for rel in (lib_rel, layout_rel):
-            if os.path.isabs(rel) or ".." in Path(rel).parts:
-                return None
-        lib_path = self.precompiled_dir / lib_rel
-        layout_path = self.precompiled_dir / layout_rel
-        try:
-            lib_bytes = lib_path.read_bytes()
-            layout_bytes = layout_path.read_bytes()
-        except OSError:
-            return None
-        if hashlib.sha256(lib_bytes).hexdigest() != entry.get("lib_sha256"):
-            return None
-        if hashlib.sha256(layout_bytes).hexdigest() != entry.get("layout_sha256"):
-            return None
-        try:
-            layout_dict = json.loads(layout_bytes)
-        except ValueError:
-            return None
-        return (str(lib_path), layout_dict)
-
     def bootstrap_code(self, fullname: str) -> types.CodeType | None:
         """Code object for a bootstrap-tier module, extracted from its JIR's
         bytecode section by the pure-Python reader -- no jir.jac, no running
@@ -312,7 +286,7 @@ class SealedImage:
         data = self._jir_bytes(fullname)
         if data is None:
             return None
-        raw = _read_section(data, _SEC_BYTECODE)
+        raw = _read_section(data, SEC_BYTECODE)
         if raw is None:
             return None
         code = marshal.loads(raw)  # noqa: S302 -- trusted sealed artifact
@@ -323,8 +297,9 @@ def load_image(precompiled_dir: str | Path) -> SealedImage | None:
     """Load and validate a sealed image; None when no manifest is present.
 
     Raises RuntimeError (fail-closed) when a manifest exists but targets a
-    different interpreter or JIR format -- silently ignoring it would degrade
-    to live compilation of a source-free tree.
+    different interpreter or JIR format, or -- for a jaclang image -- is not
+    the current manifest format. Silently ignoring any of these would
+    degrade to live compilation, which a sealed build does not have.
     """
     pdir = Path(precompiled_dir)
     manifest_path = pdir / MANIFEST_NAME
@@ -332,6 +307,18 @@ def load_image(precompiled_dir: str | Path) -> SealedImage | None:
         raw = manifest_path.read_bytes()
     except OSError:
         return None
+    # An image exists, so the bootstrap-tier escape hatch must not: it was a
+    # build/dev-time flag (the seal build no longer needs it), and honoring it
+    # here would be exactly the silent degradation the seal forbids. Refuse
+    # loudly instead of guessing which tier the caller meant.
+    for flag in ("JAC_NO_SEAL",):
+        if os.environ.get(flag):
+            raise RuntimeError(
+                f"{flag} is set, but {manifest_path} is a sealed image. "
+                "Sealed installs have no source/bytecode fallback tier to "
+                f"select; unset {flag} (it is meaningful only while building "
+                "a seal from a source tree)."
+            )
     manifest = json.loads(raw)
     if manifest.get("format") not in MANIFEST_FORMATS_ACCEPTED:
         raise RuntimeError(
@@ -349,6 +336,14 @@ def load_image(precompiled_dir: str | Path) -> SealedImage | None:
             f"sealed image {manifest_path}: JIR format "
             f"{manifest.get('jir_format_version')} != {JIR_FORMAT_VERSION}"
         )
+    if manifest.get("package") == "jaclang" and manifest.get("format") != MANIFEST_FORMAT:
+        raise RuntimeError(
+            f"sealed jaclang image {manifest_path}: manifest format "
+            f"{manifest.get('format')!r} is not the current {MANIFEST_FORMAT}. "
+            "The image ships with the code that loads it, so a format behind "
+            "the runtime means a stale or partially updated install; rebuild "
+            "the payload."
+        )
     return SealedImage(pdir, manifest)
 
 
@@ -365,15 +360,15 @@ def _jaclang_image() -> SealedImage | None:
     global _jaclang_probed
     if not _jaclang_probed:
         _jaclang_probed = True
-        # JAC_NO_SEAL disables sealed loading so jaclang runs from source. It is
-        # set while BUILDING the seal: the staged jaclang imports itself to run
-        # the precompiler, and must not sealed-load the very manifest it is about
-        # to (re)generate -- which may still be an older/incompatible format.
-        if not os.environ.get("JAC_NO_SEAL"):
-            pkg_dir = Path(__file__).resolve().parent.parent
-            image = load_image(pkg_dir / "_precompiled")
-            if image is not None:
-                _images.insert(0, image)
+        # No env gate here by design: an image next to the package either
+        # loads or raises. The seal build (which regenerates the manifest and
+        # must run unsealed) removes any seeded manifest before this module
+        # can probe, so "no manifest" IS the build/dev tier -- a build stage,
+        # not a mode anyone selects (#8139 Step 1).
+        pkg_dir = Path(__file__).resolve().parent.parent
+        image = load_image(pkg_dir / "_precompiled")
+        if image is not None:
+            _images.insert(0, image)
     for img in _images:
         if img.package == "jaclang":
             return img
@@ -413,20 +408,6 @@ def source_for(fullname: str) -> str | None:
     if found is None:
         return None
     return found[0].debug_source(fullname)
-
-
-def native_artifact_for(fullname: str) -> tuple[str, dict] | None:
-    """Sealed AOT native artifact for ``fullname`` across all images.
-
-    Returns ``(lib_abspath, layout_dict)`` or None. See
-    ``SealedImage.native_artifact`` for the integrity rules.
-    """
-    _jaclang_image()
-    for img in _images:
-        found = img.native_artifact(fullname)
-        if found is not None:
-            return found
-    return None
 
 
 def image_for_bundle_dir(bundle_dir: str | Path) -> SealedImage | None:

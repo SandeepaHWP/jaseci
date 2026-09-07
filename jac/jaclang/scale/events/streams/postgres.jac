@@ -5,8 +5,8 @@ import os;
 import time;
 import uuid;
 import from threading { Thread, Event as _ThreadStop }
-import from typing { Any, Callable, cast }
-import from jaclang.runtimelib.store { TxnIsolation }
+import from typing { cast }
+import from jaclang.data.store { TxnIsolation }
 import from jaclang.scale.events.broker {
     EventStreamBroker,
     Event,
@@ -49,7 +49,7 @@ glob _logger = logging.getLogger(__name__),
 
 obj PgEventStream(EventStreamBroker) {
     has config: dict[str, any] = {},
-        _store: Any = None,
+        _store: any = None,
         _consumer_name: str = "",
         _default_group: str = "jac-scale",
         _default_retry: RetryPolicy = RetryPolicy(),
@@ -63,11 +63,11 @@ obj PgEventStream(EventStreamBroker) {
         );
     }
 
-    def _ensure_store -> Any {
+    def _ensure_store -> any {
         if self._store is None {
-            import from jaclang.runtimelib.session { conninfo_from_url }
-            import from jaclang.runtimelib.store { PgStore }
-            import from jaclang.scale.persistence.pg { scale_db_url }
+            import from jaclang.server.session { conninfo_from_url }
+            import from jaclang.data.store { PgStore }
+            import from jaclang.server.shared_store { scale_db_url }
             url = self.config.get('url') or scale_db_url();
             assert url , "PgEventStream needs a database url (JAC_DB_URL)";
             store = PgStore(conninfo=conninfo_from_url(str(url)));
@@ -109,7 +109,7 @@ obj PgEventStream(EventStreamBroker) {
             INSERT INTO jac_events (topic, payload)
             VALUES (:t, CAST(:p AS jsonb))
             """,
-            {'t': topic, 'p': json.dumps(payload, default=_jsonable)}
+            {'t': topic, 'p': json.dumps(payload, `default=_jsonable)}
         );
     }
 
@@ -220,7 +220,7 @@ obj PgEventStream(EventStreamBroker) {
         }
     }
 
-    def ack(event: Event) { }
+    def ack(event: Event) {}
     def _send_to_dlq(topic: str, event: Event, retry: RetryPolicy) {
         try {
             self.publish(topic + retry.dead_letter_suffix, event);
@@ -232,7 +232,7 @@ obj PgEventStream(EventStreamBroker) {
     def _handle_with_retry(
         topic: str, group: str, event: Event, handler: Callable, retry: RetryPolicy
     ) {
-        h: Any = handler;
+        h: any = handler;
         for attempt in range(retry.max_attempts) {
             try {
                 h(event);
@@ -278,7 +278,7 @@ obj PgEventStream(EventStreamBroker) {
                 } except Exception as e {
                     _logger.warning(f"PgEventStream consume error on {topic}: {e}");
                 }
-                self._stop_event.wait(_POLL_SECONDS);
+                self._stop_event.`wait(_POLL_SECONDS);
             }
         }
         t = Thread(target=_loop, daemon=True, name=f"jac-events-{topic}");

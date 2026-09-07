@@ -20,9 +20,9 @@ def _emit(msg: str) {
 }
 
 def get_cache_dir -> Path {
-    override = os.environ.get("JAC_MODELS_DIR");
-    if override {
-        return Path(override).expanduser();
+    `override = os.environ.get("JAC_MODELS_DIR");
+    if `override {
+        return Path(`override).expanduser();
     }
     home = Path(os.path.expanduser("~"));
     return home / ".cache" / "jac" / "models";
@@ -91,7 +91,7 @@ def _resolve_consent(alias: str, spec: dict[str, any], auto_download: bool) -> b
         target.mkdir(parents=True, exist_ok=True);
         try {
             _consent_marker(alias).write_text("1\n");
-        } except OSError { }
+        } except OSError {}
         return True;
     }
     return False;

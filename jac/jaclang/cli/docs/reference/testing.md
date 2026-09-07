@@ -159,8 +159,8 @@ jac test
 
 !!! note "No-argument discovery"
     With no file and no `-d`, `jac test` reads `directory` from the `[test]`
-    section of `jac.toml` and collects tests only from that directory (like
-    pytest's `testpaths`). Scoping to `tests/` keeps collection from importing
+    section of `jac.toml` and collects tests only from that directory.
+    Scoping to `tests/` keeps collection from importing
     application modules whose top-level `with entry` block would otherwise run
     as a side effect of being imported. When `[test] directory` is unset, the
     whole project (from the root) is walked, as before.
@@ -170,7 +170,7 @@ jac test
 | Option | Short | Description |
 |--------|-------|-------------|
 | `--test_name` | `-t` | Run specific test by name |
-| `--filter` | `-f` | Filter tests by pattern |
+| `--filter` | `-f` | Select tests by name expression (`and`/`or`/`not`, parens) |
 | `--xit` | `-x` | Exit on first failure |
 | `--maxfail` | `-m` | Stop after N failures |
 | `--directory` | `-d` | Test directory |
@@ -214,35 +214,55 @@ All of them report through the same `jac test` pass/fail pipeline, and the CLI o
 
 ---
 
+## Tests in a Workspace
+
+In a project with several [apps](apps.md), `jac test` takes an app name the
+way `jac run` does. `jac test social_graph` reads `[test]` from that app's
+effective config (its `[apps.social_graph.test]` overlay over the base table)
+and resolves `directory` / `directories` against the app root; a bare
+`jac test` targets `[project] default-app`, or the sole app. Tests under
+shared code belong to no app and run with the base `[test]` table.
+
+The compiler stamps the app's facts onto every module it tests, so the same
+laws hold in a test as in the app itself: a test in app A cannot reach app B
+except through B's walkers and `def:pub` functions, and a bridged call in a
+test is awaited exactly as it is in the app. A test that needs two apps
+talking runs the consumer's tests with the providers colocated, which is what
+`jac run <app>` does by default.
+
+---
+
 ## Test Output
+
+One character per test: `.` passed, `s` skipped, `F` failed, `E` errored,
+`!` the worker process died while running that file.
 
 ### Success
 
 ```
-unittest.case.FunctionTestCase (test_add) ... ok
-unittest.case.FunctionTestCase (test_subtract) ... ok
+..s.....
 
-----------------------------------------------------------------------
-Ran 2 tests in 0.001s
-
-OK
+7 passed, 1 skipped in 0.42s
 ```
 
 ### Failure
 
+Each failure prints as `FAILED <file>::<test name>`, followed by a traceback
+trimmed to your own frames, then anything the test wrote to stdout or stderr
+(captured and discarded for passing tests).
+
 ```
-unittest.case.FunctionTestCase (test_add) ... FAIL
+..F.
 
-======================================================================
-FAIL: test_add
-----------------------------------------------------------------------
-AssertionError: Expected 5, got 4
+FAILED tests/test_math.jac::adds two numbers
+  tests/test_math.jac:12 in test_adds_two_numbers
+    assert add(2, 2) == 5;
+E   AssertionError: assertion failed at tests/test_math.jac:12
 
-----------------------------------------------------------------------
-Ran 1 test in 0.001s
-
-FAILED (failures=1)
+3 passed, 1 failed in 0.38s
 ```
+
+Use `-v` for one line per test instead of the progress characters.
 
 ---
 
@@ -389,18 +409,55 @@ test "divide normal" {
 }
 
 test "divide by zero" {
-    try {
+    with testraises(ZeroDivisionError) {
         divide(10, 0);
-        assert False, "Should have raised error";
-    } except ZeroDivisionError {
-        assert True;  # Expected
     }
+}
+
+test "divide by zero explains itself" {
+    with testraises(ZeroDivisionError) as ei {
+        divide(10, 0);
+    }
+    assert "Cannot divide by zero" in str(ei.value);
 }
 
 test "divide negative" {
     assert divide(-10, 2) == -5;
 }
 ```
+
+---
+
+## Skipping a Test
+
+`testskip` abandons the current test and reports it as skipped rather than
+passed or failed. Use it for environment gates. (`skip` on its own is a Jac
+keyword -- the walker skip statement -- hence the name.)
+
+```jac
+test "builds a shared library" {
+    import shutil;
+    if not shutil.which("gcc") {
+        testskip("gcc not installed");
+    }
+    assert build_shared_lib().ok;
+}
+```
+
+`testfail` is the counterpart for a branch that should be unreachable:
+
+```jac
+test "parser attaches a location to every node" {
+    for node_ in parse(src).walk() {
+        if node_.loc is None {
+            testfail(f"{node_} has no location");
+        }
+    }
+}
+```
+
+`testskip`, `testfail` and `testraises` are ambient -- usable in any `test`
+block with no import.
 
 ---
 
@@ -492,7 +549,7 @@ max_failures = 10
 ### Import
 
 ```python
-from jaclang.runtimelib.testing import JacTestClient
+from jaclang.testing.testing import JacTestClient
 ```
 
 ### Creating a Client
@@ -555,63 +612,65 @@ Responses from `JacTestClient` are `TestResponse` objects:
 
 ### Full Example
 
-```python
-import pytest
-from jaclang.runtimelib.testing import JacTestClient
+```jac
+import tempfile;
+import from jaclang.testing.testing { JacTestClient }
 
-def test_task_crud(tmp_path):
-    client = JacTestClient.from_file("app.jac", base_path=str(tmp_path))
+test "task crud" {
+    client = JacTestClient.from_file("app.jac", base_path=tempfile.mkdtemp());
+    try {
+        # Register and authenticate
+        client.register_user("testuser", "password123");
 
-    # Register and authenticate
-    client.register_user("testuser", "password123")
+        # Create
+        resp = client.post("/walker/CreateTask", json={"title": "My Task"});
+        assert resp.status_code == 200;
+        assert resp.ok;
 
-    # Create
-    resp = client.post("/walker/CreateTask", json={"title": "My Task"})
-    assert resp.status_code == 200
-    assert resp.ok
-
-    # Read
-    resp = client.post("/walker/GetTasks")
-    data = resp.json()
-    assert len(data["reports"]) == 1
-
-    # Cleanup
-    client.close()
+        # Read
+        resp = client.post("/walker/GetTasks");
+        data = resp.json();
+        assert len(data["reports"]) == 1;
+    } finally {
+        client.close();
+    }
+}
 ```
 
 ### HMR Testing
 
 Test hot module replacement behavior:
 
-```python
-def test_hmr(tmp_path):
-    client = JacTestClient.from_file("app.jac", base_path=str(tmp_path))
-    client.register_user("user", "pass")
+```jac
+test "hmr" {
+    client = JacTestClient.from_file("app.jac", base_path=tempfile.mkdtemp());
+    try {
+        client.register_user("user", "pass");
 
-    # Initial state
-    resp = client.post("/walker/get_data")
-    assert resp.ok
+        # Initial state
+        assert client.post("/walker/get_data").ok;
 
-    # Simulate file change and reload
-    client.reload()
+        # Simulate file change and reload
+        client.reload();
 
-    # Verify after reload
-    resp = client.post("/walker/get_data")
-    assert resp.ok
-
-    client.close()
+        # Verify after reload
+        assert client.post("/walker/get_data").ok;
+    } finally {
+        client.close();
+    }
+}
 ```
 
 ---
 
 ## Parameterized Tests
 
-The `parametrize()` helper registers one test per parameter, similar to `pytest.mark.parametrize`. It creates individual test cases from a list of inputs, so each case runs and reports independently.
+The `parametrize()` helper registers one test per parameter. It creates individual test cases from a list of inputs, so each case runs and reports independently.
 
 ### Import
 
 ```jac
-import from jaclang.runtimelib.test { parametrize }
+import from jaclang.testing.test { parametrize }
 ```
 
 ### Signature
@@ -632,7 +691,7 @@ parametrize(base_name: str, params: Iterable, test_func: Callable, id_fn: Callab
 Define a test function that takes a single parameter, then call `parametrize()` in a `with entry` block:
 
 ```jac
-import from jaclang.runtimelib.test { parametrize }
+import from jaclang.testing.test { parametrize }
 
 def _test_square(pair: tuple) {
     input_val = pair[0];
@@ -657,7 +716,7 @@ This registers four tests: `square_0`, `square_1`, `square_2`, `square_3`.
 Use `id_fn` to generate descriptive test names:
 
 ```jac
-import from jaclang.runtimelib.test { parametrize }
+import from jaclang.testing.test { parametrize }
 
 def _test_parse(raw: str) {
     # test logic

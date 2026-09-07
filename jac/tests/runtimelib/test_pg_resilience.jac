@@ -29,12 +29,11 @@ import os;
 import time;
 import from pathlib { Path }
 import from tempfile { TemporaryDirectory }
-import from typing { Any }
-import from jaclang.runtimelib.pgembed { PgRuntime }
-import from jaclang.runtimelib.session { shared_pg_data_dir, project_db_name }
-import from jaclang.runtimelib.store { ConnInfo, PgStore }
-import from jaclang.runtimelib.pgwire { PgWireError }
-import from jaclang.vendor.pgload { connect as pg_connect }
+import from jaclang.data.pgembed { PgRuntime }
+import from jaclang.server.session { shared_pg_data_dir, project_db_name }
+import from jaclang.data.store { ConnInfo, PgStore }
+import from jaclang.data.pgwire { PgWireError }
+import from jaclang.data.pgload { connect as pg_connect }
 
 glob STAMP_KEY = 'schema_fingerprint';
 
@@ -67,8 +66,8 @@ def _mk_store(td: str) -> tuple {
 }
 
 
-def _peer(info: ConnInfo, app_name: str) -> Any {
-    last: Any = None;
+def _peer(info: ConnInfo, app_name: str) -> any {
+    last: Exception | None = None;
     for _ in range(30) {
         try {
             return pg_connect(
@@ -88,11 +87,12 @@ def _peer(info: ConnInfo, app_name: str) -> Any {
             time.sleep(1.0);
         }
     }
+    assert last is not None;
     raise last;
 }
 
 
-def _hold_write(peer: Any) {
+def _hold_write(peer: any) {
     # An open transaction that has written to anchors: RowExclusiveLock,
     # which any CREATE INDEX [IF NOT EXISTS] replay must wait behind.
     peer.run('BEGIN');
@@ -105,19 +105,19 @@ def _hold_write(peer: Any) {
 }
 
 
-def _release(peer: Any) {
+def _release(peer: any) {
     try {
         peer.run('ROLLBACK');
-    } except Exception { }
+    } except Exception {}
     try {
         peer.close();
-    } except Exception { }
+    } except Exception {}
 }
 
 
-def _armed_peer(info: ConnInfo, app_name: str) -> Any {
+def _armed_peer(info: ConnInfo, app_name: str) -> any {
     # Peer with an open write transaction, re-armed through restarts.
-    last: Any = None;
+    last: Exception | None = None;
     for _ in range(10) {
         peer = _peer(info, app_name);
         try {
@@ -132,6 +132,7 @@ def _armed_peer(info: ConnInfo, app_name: str) -> Any {
             time.sleep(1.0);
         }
     }
+    assert last is not None;
     raise last;
 }
 
@@ -213,10 +214,10 @@ test "layer2: blocker owned by a dead process is reaped automatically" {
 
 test "layer2: blocker owned by a live process raises a structured conflict" {
     with TemporaryDirectory() as td {
-        import from jaclang.runtimelib.store { SessionConflictError }
+        import from jaclang.data.store { SessionConflictError }
         (s1, info, _, rt) = _mk_store(td);
         s1.ensure_schema({});
-        got: Any = None;
+        got: any = None;
         # A cluster restart mid-scenario silently drops the blocking
         # transaction; re-arm and try the whole scenario again.
         for attempt in range(3) {
@@ -249,7 +250,7 @@ test "layer2: blocker owned by a live process raises a structured conflict" {
 
 test "layer2: takeover_project evicts every other session on the db" {
     with TemporaryDirectory() as td {
-        import from jaclang.runtimelib.session { takeover_project }
+        import from jaclang.server.session { takeover_project }
         (s1, info, target, _) = _mk_store(td);
         s1.ensure_schema({});
         n = 0;
@@ -277,7 +278,7 @@ test "layer2: takeover_project evicts every other session on the db" {
 
 test "layer3: known sqlstates map to actionable messages" {
     import from jaclang.cli.errmap { humanize_error }
-    import from jaclang.runtimelib.store { SessionConflictError }
+    import from jaclang.data.store { SessionConflictError }
 
     full = humanize_error(
         PgWireError({'C': '53300', 'M': 'sorry, too many clients already'})
@@ -314,7 +315,7 @@ test "layer3: known sqlstates map to actionable messages" {
 
 
 test "layer4: embedded server provisioned with connection headroom" {
-    import from jaclang.runtimelib.pgembed { PG_MAX_CONNECTIONS }
+    import from jaclang.data.pgembed { PG_MAX_CONNECTIONS }
     assert PG_MAX_CONNECTIONS >= 256 , (
         f"max_connections={PG_MAX_CONNECTIONS} cannot absorb a default"
         ' 128-worker test fan-out'

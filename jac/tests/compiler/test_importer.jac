@@ -16,12 +16,13 @@ import from jaclang { JacRuntime as Jac }
 import from jaclang { JacRuntimeInterface }
 import from jaclang.cli.commands { execution }
 import from jaclang.cli.commands { analysis }
-import from jaclang.jac0core.program { JacProgram }
-import from jaclang.jac0core.compiler { JacCompiler }
-import from jaclang.jac0core.jir {
+import from jaclang.compiler.driver.program { JacProgram }
+import from jaclang.compiler.driver.compiler { JacCompiler }
+import from jaclang.compiler.driver.jir {
     get_module_cache_path,
     read_bytecode_only,
     SEC_LLVM_IR,
+    SEC_PLACEMENT,
     SECTIONS_MAGIC,
     HEADER_SIZE,
     read_sections
@@ -207,8 +208,13 @@ test "compiler separates internal from user modules" {
 
     old_compiler = Jac.compiler;
     old_program = Jac.program;
+    old_selfhost = Jac.selfhost;
     Jac.compiler = None;
     Jac.program = None;
+    # The self-host cache is process-wide; the separation assertions below
+    # inspect its hub, so this test scopes a fresh one and restores the
+    # shared cache afterward.
+    Jac.selfhost = None;
 
     try {
         captured_output = io.StringIO();
@@ -220,9 +226,9 @@ test "compiler separates internal from user modules" {
 
         compiler = Jac.get_compiler();
         user_program = Jac.get_program();
-        jaclang_root = compiler._get_jaclang_root();
+        jaclang_root = compiler.selfhost.jaclang_root();
 
-        internal_hub_paths = list(compiler.internal_program.mod.hub.keys());
+        internal_hub_paths = list(compiler.selfhost.program.mod.hub.keys());
         user_hub_paths = list(user_program.mod.hub.keys());
 
         assert len(user_hub_paths) > 0 , "User program hub should not be empty";
@@ -242,6 +248,7 @@ test "compiler separates internal from user modules" {
         os.unlink(user_file);
         Jac.compiler = old_compiler;
         Jac.program = old_program;
+        Jac.selfhost = old_selfhost;
     }
 }
 
@@ -284,7 +291,7 @@ test "get bytecode uses JIR cache on second call" {
     }
 }
 
-test "type evaluator uses JIR cache for pyi stubs" {
+test "pyi stubs derive identically in every process" {
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".pyi", delete=False, dir=_test_tmp_dir
     ) as tmp {
@@ -302,28 +309,25 @@ test "type evaluator uses JIR cache for pyi stubs" {
         sym1 = mod1.sym_tab.lookup("Foo");
         assert sym1 is not None , "Foo symbol missing after first pyi import";
 
-        cache_path = get_module_cache_path(stub_file);
-        assert cache_path.exists() , "JIR cache file should exist after first pyi import";
-
         prog2 = JacProgram();
         mod2 = prog2.load_dependency_module(stub_file);
         sym2 = mod2.sym_tab.lookup("Foo");
-        assert sym2 is not None , "Foo symbol missing after JIR cache read";
+        assert sym2 is not None , "Foo symbol missing on second derivation";
 
-        import from jaclang.jac0core.unitree { Archetype }
-        import from jaclang.jac0core.constant { Tokens as Tok }
+        import from jaclang.compiler.frontend.unitree { Archetype }
+        import from jaclang.compiler.frontend.constant { Tokens as Tok }
         foo2: list = [];
         for a in mod2.get_all_sub_nodes(Archetype) {
             if a.name is not None and a.name.value == "Foo" {
                 foo2.append(a);
             }
         }
-        assert len(foo2) == 1 , "Foo archetype missing after JIR cache read";
-        assert foo2[0].arch_type is not None , "arch_type lost in JIR round-trip";
+        assert len(foo2) == 1 , "Foo archetype missing on second derivation";
+        assert foo2[0].arch_type is not None , "arch_type missing on second derivation";
         assert foo2[0].arch_type.name == Tok.KW_CLASS , (
-            "arch_type wrong after JIR round-trip"
+            "arch_type wrong on second derivation"
         );
-        assert mod2.source is not None , "cached stub should retain source";
+        assert mod2.source is not None , "derived stub should retain source";
         assert stub_file in mod2.source.file_path
             or os.path.basename(stub_file) in mod2.source.file_path , (
             "module.source must reference original .pyi path"
@@ -334,18 +338,14 @@ test "type evaluator uses JIR cache for pyi stubs" {
         prog3 = JacProgram();
         mod3 = prog3.load_dependency_module(stub_file);
         assert mod3.sym_tab.lookup("Foo") is not None , (
-            "stale JIR cache reused after pyi edit"
+            "edited pyi must derive fresh"
         );
     } finally {
         os.unlink(stub_file);
-        cache_path2 = get_module_cache_path(stub_file);
-        if cache_path2.exists() {
-            cache_path2.unlink();
-        }
     }
 }
 
-test "load_dependency_module uses JIR cache without recompiling" {
+test "pyi loads build via PyastBuildPass and never compile" {
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".pyi", delete=False, dir=_test_tmp_dir
     ) as tmp {
@@ -356,24 +356,22 @@ test "load_dependency_module uses JIR cache without recompiling" {
     past = time.time() - 2;
     os.utime(stub_file, (past, past));
     compile_calls = 0;
-    orig_compile = JacProgram.compile;
+    orig_compile: any = JacProgram.compile;
     def counting_compile(
         self: JacProgram,
         file_path: str,
         use_str: (str | None) = None,
         no_cgen: bool = False,
-        type_check: bool = False,
         symtab_ir_only: bool = False,
-        cancel_token = None,
-        options = None
-    ) -> object {
+        cancel_token: any = None,
+        options: any = None
+    ) -> any {
         compile_calls += 1;
         return orig_compile(
             self,
             file_path,
             use_str=use_str,
             no_cgen=no_cgen,
-            type_check=type_check,
             symtab_ir_only=symtab_ir_only,
             cancel_token=cancel_token,
             options=options
@@ -386,24 +384,18 @@ test "load_dependency_module uses JIR cache without recompiling" {
         assert compile_calls == 0 , (
             "first .pyi load should use PyastBuildPass, not compile"
         );
-        cache_path = get_module_cache_path(stub_file);
-        assert cache_path.exists() , "first .pyi load should write JIR cache";
 
         prog2 = JacProgram();
         prog2.load_dependency_module(stub_file);
-        assert compile_calls == 0 , "warm cache should skip compile";
+        assert compile_calls == 0 , "second process's .pyi load must not compile either";
     } finally {
         JacProgram.compile = orig_compile;
         os.unlink(stub_file);
-        cache_path = get_module_cache_path(stub_file);
-        if cache_path.exists() {
-            cache_path.unlink();
-        }
     }
 }
 
-test "resolve_import_source_module uses JIR cache without recompiling" {
-    import jaclang.jac0core.unitree as uni;
+test "resolve_import_source_module never compiles pyi stubs" {
+    import jaclang.compiler.frontend.unitree as uni;
     import from jaclang.compiler.symbol_utils { resolve_import_source_module }
 
     with tempfile.TemporaryDirectory(dir=_test_tmp_dir) as d {
@@ -419,24 +411,22 @@ test "resolve_import_source_module uses JIR cache without recompiling" {
             f.write('import from "' + stub_name + '" { CacheProbe }\n');
         }
         compile_calls = 0;
-        orig_compile = JacProgram.compile;
+        orig_compile: any = JacProgram.compile;
         def counting_compile(
             self: JacProgram,
             file_path: str,
             use_str: (str | None) = None,
             no_cgen: bool = False,
-            type_check: bool = False,
             symtab_ir_only: bool = False,
-            cancel_token = None,
-            options = None
-        ) -> object {
+            cancel_token: any = None,
+            options: any = None
+        ) -> any {
             compile_calls += 1;
             return orig_compile(
                 self,
                 file_path,
                 use_str=use_str,
                 no_cgen=no_cgen,
-                type_check=type_check,
                 symtab_ir_only=symtab_ir_only,
                 cancel_token=cancel_token,
                 options=options
@@ -458,8 +448,6 @@ test "resolve_import_source_module uses JIR cache without recompiling" {
             assert compile_calls == 0 , (
                 "first .pyi resolve should use PyastBuildPass, not compile"
             );
-            cache_path = get_module_cache_path(stub_file);
-            assert cache_path.exists() , "first .pyi resolve should write JIR cache";
 
             prog2 = JacProgram();
             mod2 = prog2.parse_str(
@@ -471,10 +459,163 @@ test "resolve_import_source_module uses JIR cache without recompiling" {
                 if isinstance(stmt, uni.Import)
             ];
             resolve_import_source_module(prog2, imports2[0]);
-            assert compile_calls == 0 , "warm cache should skip compile";
+            assert compile_calls == 0 , "second resolve must not compile either";
         } finally {
             JacProgram.compile = orig_compile;
-            cache_path = get_module_cache_path(stub_file);
+        }
+    }
+}
+
+"""A cache newer than its source is not thereby valid: the mtime covers the
+source bytes only, so every environment input the module key folds in (the node
+schema, the analysis fingerprint, the placement/cut/codespace facts) must be
+compared before the mtime fast path can accept the file.  #8181 shortened a
+NODE_SPECS entry by one field, which a fresh-mtime cache written under the old
+schema would then be decoded against, position by position."""
+test "fresh mtime does not admit a cache written under a different environment" {
+    import jaclang.compiler.driver.jir as jir;
+    import from jaclang.compiler.driver.jir { is_module_cache_valid }
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".jac", delete=False, dir=_test_tmp_dir
+    ) as tmp {
+        tmp.write("glob env_probe = 1;\n");
+        tmp.flush();
+        jac_file = tmp.name;
+    }
+    past = time.time() - 2;
+    os.utime(jac_file, (past, past));
+    try {
+        compiler = JacCompiler();
+        assert compiler.get_bytecode(jac_file, JacProgram()) is not None;
+        cache_path = get_module_cache_path(jac_file);
+        assert cache_path.exists() , "JIR cache was not written";
+        assert os.path.getmtime(cache_path) > os.path.getmtime(jac_file) , (
+            "cache must be newer than source for the mtime fast path to apply"
+        );
+        assert is_module_cache_valid(jac_file, cache_path) , "fresh cache should be valid";
+
+        saved = list(jir._COMPILER_DIGEST_CACHE);
+        try {
+            jir._COMPILER_DIGEST_CACHE.clear();
+            jir._COMPILER_DIGEST_CACHE.append("289:" + "0" * 64);
+            assert not is_module_cache_valid(jac_file, cache_path) , (
+                "a fresh mtime served a cache written under a different compiler"
+            );
+        } finally {
+            jir._COMPILER_DIGEST_CACHE.clear();
+            jir._COMPILER_DIGEST_CACHE.extend(saved);
+        }
+        assert is_module_cache_valid(jac_file, cache_path) , (
+            "restoring the compiler digest should restore validity"
+        );
+
+        prev_tgt = os.environ.get("JAC_NATIVE_TARGET");
+        try {
+            os.environ["JAC_NATIVE_TARGET"] = "wasm32-unknown-unknown";
+            assert not is_module_cache_valid(jac_file, cache_path) , (
+                "a fresh mtime served a cache written under a different "
+                "analysis fingerprint"
+            );
+        } finally {
+            if prev_tgt is None {
+                os.environ.pop("JAC_NATIVE_TARGET", None);
+            } else {
+                os.environ["JAC_NATIVE_TARGET"] = prev_tgt;
+            }
+        }
+        assert is_module_cache_valid(jac_file, cache_path) , (
+            "restoring the analysis fingerprint should restore validity"
+        );
+
+        prev_opt = os.environ.get("JAC_OPT_LEVEL");
+        try {
+            os.environ["JAC_OPT_LEVEL"] = "0" if prev_opt != "0" else "1";
+            assert is_module_cache_valid(jac_file, cache_path) , (
+                "a native-only codegen knob (opt level) must not invalidate "
+                "a bytecode cache"
+            );
+        } finally {
+            if prev_opt is None {
+                os.environ.pop("JAC_OPT_LEVEL", None);
+            } else {
+                os.environ["JAC_OPT_LEVEL"] = prev_opt;
+            }
+        }
+    } finally {
+        os.unlink(jac_file);
+        cache_path2 = get_module_cache_path(jac_file);
+        if cache_path2.exists() {
+            cache_path2.unlink();
+        }
+    }
+}
+
+def _cached_pins(jir_bytes: bytes) -> dict[str, str] {
+    import from jaclang.compiler.placement.placement { summary_from_bytes }
+    pos = jir_bytes.find(SECTIONS_MAGIC, HEADER_SIZE);
+    if pos < 0 {
+        return {};
+    }
+    secs = read_sections(jir_bytes, pos + len(SECTIONS_MAGIC));
+    placement = secs.get(SEC_PLACEMENT);
+    if placement is None {
+        return {};
+    }
+    summary = summary_from_bytes(placement);
+    if summary is None {
+        return {};
+    }
+    return {e.name: e.pinned for e in summary.elements};
+}
+
+test "editing placement pins in jac.toml invalidates the module cache" {
+    import from jaclang.compiler.driver.jir { is_module_cache_valid }
+    with tempfile.TemporaryDirectory(dir=_test_tmp_dir) as proj {
+        toml_path = os.path.join(proj, "jac.toml");
+        jac_file = os.path.join(proj, "m.jac");
+        with open(toml_path, "w") as f {
+            f.write('[project]\nname = "pins_cache_probe"\n');
+        }
+        with open(jac_file, "w") as f {
+            f.write("def helper_fn() -> int { return 42; }\n");
+        }
+        past = time.time() - 2;
+        os.utime(jac_file, (past, past));
+        os.utime(toml_path, (past, past));
+        compiler = JacCompiler();
+        assert compiler.get_bytecode(jac_file, JacProgram()) is not None;
+        cache_path = get_module_cache_path(jac_file);
+        try {
+            assert cache_path.exists() , "JIR cache was not written";
+            assert os.path.getmtime(cache_path) > os.path.getmtime(jac_file) , (
+                "cache must be newer than source for the mtime fast path to apply"
+            );
+            assert is_module_cache_valid(jac_file, cache_path) , (
+                "fresh cache should be valid"
+            );
+
+            stale = cache_path.read_bytes();
+            assert _cached_pins(stale).get("helper_fn", "") == "" , (
+                "the pre-edit placement summary should carry no pin"
+            );
+            with open(toml_path, "a") as f {
+                f.write('\n[placement.pins]\n"m.helper_fn" = "server"\n');
+            }
+            assert not is_module_cache_valid(jac_file, cache_path) , (
+                "a jac.toml pins edit must invalidate the module cache"
+            );
+
+            assert compiler.get_bytecode(jac_file, JacProgram()) is not None;
+            assert cache_path.read_bytes() != stale , (
+                "a recompile must overwrite the stale cache entry"
+            );
+            assert is_module_cache_valid(jac_file, cache_path) , (
+                "the rewritten cache must be valid under the new pins"
+            );
+            assert _cached_pins(cache_path.read_bytes()).get("helper_fn") == "server" , (
+                "the recompiled placement summary must honor the new pin"
+            );
+        } finally {
             if cache_path.exists() {
                 cache_path.unlink();
             }
@@ -482,39 +623,8 @@ test "resolve_import_source_module uses JIR cache without recompiling" {
     }
 }
 
-test "corrupt pyi JIR cache falls back to source compile" {
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".pyi", delete=False, dir=_test_tmp_dir
-    ) as tmp {
-        tmp.write("class Baz:\n    z: int\n");
-        tmp.flush();
-        stub_file = tmp.name;
-    }
-    past = time.time() - 2;
-    os.utime(stub_file, (past, past));
-    try {
-        prog1 = JacProgram();
-        prog1.load_dependency_module(stub_file);
-        cache_path = get_module_cache_path(stub_file);
-        assert cache_path.exists() , "cache should exist";
-        cache_path.write_bytes(b"corrupt-jir-data");
-
-        prog2 = JacProgram();
-        mod = prog2.load_dependency_module(stub_file);
-        assert mod.sym_tab.lookup("Baz") is not None , (
-            "corrupt cache should fall back to source compile"
-        );
-    } finally {
-        os.unlink(stub_file);
-        cache_path2 = get_module_cache_path(stub_file);
-        if cache_path2.exists() {
-            cache_path2.unlink();
-        }
-    }
-}
-
 test "stub module cache key is source focused" {
-    import from jaclang.jac0core.jir {
+    import from jaclang.compiler.driver.jir {
         compute_module_key,
         compute_stub_module_key,
         module_cache_key,
@@ -531,16 +641,25 @@ test "stub module cache key is source focused" {
         assert stub_key == module_cache_key(stub_file) , (
             "module_cache_key should use stub key for .pyi"
         );
-        jac_key = compute_module_key(stub_file);
+        jac_probe = stub_file[:-4] + ".jac";
+        with open(jac_probe, "w") as jac_tmp {
+            jac_tmp.write("class KeyProbe:\n    k: int\n");
+        }
+        try {
+            jac_key = compute_module_key(jac_probe);
+        } finally {
+            os.unlink(jac_probe);
+        }
         assert stub_key != jac_key , (
-            "stub cache key should not include placement/client config"
+            "a project module's key folds in placement/client config; "
+            "a stub's key must not"
         );
     } finally {
         os.unlink(stub_file);
     }
 }
 
-test "JIR-cached stub re-knits star imports with overloads" {
+test "a facade stub knits star imports with overloads in every process" {
     # Regression: symbols a stub absorbs via `from X import *` have their defn
     # nodes in the foreign module's AST, which JIR serialization can only mark
     # EXTERNAL_REF; on read the reader dropped them, so a warm-cached facade
@@ -574,25 +693,17 @@ test "JIR-cached stub re-knits star imports with overloads" {
         assert fresh.names_in_scope_overload.get("probe") , (
             "fresh facade stub must absorb probe's overload chain"
         );
-        assert get_module_cache_path(facade_file).exists() , (
-            "facade stub should be JIR cached after first load"
-        );
-
         prog2 = JacProgram();
         cached = prog2.load_dependency_module(facade_file);
         assert cached.sym_tab.lookup("probe") is not None , (
-            "JIR-cached facade stub lost its absorbed symbols"
+            "second process's facade stub lost its absorbed symbols"
         );
         assert cached.names_in_scope_overload.get("probe") , (
-            "JIR-cached facade stub lost its absorbed overload chain"
+            "second process's facade stub lost its absorbed overload chain"
         );
     } finally {
         for p in (base_file, facade_file) {
             os.unlink(p);
-            cp = get_module_cache_path(p);
-            if cp.exists() {
-                cp.unlink();
-            }
         }
     }
 }
@@ -624,6 +735,7 @@ test "get_bytecode busts in-memory hub when .impl.jac changes" {
         prog = JacProgram();
         def tag_of -> int {
             code = compiler.get_bytecode(mod, prog);
+            assert code is not None , "get_bytecode returned None";
             ns: dict = {};
             exec(code, ns);
             return ns["Thing"]().get_tag();
@@ -669,18 +781,22 @@ test "release compile closure clears ASTs and evaluator but keeps stubs" {
         source_path = os.path.join(d, "source.jac");
         stub_path = os.path.join(d, "types.pyi");
         prog = JacProgram();
-        def source_ref -> object {
+        def source_ref -> any {
             source_mod = prog.parse_str("glob value = 1;\n", source_path);
             return weakref.ref(source_mod);
         }
         ast_ref = source_ref();
         prog.parse_str("value: int\n", stub_path);
         prog.get_type_evaluator();
-        prog.release_compile_closure(keep_stubs=True);
+        prog.release_compile_closure();
         gc.collect();
         assert ast_ref() is None , "released AST is still strongly referenced";
-        assert source_path not in prog.mod.hub;
-        assert stub_path in prog.mod.hub;
+        # The hub is keyed by the resolved path (JacProgram.hub_key), and
+        # find_module is the accessor that normalizes for you. Typeshed lives
+        # in the stub catalog and never enters the hub; a project .pyi loaded
+        # from source is retained across a release like any stub tree.
+        assert prog.find_module(source_path) is None;
+        assert prog.find_module(stub_path) is not None;
         assert prog.type_evaluator is None;
     }
 }
@@ -694,7 +810,7 @@ test "release compile closure honors no unit eviction" {
         os.environ["JAC_NO_UNIT_EVICT"] = "1";
         try {
             prog.release_compile_closure();
-            assert source_path in prog.mod.hub;
+            assert prog.find_module(source_path) is not None;
         } finally {
             if old_no_evict is None {
                 os.environ.pop("JAC_NO_UNIT_EVICT", None);
@@ -729,17 +845,19 @@ test "release compile closure keeps synthesized type identity stable" {
 
 test "internal get_bytecode evicts unit AST after compile" {
     # Cold bootstrap used to retain every jaclang module AST in
-    # internal_program.mod.hub. After the outermost successful compile+cache
+    # the self-host program hub. After the outermost successful compile+cache
     # write, non-stub ASTs must leave the hub so peak RSS stays near one import
     # closure (+ warm typeshed), not the union of every module ever compiled.
     compiler = JacCompiler();
     prog = JacProgram();
     # Two small, already-shipped jaclang modules (always under jaclang_root →
-    # resolve to internal_program). Force a fresh compile so we exercise the
+    # resolve to the self-host program). Force a fresh compile so we exercise the
     # post-compile eviction path rather than a disk-cache hit.
     samples = [
-        os.path.join(compiler._get_jaclang_root(), "jac0core", "log.jac"),
-        os.path.join(compiler._get_jaclang_root(), "jac0core", "constant.jac")
+        os.path.join(compiler.selfhost.jaclang_root(), "compiler", "driver", "log.jac"),
+        os.path.join(
+            compiler.selfhost.jaclang_root(), "compiler", "frontend", "constant.jac"
+        )
     ];
     for p in samples {
         assert os.path.isfile(p) , f"missing fixture {p}";
@@ -750,7 +868,7 @@ test "internal get_bytecode evicts unit AST after compile" {
         for p in samples {
             code = compiler.get_bytecode(p, prog);
             assert code is not None , f"compile failed for {p}";
-            hub = compiler.internal_program.mod.hub;
+            hub = compiler.selfhost.program.mod.hub;
             leftover_jac = [
                 k
                 for k in hub.keys()

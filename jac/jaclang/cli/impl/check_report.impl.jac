@@ -1,11 +1,10 @@
-def print_guide_hint(alert: any) -> None {
+def print_guide_hint(code: (str | None), category: (str | None)) -> None {
     import from jaclang.cli.console { console }
     import from jaclang.cli.guide_store { guide_for_diagnostic }
-    info = alert.code;
-    if info is None {
+    if not code or not category {
         return;
     }
-    name = guide_for_diagnostic(info.code, info.category.value);
+    name = guide_for_diagnostic(code, category);
     if name is not None {
         console.print(f"  → run 'jac guide {name}' for guidance", style="muted");
     }
@@ -32,13 +31,21 @@ impl print_failures(failed_results: list, nowarn: bool = False) -> None {
     for r in failed_results {
         console.print(separator(r['path'], char='_'));
         for e in r['errors'] {
-            console.error(e.pretty_print());
-            print_guide_hint(e);
+            if isinstance(e, dict) {
+                console.error(str(e.get('pretty') or e.get('text') or ''));
+                print_guide_hint(e.get('code'), e.get('category'));
+            } else {
+                console.error(str(e));
+            }
         }
         if not nowarn and r['warnings'] {
             for w in r['warnings'] {
-                console.warning(w.pretty_print());
-                print_guide_hint(w);
+                if isinstance(w, dict) {
+                    console.warning(str(w.get('pretty') or w.get('text') or ''));
+                    print_guide_hint(w.get('code'), w.get('category'));
+                } else {
+                    console.warning(str(w));
+                }
             }
         }
         console.print("");
@@ -68,7 +75,7 @@ impl print_final_summary(passed_count: int, failed_count: int, elapsed: float) -
     console.print(separator(", ".join(parts) + f" in {elapsed:.2f}s"));
 }
 
-def _census_relpath(path: str) -> str {
+def _coverage_relpath(path: str) -> str {
     import os;
     try {
         return os.path.relpath(path);
@@ -77,22 +84,22 @@ def _census_relpath(path: str) -> str {
     }
 }
 
-impl print_native_census(census: dict) -> None {
+impl print_native_coverage(coverage: dict[str, dict[str, any]]) -> None {
     import from jaclang.cli.console { console }
-    import from jaclang.jac0core.codeinfo { effective_default_codespace }
+    import from jaclang.compiler.frontend.codeinfo { effective_default_codespace }
     console.print("");
-    console.print(separator("native census"));
+    console.print(separator("native coverage"));
     console.print(f"default codespace: {effective_default_codespace()}");
     counts: dict[str, int] = {};
-    for rec in census.values() {
+    for rec in coverage.values() {
         counts[rec['outcome']] = counts.get(rec['outcome'], 0) + 1;
     }
     console.print(
         ", ".join(f"{counts.get(k, 0)} {k}" for k in ('native', 'demoted', 'server'))
     );
     native_paths = sorted(
-        _census_relpath(p)
-        for (p, rec) in census.items()
+        _coverage_relpath(p)
+        for (p, rec) in coverage.items()
         if rec['outcome'] == 'native'
     );
     if native_paths {
@@ -102,15 +109,30 @@ impl print_native_census(census: dict) -> None {
             console.print(f"  {p}");
         }
     }
+    seamed = sorted(
+        (_coverage_relpath(p), rec)
+        for (p, rec) in coverage.items()
+        if rec['outcome'] == 'native' and rec.get('seams')
+    );
+    if seamed {
+        console.print("");
+        console.print("native seams (callables demoted to Python-only):");
+        for (p, rec) in seamed {
+            console.print(f"  {p}  ({len(rec['seams'])})");
+            for s in rec['seams'] {
+                console.print(f"    {s}");
+            }
+        }
+    }
     demoted = [
         (p, rec)
-        for (p, rec) in census.items()
+        for (p, rec) in coverage.items()
         if rec['outcome'] == 'demoted'
     ];
     if demoted {
         console.print("");
         console.print("demotions (ranked by first error code):");
-        by_code: dict[str, list] = {};
+        by_code: dict[str, list[tuple[str, dict[str, any]]]] = {};
         for (p, rec) in demoted {
             by_code.setdefault(rec['code'] or '<uncoded>', []).append((p, rec));
         }
@@ -118,19 +140,19 @@ impl print_native_census(census: dict) -> None {
         for (code, entries) in ranked {
             console.print(f"  {code}  ({len(entries)})");
             for (p, rec) in sorted(entries) {
-                console.print(f"    {_census_relpath(p)}  {rec['detail']}");
+                console.print(f"    {_coverage_relpath(p)}  {rec['detail']}");
             }
         }
     }
     server = [
         (p, rec)
-        for (p, rec) in census.items()
+        for (p, rec) in coverage.items()
         if rec['outcome'] == 'server'
     ];
     if server {
         console.print("");
         console.print("server modules (ranked by classifier signal):");
-        by_reason: dict[str, list] = {};
+        by_reason: dict[str, list[str]] = {};
         for (p, rec) in server {
             by_reason.setdefault(rec['detail'] or '<unknown>', []).append(p);
         }
@@ -140,20 +162,20 @@ impl print_native_census(census: dict) -> None {
         for (reason, paths) in ranked_r {
             console.print(f"  {reason}  ({len(paths)})");
             for p in sorted(paths) {
-                console.print(f"    {_census_relpath(p)}");
+                console.print(f"    {_coverage_relpath(p)}");
             }
         }
     }
     seamed = [
         (p, rec)
-        for (p, rec) in census.items()
+        for (p, rec) in coverage.items()
         if rec['seams']
     ];
     if seamed {
         console.print("");
         console.print("native modules with demoted methods (seams):");
         for (p, rec) in sorted(seamed) {
-            console.print(f"  {_census_relpath(p)}");
+            console.print(f"  {_coverage_relpath(p)}");
             for s in rec['seams'] {
                 console.print(f"    {s}");
             }
@@ -161,7 +183,7 @@ impl print_native_census(census: dict) -> None {
     }
 }
 
-impl print_placement_report(rows_by_module: dict) -> None {
+impl print_placement_report(rows_by_module: dict[str, dict[str, any]]) -> None {
     import from jaclang.cli.console { console }
     console.print("");
     console.print(separator("placements"));
@@ -170,15 +192,15 @@ impl print_placement_report(rows_by_module: dict) -> None {
         return;
     }
     counts: dict[str, int] = {};
-    for entry in rows_by_module.values() {
-        for row in entry['rows'] {
+    for `entry in rows_by_module.values() {
+        for row in `entry['rows'] {
             key = 'dual' if row['dual'] else row['space'];
             counts[key] = counts.get(key, 0) + 1;
         }
     }
     total_crossings = 0;
-    for entry in rows_by_module.values() {
-        total_crossings += entry.get('crossings', 0);
+    for `entry in rows_by_module.values() {
+        total_crossings += `entry.get('crossings', 0);
     }
     console.print(
         ", ".join(
@@ -190,17 +212,17 @@ impl print_placement_report(rows_by_module: dict) -> None {
         f"(client import items bridged over RPC)"
     );
     for path in sorted(rows_by_module.keys()) {
-        entry = rows_by_module[path];
-        decided = entry['decided'];
-        rel = _census_relpath(path);
+        `entry = rows_by_module[path];
+        decided = `entry['decided'];
+        rel = _coverage_relpath(path);
         suffix = '';
         if decided {
             suffix = f"  [decided {decided}]";
         }
         console.print("");
         console.print(rel + suffix);
-        for row in entry['rows'] {
-            row_space = row['space'];
+        for row in `entry['rows'] {
+            row_space: str = row['space'];
             if row['dual'] {
                 row_space = row_space + ' (dual)';
             }

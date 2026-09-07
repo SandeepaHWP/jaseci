@@ -611,7 +611,7 @@ test "admin UI build emits admin based assets and keeps useEffect lambda" {
         shutil.rmtree(os.path.join(build_dir, ".jac"), ignore_errors=True);
 
         result = subprocess.run(
-            [jac_bin, "build", "main.jac", "--client", "web"],
+            [jac_bin, "build", "--as", "client", "main.jac"],
             cwd=build_dir,
             capture_output=True,
             text=True,
@@ -628,7 +628,7 @@ test "admin UI build emits admin based assets and keeps useEffect lambda" {
         );
         assert 'href="/admin/' in index_html;
 
-        bundles = list(dist.glob("client.*.js"));
+        bundles = list(dist.`glob("client.*.js"));
         assert bundles , "no client bundle emitted";
         js = bundles[0].read_text(encoding="utf-8");
         assert ".useEffect([])" not in js , (

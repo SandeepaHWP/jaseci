@@ -5,17 +5,20 @@ import tempfile;
 import tomllib;
 import from pathlib { Path }
 import from jaclang.scale.injector.bundle { sanitized_jac_toml, pack_jab }
+import from jaclang.scale.tests.support { pod_binary, require_pod_binary }
 import from jaclang.scale.injector.pvc_injector {
     PvcInjector,
     build_bundle_pvc,
     build_loader_pod,
     BUNDLE_MOUNT_PATH,
-    LOADER_UID,
-    LOADER_GID
+    RUNTIME_UID,
+    RUNTIME_GID,
+    build_pvc_init_container,
+    bundle_keys_from_pod_spec
 }
 
 
-glob _JAC_BIN: Path = Path(__file__).parents[4] / "zig-out" / "bin" / "jac";
+glob _JAC_BIN: Path = pod_binary();
 
 
 def _make_project(project: str, toml: str) {
@@ -36,9 +39,7 @@ def _sanitized_toml(project: str) -> dict {
 
 
 test "secrets are stripped and secret-bearing files excluded from the sealed .jab" {
-    if not _JAC_BIN.is_file() {
-        return;
-    }
+    require_pod_binary();
     with tempfile.TemporaryDirectory() as project {
         with open(os.path.join(project, "app.jac"), "w") as handle {
             handle.write("with entry { print(\"ok\"); }");
@@ -54,9 +55,8 @@ test "secrets are stripped and secret-bearing files excluded from the sealed .ja
                 "plugins.scale.secrets.jwt = \"topsecret\"\n"
                     + "[project]\nname = \"x\"\n"
                     + "[plugins.scale.database]\nurl = \"env:JAC_DB_URL\"\n"
-                    + "[plugins.scale]\n# nested creds annotation\nsecrets.token = \"nestedshh\"\n"
-                    + "[plugins.scale.secrets]\ndb_password = \"p@ssw0rd\"\n"
                     + "# s3 access creds\n[scale.secrets]\napi_key = \"shhhh\"\n"
+                    + "db_password = \"p@ssw0rd\"\ntoken = \"nestedshh\"\n"
             );
         }
         raw = pack_jab(project, _JAC_BIN.read_bytes());
@@ -64,7 +64,9 @@ test "secrets are stripped and secret-bearing files excluded from the sealed .ja
         toml_text = "";
         with tarfile.open(fileobj=io.BytesIO(raw), mode="r:gz") as tar {
             names = tar.getnames();
-            toml_text = tar.extractfile("jac.toml").read().decode("utf-8");
+            toml_member = tar.extractfile("jac.toml");
+            assert toml_member is not None;
+            toml_text = toml_member.read().decode("utf-8");
         }
         assert "app.jac" in names;
         assert "_precompiled/MANIFEST.json" in names;
@@ -77,6 +79,24 @@ test "secrets are stripped and secret-bearing files excluded from the sealed .ja
         assert "p@ssw0rd" not in toml_text;
         assert "shhhh" not in toml_text;
         assert "nestedshh" not in toml_text;
+    }
+}
+
+
+test "a dotted secret key inside a plugin table is stripped with its annotation" {
+    with tempfile.TemporaryDirectory() as project {
+        _make_project(
+            project,
+            "[project]\nname = \"x\"\n"
+                + "[plugins.scale]\n# nested creds annotation\nsecrets.token = \"nestedshh\"\n"
+                + "[plugins.scale.database]\nurl = \"env:JAC_DB_URL\"\n"
+        );
+        text = sanitized_jac_toml(Path(project)) or "";
+        assert "nestedshh" not in text , text;
+        assert "nested creds annotation" not in text , text;
+        data = tomllib.loads(text);
+        assert "secrets" not in data["plugins"]["scale"] , data;
+        assert data["plugins"]["scale"]["database"]["url"] == "env:JAC_DB_URL";
     }
 }
 
@@ -121,8 +141,8 @@ test "the loader pod keeps fsGroup for storage that honors it (#7432)" {
     assert pod["kind"] == "Pod";
     assert pod["metadata"]["name"] == "orders-bundle-loader";
     spec = pod["spec"];
-    assert spec["securityContext"]["fsGroup"] == LOADER_GID;
-    assert spec["securityContext"]["runAsUser"] == LOADER_UID;
+    assert spec["securityContext"]["fsGroup"] == RUNTIME_GID;
+    assert spec["securityContext"]["runAsUser"] == RUNTIME_UID;
     claims = [
         v["persistentVolumeClaim"]["claimName"]
         for v in spec["volumes"]
@@ -156,7 +176,7 @@ test "the loader pod makes the bundle volume root writable without fsGroup (#743
     assert set(sc["capabilities"]["add"]) == {"CHOWN", "FOWNER", "DAC_OVERRIDE"};
     # And it must actually chown/chmod the bundle mount to the loader identity.
     script = perms["command"][-1];
-    assert f"{LOADER_UID}:{LOADER_GID}" in script;
+    assert f"{RUNTIME_UID}:{RUNTIME_GID}" in script;
     assert BUNDLE_MOUNT_PATH in script;
     assert "chown" in script;
     assert "chmod" in script;
@@ -182,4 +202,31 @@ test "mutate_pod_spec wires the pvc, an init container, and the app mount" {
     assert len(result["initContainers"]) == 1;
     mount_names = [mount["name"] for mount in result["containers"][0]["volumeMounts"]];
     assert "jac-app" in mount_names;
+}
+
+
+# Bundle retention (#8089): the keep-set has to be derived from what a pod
+# template actually mounts, so the reader is driven by the writer's own output
+# rather than a hand-written arg string. A consumer that reimplements this
+# parsing hardcodes the container name and the mount layout.
+test "bundle keys round-trip from the init container the injector builds" {
+    keys = ["bundles/orders/aaa.jab", "toolchain/orders/bbb.tar.gz"];
+    pod_spec = {
+        "initContainers": [
+            build_pvc_init_container(
+                "python:3.12-slim", [f"{BUNDLE_MOUNT_PATH}/{k}" for k in keys]
+            )
+        ]
+    };
+
+    assert bundle_keys_from_pod_spec(pod_spec) == keys;
+}
+
+
+test "a pod spec with no bootstrap container references no bundles" {
+    assert bundle_keys_from_pod_spec({}) == [];
+    assert bundle_keys_from_pod_spec(
+        {"initContainers": [{"name": "wait-for-postgres", "args": ["sleep 1"]}]}
+    )
+        == [];
 }

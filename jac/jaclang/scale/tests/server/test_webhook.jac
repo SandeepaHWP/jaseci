@@ -9,14 +9,12 @@ import time;
 import uuid;
 import from logging.handlers { MemoryHandler }
 import from pathlib { Path }
-import from typing { Any, cast }
-
+import from typing { cast }
 import from jaclang.scale.tests.scale_test_client {
     ScaleTestClient,
     make_client,
     extract_data
 }
-import from jaclang.scale.tests.server_support { _extract_transport_response_data }
 
 """Generate HMAC-SHA256 signature for webhook payload."""
 def _generate_webhook_signature(payload: bytes, secret: str) -> str {
@@ -58,7 +56,7 @@ test "webhook warning absent at boot without webhook walkers" {
             "Webhook durability warning fired at boot for an app with no "
             f"webhook walkers: {warnings}"
         );
-    } finally { }
+    } finally {}
 }
 
 test "webhook durability warning absent when the shared database is available" {
@@ -73,7 +71,9 @@ test "webhook durability warning absent when the shared database is available" {
 test "webhook - endpoint exists" {
     client = make_client();
     try {
-        schema = client._server.server.app.openapi();
+        srv = client._server;
+        assert srv is not None , "server must be running";
+        schema = srv.app.openapi();
         paths = schema.get("paths", {});
 
         assert "/webhook/PaymentReceived" in paths , (
@@ -90,7 +90,9 @@ test "webhook - endpoint exists" {
 test "webhook - normal walker not in webhook" {
     client = make_client();
     try {
-        schema = client._server.server.app.openapi();
+        srv = client._server;
+        assert srv is not None , "server must be running";
+        schema = srv.app.openapi();
         paths = schema.get("paths", {});
 
         assert "/webhook/NormalPayment" not in paths , (

@@ -14,9 +14,9 @@ was already published while still delivering what comes after.
 
 import threading;
 import uuid;
-import from jaclang.runtimelib.pgembed { PgRuntime }
-import from jaclang.runtimelib.session { shared_pg_data_dir }
-import from jaclang.runtimelib.store { PgStore }
+import from jaclang.data.pgembed { PgRuntime }
+import from jaclang.server.session { shared_pg_data_dir }
+import from jaclang.data.store { PgStore }
 import from jaclang.scale.events.broker { Event }
 import from jaclang.scale.events.streams.postgres { PgEventStream, _STREAM_SCHEMA }
 
@@ -189,7 +189,7 @@ test "register_handler shares the same positioning rule as consume" {
     try {
         _publish(stream, topic, 1);
         stream.register_handler(topic, handler, group="g_push", start_from="earliest");
-        assert done.wait(timeout=15.0) , "handler never received the replayed event";
+        assert done.`wait(timeout=15.0) , "handler never received the replayed event";
         assert received[0].data["n"] == 0;
     } finally {
         stream.stop(drain=False);

@@ -13,10 +13,12 @@ import from jaclang.scale.injector.bundle {
 glob logger = logging.getLogger(__name__);
 
 glob BUNDLE_VOLUME_NAME: str = "jac-bundles",
-     BUNDLE_MOUNT_PATH: str = "/jac-bundles";
+     BUNDLE_MOUNT_PATH: str = "/jac-bundles",
+     PVC_BOOTSTRAP_NAME: str = "jac-pvc-bootstrap";
 
-glob LOADER_UID: int = 1000,
-     LOADER_GID: int = 1000;
+glob RUNTIME_UID: int = 1000,
+     RUNTIME_GID: int = 1000,
+     VOLUME_PERMS_NAME: str = "jac-volume-perms";
 
 
 def bundle_pvc_name(app_name: str) -> str {
@@ -26,6 +28,29 @@ def bundle_pvc_name(app_name: str) -> str {
 
 def bundle_pvc_path(object_key: str) -> str {
     return f"{BUNDLE_MOUNT_PATH}/{object_key}";
+}
+
+
+def bundle_keys_from_pod_spec(pod_spec: dict[str, any]) -> list[str] {
+    prefix = f"{BUNDLE_MOUNT_PATH}/";
+    keys: list[str] = [];
+    for raw in list(pod_spec.get("initContainers") or []) {
+        container = dict(raw);
+        if container.get("name") != PVC_BOOTSTRAP_NAME {
+            continue;
+        }
+        for arg in list(container.get("args") or []) {
+            for token in str(arg).replace(";", " ").split() {
+                if token.startswith(prefix) {
+                    key = token[len(prefix):];
+                    if key and key not in keys {
+                        keys.append(key);
+                    }
+                }
+            }
+        }
+    }
+    return keys;
 }
 
 
@@ -68,17 +93,23 @@ def build_bundle_pvc(
 }
 
 
-def build_loader_perms_init_container(loader_image: str) -> dict[str, any] {
-    script = (
-        f"chown -R {LOADER_UID}:{LOADER_GID} {BUNDLE_MOUNT_PATH} "
-        f"&& chmod 0775 {BUNDLE_MOUNT_PATH} "
-        "|| echo 'bundle-perms: chown/chmod not permitted by the storage "
-        "backend; relying on the volume permissions as provisioned' >&2"
-    );
+def build_volume_perms_init_container(
+    name: str, image: str, mounts: list[dict[str, str]], recursive: bool = False
+) -> dict[str, any] {
+    flag = "-R " if recursive else "";
+    steps: list[str] = [];
+    for mount in mounts {
+        path = mount["mountPath"];
+        steps.append(
+            f'chown {flag}{RUNTIME_UID}:{RUNTIME_GID} "{path}" && chmod 0775 "{path}" '
+            f"|| echo '{name}: chown/chmod of {path} not permitted by the storage "
+            "backend; relying on the volume permissions as provisioned' >&2"
+        );
+    }
     return {
-        "name": "bundle-perms",
-        "image": loader_image,
-        "command": ["sh", "-c", script],
+        "name": name,
+        "image": image,
+        "command": ["sh", "-c", "; ".join(steps)],
         "securityContext": {
             "runAsNonRoot": False,
             "runAsUser": 0,
@@ -90,8 +121,30 @@ def build_loader_perms_init_container(loader_image: str) -> dict[str, any] {
             },
             "seccompProfile": {"type": "RuntimeDefault"}
         },
-        "volumeMounts": [{"name": "bundles", "mountPath": BUNDLE_MOUNT_PATH}]
+        "volumeMounts": [_writable_mount(m) for m in mounts]
     };
+}
+
+
+def _writable_mount(mount: dict[str, str]) -> dict[str, str] {
+    out = dict(mount);
+    out.pop("readOnly", None);
+    return out;
+}
+
+
+def build_loader_perms_init_container(loader_image: str) -> dict[str, any] {
+    return build_volume_perms_init_container(
+        "bundle-perms",
+        loader_image,
+        [{"name": "bundles", "mountPath": BUNDLE_MOUNT_PATH}],
+        recursive=True
+    );
+}
+
+
+def runtime_pod_security_context -> dict[str, any] {
+    return {"fsGroup": RUNTIME_GID, "fsGroupChangePolicy": "OnRootMismatch"};
 }
 
 
@@ -109,8 +162,8 @@ def build_loader_pod(
             "restartPolicy": "Never",
             "securityContext": {
                 "runAsNonRoot": True,
-                "runAsUser": LOADER_UID,
-                "fsGroup": LOADER_GID,
+                "runAsUser": RUNTIME_UID,
+                "fsGroup": RUNTIME_GID,
                 "seccompProfile": {"type": "RuntimeDefault"}
             },
             "initContainers": [build_loader_perms_init_container(loader_image)],
@@ -121,7 +174,7 @@ def build_loader_pod(
                     "command": ["sh", "-c", "sleep 3600"],
                     "securityContext": {
                         "runAsNonRoot": True,
-                        "runAsUser": LOADER_UID,
+                        "runAsUser": RUNTIME_UID,
                         "readOnlyRootFilesystem": True,
                         "allowPrivilegeEscalation": False,
                         "capabilities": {"drop": ["ALL"]},
@@ -148,7 +201,7 @@ def build_pvc_init_container(
     untars = "".join([f"tar xzf {p} -C {APP_MOUNT_PATH}; " for p in bundle_paths]);
     script = "set -eu; " + untars + ensure_jac_toml_cmd();
     return {
-        "name": "jac-pvc-bootstrap",
+        "name": PVC_BOOTSTRAP_NAME,
         "image": base_image,
         "command": ["sh", "-c"],
         "args": [script],
@@ -182,7 +235,8 @@ obj PvcInjector(Injector) {
         access_mode: str = "ReadWriteMany",
         loader_image: str = "busybox:1.36",
         _object_key: str = "",
-        _bundle_bytes: bytes = b"";
+        _bundle_bytes: bytes = b"",
+        _fleet: any = None;
 
     def _seed_artifacts -> list[tuple[str, bytes]] {
         return [(self._object_key, self._bundle_bytes)];
@@ -196,7 +250,8 @@ obj PvcInjector(Injector) {
         raw = pack_jab(
             project_dir,
             getattr(self, "_seal_binary_bytes", b""),
-            getattr(self, "_pod_arch", "")
+            getattr(self, "_pod_arch", ""),
+            self._fleet
         );
         digest = content_address(raw);
         self._object_key = bundle_object_key(app_name, digest);

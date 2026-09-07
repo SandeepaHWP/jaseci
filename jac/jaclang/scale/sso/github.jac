@@ -1,4 +1,4 @@
-import from jaclang.runtimelib.serving.client { arequest }
+import from jaclang.server.serving.client { arequest }
 import from jaclang.scale.sso.provider { OAuth2CodeProvider, SSOUserInfo }
 
 obj GithubSSOProvider(OAuth2CodeProvider) {
@@ -38,9 +38,9 @@ obj GithubSSOProvider(OAuth2CodeProvider) {
         if not email {
             emails = await self._api_get('/user/emails', access_token);
             if isinstance(emails, list) {
-                for entry in emails {
-                    if isinstance(entry, dict) and entry.get('primary') {
-                        email = entry.get('email');
+                for `entry in emails {
+                    if isinstance(`entry, dict) and `entry.get('primary') {
+                        email = `entry.get('email');
                         break;
                     }
                 }

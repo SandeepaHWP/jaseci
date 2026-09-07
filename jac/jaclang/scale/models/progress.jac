@@ -1,5 +1,3 @@
-import from typing { Callable }
-
 obj ProgressEvent {
     has phase: str,
         step: str = "",
@@ -13,7 +11,7 @@ class EventSink {
 }
 
 obj NoopSink(EventSink) {
-    def emit(event: ProgressEvent) { }
+    def emit(event: ProgressEvent) {}
 }
 
 obj CallbackSink(EventSink) {

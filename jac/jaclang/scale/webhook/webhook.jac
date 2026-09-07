@@ -3,17 +3,16 @@ import hashlib;
 import json;
 import logging;
 import secrets;
-import from typing { Any }
-import from jaclang.runtimelib.serving.authcrypt {
+import from jaclang.server.serving.authcrypt {
     JWTError,
     JWTExpiredError,
     jwt_decode,
     jwt_encode
 }
 import from datetime { UTC, datetime, timedelta }
-import from jaclang.runtimelib.transport { TransportResponse, Meta }
+import from jaclang.server.transport { TransportResponse, Meta }
 import from jaclang.scale.config.config_loader { get_scale_config }
-import from jaclang.scale.persistence.pg { open_docs_store }
+import from jaclang.server.shared_store { open_docs_store }
 
 glob logger = logging.getLogger(__name__);
 
@@ -29,7 +28,7 @@ obj WebhookUtils {
     static def extract_signature(header_value: str) -> str;
 }
 
-def _create_api_key_db -> Any | None {
+def _create_api_key_db -> any | None {
     try {
         return open_docs_store();
     } except Exception as e {
@@ -39,7 +38,7 @@ def _create_api_key_db -> Any | None {
 }
 
 obj ApiKeyManager {
-    has _db: Any | None = _create_api_key_db(),
+    has _db: any | None = _create_api_key_db(),
         _inmemory_store: dict = {},
         _collection: str = 'webhook_api_keys',
         _rate_window: dict = {};

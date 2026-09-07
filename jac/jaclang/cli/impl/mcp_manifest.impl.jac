@@ -13,6 +13,7 @@ impl get_command(
     name: str
 ) -> dict[str, str | bool | list | None | list[dict[str, str]]] {
     import from jaclang.cli.manifest { get_command_meta }
+    import from jaclang.cli.command { arg_typ_name }
 
     meta = get_command_meta(name);
     if meta is None {
@@ -29,9 +30,9 @@ impl get_command(
         info: dict[str, str | bool | list[any] | None] = {
             'name': arg.name,
             'kind': arg.kind.name,
-            'type': arg.typ,
+            'type': arg_typ_name(arg.typ),
             'required': arg.required,
-            'default': arg.default,
+            'default': arg.`default,
             'help': arg.help
         };
         if arg.short is not None {

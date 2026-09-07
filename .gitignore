@@ -9,13 +9,14 @@ venv
 _precompiled/
 _dist/
 _planning/
+jac-seal/
 
 # Distribution / packaging
 .Python
 play/
 build/
 develop-eggs/
-dist/
+/dist/
 downloads/
 eggs/
 .eggs/
@@ -92,3 +93,4 @@ jactastic/**
 
 # Zig 0.16 project-local package cache (fetched, hash-pinned deps)
 zig-pkg/
+

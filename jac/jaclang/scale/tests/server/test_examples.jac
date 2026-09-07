@@ -10,7 +10,7 @@ import requests;
 import from pathlib { Path }
 
 import from jaclang.project.config { find_project_root }
-import from jaclang.scale.tests.server_support { get_free_port }
+import from jaclang.scale.tests.support { get_free_port }
 
 glob JacScaleFixtures: Path = Path(__file__).parent.parent / "fixtures";
 
@@ -64,10 +64,11 @@ obj JacScaleTestRunner {
         import from jaclang.scale.runtime.context.util { jac_executable }
         cmd = [
             jac_executable(),
-            "start",
-            str(self.example_file),
+            "run",
+            "--serve",
             "--port",
-            str(self.port)
+            str(self.port),
+            str(self.example_file)
         ];
 
         self.server_process = subprocess.Popen(
@@ -115,10 +116,10 @@ obj JacScaleTestRunner {
         if self.server_process {
             self.server_process.terminate();
             try {
-                self.server_process.wait(timeout=5);
+                self.server_process.`wait(timeout=5);
             } except subprocess.TimeoutExpired {
                 self.server_process.kill();
-                self.server_process.wait();
+                self.server_process.`wait();
             }
             if self.server_process.stdout {
                 self.server_process.stdout.close();
@@ -200,7 +201,7 @@ obj JacScaleTestRunner {
             headers["Authorization"] = f"Bearer {self.token}";
         }
 
-        response = None;
+        response: any = None;
         for attempt in range(max_retries) {
             response = requests.request(
                 method=method, url=url, json=data, headers=headers, timeout=timeout
@@ -266,7 +267,7 @@ obj JacScaleTestRunner {
             headers["Authorization"] = f"Bearer {self.token}";
         }
 
-        response = None;
+        response: any = None;
         for attempt in range(max_retries) {
             try {
                 response = requests.request(

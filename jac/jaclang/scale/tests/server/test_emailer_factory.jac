@@ -1,16 +1,15 @@
 import sys;
 import from pathlib { Path }
-import from typing { Any }
 import from jaclang.scale.emailer.emailer { Emailer }
 import from jaclang.scale.emailer.factory { create as create_emailer, register }
-import from jaclang.scale.identity.auth_tokens {
+import from jaclang.server.identity.auth_tokens {
     AuthTokenStore,
     reset_auth_token_store
 }
 
 
 obj _RecordingEmailer(Emailer) {
-    has sent: list[dict[str, Any]] = [];
+    has sent: list[dict[str, any]] = [];
 
     override def is_ready -> bool {
         return True;

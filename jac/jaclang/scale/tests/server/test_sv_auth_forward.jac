@@ -1,11 +1,17 @@
-import jaclang.runtimelib.serving.client as sv_http;
-import from jaclang.runtimelib { sv_client }
+import jaclang.server.serving.client as sv_http;
+import from jaclang.server { sv_client }
 import from jaclang.scale.runtime.context.auth_ctx {
     set_current_auth,
     reset_current_auth,
     get_current_auth
 }
 import from jaclang.scale.plugin { JacScalePlugin }
+import jaclang.scale.runtime.rpc.rpc as rpc_mod;
+
+
+def _as_any(v: any) -> any {
+    return v;
+}
 
 
 obj _MockRequest {
@@ -38,14 +44,29 @@ def _install_mock(handler: any) -> any {
     return original;
 }
 
+"""Pin rpc_timeout for one module; every other module keeps the real resolver."""
+def _install_rpc_timeout(module_name: str, seconds: float) -> any {
+    original = getattr(rpc_mod, "_sv_rpc_timeout");
+
+    def resolver(name: str) -> float {
+        return seconds if name == module_name else original(name);
+    }
+    setattr(rpc_mod, "_sv_rpc_timeout", resolver);
+    return original;
+}
+
+def _restore_rpc_timeout(original: any) {
+    setattr(rpc_mod, "_sv_rpc_timeout", original);
+}
+
 """Replace the function transport with one that always fails to connect."""
 def _install_unreachable_transport(round_trips: dict) -> any {
-    import from jaclang.runtimelib.serving.client { ClientConnectionError }
+    import from jaclang.server.serving.client { ClientRequestNotSent }
     original = sv_http.post_stream_aware_sync;
 
     def fake(*args: any, **kwargs: any) -> tuple[str, any] {
         round_trips["n"] = round_trips["n"] + 1;
-        raise ClientConnectionError(detail="connection refused");
+        raise ClientRequestNotSent(detail="connection refused");
     }
     sv_http.post_stream_aware_sync = fake;
     return original;
@@ -53,12 +74,12 @@ def _install_unreachable_transport(round_trips: dict) -> any {
 
 """Replace the walker transport with one that always fails to connect."""
 def _install_unreachable_walker_transport(round_trips: dict) -> any {
-    import from jaclang.runtimelib.serving.client { ClientConnectionError }
+    import from jaclang.server.serving.client { ClientRequestNotSent }
     original = sv_http.request_sync;
 
     def fake(*args: any, **kwargs: any) -> any {
         round_trips["n"] = round_trips["n"] + 1;
-        raise ClientConnectionError(detail="connection refused");
+        raise ClientRequestNotSent(detail="connection refused");
     }
     sv_http.request_sync = fake;
     return original;
@@ -156,7 +177,7 @@ test "sv_service_call retries on transport error and succeeds on 2nd attempt" {
     def handler(request: _MockRequest) -> _MockResponse {
         call_count["n"] = call_count["n"] + 1;
         if call_count["n"] == 1 {
-            raise sv_http.ClientConnectionError("connection refused");
+            raise sv_http.ClientRequestNotSent("connection refused");
         }
         return _MockResponse(json_payload={"ok": True, "data": {"result": "ok"}});
     }
@@ -179,7 +200,7 @@ test "sv_service_call gives up after max_attempts on persistent transport error"
 
     def handler(request: _MockRequest) -> _MockResponse {
         call_count["n"] = call_count["n"] + 1;
-        raise sv_http.ClientConnectionError("connection refused");
+        raise sv_http.ClientRequestNotSent("connection refused");
     }
 
     original_post = _install_mock(handler);
@@ -400,9 +421,7 @@ test "walker_call records one breaker failure per failed round trip" {
         sv_client.register(mod, "http://demo.invalid");
         try {
             JacScalePlugin.sv_walker_call(mod, "Ping", {}, None);
-        } except RuntimeError {
-            ;
-        }
+        } except RuntimeError {}
 
         st = _breaker_peek(mod);
         assert st is not None;
@@ -428,9 +447,7 @@ test "breaker opens after exactly the trip threshold of failed round trips" {
             calls += 1;
             try {
                 JacScalePlugin.sv_service_call(mod, "ping", {});
-            } except RuntimeError {
-                ;
-            }
+            } except RuntimeError {}
         }
 
         assert round_trips["n"] == _BREAKER_TRIP_THRESHOLD , (
@@ -501,9 +518,7 @@ test "application error envelope does NOT trip the breaker" {
         for _ in range(_BREAKER_TRIP_THRESHOLD) {
             try {
                 JacScalePlugin.sv_service_call(mod, "fail", {});
-            } except RuntimeError {
-                ;
-            }
+            } except RuntimeError {}
         }
 
         assert not breaker_should_skip(mod);
@@ -569,7 +584,6 @@ test "sv_service_call uses the default 10s timeout when no per-service override"
 
 
 test "sv_service_call honors per-service rpc_timeout from config" {
-    import jaclang.scale.runtime.rpc.rpc as plugin_mod;
     captured: dict = {};
 
     def handler(request: _MockRequest) -> _MockResponse {
@@ -578,19 +592,14 @@ test "sv_service_call honors per-service rpc_timeout from config" {
     }
 
     original_post = _install_mock(handler);
-
-    original_resolver = getattr(plugin_mod, "_sv_rpc_timeout");
-    def fake_resolver(module_name: str) -> float {
-        return 75.5 if module_name == "slow_mod" else 10.0;
-    }
-    setattr(plugin_mod, "_sv_rpc_timeout", fake_resolver);
+    original_resolver = _install_rpc_timeout("slow_mod", 75.5);
 
     try {
         sv_client.register("slow_mod", "http://demo.invalid");
         JacScalePlugin.sv_service_call("slow_mod", "run", {});
         assert captured["timeout"] == 75.5;
     } finally {
-        setattr(plugin_mod, "_sv_rpc_timeout", original_resolver);
+        _restore_rpc_timeout(original_resolver);
         sv_http.post_stream_aware_sync = original_post;
         sv_client.unregister("slow_mod");
     }
@@ -623,7 +632,7 @@ test "sv_service_call uses URL from get_sv_registry hookspec when present" {
             "k9_test_mod": "http://k9-test-mod-service.prod.svc.cluster.local:8000"
         };
     }
-    jaclang.JacRuntime.get_sv_registry = staticmethod(fake_registry);
+    _as_any(jaclang.JacRuntime).get_sv_registry = staticmethod(fake_registry);
 
     try {
         if "k9_test_mod" in sv_client._registry {
@@ -655,7 +664,7 @@ test "sv_service_call falls back to sv_client.resolve_url when hookspec empty" {
     original_post = _install_mock(handler);
     original_get_registry = jaclang.JacRuntime.get_sv_registry;
 
-    jaclang.JacRuntime.get_sv_registry = staticmethod(lambda { {}; });
+    _as_any(jaclang.JacRuntime).get_sv_registry = staticmethod(lambda { {}; });
 
     try {
         sv_client.register("k9_fallback_mod", "http://fallback.invalid:9999");
@@ -670,81 +679,276 @@ test "sv_service_call falls back to sv_client.resolve_url when hookspec empty" {
 }
 
 
-obj _K8sStubMsCfg {
-    has data: dict[str, any];
+import socket;
+import threading;
 
-    def get_microservices_config -> dict[str, any] {
-        return self.data;
+
+"""Count round trips and delivered POSTs apart; an abandoned connect is not a delivery."""
+def _start_counting_server(counts: dict, reply: (bytes | None)) -> tuple {
+    srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM);
+    srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1);
+    srv.bind(("127.0.0.1", 0));
+    srv.listen(8);
+    port = srv.getsockname()[1];
+    held: list = [];
+
+    def serve {
+        while True {
+            try {
+                (conn, _addr) = srv.accept();
+            } except OSError {
+                return;
+            }
+            counts["conns"] = counts["conns"] + 1;
+            held.append(conn);
+            try {
+                data = conn.recv(65536);
+            } except OSError {
+                continue;
+            }
+            if not data.startswith(b"POST ") {
+                continue;
+            }
+            counts["posts"] = counts["posts"] + 1;
+            if reply is not None {
+                try {
+                    conn.sendall(reply);
+                    conn.close();
+                } except OSError {}
+            }
+        }
+    }
+    t = threading.Thread(target=serve, daemon=True);
+    t.start();
+    return (srv, held, port);
+}
+
+
+def _stop_counting_server(srv: any, held: list) {
+    try {
+        srv.close();
+    } except OSError {}
+    for conn in held {
+        try {
+            conn.close();
+        } except OSError {}
     }
 }
 
-test "ensure_sv_service registers DNS URL when in K8s mode" {
-    import os;
-    import jaclang.scale.config.config_loader as cfg_mod;
-    import from jaclang.scale.plugin { JacScalePlugin }
 
-    orig_k8s_host = os.environ.get("KUBERNETES_SERVICE_HOST");
-    orig_ns = os.environ.get("POD_NAMESPACE");
-    original_cfg = getattr(cfg_mod, "get_scale_config");
+test "walker_call sends exactly one POST to a peer that never replies" {
+    counts: dict = {"conns": 0, "posts": 0};
+    (srv, held, port) = _start_counting_server(counts, None);
+    mod = "deaf_walker_mod";
+    _breaker_reset(mod);
+    original_timeout = _install_rpc_timeout(mod, 1.5);
+    try {
+        sv_client.register(mod, f"http://127.0.0.1:{port}");
+        raised_msg = "";
+        try {
+            JacScalePlugin.sv_walker_call(mod, "Ping", {}, None);
+        } except RuntimeError as e {
+            raised_msg = str(e);
+        }
+        assert "no response head within" in raised_msg , raised_msg;
+        assert counts["posts"] == 1 , raised_msg;
+        assert f"after {counts['conns']} attempts" in raised_msg , raised_msg;
+    } finally {
+        _restore_rpc_timeout(original_timeout);
+        sv_client.unregister(mod);
+        _stop_counting_server(srv, held);
+        _breaker_reset(mod);
+    }
+}
 
-    os.environ["KUBERNETES_SERVICE_HOST"] = "10.0.0.1";
-    os.environ["POD_NAMESPACE"] = "prod";
-    setattr(
-        cfg_mod,
-        "get_scale_config",
-        lambda { _K8sStubMsCfg(
-            data={"routes": {"k9_2_peer": "/api/peer"}, "gateway_port": 8000}
-        ); }
+
+test "service_call sends exactly one POST to a peer that never replies" {
+    counts: dict = {"conns": 0, "posts": 0};
+    (srv, held, port) = _start_counting_server(counts, None);
+    mod = "deaf_service_mod";
+    _breaker_reset(mod);
+    original_timeout = _install_rpc_timeout(mod, 1.5);
+    try {
+        sv_client.register(mod, f"http://127.0.0.1:{port}");
+        raised_msg = "";
+        try {
+            JacScalePlugin.sv_service_call(mod, "ping", {});
+        } except RuntimeError as e {
+            raised_msg = str(e);
+        }
+        assert "no response head within" in raised_msg , raised_msg;
+        assert counts["posts"] == 1 , raised_msg;
+        assert f"after {counts['conns']} attempts" in raised_msg , raised_msg;
+    } finally {
+        _restore_rpc_timeout(original_timeout);
+        sv_client.unregister(mod);
+        _stop_counting_server(srv, held);
+        _breaker_reset(mod);
+    }
+}
+
+
+test "service_call does not retry an HTTP 500" {
+    counts: dict = {"conns": 0, "posts": 0};
+    reply = (
+        b"HTTP/1.1 500 Internal Server Error\r\n"
+        + b"Content-Type: text/plain\r\n"
+        + b"Content-Length: 4\r\n"
+        + b"Connection: close\r\n\r\nboom"
     );
-
-    if "k9_2_peer" in sv_client._registry {
-        sv_client.unregister("k9_2_peer");
-    }
-
+    (srv, held, port) = _start_counting_server(counts, reply);
+    mod = "http500_service_mod";
+    _breaker_reset(mod);
+    original_timeout = _install_rpc_timeout(mod, 1.5);
     try {
-        JacScalePlugin.ensure_sv_service("k9_2_peer", ".");
-        url = sv_client._registry.get("k9_2_peer", "");
-        assert url == "http://k9-2-peer-service.prod.svc.cluster.local:8000" , (
-            f"expected DNS URL, got '{url}'"
-        );
+        sv_client.register(mod, f"http://127.0.0.1:{port}");
+        raised_msg = "";
+        try {
+            JacScalePlugin.sv_service_call(mod, "boom", {});
+        } except RuntimeError as e {
+            raised_msg = str(e);
+        }
+        assert "HTTP 500" in raised_msg , raised_msg;
+        assert counts["posts"] == 1 , raised_msg;
+        assert f"after {counts['conns']} attempts" in raised_msg , raised_msg;
     } finally {
-        if "k9_2_peer" in sv_client._registry {
-            sv_client.unregister("k9_2_peer");
-        }
-        if orig_k8s_host is None {
-            del os.environ["KUBERNETES_SERVICE_HOST"];
-        } else {
-            os.environ["KUBERNETES_SERVICE_HOST"] = orig_k8s_host;
-        }
-        if orig_ns is None {
-            del os.environ["POD_NAMESPACE"];
-        } else {
-            os.environ["POD_NAMESPACE"] = orig_ns;
-        }
-        setattr(cfg_mod, "get_scale_config", original_cfg);
+        _restore_rpc_timeout(original_timeout);
+        sv_client.unregister(mod);
+        _stop_counting_server(srv, held);
+        _breaker_reset(mod);
     }
 }
 
 
-test "ensure_sv_service early-returns when peer already registered" {
-    import os;
-    import from jaclang.scale.plugin { JacScalePlugin }
+"""Record the request line's path of every POST and answer it with `reply`."""
+def _start_capturing_server(paths: list[str], reply: bytes) -> tuple {
+    srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM);
+    srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1);
+    srv.bind(("127.0.0.1", 0));
+    srv.listen(8);
+    port = srv.getsockname()[1];
+    held: list = [];
 
-    orig_k8s_host = os.environ.get("KUBERNETES_SERVICE_HOST");
-    os.environ["KUBERNETES_SERVICE_HOST"] = "10.0.0.1";
+    def serve {
+        while True {
+            try {
+                (conn, _addr) = srv.accept();
+            } except OSError {
+                return;
+            }
+            held.append(conn);
+            try {
+                data = conn.recv(65536);
+            } except OSError {
+                continue;
+            }
+            if not data.startswith(b"POST ") {
+                continue;
+            }
+            paths.append(data.split(b" ")[1].decode("ascii"));
+            try {
+                conn.sendall(reply);
+                conn.close();
+            } except OSError {}
+        }
+    }
+    t = threading.Thread(target=serve, daemon=True);
+    t.start();
+    return (srv, held, port);
+}
 
-    sv_client.register("k9_2_already_registered", "http://prior-url.example.com:8000");
 
+glob _WALKER_OK_BODY: bytes = b'{"ok": true, "data": {"result": {}, "reports": []}}',
+     _WALKER_OK_REPLY: bytes = (
+         b"HTTP/1.1 200 OK\r\n"
+         + b"Content-Type: application/json\r\n"
+         + b"Content-Length: "
+         + str(len(_WALKER_OK_BODY)).encode("ascii")
+         + b"\r\n"
+         + b"Connection: close\r\n\r\n"
+         + _WALKER_OK_BODY
+     );
+
+
+def _reset_peer(mod: str) {
+    sv_client.unregister(mod);
+    sv_client._consumer_providers.pop("route_consumer", None);
+    sv_client.set_consumer_app("");
+    _breaker_reset(mod);
+}
+
+
+test "a compiled consumer's declared route is not appended to a bare peer URL" {
+    paths: list[str] = [];
+    (srv, held, port) = _start_capturing_server(paths, _WALKER_OK_REPLY);
+    mod = "declared_route_peer";
+    _reset_peer(mod);
     try {
-        JacScalePlugin.ensure_sv_service("k9_2_already_registered", ".");
-        assert sv_client._registry["k9_2_already_registered"]
-            == ("http://prior-url.example.com:8000");
+        sv_client._declare_consumer_provider("route_consumer", mod, "/api/peer");
+        sv_client.register(mod, f"http://127.0.0.1:{port}");
+        assert sv_client.provider_route(mod) == "/api/peer";
+        assert sv_client.registered_route(mod) == "";
+        assert sv_client.resolve_url(mod) == f"http://127.0.0.1:{port}";
+
+        JacScalePlugin.sv_walker_call(mod, "Ping", {}, None);
+        assert paths == ["/walker/Ping"] , paths;
     } finally {
-        sv_client.unregister("k9_2_already_registered");
-        if orig_k8s_host is None {
-            del os.environ["KUBERNETES_SERVICE_HOST"];
-        } else {
-            os.environ["KUBERNETES_SERVICE_HOST"] = orig_k8s_host;
+        _reset_peer(mod);
+        _stop_counting_server(srv, held);
+    }
+}
+
+
+test "a route registered together with a URL is appended (gateway base)" {
+    paths: list[str] = [];
+    (srv, held, port) = _start_capturing_server(paths, _WALKER_OK_REPLY);
+    mod = "gateway_route_peer";
+    _reset_peer(mod);
+    try {
+        sv_client._declare_consumer_provider("route_consumer", mod, "/api/peer");
+        sv_client.register(mod, f"http://127.0.0.1:{port}/", "/api/peer");
+        assert sv_client.registered_route(mod) == "/api/peer";
+        assert sv_client.resolve_url(mod) == f"http://127.0.0.1:{port}/api/peer";
+
+        JacScalePlugin.sv_walker_call(mod, "Ping", {}, None);
+        assert paths == ["/api/peer/walker/Ping"] , paths;
+
+        sv_client.register(mod, f"http://127.0.0.1:{port}");
+        assert sv_client.registered_route(mod) == "";
+        JacScalePlugin.sv_walker_call(mod, "Ping", {}, None);
+        assert paths == ["/api/peer/walker/Ping", "/walker/Ping"] , paths;
+    } finally {
+        _reset_peer(mod);
+        _stop_counting_server(srv, held);
+    }
+}
+
+
+test "JAC_APP_<APP>_URL is used as given unless JAC_APP_<APP>_ROUTE is set too" {
+    import os;
+    mod = "env_route_peer";
+    url_key = sv_client.peer_url_env_key(mod);
+    route_key = sv_client.peer_route_env_key(mod);
+    saved_url = os.environ.get(url_key);
+    saved_route = os.environ.get(route_key);
+    _reset_peer(mod);
+    try {
+        sv_client._declare_consumer_provider("route_consumer", mod, "/api/peer");
+        os.environ[url_key] = "http://member.invalid:9001";
+        os.environ.pop(route_key, None);
+        assert sv_client.resolve_url(mod) == "http://member.invalid:9001";
+
+        sv_client.unregister(mod);
+        os.environ[route_key] = "/api/peer";
+        assert sv_client.resolve_url(mod) == "http://member.invalid:9001/api/peer";
+    } finally {
+        _reset_peer(mod);
+        for (k, v) in [(url_key, saved_url), (route_key, saved_route)] {
+            if v is None {
+                os.environ.pop(k, None);
+            } else {
+                os.environ[k] = v;
+            }
         }
     }
 }

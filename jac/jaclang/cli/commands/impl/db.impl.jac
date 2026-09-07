@@ -1,10 +1,9 @@
 import os;
 import from enum { StrEnum }
 import from pathlib { Path }
-import from typing { Any }
 import from jaclang.cli.console { console }
-import from jaclang.runtimelib.store { TxnIsolation }
-import from jaclang.runtimelib.dbcatalog { DbRecord, MAINTENANCE_DB }
+import from jaclang.data.store { TxnIsolation }
+import from jaclang.data.dbcatalog { DbRecord, MAINTENANCE_DB }
 
 
 enum DbAction(StrEnum) {
@@ -41,17 +40,17 @@ def _project_data_dir(explicit: str) -> str {
     if explicit {
         return str(Path(explicit).expanduser());
     }
-    import from jaclang.runtimelib.session { shared_pg_data_dir }
+    import from jaclang.server.session { shared_pg_data_dir }
     return shared_pg_data_dir();
 }
 
 
 def _project_database -> str {
-    import from jaclang.runtimelib.session { project_db_name }
+    import from jaclang.server.session { project_db_name }
     base = str(Path.cwd());
     jacs = sorted(
         p
-        for p in Path.cwd().glob("*.jac")
+        for p in Path.cwd().`glob("*.jac")
         if p.is_file()
     );
     target = str(jacs[0]) if len(jacs) == 1 else None;
@@ -59,8 +58,8 @@ def _project_database -> str {
 }
 
 
-def _runtime_for(data_dir: str, tcp: bool = False, port: int = 5432) -> Any {
-    import from jaclang.runtimelib.pgembed { PgRuntime }
+def _runtime_for(data_dir: str, tcp: bool = False, port: int = 5432) -> any {
+    import from jaclang.data.pgembed { PgRuntime }
     return PgRuntime(
         data_dir=data_dir,
         tcp=tcp,
@@ -71,16 +70,16 @@ def _runtime_for(data_dir: str, tcp: bool = False, port: int = 5432) -> Any {
 }
 
 
-def _catalog_runtime(data_dir: str) -> Any {
-    import from jaclang.runtimelib.pgembed { PgRuntime }
+def _catalog_runtime(data_dir: str) -> any {
+    import from jaclang.data.pgembed { PgRuntime }
     return PgRuntime(data_dir=data_dir, database=MAINTENANCE_DB);
 }
 
 
-def _open_store(rt: Any) -> Any {
-    import from jaclang.runtimelib.store { PgStore }
+def _open_store(rt: any) -> any {
+    import from jaclang.data.store { PgStore }
     store = PgStore(conninfo=rt.ensure());
-    store.ensure_schema({});
+    store.ensure_schema_once({});
     return store;
 }
 
@@ -180,7 +179,7 @@ def _db_sql(data_dir: str, query: str) -> int {
 
 
 def _db_fetch -> int {
-    import from jaclang.runtimelib.pgembed { PgRuntime, dist_cache_dir }
+    import from jaclang.data.pgembed { PgRuntime, dist_cache_dir }
     bin_dir = PgRuntime(data_dir=dist_cache_dir()).fetch_dist();
     console.success(f"embedded postgres binaries ready at {bin_dir}");
     return 0;
@@ -223,8 +222,8 @@ def _db_list(data_dir: str) -> int {
 }
 
 
-def _prune_candidates(rt: Any, records: list, empty: bool) -> list[PruneCandidate] {
-    import from jaclang.runtimelib.dbcatalog { holds_no_data }
+def _prune_candidates(rt: any, records: list, empty: bool) -> list[PruneCandidate] {
+    import from jaclang.data.dbcatalog { holds_no_data }
     info = rt.conninfo();
     out: list[PruneCandidate] = [];
     for rec in records {
@@ -233,8 +232,8 @@ def _prune_candidates(rt: Any, records: list, empty: bool) -> list[PruneCandidat
                 out.append(
                     PruneCandidate(
                         record=rec,
-                        reason=f"scratch store of pid {rec.pid}, which is gone",
-                        force=True
+                        reason=f"scratch store, {rec.dead_scratch_reason()}",
+                        force=rec.pid_confirmed_dead()
                     )
                 );
             }
@@ -260,16 +259,19 @@ def _db_prune(data_dir: str, yes: bool, empty: bool) -> int {
     if _cluster_missing(data_dir) {
         return 0;
     }
-    import from jaclang.runtimelib.dbcatalog {
+    import from jaclang.data.dbcatalog {
+        condemn_stale_scratch,
         connect_admin,
         drop_database,
+        drop_if_still_dead,
         list_databases
     }
     rt = _catalog_runtime(data_dir);
-    conn: Any = connect_admin(rt.ensure());
+    conn: any = connect_admin(rt.ensure());
     try {
         records = list_databases(conn);
         candidates = _prune_candidates(rt, records, empty);
+        marked = condemn_stale_scratch(conn, records) if yes else [];
         unattributed = len(
             [
                 rec
@@ -278,8 +280,14 @@ def _db_prune(data_dir: str, yes: bool, empty: bool) -> int {
             ]
         );
         console.print(f"data dir : {data_dir}");
-        if not candidates {
+        if not candidates and not marked {
             console.print("nothing to prune");
+        }
+        for name in marked {
+            console.print(
+                f"marked {name}: its heartbeat stopped, so a later prune will "
+                "reclaim it if it is still silent and unused by then"
+            );
         }
         reclaim = 0;
         dropped = 0;
@@ -293,7 +301,12 @@ def _db_prune(data_dir: str, yes: bool, empty: bool) -> int {
                 );
                 continue;
             }
-            if drop_database(conn, rec.database, force=cand.force) {
+            gone = (
+                drop_if_still_dead(conn, rec.database)
+                    if rec.is_scratch()
+                    else drop_database(conn, rec.database, force=cand.force)
+            );
+            if gone {
                 dropped += 1;
                 console.print(
                     f"dropped {rec.database} ({_human_size(rec.size_bytes)}): "
@@ -330,7 +343,7 @@ def _db_prune(data_dir: str, yes: bool, empty: bool) -> int {
 
 
 def _db_drop(data_dir: str, database: str, yes: bool) -> int {
-    import from jaclang.runtimelib.dbcatalog { is_jac_database }
+    import from jaclang.data.dbcatalog { is_jac_database }
     if not database {
         console.error("usage: jac db drop <database> -y");
         return 1;

@@ -26,9 +26,7 @@ impl TemplateRegistry.register(template_info: dict[str, any]) -> None {
         raise ValueError(f"Template '{name}' must have a 'config' field");
     }
 
-    kind = template_info.get("kind")
-        or config.get("project", {}).get("kind", "")
-        or "cli";
+    kind = template_kind_for(config, str(template_info.get("kind") or ""));
 
     template = ProjectTemplate(
         name=name,
@@ -138,9 +136,9 @@ def _register_builtin_shadcn_template(registry: TemplateRegistry) -> None {
         return;
     }
     results = register_project_template();
-    for entry in _iter_template_dicts(results) {
+    for `entry in _iter_template_dicts(results) {
         try {
-            registry.register(entry);
+            registry.register(`entry);
         } except Exception as e {
             import from jaclang.cli.console { console }
             console.warning(f"Skipping invalid project template: {e}");
@@ -165,10 +163,8 @@ def _iter_template_dicts(results: any) -> list[dict[str, any]] {
 
 def _register_builtin_client_templates(registry: TemplateRegistry) -> None {
     try {
-        import from jaclang.runtimelib.client.plugin_config { JacClientPluginConfig }
-        import from jaclang.runtimelib.client.desktop_plugin_config {
-            JacDesktopPluginConfig
-        }
+        import from jaclang.client.plugin_config { JacClientPluginConfig }
+        import from jaclang.client.desktop_plugin_config { JacDesktopPluginConfig }
     } except Exception {
         return;
     }
@@ -177,9 +173,9 @@ def _register_builtin_client_templates(registry: TemplateRegistry) -> None {
     if desktop is not None {
         entries.append(desktop);
     }
-    for entry in _iter_template_dicts(entries) {
+    for `entry in _iter_template_dicts(entries) {
         try {
-            registry.register(entry);
+            registry.register(`entry);
         } except Exception as e {
             import from jaclang.cli.console { console }
             console.warning(f"Skipping invalid client template: {e}");
@@ -199,7 +195,7 @@ def _core_template(
         "name": "{{name}}",
         "version": "0.1.0",
         "description": spec.description,
-        "entry-point": spec.entry,
+        "entry-point": spec.`entry,
         "kind": kind
     };
     config: dict[str, any] = {
@@ -216,7 +212,7 @@ def _core_template(
         "kind": kind,
         "is_default_for_kind": True,
         "config": config,
-        "files": {spec.entry: body},
+        "files": {spec.`entry: body},
         "root_gitignore_entries": [".jac/", "jac.local.toml"],
         "directories": [".jac"]
     };
@@ -246,15 +242,31 @@ def _register_core_templates(registry: TemplateRegistry) {
     );
 
     for info in [
-        _core_template("cli", _hello),
         _core_template("cli-native", _hello),
         _core_template("native-binary", _hello),
         _core_template("native-lib", _shared),
-        _core_template("service", _service),
         _core_template("service-mesh", _service),
         _core_template("py-package", _lib),
         _core_template("js-package", _lib)
     ] {
         registry.register(info);
     }
+}
+
+impl template_kind_for(config: dict[str, any], explicit: str = "") -> str {
+    if explicit {
+        return explicit;
+    }
+    apps = config.get("apps") if isinstance(config, dict) else None;
+    if isinstance(apps, dict) and apps {
+        if len(apps) > 1 {
+            return "workspace";
+        }
+        sole = next(iter(apps.values()));
+        sole_kind = sole.get("kind", "") if isinstance(sole, dict) else "";
+        return str(sole_kind or "") or "cli";
+    }
+    project = config.get("project", {}) if isinstance(config, dict) else {};
+    kind = project.get("kind", "") if isinstance(project, dict) else "";
+    return str(kind or "") or "cli";
 }

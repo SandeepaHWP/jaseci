@@ -9,7 +9,7 @@ import from pathlib { Path }
 import from urllib.request { urlopen }
 import from urllib.error { HTTPError }
 import from jaclang.scale.injector.bundle { TOOLCHAIN_SUBDIR }
-import from jaclang.runtimelib.utils { release_arch, host_arch, host_os }
+import from jaclang.runtime.graph_utils { release_arch, host_arch, host_os }
 
 glob logger = logging.getLogger(__name__);
 
@@ -49,9 +49,9 @@ def cluster_node_archs -> list[str] {
 
 
 def node_arch -> str {
-    override = os.environ.get("JAC_NODE_ARCH", "");
-    if override {
-        return release_arch(override);
+    `override = os.environ.get("JAC_NODE_ARCH", "");
+    if `override {
+        return release_arch(`override);
     }
     archs = cluster_node_archs();
     if len(archs) == 1 {
@@ -179,8 +179,20 @@ def _list_release_versions(repo: str) -> list[str] {
     out: list[str] = [];
     for rel in arr {
         tag = str(rel.get("tag_name", ""));
-        if tag.startswith("v") and not rel.get("prerelease", False) {
-            out.append(tag[1:]);
+        if (
+            not tag.startswith("v")
+            or rel.get("prerelease", False)
+            or rel.get("draft", False)
+        ) {
+            continue;
+        }
+        version = tag[1:];
+        prefix = f"jac-{version}-";
+        for asset in rel.get("assets", []) {
+            if str(asset.get("name", "")).startswith(prefix) {
+                out.append(version);
+                break;
+            }
         }
     }
     return out;
@@ -238,16 +250,75 @@ glob _deploy_version_memo: dict[str, any] = {};
 
 def resolve_deploy_version(project_dir: str, channel: str) -> str {
     import from jaclang.scale.config.dev_config { Channel }
-    import from jaclang.project.config { JacConfig, find_project_root }
     if channel != Channel.STABLE.value {
         return "";
     }
+    return resolve_pinned_version(project_dir);
+}
+
+
+def deploy_generation_refusal(
+    project_dir: str, channel: str = "", offline: bool = False
+) -> str {
+    import from jaclang.cli.manifest_route { resolve_cli_version }
+    import from jaclang.project.config { JacConfig, find_project_root }
+    import from jaclang.scale.config.dev_config { Channel, resolve_dev_channel }
+    channel = channel or resolve_dev_channel(project_dir).value;
+    if offline {
+        found = find_project_root(Path(project_dir));
+        pinned = (
+            _exact_of(str(JacConfig.load(found[1]).project.jac_version or ""))
+                if found is not None and channel == Channel.STABLE.value
+                else ""
+        );
+    } else {
+        try {
+            pinned = resolve_deploy_version(project_dir, channel);
+        } except RuntimeError {
+            return "";
+        }
+    }
+    running = resolve_cli_version().strip();
+    if not pinned or not running {
+        return "";
+    }
+    (pin_major, pin_minor, _) = _ver_key(pinned);
+    (run_major, run_minor, _) = _ver_key(running);
+    if (pin_major, pin_minor) == (run_major, run_minor) {
+        return "";
+    }
+    return (
+        f"this deployer is jac {running} and cannot deploy an app pinned to "
+        f"{pinned}. the deploying jac renders the manifests and provisions the "
+        "database, so a different minor line stands up a backend the pod "
+        f"cannot use. upgrade the deployer, or pin [project] jac-version to "
+        f"{run_major}.{run_minor}."
+    );
+}
+
+
+def resolve_console_version(
+    project_dir: str, channel: str, deploy_version: str
+) -> str {
+    import from jaclang.scale.config.dev_config { Channel }
+    if deploy_version {
+        return deploy_version;
+    }
+    if channel == Channel.LOCAL.value {
+        return resolve_pinned_version(project_dir);
+    }
+    return "";
+}
+
+
+def resolve_pinned_version(project_dir: str) -> str {
+    import from jaclang.project.config { JacConfig, find_project_root }
     found = find_project_root(Path(project_dir));
     if found is None {
         return "";
     }
     toml = found[1];
-    prefix = f"{toml}|{channel}|";
+    prefix = f"{toml}||";
 
     stamp = hashlib.sha256(toml.read_bytes()).hexdigest();
     key = prefix + stamp;
@@ -408,6 +479,14 @@ def download_release_binary(
 }
 
 
+def _write_cache_atomic(cache_file: Path, payload: bytes) {
+    cache_file.parent.mkdir(parents=True, exist_ok=True);
+    tmp = cache_file.with_name(f"{cache_file.name}.{os.getpid()}.tmp");
+    tmp.write_bytes(payload);
+    tmp.replace(cache_file);
+}
+
+
 def _fetch_verified_asset(
     url: str, checksum_url: str, cache_file: Path, what: str
 ) -> bytes {
@@ -425,9 +504,7 @@ def _fetch_verified_asset(
             cached_bytes: bytes | None = None;
             try {
                 cached_bytes = cache_file.read_bytes();
-            } except OSError {
-                ;
-            }
+            } except OSError {}
             if cached_bytes is not None
                 and hashlib.sha256(cached_bytes).hexdigest() == want {
                 logger.info(f"Using the cached {what} (checksum match).");
@@ -445,10 +522,7 @@ def _fetch_verified_asset(
             );
         }
         try {
-            cache_file.parent.mkdir(parents=True, exist_ok=True);
-            tmp = cache_file.with_suffix(f".{os.getpid()}.tmp");
-            tmp.write_bytes(payload);
-            tmp.rename(cache_file);
+            _write_cache_atomic(cache_file, payload);
         } except Exception as e {
             logger.warning(f"Could not cache the downloaded {what} ({e}).");
         }
@@ -471,11 +545,7 @@ def host_toolchain_path(project_dir: str, channel: str = "") -> str {
     payload = download_release_binary(channel, arch, version, plat);
     path = _binary_cache_path(channel, arch, plat, version);
     if not path.is_file() {
-        path.parent.mkdir(parents=True, exist_ok=True);
-        tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp");
-        tmp.write_bytes(payload);
-        tmp.chmod(0o755);
-        tmp.replace(path);
+        _write_cache_atomic(path, payload);
     }
     path.chmod(0o755);
     logger.info(f"Host build steps for this deploy run the pinned jac {version}.");
@@ -598,14 +668,26 @@ def pack_binary_bytes(binary_bytes: bytes) -> bytes {
 }
 
 
+def admin_dist_source(channel: str, version: str) -> str {
+    if channel == "dev" {
+        return "dev";
+    }
+    if channel == "local" and not version {
+        return "";
+    }
+    return "release";
+}
+
+
 def _admin_dist_urls(channel: str, version: str = "") -> tuple[str, str] {
     repo = GH_REPO;
     suffix = "-admin-dist.tar.gz";
-    if channel == "dev" {
+    source = admin_dist_source(channel, version);
+    if source == "dev" {
         url = f"https://github.com/{repo}/releases/download/dev/jac-dev{suffix}";
         return (url, url + ".sha256");
     }
-    if channel == "local" {
+    if not source {
         return ("", "");
     }
 
