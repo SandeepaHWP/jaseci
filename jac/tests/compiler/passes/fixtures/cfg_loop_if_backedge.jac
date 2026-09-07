@@ -1,4 +1,4 @@
-def use(items: list[any]) -> str {
+def use(items: list) -> str {
     tag = "";
     for item in items {
         if item == "x" {
