@@ -57,7 +57,7 @@ def _call_sync(tc: any, timeout: any) -> any {
     }
     import threading;
     result_box: list[any] = [None];
-    error_box: list[any] = [None];
+    error_box: list[Exception | None] = [None];
     def _worker {
         try {
             result_box[0] = tc();

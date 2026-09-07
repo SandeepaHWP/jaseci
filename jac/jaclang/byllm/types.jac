@@ -173,8 +173,10 @@ def serialize_media_content(content: list[any]) -> list[dict[str, any]] {
         }
         semstring = "";
         if isinstance(item, tuple) {
-            semstring = item[1] or "";
-            item = item[0];
+            # isinstance narrows to a bare tuple, whose members read as Unknown.
+            pair: tuple[any, ...] = item;
+            semstring = pair[1] or "";
+            item = pair[0];
         }
         if semstring {
             blocks.append({"type": "text", "text": semstring});
@@ -185,7 +187,7 @@ def serialize_media_content(content: list[any]) -> list[dict[str, any]] {
 }
 
 
-def normalize_tool_result(value: any) -> str | list[dict[str, any]] {
+def normalize_tool_result(value: any) -> str | list[Media] {
     if isinstance(value, str) {
         return value;
     }
@@ -210,7 +212,7 @@ def content_preview(content: any, max_len: int) -> str {
     if not isinstance(content, list) {
         return str(content)[:max_len];
     }
-    parts: list[dict[str, any]] = [];
+    parts: list[str] = [];
     for item in content {
         if isinstance(item, str) {
             parts.append(item);
@@ -291,9 +293,11 @@ def _split_tool_msg_images(
     if not isinstance(content, list) {
         return (msg, []);
     }
+    # isinstance narrows to a bare list, whose elements read as Unknown.
+    blocks_in: list[dict[str, any]] = content;
     text_blocks: list[dict[str, any]] = [];
     image_blocks: list[dict[str, any]] = [];
-    for block in content {
+    for block in blocks_in {
         if isinstance(block, dict) and block.get("type") in ("image_url", "image") {
             image_blocks.append(block);
         } else {

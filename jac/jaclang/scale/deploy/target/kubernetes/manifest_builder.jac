@@ -1355,7 +1355,7 @@ obj ManifestBuilder {
         actually matches.
         """;
         import json;
-        canonical_rules = [];
+        canonical_rules: list[dict[str, any]] = [];
         for rule in rules {
             headers = [
                 (str(h.get("name", "")), str(h.get("value", "")))

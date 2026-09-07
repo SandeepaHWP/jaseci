@@ -67,7 +67,7 @@ class ExecutionEngine(ffi.ObjectRef) {
     def init(self: ExecutionEngine, ptr: any, module: any) -> object {
         self._modules = `set([module]);
         self._td: (targets.TargetData | None) = None;
-        self.static_init_symbols = [];
+        self.static_init_symbols: list[str] = [];
         self.static_init_chained = `set();
         self._pinned = False;
         module._owned = True;
