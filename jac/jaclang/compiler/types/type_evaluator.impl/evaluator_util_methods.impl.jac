@@ -1138,7 +1138,7 @@ impl TypeEvaluator._set_module_item_symbol_and_type(
 
 impl TypeEvaluator._ct_args_for_class(
     base_type: ClassType, slot_vals: list[Expr]
-) -> (tuple | None) {
+) -> (tuple[any, ...] | None) {
     if not base_type.shared.ct_params {
         return None;
     }

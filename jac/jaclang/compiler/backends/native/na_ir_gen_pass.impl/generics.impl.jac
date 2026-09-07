@@ -80,7 +80,7 @@ impl NaIRGenPass._syntactic_bind_type_params(
 
 impl NaIRGenPass._solve_generic_call(
     ability: uni.Ability, nd: uni.FuncCall
-) -> (dict | None) {
+) -> (dict[any, any] | None) {
     try {
         import from jaclang.compiler.types.types {
             TypeVarType as _TVT,
@@ -320,7 +320,7 @@ impl NaIRGenPass._ability_has_ct_params(ability: uni.Ability) -> bool {
 
 impl NaIRGenPass._solve_ct_args(
     ability: uni.Ability, nd: uni.FuncCall
-) -> (dict | None) {
+) -> (dict[any, any] | None) {
     sig = ability.signature;
     params = sig.get_parameters() if isinstance(sig, uni.FuncSignature) else [];
     positional: list[any] = [];

@@ -1022,7 +1022,8 @@ obj ManifestBuilder {
 
     def _owner_labels -> dict[str, str] {
         return {
-            str(k): str(v) for (k, v) in dict(self.k8s_config.labels or {}).items()
+            str(k): str(v)
+            for (k, v) in dict[any, any](self.k8s_config.labels or {}).items()
         };
     }
 

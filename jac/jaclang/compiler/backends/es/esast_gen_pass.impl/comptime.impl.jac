@@ -106,7 +106,7 @@ impl EsastGenPass._is_ct_type_param(nd: uni.Name) -> bool {
     return isinstance(owner, uni.TypeParam) and owner.is_comptime;
 }
 
-impl EsastGenPass._ct_ctor_slots(nd: uni.UniNode) -> (list[tuple] | None) {
+impl EsastGenPass._ct_ctor_slots(nd: uni.UniNode) -> (list[tuple[any, ...]] | None) {
     if not isinstance(nd, uni.AtomTrailer) or nd.is_attr {
         return None;
     }

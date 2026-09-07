@@ -149,7 +149,7 @@ impl NaIRGenPass._bytearray_runtime_fns -> dict[any, any] {
     return self._bytearray_fns;
 }
 
-impl NaIRGenPass._bytearray_src_of(val: ir.Value) -> (tuple | None) {
+impl NaIRGenPass._bytearray_src_of(val: ir.Value) -> (tuple[any, ...] | None) {
     if self._is_bytes_value(val) {
         return (self._bytes_data_ptr(val), self._bytes_len_val(val));
     }

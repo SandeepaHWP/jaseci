@@ -52,7 +52,7 @@ impl LocalDeployer.scale_service(name: str, replicas: int) -> bool {
     return True;
 }
 
-impl LocalDeployer.status -> dict[str, dict] {
+impl LocalDeployer.status -> dict[str, dict[any, any]] {
     import from jaclang.scale.runtime.orchestrator.process_manager {
         _read_pidfile,
         _read_portfile,

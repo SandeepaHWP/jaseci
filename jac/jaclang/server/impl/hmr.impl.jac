@@ -72,7 +72,9 @@ impl HotReloader.attach_client_bundler(bundler: any) -> None {
     bundler.on_client_event = self.record_client_event;
 }
 
-impl HotReloader.record_client_event(slot: str, payload: (dict | None)) -> None {
+impl HotReloader.record_client_event(
+    slot: str, payload: (dict[any, any] | None)
+) -> None {
     import from jaclang.client.client_diagnostics { classify_client_payload }
     import from jaclang.client.source_mapping { _error_rate_limiter }
     if slot not in ('vite', 'client', 'runtime', 'ready') {
@@ -119,7 +121,7 @@ impl HotReloader.record_ok -> None {
 impl HotReloader.record_error(
     file_path: str,
     message: str,
-    alerts: (list | None) = None,
+    alerts: (list[any] | None) = None,
     line: int = 0,
     column: int = 0
 ) -> None {

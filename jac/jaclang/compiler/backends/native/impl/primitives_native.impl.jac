@@ -369,7 +369,7 @@ impl NativeBoolEmitter.emit_op_xor(
 
 impl NativeComplexEmitter._load_parts(
     self: NativeComplexEmitter, ctx: NativeEmitCtx, val: ir.Value
-) -> (tuple | None) {
+) -> (tuple[any, ...] | None) {
     p = ctx.pass_ref;
     b = get_builder(p);
     i32 = ir.IntType(32);
@@ -4503,7 +4503,7 @@ impl NativeTupleEmitter.emit_op_contains(
 
 impl NativeRangeEmitter._load_range(
     self: NativeRangeEmitter, ctx: NativeEmitCtx, target: ir.Value
-) -> (tuple | None) {
+) -> (tuple[any, ...] | None) {
     p = ctx.pass_ref;
     b = get_builder(p);
     i32 = ir.IntType(32);

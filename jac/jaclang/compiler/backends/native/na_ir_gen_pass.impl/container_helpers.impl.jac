@@ -210,7 +210,9 @@ impl NaIRGenPass._spread_operand(nd: (uni.UniNode | None)) -> (uni.Expr | None) 
     return None;
 }
 
-impl NaIRGenPass._container_src_info(val: (ir.Value | None)) -> (dict | None) {
+impl NaIRGenPass._container_src_info(
+    val: (ir.Value | None)
+) -> (dict[any, any] | None) {
     if val is None or not isinstance(val.type, ir.PointerType) {
         return None;
     }
@@ -385,7 +387,7 @@ impl NaIRGenPass._emit_live_slot_loop(
     layout: dict[any, any],
     tag: str,
     body_cb: Callable[..., ir.IRBuilder],
-    fields: (list | None) = None,
+    fields: (list[any] | None) = None,
     reverse: bool = False
 ) -> ir.IRBuilder {
     i8 = ir.IntType(8);

@@ -11,7 +11,9 @@ import from contextlib { suppress }
 import from pathlib { Path }
 import from jaclang.cli.console { console }
 
-impl compile_cl_module(filepath: str) -> tuple[str, list, dict, list] {
+impl compile_cl_module(
+    filepath: str
+) -> tuple[str, list[any], dict[any, any], list[any]] {
     import from jaclang.compiler.driver.program { JacProgram }
     prog = JacProgram();
     mod = prog.compile(str(filepath));
@@ -114,7 +116,7 @@ impl _build_harness(
     module_js: str,
     tests: list[any],
     api_base_url: str = "",
-    storage: (dict | None) = None
+    storage: (dict[any, any] | None) = None
 ) -> str {
     imports = "\n".join([m.group(0).strip() for m in _IMPORT_LINE.finditer(module_js)]);
     body = _IMPORT_LINE.sub("", module_js);
@@ -147,7 +149,7 @@ impl _build_harness(
 
 impl _collect_local_imports(
     module_js: str, source_dir: str, entry_path: str
-) -> tuple[dict, dict] {
+) -> tuple[dict[any, any], dict[any, any]] {
     staged: dict[str, str] = {};
     merged_imports: dict[str, str] = {};
     requested: dict[any, any] = {};
@@ -375,7 +377,7 @@ impl run_cl_test_file(
     filepath: str,
     api_base_url: (str | None) = None,
     test_name: (str | None) = None,
-    storage: (dict | None) = None,
+    storage: (dict[any, any] | None) = None,
     serve: bool = True,
     timeout: float = 120.0
 ) -> list[ClTestResult] {
@@ -430,7 +432,7 @@ impl _run_harness(
     tests: list[any],
     imports: dict[any, any],
     api_base_url: str,
-    storage: (dict | None),
+    storage: (dict[any, any] | None),
     timeout: float,
     source_path: (str | None) = None
 ) -> list[ClTestResult] {

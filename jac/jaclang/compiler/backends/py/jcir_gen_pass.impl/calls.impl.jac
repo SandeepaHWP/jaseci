@@ -231,7 +231,7 @@ impl JcirGenPass.exit_atom_unit with AtomUnit exit {
     self.set_out(here, self.outs(here.value));
 }
 
-impl JcirGenPass.gen_call_args(nd: FuncCall) -> tuple[(list, list)] {
+impl JcirGenPass.gen_call_args(nd: FuncCall) -> tuple[(list[any], list[any])] {
     args: list[CgNode] = [];
     keywords: list[CgNode] = [];
     if nd.params {
@@ -256,7 +256,7 @@ impl JcirGenPass.exit_func_call with FuncCall exit {
     self._exit_func_call_impl(here);
 }
 
-impl JcirGenPass._place_parts(arg: UniNode) -> (tuple | None) {
+impl JcirGenPass._place_parts(arg: UniNode) -> (tuple[any, ...] | None) {
     place = arg;
     if isinstance(arg, UnaryExpr) and is_borrow_kind(arg.ownership) {
         place = arg.operand;

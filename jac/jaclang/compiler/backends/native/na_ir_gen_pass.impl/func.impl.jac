@@ -166,7 +166,9 @@ impl NaIRGenPass._normalize_type_key(key: str) -> str {
     return key;
 }
 
-impl NaIRGenPass._elem_keys_of_annotation(ann: (uni.UniNode | None)) -> (list | None) {
+impl NaIRGenPass._elem_keys_of_annotation(
+    ann: (uni.UniNode | None)
+) -> (list[any] | None) {
     if ann is None {
         return None;
     }
@@ -1259,7 +1261,9 @@ impl NaIRGenPass._codegen_generator(nd: uni.Ability, func: ir.Function) -> None 
     self.has_native_code = True;
 }
 
-impl NaIRGenPass._emit_generator_drop_fn(name: str, slots: list[tuple]) -> ir.Function {
+impl NaIRGenPass._emit_generator_drop_fn(
+    name: str, slots: list[tuple[any, ...]]
+) -> ir.Function {
     i8 = ir.IntType(8);
     i8p = i8.as_pointer();
     i64 = ir.IntType(64);

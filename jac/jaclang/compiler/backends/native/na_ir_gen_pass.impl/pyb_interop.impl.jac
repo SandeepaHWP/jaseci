@@ -1,6 +1,6 @@
 glob _PYB_BRIDGE_MODULE: str = "jaclang.runtime.interop_bridge";
 
-impl NaIRGenPass._pyb_base_of(arch_name: str) -> (tuple | None) {
+impl NaIRGenPass._pyb_base_of(arch_name: str) -> (tuple[any, ...] | None) {
     """The first Python-side base on `arch_name`'s MRO, as (name, path).
 
     A base counts as Python-side when its symbol resolves to a jac
@@ -163,7 +163,7 @@ impl NaIRGenPass._pyb_native_override_owner(arch_name: str, meth: str) -> (str |
 
 impl NaIRGenPass._pyb_shadowed_dispatch(
     arch_name: str, method_name: str
-) -> (tuple | None) {
+) -> (tuple[any, ...] | None) {
     """`(base, dispatched, owner)` when a shadow call would run the wrong body.
 
     The bridge builds the shadow as `type(name, (base,), {})` -- the
@@ -792,7 +792,7 @@ impl NaIRGenPass._pyb_from_py(
 
 impl NaIRGenPass._pyb_build_args(
     params: list[any], skip_kwargs: bool = False
-) -> (tuple | None) {
+) -> (tuple[any, ...] | None) {
     """Marshal call params into (PyTuple handle, PyDict handle | None).
 
     Returns None when any argument's type cannot cross the boundary;

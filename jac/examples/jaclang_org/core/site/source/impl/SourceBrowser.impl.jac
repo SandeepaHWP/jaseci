@@ -12,7 +12,7 @@ impl _ancestors_of(d: str) -> list[str] {
     return out;
 }
 
-impl _dir_paths(rows: list[dict]) -> list[str] {
+impl _dir_paths(rows: list[dict[any, any]]) -> list[str] {
     out: list[str] = [];
     for r in rows {
         if r["kind"] == "dir" {
@@ -22,7 +22,7 @@ impl _dir_paths(rows: list[dict]) -> list[str] {
     return out;
 }
 
-impl _build_rows(tree: list[SourceFile]) -> list[dict] {
+impl _build_rows(tree: list[SourceFile]) -> list[dict[any, any]] {
     rows: list[dict[any, any]] = [];
     seen: list[str] = [];
     for f in tree {

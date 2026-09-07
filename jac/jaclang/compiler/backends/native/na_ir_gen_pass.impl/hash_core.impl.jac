@@ -1059,7 +1059,7 @@ impl NaIRGenPass._str_fnv_fn -> ir.Function {
     return fn;
 }
 
-impl NaIRGenPass._tuple_key_fields(key_type: ir.Type) -> (list | None) {
+impl NaIRGenPass._tuple_key_fields(key_type: ir.Type) -> (list[any] | None) {
     if not isinstance(key_type, ir.PointerType) {
         return None;
     }

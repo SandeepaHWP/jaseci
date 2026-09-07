@@ -2,7 +2,7 @@ import ast;
 import re;
 import from pathlib { Path }
 
-def tour_sections -> list[dict] {
+def tour_sections -> list[dict[any, any]] {
     source = Path(_project_root(), "core/site/landing/WaitWuuut.jac").read_text();
     catalog = source.split("glob GROUPS: list[dict] = ", 1)[1].split(
         ",\n     ABSENT:", 1

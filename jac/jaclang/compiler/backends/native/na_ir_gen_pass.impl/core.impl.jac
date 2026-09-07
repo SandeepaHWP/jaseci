@@ -521,7 +521,7 @@ impl NaIRGenPass._exported_accessors(arch_name: str) -> dict[(str, dict[(str, st
     return out;
 }
 
-impl NaIRGenPass._ret_tuple_hints(fname: str, ret_tuple: any) -> (list | None) {
+impl NaIRGenPass._ret_tuple_hints(fname: str, ret_tuple: any) -> (list[any] | None) {
     keys = self.func_ret_elem_keys.get(fname);
     if not keys or len(keys) != len(ret_tuple.element_types) {
         return None;
@@ -1548,7 +1548,7 @@ impl NaIRGenPass._dispatch_primitive_method(
     target: ir.Value,
     args: list[ir.Value],
     type_key: str,
-    kwargs: (dict | None) = None,
+    kwargs: (dict[any, any] | None) = None,
     kw_node: (uni.UniNode | None) = None
 ) -> (ir.Value | None) {
     self._ensure_emitters();
@@ -1601,10 +1601,10 @@ impl NaIRGenPass._dispatch_primitive_method(
 impl NaIRGenPass._dispatch_builtin(
     func_name: str,
     args: list[ir.Value],
-    kwargs: (dict | None) = None,
+    kwargs: (dict[any, any] | None) = None,
     kw_node: (uni.UniNode | None) = None,
     type_key: str = "",
-    arg_nodes: (list | None) = None
+    arg_nodes: (list[any] | None) = None
 ) -> (ir.Value | None) {
     args = [self._str_norm(_a) for _a in args];
     self._ensure_emitters();
@@ -1650,7 +1650,7 @@ impl NaIRGenPass._split_call_kwargs(nd: uni.FuncCall) -> dict[any, any] {
     return out;
 }
 
-impl NaIRGenPass._ct_ctor_slots(target: uni.UniNode) -> list[tuple] {
+impl NaIRGenPass._ct_ctor_slots(target: uni.UniNode) -> list[tuple[any, ...]] {
     out: list[tuple[any, ...]] = [];
     if not isinstance(target, uni.AtomTrailer) or target.is_attr {
         return out;

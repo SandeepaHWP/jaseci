@@ -1122,7 +1122,7 @@ impl JacGraph.connect(
     right: (NodeArchetype | list[NodeArchetype]),
     `edge: type[EdgeArchetype] | EdgeArchetype | None = None,
     undir: bool = False,
-    conn_assign: (tuple[(tuple, tuple)] | None) = None,
+    conn_assign: (tuple[(tuple[any, ...], tuple[any, ...])] | None) = None,
     edges_only: bool = False
 ) -> (NodeArchetype | list[NodeArchetype] | list[EdgeArchetype]) {
     if (
@@ -1360,7 +1360,7 @@ impl JacGraph.get_all_root -> list[Root] {
 impl JacGraph.build_edge(
     is_undirected: bool,
     conn_type: type[EdgeArchetype] | EdgeArchetype | None,
-    conn_assign: (tuple[(tuple, tuple)] | None)
+    conn_assign: (tuple[(tuple[any, ...], tuple[any, ...])] | None)
 ) -> Callable[([NodeAnchor, NodeAnchor], EdgeArchetype)] {
     ct = conn_type or GenericEdge;
     cls = ct if isinstance(ct, `type) else `type(ct);
@@ -1382,7 +1382,7 @@ impl JacGraph.heavy_edge(
     target: NodeAnchor,
     conn_type: type[EdgeArchetype] | EdgeArchetype | None,
     is_undirected: bool,
-    conn_assign: (tuple[(tuple, tuple)] | None)
+    conn_assign: (tuple[(tuple[any, ...], tuple[any, ...])] | None)
 ) -> EdgeArchetype {
     import from jaclang.runtime.osp_graph_sv { sv_conn }
     ct = conn_type or GenericEdge;
@@ -1941,7 +1941,9 @@ impl JacModule.update_walker(
 }
 
 impl JacIntrospection.spawn_node(
-    node_name: str, attributes: (dict | None) = None, module_name: str = '__main__'
+    node_name: str,
+    attributes: (dict[any, any] | None) = None,
+    module_name: str = '__main__'
 ) -> NodeArchetype {
     node_class = JacRuntimeInterface.get_archetype(module_name, node_name);
     if (isinstance(node_class, `type) and issubclass(node_class, NodeArchetype)) {
@@ -1956,7 +1958,9 @@ impl JacIntrospection.spawn_node(
 }
 
 impl JacIntrospection.spawn_walker(
-    walker_name: str, attributes: (dict | None) = None, module_name: str = '__main__'
+    walker_name: str,
+    attributes: (dict[any, any] | None) = None,
+    module_name: str = '__main__'
 ) -> WalkerArchetype {
     walker_class = JacRuntimeInterface.get_archetype(module_name, walker_name);
     if (

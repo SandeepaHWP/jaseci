@@ -9,7 +9,7 @@ impl jacSpawn(left: str, right: str = "", fields: dict[any, any] = {}) -> any {
 impl jacSignup(
     identities_or_username: (str | list[any]),
     credential_or_password: (str | dict[any, any]),
-    profile: (dict | None) = None
+    profile: (dict[any, any] | None) = None
 ) -> dict[any, any] {
     return await _jacSignup(identities_or_username, credential_or_password, profile);
 }

@@ -1040,7 +1040,7 @@ impl PgStore.subtype_names(type_name: str) -> list[str] {
 }
 
 
-impl PgStore.rows(sql: str, params: dict[any, any]) -> list[tuple] {
+impl PgStore.rows(sql: str, params: dict[any, any]) -> list[tuple[any, ...]] {
     return [tuple(r) for r in self._run(sql, params)];
 }
 

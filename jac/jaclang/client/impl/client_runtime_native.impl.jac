@@ -321,7 +321,9 @@ impl _getNativeRoutes -> list[any] {
     return [];
 }
 
-impl _matchRoutePattern(pattern_path: str, actual_path: str) -> (dict | None) {
+impl _matchRoutePattern(
+    pattern_path: str, actual_path: str
+) -> (dict[any, any] | None) {
     pattern_parts = _splitRouteParts(pattern_path);
     actual_parts = _splitRouteParts(actual_path);
     if len(pattern_parts) != len(actual_parts) {
@@ -357,7 +359,7 @@ impl _lookupRouteByPath(path: str) -> (RouteMatch | None) {
     return None;
 }
 
-impl _lookupRouteByName(name: str) -> (dict | None) {
+impl _lookupRouteByName(name: str) -> (dict[any, any] | None) {
     for route in _getNativeRoutes() {
         if route["name"] == name {
             return route;
@@ -632,7 +634,7 @@ impl useRouter -> dict[any, any] {
 
 impl useNavigate -> any {
     nav = jacUseNavigation();
-    def _navigate(target: any, options: (dict | None) = None) {
+    def _navigate(target: any, options: (dict[any, any] | None) = None) {
         _performNavigation(nav, target, options or {});
     }
     return _navigate;

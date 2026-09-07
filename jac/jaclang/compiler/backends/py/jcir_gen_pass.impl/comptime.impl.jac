@@ -349,7 +349,7 @@ impl JcirGenPass._ct_param_decls(cls_expr: Expr) -> (list[TypeParam] | None) {
     return `list(arch.type_params or []);
 }
 
-impl JcirGenPass._ct_ctor_slots(nd: AtomTrailer) -> (list[tuple] | None) {
+impl JcirGenPass._ct_ctor_slots(nd: AtomTrailer) -> (list[tuple[any, ...]] | None) {
     if nd.is_attr or not isinstance(nd.right, IndexSlice) or nd.right.is_range {
         return None;
     }

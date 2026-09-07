@@ -256,8 +256,8 @@ def _check_file_job(request: dict[(str, any)]) -> dict[(str, any)] {
 impl check(
     paths: list[any],
     print_errs: bool = True,
-    ignore: (list | None) = None,
-    disable_error_code: (list | None) = None,
+    ignore: (list[any] | None) = None,
+    disable_error_code: (list[any] | None) = None,
     parse_only: bool = False,
     nowarn: bool = False,
     lint_only: bool = False,
@@ -641,7 +641,9 @@ impl check(
     return 1 if (total_errors > 0 or had_path_errors) else 0;
 }
 
-impl lint(paths: list[any], fix: bool = False, ignore: (list | None) = None) -> int {
+impl lint(
+    paths: list[any], fix: bool = False, ignore: (list[any] | None) = None
+) -> int {
     import from jaclang.compiler.driver.program { JacProgram }
     if isinstance(paths, str) {
         paths = [paths];
@@ -1358,7 +1360,7 @@ impl format(
 }
 
 impl precommit(
-    paths: (list | None) = None,
+    paths: (list[any] | None) = None,
     staged: bool = False,
     verify: bool = False,
     install: bool = False,
@@ -1665,7 +1667,7 @@ impl `test(
     pct_range: str = "",
     resume: bool = False,
     verbose: bool = False,
-    ignore: (list | None) = None,
+    ignore: (list[any] | None) = None,
     jobs: str = ""
 ) -> int {
     import os;

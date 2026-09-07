@@ -594,7 +594,7 @@ impl NaIRGenPass._make_range_iter(range_val: ir.Value) -> ir.Value {
 
 impl NaIRGenPass._make_iter_from_value(
     val: ir.Value, expr: uni.UniNode
-) -> (tuple | None) {
+) -> (tuple[any, ...] | None) {
     i8p = ir.IntType(8).as_pointer();
 
     _checked_list = self._list_spec_of(expr);
@@ -658,7 +658,7 @@ impl NaIRGenPass._make_iter_from_value(
     return None;
 }
 
-impl NaIRGenPass._adapter_clos_parts(clos: ir.Value) -> (tuple | None) {
+impl NaIRGenPass._adapter_clos_parts(clos: ir.Value) -> (tuple[any, ...] | None) {
     sn = self._closure_struct_of(clos.type);
     if sn is None {
         return None;
@@ -680,7 +680,7 @@ impl NaIRGenPass._adapter_clos_parts(clos: ir.Value) -> (tuple | None) {
     return ("clos", fn_i64, env, fnty_env);
 }
 
-impl NaIRGenPass._adapter_callee(fn_expr: uni.UniNode) -> (tuple | None) {
+impl NaIRGenPass._adapter_callee(fn_expr: uni.UniNode) -> (tuple[any, ...] | None) {
     fname = self._get_name(fn_expr);
     if fname is not None and fname in self.nested_captures {
         clos = self._emit_closure_value(fname, fn_expr);
@@ -721,7 +721,7 @@ impl NaIRGenPass._adapter_callee(fn_expr: uni.UniNode) -> (tuple | None) {
     return None;
 }
 
-impl NaIRGenPass._build_iter_from_expr(expr: uni.UniNode) -> (tuple | None) {
+impl NaIRGenPass._build_iter_from_expr(expr: uni.UniNode) -> (tuple[any, ...] | None) {
     self._ensure_iter_types();
     if isinstance(expr, uni.FuncCall) {
         cname = self._get_name(expr.target);
@@ -782,7 +782,7 @@ impl NaIRGenPass._build_iter_from_expr(expr: uni.UniNode) -> (tuple | None) {
 
 impl NaIRGenPass._make_map_iter(
     up: tuple[any, ...], callee: tuple[any, ...]
-) -> (tuple | None) {
+) -> (tuple[any, ...] | None) {
     i8p = ir.IntType(8).as_pointer();
     i32 = ir.IntType(32);
     i1 = ir.IntType(1);
@@ -856,7 +856,7 @@ impl NaIRGenPass._make_map_iter(
 
 impl NaIRGenPass._make_filter_iter(
     up: tuple[any, ...], callee: tuple[any, ...]
-) -> (tuple | None) {
+) -> (tuple[any, ...] | None) {
     i8p = ir.IntType(8).as_pointer();
     i32 = ir.IntType(32);
     i1 = ir.IntType(1);
@@ -933,7 +933,7 @@ impl NaIRGenPass._make_filter_iter(
     return (self._make_jac_iter(nfn, st), up_name, up_type);
 }
 
-impl NaIRGenPass._make_enumerate_iter(up: tuple[any, ...]) -> (tuple | None) {
+impl NaIRGenPass._make_enumerate_iter(up: tuple[any, ...]) -> (tuple[any, ...] | None) {
     i8p = ir.IntType(8).as_pointer();
     i32 = ir.IntType(32);
     i64 = ir.IntType(64);
@@ -990,7 +990,7 @@ impl NaIRGenPass._make_enumerate_iter(up: tuple[any, ...]) -> (tuple | None) {
 
 impl NaIRGenPass._make_zip_iter(
     up_a: tuple[any, ...], up_b: tuple[any, ...]
-) -> (tuple | None) {
+) -> (tuple[any, ...] | None) {
     i8p = ir.IntType(8).as_pointer();
     i32 = ir.IntType(32);
     i1 = ir.IntType(1);
@@ -1187,7 +1187,9 @@ impl NaIRGenPass._user_iter_next_fn(
     return fn;
 }
 
-impl NaIRGenPass._make_user_iter(it_obj: ir.Value, iter_struct: str) -> (tuple | None) {
+impl NaIRGenPass._make_user_iter(
+    it_obj: ir.Value, iter_struct: str
+) -> (tuple[any, ...] | None) {
     next_method_fn = self._resolve_method(iter_struct, "__next__");
     if next_method_fn is None {
         return None;
@@ -1209,7 +1211,7 @@ impl NaIRGenPass._make_user_iter(it_obj: ir.Value, iter_struct: str) -> (tuple |
 
 impl NaIRGenPass._make_user_iter_from_obj(
     obj_val: ir.Value, struct_name: str, expr: uni.UniNode
-) -> (tuple | None) {
+) -> (tuple[any, ...] | None) {
     if self._resolve_method(struct_name, "__next__") is not None {
         it_obj = obj_val;
         iter_struct = struct_name;

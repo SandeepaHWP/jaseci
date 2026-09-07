@@ -7,8 +7,8 @@ impl _path_of(uri: str) -> str {
 }
 
 impl _merge_app_alerts(
-    collected: list[tuple[str, list, list]], app_count: int
-) -> tuple[list, list] {
+    collected: list[tuple[str, list[any], list[any]]], app_count: int
+) -> tuple[list[any], list[any]] {
     def key_of(alert: any) -> tuple[any, ...] {
         code = alert.code.code if alert.code else '';
         return (
@@ -21,9 +21,9 @@ impl _merge_app_alerts(
     }
 
     def merge(index: int) -> list[any] {
-        seen_apps: dict[tuple, set[str]] = {};
-        first: dict[tuple, any] = {};
-        order: list[tuple] = [];
+        seen_apps: dict[tuple[any, ...], set[str]] = {};
+        first: dict[tuple[any, ...], any] = {};
+        order: list[tuple[any, ...]] = [];
         tagged: list[tuple[str, any]] = [];
         for entry_item in collected {
             app_name = entry_item[0];
@@ -44,7 +44,7 @@ impl _merge_app_alerts(
             if len(seen_apps[key]) >= app_count
         };
         out: list[any] = [];
-        emitted: set[tuple] = set();
+        emitted: set[tuple[any, ...]] = set();
         for (app_name, alert) in tagged {
             key = key_of(alert);
             if key in shared {
@@ -248,7 +248,7 @@ impl JacLangServer.type_check_file(
             ];
         }
         multi = len(targets) > 1;
-        collected: list[tuple[str, list, list]] = [];
+        collected: list[tuple[str, list[any], list[any]]] = [];
         build: (uni.Module | None) = None;
         for (app_name, app_kind) in targets {
             build = self.program.compile(
@@ -1230,7 +1230,7 @@ impl JacLangServer._clear_alerts_for_file(file_path: str) -> None {
     }
 }
 
-impl JacLangServer.diagnostics.getter -> dict[str, list] {
+impl JacLangServer.diagnostics.getter -> dict[str, list[any]] {
     with self._state_lock.read_lock() {
         all_errors = list(self.program.errors_had);
         all_warnings = list(self.program.warnings_had);

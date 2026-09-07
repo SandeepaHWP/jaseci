@@ -44,7 +44,7 @@ impl ws_reject_pre_accept(websocket: WebSocket, auth_detail: dict[str, any]) {
 
 impl ws_authenticate(
     websocket: WebSocket, user_manager: any, handshake_timeout: float, max_bytes: int
-) -> (dict, dict | None) {
+) -> (dict[any, any], dict[any, any] | None) {
     try {
         raw = await asyncio.wait_for(
             websocket.receive_text(), timeout=handshake_timeout

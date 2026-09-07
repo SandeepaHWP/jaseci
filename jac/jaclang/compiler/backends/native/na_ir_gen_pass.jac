@@ -735,7 +735,7 @@ walker NaIRGenPass(Transform) {
         layout: dict[any, any],
         tag: str,
         body_cb: Callable[..., ir.IRBuilder],
-        fields: (list | None) = None,
+        fields: (list[any] | None) = None,
         reverse: bool = False
     ) -> ir.IRBuilder;
 
@@ -1415,7 +1415,7 @@ walker NaIRGenPass(Transform) {
     def _receiver_union_parts(nd: (uni.UniNode | None)) -> (list[str] | None);
     def _jc_reference_schema(
         ft: ir.Type, layouts: dict[any, any], semantic: object = None
-    ) -> (dict | None);
+    ) -> (dict[any, any] | None);
 
     def _codegen_union_member(
         obj_val: ir.Value, field_name: str, nd: uni.AtomTrailer, parts: list[str]

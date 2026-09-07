@@ -104,7 +104,7 @@ impl JacTestResult.postinit -> None {
 }
 
 impl invoke_native_test(
-    engine: any, symbol: str, test_name: str, init_symbols: (list | None) = None
+    engine: any, symbol: str, test_name: str, init_symbols: (list[any] | None) = None
 ) -> None {
     import ctypes;
     import os;

@@ -18,7 +18,7 @@ import from jaclang.testing.test { parametrize }
 import from tests.ownership_helpers { compile_fixture, expect_ownership_codes }
 
 # (group, case name, fixture, expected E13xx codes, [enforce nogc])
-glob OWNERSHIP_CASES: list[tuple] = [
+glob OWNERSHIP_CASES: list[tuple[any, ...]] = [
          ("places", "take needs optional storage", "take_nonoptional.jac", ["E1319"]),
          (
              "places",

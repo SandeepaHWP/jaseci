@@ -244,7 +244,7 @@ impl EsJsxProcessor._lift_if(
 
 impl EsJsxProcessor._view_arm(
     self: EsJsxProcessor, nd: uni.JsxElement
-) -> (list | None) {
+) -> (list[any] | None) {
     import from jaclang.compiler.backends.es.view_ir { ElementChild }
     ve = self._view_by_node.get(id(nd));
     if ve is None {

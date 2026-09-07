@@ -602,7 +602,7 @@ walker JcirGenPass(BaseAstGenPass[CgItem]) {
     can exit_atom_trailer with AtomTrailer exit;
     can exit_atom_unit with AtomUnit exit;
     can exit_func_call with FuncCall exit;
-    def _place_parts(arg: UniNode) -> (tuple | None);
+    def _place_parts(arg: UniNode) -> (tuple[any, ...] | None);
     def _name_take_expr(owner: str) -> CgNode;
     def _name_swap_expr(store_id: str, value: CgNode) -> CgNode;
     def _lower_take(nd: FuncCall) -> (CgNode | None);

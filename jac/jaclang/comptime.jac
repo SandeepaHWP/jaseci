@@ -222,7 +222,7 @@ def embed_bytes(path: str) -> bytes {
     }
 }
 
-def _scalar_size_align(t: any) -> (tuple | None) {
+def _scalar_size_align(t: any) -> (tuple[any, ...] | None) {
     import from jaclang.runtime.scalars { shape_of }
     name = t?.__name__ if isinstance(t, `type) else str(t);
     if name == "bool" {

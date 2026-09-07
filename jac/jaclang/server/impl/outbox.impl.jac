@@ -232,7 +232,7 @@ impl SqlOutboxStore.remember_key(
 }
 
 
-impl PgOutboxStore._exec(sql: str, params: dict[any, any]) -> list[tuple] {
+impl PgOutboxStore._exec(sql: str, params: dict[any, any]) -> list[tuple[any, ...]] {
     return self.store.rows(sql, params);
 }
 
@@ -268,7 +268,9 @@ impl SqliteOutboxStore.postinit -> None {
 }
 
 
-impl SqliteOutboxStore._exec(sql: str, params: dict[any, any]) -> list[tuple] {
+impl SqliteOutboxStore._exec(
+    sql: str, params: dict[any, any]
+) -> list[tuple[any, ...]] {
     with self._lock {
         conn = self._conn;
         if conn is None {

@@ -2520,7 +2520,7 @@ impl NaIRGenPass._codegen_atom_trailer(nd: uni.AtomTrailer) -> (ir.Value | None)
     return None;
 }
 
-impl NaIRGenPass._infer_dict_type(val: ir.Value) -> (tuple | None) {
+impl NaIRGenPass._infer_dict_type(val: ir.Value) -> (tuple[any, ...] | None) {
     if not isinstance(val.type, ir.PointerType) {
         return None;
     }

@@ -116,7 +116,7 @@ def _native_parse_woven(
     prog: (JacProgram | None),
     annexes: list[any],
     early_context: str = ""
-) -> (tuple | None) {
+) -> (tuple[any, ...] | None) {
     import jaclang.compiler.native_compiler as _jc;
     kernel = _jc.ensure_loaded();
     if kernel is None {

@@ -498,7 +498,7 @@ impl LanguageServer._write_message(body: dict[any, any]) -> None {
     }
 }
 
-impl LanguageServer._read_message(stream: any) -> Optional[dict] {
+impl LanguageServer._read_message(stream: any) -> Optional[dict[any, any]] {
     content_length = -1;
     while True {
         line = stream.readline();

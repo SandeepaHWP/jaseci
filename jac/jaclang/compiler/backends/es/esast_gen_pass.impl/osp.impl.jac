@@ -4,7 +4,7 @@ impl EsastGenPass._osp_model -> OspModel {
     return get_osp_model(_root);
 }
 
-impl EsastGenPass._osp_ability_info(nd: uni.Ability) -> (dict | None) {
+impl EsastGenPass._osp_ability_info(nd: uni.Ability) -> (dict[any, any] | None) {
     if not isinstance(nd.signature, uni.EventSignature) {
         return None;
     }

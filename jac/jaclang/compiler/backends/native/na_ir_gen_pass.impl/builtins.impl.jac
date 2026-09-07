@@ -289,7 +289,9 @@ impl NaIRGenPass._fstring_spec_text(spec: uni.Expr) -> (str | None) {
     return static_fstring_spec_text(spec);
 }
 
-impl NaIRGenPass._fstring_spec_to_printf(spec: str, kind: str) -> (tuple | None) {
+impl NaIRGenPass._fstring_spec_to_printf(
+    spec: str, kind: str
+) -> (tuple[any, ...] | None) {
     fill: (str | None) = None;
     align: (str | None) = None;
     i = 0;
@@ -738,7 +740,7 @@ impl NaIRGenPass._codegen_string_index(
 
 impl NaIRGenPass._emit_norm_slice_bounds(
     slice_node: object, src_len: ir.Value
-) -> (tuple | None) {
+) -> (tuple[any, ...] | None) {
     i64 = ir.IntType(64);
     zero = ir.Constant(i64, 0);
     one = ir.Constant(i64, 1);

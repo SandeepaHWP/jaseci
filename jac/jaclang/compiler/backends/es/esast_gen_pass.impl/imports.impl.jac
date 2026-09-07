@@ -195,7 +195,7 @@ impl EsastGenPass.exit_import with uni.Import exit {
 
 impl EsastGenPass._partition_client_import_items(
     nd: uni.Import
-) -> (tuple[list, list] | None) {
+) -> (tuple[list[any], list[any]] | None) {
     import from jaclang.compiler.symbol_utils {
         ClientImportVerdict,
         classify_client_import_item,

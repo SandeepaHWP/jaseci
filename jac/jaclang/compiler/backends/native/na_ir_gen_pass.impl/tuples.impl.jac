@@ -476,7 +476,7 @@ impl NaIRGenPass._tuple_iter_shape(
         and isinstance(_t.pointee, ir.LiteralStructType);
 }
 
-impl NaIRGenPass._tuple_seq_flavor(elem_types: list[any]) -> (tuple | None) {
+impl NaIRGenPass._tuple_seq_flavor(elem_types: list[any]) -> (tuple[any, ...] | None) {
     i8p = ir.IntType(8).as_pointer();
     if not elem_types {
         return ("i64", ir.IntType(64));
@@ -507,7 +507,7 @@ impl NaIRGenPass._tuple_seq_flavor(elem_types: list[any]) -> (tuple | None) {
 
 impl NaIRGenPass._tuple_iter_seq(
     expr: (uni.UniNode | None), val: (ir.Value | None)
-) -> (tuple | None) {
+) -> (tuple[any, ...] | None) {
     i8p = ir.IntType(8).as_pointer();
     i32 = ir.IntType(32);
     _lit = expr;

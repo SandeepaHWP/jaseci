@@ -226,7 +226,7 @@ def _nd_types(hop: QHop) -> list[type] {
 impl compile_query(
     q: GraphQuery,
     upto: int,
-    promotions: (dict | None) = None,
+    promotions: (dict[any, any] | None) = None,
     count_only: bool = False,
     acl_root: (str | None) = None
 ) -> CompiledQuery {

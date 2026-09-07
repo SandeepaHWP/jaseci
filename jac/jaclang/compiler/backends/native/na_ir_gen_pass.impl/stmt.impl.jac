@@ -1,4 +1,4 @@
-impl NaIRGenPass._codegen_body(stmts: (list | tuple[any, ...])) -> None {
+impl NaIRGenPass._codegen_body(stmts: (list[any] | tuple[any, ...])) -> None {
     for stmt in stmts {
         if self.builder.block.is_terminated {
             break;
@@ -1197,7 +1197,7 @@ impl NaIRGenPass._match_map_cond(
 
 impl NaIRGenPass._match_arch_fields(
     pat: uni.MatchArch, arch_name: str
-) -> (list | None) {
+) -> (list[any] | None) {
     out: list[any] = [];
     args = list(pat.arg_patterns) if pat.arg_patterns else [];
     if args {
@@ -4120,7 +4120,7 @@ impl NaIRGenPass._codegen_for_indexed(
     nd: uni.InForStmt,
     kind: str,
     collection_val: ir.Value,
-    helpers: (dict | None),
+    helpers: (dict[any, any] | None),
     var_names: list[any],
     var_types: list[any],
     rc_vars: bool,
@@ -4400,7 +4400,7 @@ impl NaIRGenPass._codegen_for_indexed(
     }
 }
 
-impl NaIRGenPass._na_chunks_shape(expr: object) -> (tuple | None) {
+impl NaIRGenPass._na_chunks_shape(expr: object) -> (tuple[any, ...] | None) {
     if not isinstance(expr, uni.FuncCall) {
         return None;
     }

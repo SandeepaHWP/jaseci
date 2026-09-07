@@ -1811,7 +1811,7 @@ impl NaIRGenPass._empty_container_for_field(
 impl NaIRGenPass._codegen_instantiation(
     nd: (uni.FuncCall | uni.Name),
     type_name_override: (str | None) = None,
-    ctor_params: (list | None) = None
+    ctor_params: (list[any] | None) = None
 ) -> (ir.Value | None) {
     _is_call = isinstance(nd, uni.FuncCall);
     type_name = type_name_override
@@ -4328,7 +4328,7 @@ impl NaIRGenPass._emit_class_routed_call(
 
 impl NaIRGenPass._jc_reference_schema(
     ft: ir.Type, layouts: dict[any, any], semantic: object = None
-) -> (dict | None) {
+) -> (dict[any, any] | None) {
     """Combine semantic reference types with the backend's container ABI.""";
     args = semantic.private.type_args or [] if isinstance(semantic, ClassType) else [];
     semantic_name = semantic.shared.class_name

@@ -1814,7 +1814,7 @@ impl NaIRGenPass._nogc_type_arg_mangles(expr: uni.UniNode | None) -> list[any] {
     return _args;
 }
 
-impl NaIRGenPass._drop_spec_for_mangle(mangle: str) -> (tuple | None) {
+impl NaIRGenPass._drop_spec_for_mangle(mangle: str) -> (tuple[any, ...] | None) {
     if mangle == "int" or mangle == "bool" {
         return ("i64", ir.IntType(64));
     }
@@ -2593,7 +2593,7 @@ impl NaIRGenPass._call_str_cmp3(
     return b.call(self.str_cmp3_fn, [l_data, l_len, r_data, r_len], name=name);
 }
 
-impl NaIRGenPass._str_cmp_parts_of(val: ir.Value) -> (tuple | None) {
+impl NaIRGenPass._str_cmp_parts_of(val: ir.Value) -> (tuple[any, ...] | None) {
     if self._str_desc_ty is not None and val.type == self._str_desc_ty {
         _hl = self._nogc_headerless();
         _d = self.builder.extract_value(val, 0 if _hl else 1, name="scmp.data");

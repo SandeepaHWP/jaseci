@@ -833,8 +833,8 @@ impl NaIRGenPass._codegen_kwargs_dict(
     nd: uni.FuncCall,
     leftover: dict[any, any],
     expected: (ir.Type | None),
-    order: (list | None) = None,
-    bind_records: (list | None) = None
+    order: (list[any] | None) = None,
+    bind_records: (list[any] | None) = None
 ) -> (ir.Value | None) {
     dict_key: (str | None) = None;
     if expected is not None and isinstance(expected, ir.PointerType) {
@@ -1183,7 +1183,9 @@ impl NaIRGenPass._emit_new(nd: uni.FuncCall) -> (ir.Value | None) {
     );
 }
 
-impl NaIRGenPass._native_module_call_target(nd: uni.FuncCall) -> (tuple | None) {
+impl NaIRGenPass._native_module_call_target(
+    nd: uni.FuncCall
+) -> (tuple[any, ...] | None) {
     trailer = nd.target;
     if not isinstance(trailer, uni.AtomTrailer) or not trailer.is_attr {
         return None;

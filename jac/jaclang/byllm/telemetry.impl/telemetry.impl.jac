@@ -4,7 +4,7 @@ impl register_agent_callback(callback: Callable) -> None {
     }
 }
 
-impl _aggregate_usage(usage_history: list[dict]) -> dict[str, object] {
+impl _aggregate_usage(usage_history: list[dict[any, any]]) -> dict[str, object] {
     totals: dict[any, any] = {};
     by_kind: dict[any, any] = {};
     for u in usage_history {

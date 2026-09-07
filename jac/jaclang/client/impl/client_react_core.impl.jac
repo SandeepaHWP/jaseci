@@ -150,7 +150,7 @@ impl __bridgeErrorFromFetch(err: any, app: str = "", name: str = "") -> BridgeEr
     return BridgeUnavailable(app=app, name=name, detail=message);
 }
 
-impl __bridgeApiBase(opts: (dict | None) = None) -> str {
+impl __bridgeApiBase(opts: (dict[any, any] | None) = None) -> str {
     base_url = globalThis.__jacGetApiBaseUrl__();
     route = opts["route"] if opts and opts["route"] else "";
     if route {
@@ -160,7 +160,10 @@ impl __bridgeApiBase(opts: (dict | None) = None) -> str {
 }
 
 impl __doWalkerFetch(
-    `walker: str, nodeId: str, fields: dict[any, any], opts: (dict | None) = None
+    `walker: str,
+    nodeId: str,
+    fields: dict[any, any],
+    opts: (dict[any, any] | None) = None
 ) -> any {
     await _awaitPlatformReady();
     app = opts["app"] if opts and opts["app"] else "";
@@ -209,7 +212,7 @@ impl __doWalkerFetch(
 }
 
 impl __doFuncFetch(
-    function_name: str, args: dict[any, any], opts: (dict | None) = None
+    function_name: str, args: dict[any, any], opts: (dict[any, any] | None) = None
 ) -> any {
     await _awaitPlatformReady();
     app = opts["app"] if opts and opts["app"] else "";
@@ -309,7 +312,10 @@ impl __cachedEndpointCall(endpoint_key: str, args_key: str, fetch_fn: any) -> an
 }
 
 impl __jacSpawn(
-    left: str, right: str = "", fields: dict[any, any] = {}, opts: (dict | None) = None
+    left: str,
+    right: str = "",
+    fields: dict[any, any] = {},
+    opts: (dict[any, any] | None) = None
 ) -> any {
     if left == "login"
         or left == "signup"
@@ -330,13 +336,16 @@ impl __jacSpawn(
 }
 
 impl jacSpawn(
-    left: str, right: str = "", fields: dict[any, any] = {}, opts: (dict | None) = None
+    left: str,
+    right: str = "",
+    fields: dict[any, any] = {},
+    opts: (dict[any, any] | None) = None
 ) -> any {
     return __jacSpawn(left, right, fields, opts);
 }
 
 impl __jacCallFunction(
-    function_name: str, args: dict[any, any] = {}, opts: (dict | None) = None
+    function_name: str, args: dict[any, any] = {}, opts: (dict[any, any] | None) = None
 ) -> any {
     app = opts["app"] if opts and opts["app"] else "";
     endpoint_key = f"func:{function_name}";
@@ -367,7 +376,7 @@ impl __normalizeCredential(x: any) -> dict[str, any] {
 impl jacSignup(
     identities_or_username: (str | list[any]),
     credential_or_password: (str | dict[any, any]),
-    profile: (dict | None) = None
+    profile: (dict[any, any] | None) = None
 ) -> dict[any, any] {
     base_url = globalThis.__jacGetApiBaseUrl__();
     credential = __normalizeCredential(credential_or_password);

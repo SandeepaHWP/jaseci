@@ -1,4 +1,4 @@
-glob _SCRIPT: list[dict] = [
+glob _SCRIPT: list[dict[any, any]] = [
          {"k": "cmd", "t": "jac create trailmate --use jac-shadcn"},
          {"k": "out", "t": "  Themed starter ready (nova / orange / geist)"},
          {"k": "cmd", "t": "jac scale deploy"},
@@ -16,7 +16,7 @@ def:pub TerminalDemo(className: str = "") -> JsxElement {
         si = 0;
         ci = 0;
         pause = 18;
-        done: list[dict] = [];
+        done: list[dict[any, any]] = [];
         interval = setInterval(
             lambda {
                 if pause > 0 {

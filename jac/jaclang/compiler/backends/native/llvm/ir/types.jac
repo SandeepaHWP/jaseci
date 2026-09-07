@@ -622,7 +622,7 @@ class LiteralStructType(BaseStructType) {
 class IdentifiedStructType(BaseStructType) {
     with entry {
         null = 'zeroinitializer';
-        elements: (tuple | None);
+        elements: (tuple[any, ...] | None);
     }
 
     def init(

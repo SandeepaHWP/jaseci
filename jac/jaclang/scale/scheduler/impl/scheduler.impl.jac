@@ -124,7 +124,7 @@ impl PgJobStore.find_active(
     offset: int = 0,
     trigger: str | None = None,
     created_by: str | None = None
-) -> tuple[list[dict], int] {
+) -> tuple[list[dict[any, any]], int] {
     conds: list[str] = ["collection = :c", "doc->>'status' = 'active'"];
     params: dict[str, any] = {'c': self._collection};
     if trigger {
@@ -217,7 +217,7 @@ impl MemoryJobStore.find_active(
     offset: int = 0,
     trigger: str | None = None,
     created_by: str | None = None
-) -> tuple[list[dict], int] {
+) -> tuple[list[dict[any, any]], int] {
     matches: list[dict[any, any]] = [];
     for j in self._jobs.values() {
         if j.get('status') != 'active' {
@@ -535,19 +535,19 @@ impl JacScaleScheduler.list_jobs(
     offset: int = 0,
     trigger: str | None = None,
     created_by: str | None = None
-) -> tuple[list[dict], int] {
+) -> tuple[list[dict[any, any]], int] {
     return self._require_store().find_active(
         limit=limit, offset=offset, trigger=trigger, created_by=created_by
     );
 }
 
-impl JacScaleScheduler.get_job(job_id: str) -> (dict | None) {
+impl JacScaleScheduler.get_job(job_id: str) -> (dict[any, any] | None) {
     return self._require_store().find_active_one(job_id);
 }
 
 impl JacScaleScheduler.update_job(
     job_id: str, spec: TriggerSpec, acting_as: str | None = None
-) -> (dict | None) {
+) -> (dict[any, any] | None) {
     existing = self.get_job(job_id);
     if existing is None {
         return None;
