@@ -411,7 +411,7 @@ obj KubernetesTarget(KubernetesTargetBase) {
                     }
                 }
                 phase = str(p.status.phase or '?');
-                statuses = list(p.status.init_container_statuses or [])
+                statuses: list[any] = list(p.status.init_container_statuses or [])
                     + list(p.status.container_statuses or []);
                 pod_reason = "";
                 pod_crash = "";
@@ -762,7 +762,8 @@ obj KubernetesTarget(KubernetesTargetBase) {
             ).items
                 if pod_selector
                 else [];
-            for p in stuck {
+            stuck_pods: list[any] = stuck;
+            for p in stuck_pods {
                 timeout_detail += (
                     f" [pod {p.metadata.name}]"
                     + self._pod_failure_detail(core_v1, ns, str(p.metadata.name), p)
@@ -789,7 +790,7 @@ obj KubernetesTarget(KubernetesTargetBase) {
             if pod is None {
                 pod = core_v1.read_namespaced_pod(pod_name, namespace);
             }
-            statuses = (pod.status.init_container_statuses or [])
+            statuses: list[any] = (pod.status.init_container_statuses or [])
                 + (pod.status.container_statuses or []);
             for cs in statuses {
                 states: list[any] = [];
@@ -1436,7 +1437,8 @@ obj KubernetesTarget(KubernetesTargetBase) {
             listed = apps_v1.list_namespaced_deployment(
                 namespace=namespace, label_selector=FLEET_SELECTOR
             );
-            for dep in list(listed?.items or []) {
+            dep_items: list[any] = list(listed?.items or []);
+            for dep in dep_items {
                 try {
                     names.append(str(dep.metadata.name));
                 } except Exception {

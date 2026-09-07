@@ -487,9 +487,9 @@ obj KubernetesTargetBase(DeploymentTarget) {
 
         namespace = self.k8s_config.namespace;
         components = [];
-        urls = {};
+        urls: dict[str, any] = {};
 
-        dep_map = {};
+        dep_map: dict[str, any] = {};
         try {
             dep_items: list[any] = apps_v1.list_namespaced_deployment(
                 namespace=namespace
@@ -505,7 +505,7 @@ obj KubernetesTargetBase(DeploymentTarget) {
             }
         }
 
-        sts_map = {};
+        sts_map: dict[str, any] = {};
         try {
             sts_items: list[any] = apps_v1.list_namespaced_stateful_set(
                 namespace=namespace
