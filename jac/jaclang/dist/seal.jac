@@ -306,7 +306,7 @@ def bake_serve_payloads(
         json.dumps(sm, sort_keys=True, indent=1) + "\n", encoding="utf-8"
     );
 
-    client_meta: dict[any, any] = sm.get('client', {}) or {};
+    client_meta: any = sm.get('client', {}) or {};
     if not bake_client
         or not (client_meta.get('has_client') or client_meta.get('exports')) {
         return True;

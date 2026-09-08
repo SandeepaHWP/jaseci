@@ -112,7 +112,7 @@ impl JcirGenPass._move_release_stmts(stmt: CodeBlockStmt) -> list[CgNode] {
         return [];
     }
     sites = self.ir_in.own_move_sites;
-    last_uses: list[any] = self.ir_in.rc_last_use.get(id(stmt)) or [];
+    last_uses: any = self.ir_in.rc_last_use.get(id(stmt)) or [];
     if not sites and not last_uses {
         return [];
     }

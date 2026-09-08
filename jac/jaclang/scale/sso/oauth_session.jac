@@ -83,8 +83,8 @@ def complete_identity(
         or user.get("role") == "system" {
         return OAuthLogin(error="This account cannot sign in.");
     }
-    profile: dict[any, any] = user.get("profile") or {};
-    profiles: dict[any, any] = profile.get("sso") or {};
+    profile: any = user.get("profile") or {};
+    profiles: any = profile.get("sso") or {};
     profiles[platform] = info.profile_fields();
     profile["sso"] = profiles;
     manager.update_user_fields(user_id, {"profile": profile});

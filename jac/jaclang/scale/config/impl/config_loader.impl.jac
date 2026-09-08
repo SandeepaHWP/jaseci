@@ -422,7 +422,7 @@ impl JacScaleConfig.get_scheduler_config(self: JacScaleConfig) -> dict[str, any]
 
 impl JacScaleConfig.get_emailer_config(self: JacScaleConfig) -> dict[str, any] {
     config = self.load();
-    emailer_config: dict[any, any] = config.get('emailer', {}) or {};
+    emailer_config: any = config.get('emailer', {}) or {};
     smtp_config = dict(emailer_config.get('smtp', {}) or {});
     smtp_password_env = os.environ.get('EMAILER_SMTP_PASSWORD');
     if smtp_password_env {
@@ -445,7 +445,7 @@ impl JacScaleConfig.get_emailer_config(self: JacScaleConfig) -> dict[str, any] {
 
 impl JacScaleConfig.get_auth_config(self: JacScaleConfig) -> dict[str, any] {
     config = self.load();
-    auth_config: dict[any, any] = config.get('auth', {}) or {};
+    auth_config: any = config.get('auth', {}) or {};
     return {
         'reset_token_ttl_seconds': int(
             auth_config.get('reset_token_ttl_seconds', 1800)

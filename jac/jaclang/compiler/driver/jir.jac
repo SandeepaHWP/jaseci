@@ -257,7 +257,7 @@ def _manifest_compiler_digest(pkg_dir: str) -> str {
     stored_digest = "";
     try {
         raw = json.loads(manifest_path.read_text());
-        entries: dict[any, any] = raw.get("entries", {}) or {};
+        entries: any = raw.get("entries", {}) or {};
         stored_digest = raw.get("digest", "") or "";
     } except Exception {
         entries = {};

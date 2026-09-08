@@ -531,8 +531,8 @@ impl run_jab_image(
 
     meta = jab_app_meta(img_root);
     kind = str(meta.get("kind") or "cli");
-    entry_meta: dict[any, any] = meta.get("entry") or {};
-    caps: list[any] = meta.get("capabilities") or [];
+    entry_meta: any = meta.get("entry") or {};
+    caps: any = meta.get("capabilities") or [];
     entry_rel = str(entry_meta.get("path") or "");
     if not entry_rel {
         attach_note = ", attachable package" if "attachable" in caps else "";

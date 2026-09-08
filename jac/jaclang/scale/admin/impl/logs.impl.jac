@@ -203,9 +203,9 @@ def _flatten_loki_response(
     payload: dict[any, any], ascending: bool = True
 ) -> list[dict[any, any]] {
     out: list[dict[any, any]] = [];
-    data: dict[any, any] = payload.get("data") or {};
+    data: any = payload.get("data") or {};
     for stream in (data.get("result") or []) {
-        labels: dict[any, any] = stream.get("stream") or {};
+        labels: any = stream.get("stream") or {};
         for `entry in (stream.get("values") or []) {
             if len(`entry) < 2 {
                 continue;

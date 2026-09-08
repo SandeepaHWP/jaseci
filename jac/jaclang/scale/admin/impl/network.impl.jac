@@ -37,8 +37,8 @@ def endpoint_ready_counts(ep: dict[any, any]) -> dict[any, any] {
 def summarize_service(
     svc: dict[any, any], ready_by_name: dict[any, any]
 ) -> dict[any, any] {
-    meta: dict[any, any] = svc.get("metadata", {}) or {};
-    spec: dict[any, any] = svc.get("spec", {}) or {};
+    meta: any = svc.get("metadata", {}) or {};
+    spec: any = svc.get("spec", {}) or {};
     name = _s(meta.get("name"));
     ports: list[any] = [];
     for p in (spec.get("ports", []) or []) {
@@ -63,17 +63,17 @@ def summarize_service(
 
 
 def summarize_ingress(ing: dict[any, any]) -> dict[any, any] {
-    meta: dict[any, any] = ing.get("metadata", {}) or {};
-    spec: dict[any, any] = ing.get("spec", {}) or {};
-    status: dict[any, any] = ing.get("status", {}) or {};
+    meta: any = ing.get("metadata", {}) or {};
+    spec: any = ing.get("spec", {}) or {};
+    status: any = ing.get("status", {}) or {};
     rules_out: list[any] = [];
     for rule in (spec.get("rules", []) or []) {
         host = _s(rule.get("host"));
-        http: dict[any, any] = rule.get("http", {}) or {};
+        http: any = rule.get("http", {}) or {};
         for path in (http.get("paths", []) or []) {
-            backend: dict[any, any] = path.get("backend", {}) or {};
-            svc: dict[any, any] = backend.get("service", {}) or {};
-            svc_port: dict[any, any] = svc.get("port", {}) or {};
+            backend: any = path.get("backend", {}) or {};
+            svc: any = backend.get("service", {}) or {};
+            svc_port: any = svc.get("port", {}) or {};
             rules_out.append(
                 {
                     "host": host,
@@ -102,8 +102,8 @@ def summarize_ingress(ing: dict[any, any]) -> dict[any, any] {
 def pvc_claimants(pods: list[any]) -> dict[any, any] {
     out: dict[any, any] = {};
     for pod in pods {
-        meta: dict[any, any] = pod.get("metadata", {}) or {};
-        spec: dict[any, any] = pod.get("spec", {}) or {};
+        meta: any = pod.get("metadata", {}) or {};
+        spec: any = pod.get("spec", {}) or {};
         pod_name = _s(meta.get("name"));
         for vol in (spec.get("volumes", []) or []) {
             pvc = vol.get("persistent_volume_claim");
@@ -125,9 +125,9 @@ def pvc_claimants(pods: list[any]) -> dict[any, any] {
 def summarize_pvc(
     pvc: dict[any, any], claimants_by_name: dict[any, any]
 ) -> dict[any, any] {
-    meta: dict[any, any] = pvc.get("metadata", {}) or {};
-    spec: dict[any, any] = pvc.get("spec", {}) or {};
-    status: dict[any, any] = pvc.get("status", {}) or {};
+    meta: any = pvc.get("metadata", {}) or {};
+    spec: any = pvc.get("spec", {}) or {};
+    status: any = pvc.get("status", {}) or {};
     name = _s(meta.get("name"));
     capacity = (status.get("capacity", {}) or {}).get("storage");
     return {

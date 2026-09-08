@@ -4,7 +4,7 @@ def _tool_call_fragments(chunk: object) -> list[dict[any, any]] {
         if chunk?.choices and chunk?.choices?[0]?.delta {
             raw = chunk?.choices?[0]?.delta?.tool_calls;
         } elif isinstance(chunk, dict) {
-            _choices: list[any] = chunk.get("choices") or [];
+            _choices: any = chunk.get("choices") or [];
             if _choices {
                 _tcs = (_choices[0].get("delta") or {}).get("tool_calls");
                 raw = _tcs if isinstance(_tcs, list) else None;
@@ -20,7 +20,7 @@ def _tool_call_fragments(chunk: object) -> list[dict[any, any]] {
     for (pos, tc) in enumerate(raw) {
         try {
             if isinstance(tc, dict) {
-                fn: dict[any, any] = tc.get("function") or {};
+                fn: any = tc.get("function") or {};
                 idx = tc.get("index");
                 out.append(
                     {
@@ -442,7 +442,7 @@ def _default_compact(
                 );
             }
             if str(role) == "assistant" and not content {
-                tool_calls: list[any] = msg.get("tool_calls") or [];
+                tool_calls: any = msg.get("tool_calls") or [];
                 if tool_calls {
                     descs: list[any] = [];
                     for tc in tool_calls {
@@ -1410,7 +1410,7 @@ def _parse_tool_calls(
 
 def _sanitize_tool_calls(message: LiteLLMMessage) -> set {
     damaged: set = set();
-    tool_calls: list[any] = (message or {}).get("tool_calls") or [];
+    tool_calls: any = (message or {}).get("tool_calls") or [];
     for tc in tool_calls {
         fn = tc?.function;
         if fn is None {
@@ -1502,7 +1502,7 @@ impl BaseLLM.dispatch_no_streaming(mt_run: MTRuntime) -> CompletionResult {
 
     truncated_ids = _truncated_call_ids(message, finish_reason);
     tool_calls: list[ToolCall] = [];
-    _tc_raw: list[any] = (message or {}).get("tool_calls") or [];
+    _tc_raw: any = (message or {}).get("tool_calls") or [];
     tool_calls_list: list[any] = _tc_raw if isinstance(_tc_raw, list) else [];
     tool_calls = _parse_tool_calls(mt_run, tool_calls_list, truncated_ids, damaged_ids);
 
@@ -1622,7 +1622,7 @@ impl BaseLLM.dispatch_streaming_with_tools(
                 if chunk?.choices and chunk?.choices?[0]?.delta {
                     delta_content = chunk?.choices?[0]?.delta?.content or "";
                 } elif isinstance(chunk, dict) {
-                    _choices: list[any] = chunk.get("choices") or [];
+                    _choices: any = chunk.get("choices") or [];
                     if _choices {
                         delta_content = str(
                             (_choices[0].get("delta") or {}).get("content") or ""
@@ -1664,7 +1664,7 @@ impl BaseLLM.dispatch_streaming_with_tools(
         rebuilt = _rebuild_stream_chunks(chunks, _stream_resp?.logging_obj);
         if rebuilt {
             message = rebuilt.get("choices", [])[0].get("message");
-            usage_data: dict[any, any] = rebuilt.get("usage", {}) or {};
+            usage_data: any = rebuilt.get("usage", {}) or {};
             actual_model = rebuilt.get("model", self.model_name);
             _attach_call_cost(usage_data, actual_model, rebuilt);
             finish_reason = str(
@@ -1693,7 +1693,7 @@ impl BaseLLM.dispatch_streaming_with_tools(
 
     truncated_ids = _truncated_call_ids(message, finish_reason);
     tool_calls: list[ToolCall] = [];
-    _tc_raw: list[any] = (message or {}).get("tool_calls") or [];
+    _tc_raw: any = (message or {}).get("tool_calls") or [];
     tool_calls_list: list[any] = _tc_raw if isinstance(_tc_raw, list) else [];
     tool_calls = _parse_tool_calls(mt_run, tool_calls_list, truncated_ids, damaged_ids);
     output_value = mt_run.parse_response(output_content)
@@ -1747,7 +1747,7 @@ impl BaseLLM.adispatch_no_streaming(mt_run: MTRuntime) -> CompletionResult {
 
     truncated_ids = _truncated_call_ids(message, finish_reason);
     tool_calls: list[ToolCall] = [];
-    _tc_raw: list[any] = (message or {}).get("tool_calls") or [];
+    _tc_raw: any = (message or {}).get("tool_calls") or [];
     tool_calls_list: list[any] = _tc_raw if isinstance(_tc_raw, list) else [];
     tool_calls = _parse_tool_calls(mt_run, tool_calls_list, truncated_ids, damaged_ids);
     output_value = mt_run.parse_response(output_content)

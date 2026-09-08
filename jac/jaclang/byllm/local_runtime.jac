@@ -124,7 +124,7 @@ def normalize_response_format(rf: dict[str, any] | None) -> dict[str, any] | Non
         return rf;
     }
     if rf.get("type") == "json_schema" {
-        js: dict[any, any] = rf.get("json_schema") or {};
+        js: any = rf.get("json_schema") or {};
         schema = js.get("schema") if isinstance(js, dict) else None;
         translated: dict[str, any] = {"type": "json_object"};
         if isinstance(schema, dict) {

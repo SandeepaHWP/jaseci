@@ -13,12 +13,14 @@ def _render_tool(tool: object) -> str {
     if not isinstance(fn, dict) {
         return "";
     }
+
+    fn: dict[str, any] = fn;
     name = str(fn.get("name", "") or "");
     if not name {
         return "";
     }
     desc = str(fn.get("description", "") or "");
-    params: dict[any, any] = fn.get("parameters", {}) or {};
+    params: any = fn.get("parameters", {}) or {};
     props = params.get("properties", {}) if isinstance(params, dict) else {};
     required = params.get("required", []) if isinstance(params, dict) else [];
     if not isinstance(props, dict) {

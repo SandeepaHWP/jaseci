@@ -1082,7 +1082,7 @@ impl JacForm(props: dict[str, any]) -> JsxElement {
     onSubmit = props["onSubmit"];
     validate_mode = props.get("validateMode", None) or "onTouched";
     submitLabel = props.get("submitLabel", None) or "Submit";
-    field_config: dict[any, any] = props.get("field_config", None) or {};
+    field_config: any = props.get("field_config", None) or {};
     actualSchema = schema;
     try {
         if schema._def and schema._def.schema {
@@ -1098,7 +1098,7 @@ impl JacForm(props: dict[str, any]) -> JsxElement {
     [passwordVisible, setPasswordVisible] = useState({});
     fields = [];
     for fieldName in fieldNames {
-        config: dict[any, any] = field_config.get(fieldName, None) or {};
+        config: any = field_config.get(fieldName, None) or {};
         label = config.get("label", None) or fieldName;
         placeholder = str(config.get("placeholder", None) or "");
         field_type = str(config.get("type", None) or config.get("key", None) or "text");

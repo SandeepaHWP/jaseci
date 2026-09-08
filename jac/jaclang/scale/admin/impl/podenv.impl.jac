@@ -77,9 +77,9 @@ def redact_env(entries: list[any], prefixes: list[any]) -> list[any] {
 
 
 def pod_env_entries(pod: dict[any, any]) -> list[any] {
-    spec: dict[any, any] = pod.get("spec", {}) or {};
+    spec: any = pod.get("spec", {}) or {};
     out: list[any] = [];
-    containers: list[any] = spec.get("containers", []) or [];
+    containers: any = spec.get("containers", []) or [];
     if not containers {
         return out;
     }
@@ -112,8 +112,8 @@ def build_podenv(
 ) -> dict[any, any] {
     pod_rows: list[any] = [];
     for pod in pods {
-        meta: dict[any, any] = pod.get("metadata", {}) or {};
-        labels: dict[any, any] = meta.get("labels", {}) or {};
+        meta: any = pod.get("metadata", {}) or {};
+        labels: any = meta.get("labels", {}) or {};
         pod_rows.append(
             {
                 "pod": _s(meta.get("name")),
