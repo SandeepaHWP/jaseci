@@ -186,7 +186,7 @@ def annex_sources(file_path: str) -> list[tuple[str, str]] {
         if discover_base_file(file_path) is not None {
             return [];
         }
-        paths = [
+        paths: list[str] = [
             *discover_annex_files(file_path, ".impl.jac"),
             *discover_annex_files(file_path, ".test.jac")
         ];

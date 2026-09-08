@@ -276,7 +276,7 @@ def _manifest_compiler_digest(pkg_dir: str) -> str {
             and prev[0] == st.st_mtime
             and prev[1] == st.st_size
         ) {
-            sha = prev[2];
+            sha: str = str(prev[2]);
         } else {
             sha = compute_content_sha256(full);
             changed = True;

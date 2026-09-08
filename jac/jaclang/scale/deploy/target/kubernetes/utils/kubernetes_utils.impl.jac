@@ -92,7 +92,8 @@ impl describe_pod_status(
             pod = core_v1.read_namespaced_pod(pod_name, namespace);
         }
         lines.append(f"phase={(pod.status.phase or '?')}");
-        for cond in (pod.status.conditions or []) {
+        conditions: any = pod.status.conditions or [];
+        for cond in conditions {
             if (cond.status or '') != 'True' and cond.reason {
                 lines.append(
                     f"condition {cond.type}={cond.status} ({cond.reason}: {cond.message
@@ -100,7 +101,7 @@ impl describe_pod_status(
                 );
             }
         }
-        container_states = (pod.status.init_container_statuses or [])
+        container_states: any = (pod.status.init_container_statuses or [])
             + (pod.status.container_statuses or []);
         for cs in container_states {
             waiting = cs.state.waiting if cs.state else None;
@@ -111,7 +112,8 @@ impl describe_pod_status(
                 );
             }
         }
-        for vol in ((pod.spec.volumes if pod.spec else None) or []) {
+        volumes: any = (pod.spec.volumes if pod.spec else None) or [];
+        for vol in volumes {
             claim = vol.persistent_volume_claim;
             if not claim {
                 continue;
@@ -140,7 +142,8 @@ impl describe_pod_status(
             events = core_v1.list_namespaced_event(
                 namespace, field_selector=f"involvedObject.name={obj_name}"
             );
-            for ev in (events.items or []) {
+            ev_items: any = events.items or [];
+            for ev in ev_items {
                 lines.append(
                     f"event [{obj_name}/{ev.reason or '?'}] {ev.message or ''}"
                 );

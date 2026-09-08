@@ -144,6 +144,7 @@ def:pub LLMTracesPage -> JsxElement {
     }
 
     if showDetail {
+        emptyList: list[any] = [];
         return
             <div className="space-y-4">
                 <div className="flex items-center gap-3">
@@ -388,7 +389,9 @@ def:pub LLMTracesPage -> JsxElement {
                                                     {call["error"]}
                                                 </div>}
                                         </div>
-                                        for call in (selectedTrace["llm_calls"] or [])
+                                        for call in (
+                                            selectedTrace["llm_calls"] or emptyList
+                                        )
                                     ]}
                                 </div>}
                         </div>
@@ -475,7 +478,7 @@ def:pub LLMTracesPage -> JsxElement {
                                             </div>
                                         </div>
                                         for child in (
-                                            selectedTrace["child_traces"] or []
+                                            selectedTrace["child_traces"] or emptyList
                                         )
                                     ]}
                                 </div>

@@ -495,7 +495,8 @@ impl _hints_from_schema(name: str, prop: dict[any, any]) -> list[str] {
     if prop.get("type") == "object" {
         nested = prop.get("properties");
         if isinstance(nested, dict) {
-            for (sub, sub_prop) in nested.items() {
+            nested_props: dict[any, any] = nested;
+            for (sub, sub_prop) in nested_props.items() {
                 if sub != name {
                     out.extend(_hints_from_schema(sub, sub_prop));
                 }
@@ -535,7 +536,8 @@ impl schema_to_hint_text(rf: dict[any, any] | None) -> str {
         return lead;
     }
     lines: list[str] = [];
-    for (name, prop) in props.items() {
+    top_props: dict[any, any] = props;
+    for (name, prop) in top_props.items() {
         if isinstance(prop, dict) {
             lines.extend(_hints_from_schema(name, prop));
         }

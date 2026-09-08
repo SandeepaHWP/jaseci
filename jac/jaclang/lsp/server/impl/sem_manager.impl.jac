@@ -95,7 +95,7 @@ impl SemTokManager.gen_sem_tokens(ir: uni.Module) -> list[int] {
     }
 
     tokens.sort(key=lambda (x: any) { (x[0], x[1]); });
-    result = [];
+    result: list[int] = [];
     (prev_line, prev_col) = (0, 0);
     for (line, col_start, length, tok_type, tok_mod) in tokens {
         result += [

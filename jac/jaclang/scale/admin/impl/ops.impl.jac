@@ -281,7 +281,8 @@ async def _loki_recent_count -> int {
         }
         data: any = resp.json().get("data", {}) or {};
         total = 0;
-        for stream in (data.get("result", []) or []) {
+        streams: any = data.get("result", []) or [];
+        for stream in streams {
             total += len(stream.get("values", []) or []);
         }
         return total;

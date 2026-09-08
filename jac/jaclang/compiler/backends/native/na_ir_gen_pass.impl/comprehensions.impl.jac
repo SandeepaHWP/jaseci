@@ -554,7 +554,7 @@ impl NaIRGenPass._codegen_compr_range_walk(
     if not isinstance(collection, uni.FuncCall) {
         return;
     }
-    params: list[any] = collection.params or [];
+    params: Sequence[any] = collection.params or [];
     start_val: (ir.Value | None) = None;
     stop_val: (ir.Value | None) = None;
     if len(params) == 1 {

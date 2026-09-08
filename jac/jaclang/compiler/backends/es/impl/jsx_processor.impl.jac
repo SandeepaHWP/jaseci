@@ -3,7 +3,7 @@ impl EsJsxProcessor.init(self: EsJsxProcessor, pass_ref: EsastGenPass) -> None {
     import from jaclang.compiler.backends.es { estree as es }
     self.es = es;
 
-    self._view_by_node = {};
+    self._view_by_node: dict[any, any] = {};
 }
 
 impl EsJsxProcessor.element(self: EsJsxProcessor, nd: uni.JsxElement) -> Expression {

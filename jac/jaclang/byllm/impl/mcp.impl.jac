@@ -165,7 +165,8 @@ async def _do_call_tool(
     logger.debug(f"[MCP] call_tool {name}({arguments})");
     result = await session.call_tool(name, arguments);
     parts: list[str] = [];
-    for item in (result.content or []) {
+    content: any = result.content or [];
+    for item in content {
         text = item?.text;
         parts.append(str(text) if text is not None else str(item));
     }

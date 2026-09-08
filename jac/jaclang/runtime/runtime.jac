@@ -82,7 +82,7 @@ glob logger = getLogger(__name__),
      _request_context: ContextVar[ExecutionContext | None] = ContextVar(
          'request_context', `default=None
      ),
-     _default_base_path_dir: list[str] = [os.getcwd()],
+     _default_base_path_dir: list[str | None] = [os.getcwd()],
      _default_full_target_path: list[str | None] = [None],
      _shared_root_resolver: list[any] = [None, None];
 

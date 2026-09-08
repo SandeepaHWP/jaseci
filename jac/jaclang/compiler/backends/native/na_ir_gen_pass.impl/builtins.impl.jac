@@ -25,7 +25,7 @@ impl NaIRGenPass._get_printf -> ir.Function {
 
 impl NaIRGenPass._emit_print(nd: uni.FuncCall) -> (ir.Value | None) {
     printf = self._get_printf();
-    params: list[any] = nd.params or [];
+    params: Sequence[any] = nd.params or [];
     if not params {
         fmt = self._get_fmt_string("");
         fmt_ptr = self.builder.bitcast(fmt, ir.IntType(8).as_pointer());
@@ -34,7 +34,7 @@ impl NaIRGenPass._emit_print(nd: uni.FuncCall) -> (ir.Value | None) {
     }
 
     fmt_parts = [];
-    args = [];
+    args: list[ir.Value] = [];
     for (i, param) in enumerate(params) {
         val = self._str_norm(self._codegen_expr(param));
         if val is None {

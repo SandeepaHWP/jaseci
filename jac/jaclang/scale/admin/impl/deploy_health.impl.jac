@@ -57,7 +57,7 @@ def summarize_deployment(dep: dict[any, any]) -> dict[any, any] {
     meta: any = dep.get("metadata", {}) or {};
     spec: any = dep.get("spec", {}) or {};
     status: any = dep.get("status", {}) or {};
-    containers = ((spec.get("template", {}) or {}).get("spec", {}) or {}).get(
+    containers: any = ((spec.get("template", {}) or {}).get("spec", {}) or {}).get(
         "containers", []
     )
         or [];
@@ -175,8 +175,9 @@ def _collect_deploy_health -> dict[any, any] {
         logger.warning(f"deploy-health list failed: {e}");
         return {"available": False, "detail": api_error_detail(e)};
     }
-    deployments = [d.to_dict() for d in (dep_objs or [])];
-    pods = [p.to_dict() for p in (pod_objs or [])];
+    empty: list[any] = [];
+    deployments = [d.to_dict() for d in (dep_objs or empty)];
+    pods = [p.to_dict() for p in (pod_objs or empty)];
     return build_deploy_health(ns, deployments, pods);
 }
 

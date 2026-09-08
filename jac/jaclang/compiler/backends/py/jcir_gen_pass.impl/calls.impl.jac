@@ -299,7 +299,7 @@ impl JcirGenPass._name_take_expr(owner: str) -> CgNode {
 }
 
 impl JcirGenPass._lower_take(nd: FuncCall) -> (CgNode | None) {
-    params = list(nd.params or []);
+    params: list[any] = list(nd.params or []);
     if len(params) != 1 or isinstance(params[0], KWPair) {
         return None;
     }
@@ -320,7 +320,7 @@ impl JcirGenPass._lower_take(nd: FuncCall) -> (CgNode | None) {
 }
 
 impl JcirGenPass._lower_swap(nd: FuncCall) -> (CgNode | None) {
-    params = list(nd.params or []);
+    params: list[any] = list(nd.params or []);
     if len(params) != 2 or any([isinstance(p, KWPair) for p in params]) {
         return None;
     }

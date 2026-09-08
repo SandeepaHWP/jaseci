@@ -495,8 +495,8 @@ def get_symtab_tree_str(
 
 def printgraph_symtab_tree(nd: UniScopeNode) -> str {
     dot_lines = [];
-    id_map = {};
-    last_id_state = {"used": 0};
+    id_map: dict[int, int] = {};
+    last_id_state: dict[str, int] = {"used": 0};
     def gen_node_id(nd: SymbolTree) -> int {
         if (id(nd) not in id_map) {
             id_map[id(nd)] = last_id_state["used"];

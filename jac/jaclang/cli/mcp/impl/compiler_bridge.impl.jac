@@ -54,7 +54,7 @@ impl run_with_timeout(func: object, timeout: int = 10) -> tuple[bool, any] {
 
 def _cap_read(stream: IO[bytes], holder: list[any], cap: int) {
     try {
-        chunks: list[str] = [];
+        chunks: list[bytes] = [];
         total: int = 0;
         while True {
             want: int = min(4096, cap - total);

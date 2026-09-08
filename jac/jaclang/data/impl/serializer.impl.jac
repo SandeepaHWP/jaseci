@@ -67,7 +67,8 @@ impl Serializer._declared_of(owner: object, attr: str) -> object {
             if not isinstance(ann, dict) {
                 continue;
             }
-            for (name, tag) in ann.items() {
+            annotations: dict[any, any] = ann;
+            for (name, tag) in annotations.items() {
                 sized = SIZED_TYPES.get(tag)
                     if isinstance(tag, str)
                     else (tag if tag?.__jac_sized__ is not None else None);
@@ -993,7 +994,8 @@ impl Serializer._deserialize_permission(data: object) -> (Permission | None) {
         return None;
     }
     perm = Permission();
-    perm.all = access_level_cast(data.get('all', -1));
+    perm_data: dict[any, any] = data;
+    perm.all = access_level_cast(perm_data.get('all', -1));
     if (roots := data.get('roots')) {
         perm.roots = Serializer._deserialize_access(roots);
     }

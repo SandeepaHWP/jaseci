@@ -678,7 +678,8 @@ impl ModuleIntrospector._register_sealed_bindings(
         return None;
     }
 
-    for b in sm.get('cross_bindings', []) or [] {
+    cross_bindings: any = sm.get('cross_bindings', []) or [];
+    for b in cross_bindings {
         name = b.get('name');
         rel = b.get('src');
         if not name or not rel {
@@ -1717,10 +1718,11 @@ impl JacAPIServer._register_scheduled_tasks -> None {
         return target;
     }
     self.introspector.load();
-    for (registry, is_walker) in [
+    registries: list[any] = [
         (dict(self.introspector._walkers), True),
         (dict(self.introspector._functions), False)
-    ] {
+    ];
+    for (registry, is_walker) in registries {
         for (name, item) in registry.items() {
             spec = item?.schedule_spec;
             if not isinstance(spec, ScheduleSpec) {

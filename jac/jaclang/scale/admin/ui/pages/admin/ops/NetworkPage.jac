@@ -95,6 +95,8 @@ def:pub NetworkPage -> JsxElement {
         return base + "text-success";
     }
 
+    emptyList: list[any] = [];
+
     <div className="space-y-4">
         <PageHeader
             icon={Network}
@@ -175,7 +177,7 @@ def:pub NetworkPage -> JsxElement {
                             {r["host"] or "*"}{r["path"]} {"->"} {r["service"]}:{String(
                                 r["port"]
                             )}
-                        </div> for r in (ing["rules"] or [])
+                        </div> for r in (ing["rules"] or emptyList)
                     ]}
                 </div> for ing in ingresses
             ]}

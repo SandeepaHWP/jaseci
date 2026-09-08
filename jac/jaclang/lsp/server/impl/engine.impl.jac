@@ -442,11 +442,12 @@ impl JacLangServer.get_references(
 ) -> list[lspt.Location] {
     node_selected = self.get_token_at_position(file_path, position);
     if node_selected and node_selected.sym {
+        occurrences: list[any] = [*node_selected.sym.defn, *node_selected.sym.uses];
         list_of_references: list[lspt.Location] = [
             lspt.Location(
                 uri=_uri_of(cur_node.loc.mod_path),
                 range=utils.create_range(cur_node.loc)
-            ) for cur_node in [*node_selected.sym.defn, *node_selected.sym.uses]
+            ) for cur_node in occurrences
         ];
         return list_of_references;
     }

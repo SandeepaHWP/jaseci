@@ -178,7 +178,7 @@ impl QHop.only_anchors -> list[Anchor] {
     if self.only is None {
         return [];
     }
-    sel = self.only if isinstance(self.only, (list, tuple, set)) else [self.only];
+    sel: any = self.only if isinstance(self.only, (list, tuple, set)) else [self.only];
     out: list[Anchor] = [];
     for item in sel {
         anch = item?.__jac__;

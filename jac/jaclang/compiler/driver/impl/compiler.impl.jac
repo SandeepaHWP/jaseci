@@ -1964,7 +1964,8 @@ impl JacCompiler.run_schedule(
         run_pass(
             current_pass, mod, target_program, cancel_token=cancel_token, policy=_policy
         );
-        for _prov in (getattr(current_pass, 'PROVIDES', ()) or ()) {
+        _provides: any = getattr(current_pass, 'PROVIDES', ()) or ();
+        for _prov in _provides {
             provided.add(_prov);
         }
     }

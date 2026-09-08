@@ -258,7 +258,7 @@ impl JacWalker.`visit(
     items: list[any] = `list(expr)
         if isinstance(expr, `list)
         else ([expr] if isinstance(expr, (NodeArchetype, EdgeArchetype)) else []);
-    targets: list[NodeAnchor | EdgeAnchor] = [];
+    targets: list[any] = [];
     for arch in items {
         anchor = arch.__jac__;
         if not isinstance(anchor, (NodeAnchor, EdgeAnchor)) {
@@ -1242,7 +1242,7 @@ impl JacGraph.clear_edges(
             }
         }
     }
-    origins = origin if isinstance(origin, `list) else [origin];
+    origins: list[any] = origin if isinstance(origin, `list) else [origin];
     hit = False;
     for o in origins {
         anchor = o.__jac__;

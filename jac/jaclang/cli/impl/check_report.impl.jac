@@ -32,8 +32,9 @@ impl print_failures(failed_results: list[any], nowarn: bool = False) -> None {
         console.print(separator(r['path'], char='_'));
         for e in r['errors'] {
             if isinstance(e, dict) {
-                console.error(str(e.get('pretty') or e.get('text') or ''));
-                print_guide_hint(e.get('code'), e.get('category'));
+                err: dict[any, any] = e;
+                console.error(str(err.get('pretty') or err.get('text') or ''));
+                print_guide_hint(err.get('code'), err.get('category'));
             } else {
                 console.error(str(e));
             }
@@ -41,8 +42,9 @@ impl print_failures(failed_results: list[any], nowarn: bool = False) -> None {
         if not nowarn and r['warnings'] {
             for w in r['warnings'] {
                 if isinstance(w, dict) {
-                    console.warning(str(w.get('pretty') or w.get('text') or ''));
-                    print_guide_hint(w.get('code'), w.get('category'));
+                    warn: dict[any, any] = w;
+                    console.warning(str(warn.get('pretty') or warn.get('text') or ''));
+                    print_guide_hint(warn.get('code'), warn.get('category'));
                 } else {
                     console.warning(str(w));
                 }

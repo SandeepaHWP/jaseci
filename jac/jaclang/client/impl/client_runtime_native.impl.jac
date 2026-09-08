@@ -169,17 +169,18 @@ impl _isAbsoluteImageUri(src: str) -> bool {
 }
 
 impl _adaptImageProps(props: dict[any, any]) -> dict[any, any] {
-    out = {** (props or {})};
+    out: dict[any, any] = {** (props or {})};
     src = out["src"] if out["src"] else None;
     if out["alt"] and not out["accessibilityLabel"] {
         out["accessibilityLabel"] = str(out["alt"]);
     }
-    if src is not None and out["source"] is None {
+    cur_source: any = out["source"];
+    if src is not None and cur_source is None {
         if typeof(src) == "number" {
             out["source"] = src;
         } else {
             uri = str(src);
-            asset_map: dict[any, any] = globalThis.__JAC_RN_ASSET_MAP__ or {};
+            asset_map: any = globalThis.__JAC_RN_ASSET_MAP__ or {};
             mapped_asset = asset_map[uri] if asset_map else None;
             if mapped_asset is not None {
                 out["source"] = mapped_asset;

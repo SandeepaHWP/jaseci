@@ -70,8 +70,8 @@ class NativeCompiler {
         with open(lib_path + ".layout.json") as f {
             self.layout = json.load(f)["classes"];
         }
-        self._keep = [];
-        self.classes = {};
+        self._keep: list[any] = [];
+        self.classes: dict[str, any] = {};
         self._value_rows: dict[str, int] = {};
         self._bind();
         self._register();

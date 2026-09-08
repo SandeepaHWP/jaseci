@@ -588,7 +588,7 @@ impl JcirGenPass.exit_edge_ref_trailer with EdgeRefTrailer exit {
     }
     origin: (CgNode | None) = None;
     cur = here.chain[0];
-    chomp = [*here.chain[1:]];
+    chomp: list[any] = [*here.chain[1:]];
     from_visit = bool(isinstance(here.parent, VisitStmt));
     if not isinstance(cur, EdgeOpRef) {
         origin = self.val(cur);

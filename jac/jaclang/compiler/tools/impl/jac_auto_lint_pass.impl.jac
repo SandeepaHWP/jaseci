@@ -1381,8 +1381,8 @@ impl JacAutoLintPass._base_decl_archetypes(annex_path: str) -> list[uni.Archetyp
 impl JacAutoLintPass._signatures_match(
     decl_sig: uni.FuncSignature, impl_sig: uni.FuncSignature
 ) -> bool {
-    decl_params: list[any] = decl_sig.params or [];
-    impl_params: list[any] = impl_sig.params or [];
+    decl_params: Sequence[any] = decl_sig.params or [];
+    impl_params: Sequence[any] = impl_sig.params or [];
     if (
         len(decl_params) != len(impl_params)
         or len(decl_sig.posonly_params) != len(impl_sig.posonly_params)
@@ -2633,8 +2633,7 @@ impl JacAutoLintPass._detect_map_lambda_jsx(
     if sig is None {
         return None;
     }
-    all_params: list[uni.ParamVar] = list(sig.posonly_params or [])
-        + list(sig.params or []);
+    all_params: list[any] = list(sig.posonly_params or []) + list(sig.params or []);
     if len(all_params) != 1 {
         return None;
     }

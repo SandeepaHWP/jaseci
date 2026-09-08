@@ -553,13 +553,15 @@ obj IfaceRegistry {
         }
         live_errs = {key_of(a) for a in self.prog.errors_had[err0:]};
         live_warns = {key_of(a) for a in self.prog.warnings_had[warn0:]};
-        for rec in (prof.get("errors") or []) {
+        prof_errors: any = prof.get("errors") or [];
+        for rec in prof_errors {
             if rec_key(rec) in live_errs {
                 continue;
             }
             self.prog.errors_had.append(_alert_from_record(rec));
         }
-        for rec in (prof.get("warnings") or []) {
+        prof_warnings: any = prof.get("warnings") or [];
+        for rec in prof_warnings {
             if rec_key(rec) in live_warns {
                 continue;
             }
@@ -1110,10 +1112,10 @@ obj IfaceRegistry {
             }
             fresh_errs = sorted(digestible(a) for a in prog2.errors_had);
             fresh_warns = sorted(digestible(a) for a in prog2.warnings_had);
-            replay_errs = sorted(rec_digestible(r) for r in (prof.get("errors") or []));
-            replay_warns = sorted(
-                rec_digestible(r) for r in (prof.get("warnings") or [])
-            );
+            cached_errs: any = prof.get("errors") or [];
+            cached_warns: any = prof.get("warnings") or [];
+            replay_errs = sorted(rec_digestible(r) for r in cached_errs);
+            replay_warns = sorted(rec_digestible(r) for r in cached_warns);
             if fresh_errs != replay_errs or fresh_warns != replay_warns {
                 raise RuntimeError(
                     f"analysis-cache verify failed for {resolved}: replayed "

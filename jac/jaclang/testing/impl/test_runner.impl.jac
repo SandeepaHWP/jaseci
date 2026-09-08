@@ -1146,7 +1146,8 @@ impl _run_plan(
             );
             return;
         }
-        for item in (record.get("result") or []) {
+        outcomes: any = record.get("result") or [];
+        for item in outcomes {
             reporter.record(TestOutcome.from_wire(item));
         }
     }

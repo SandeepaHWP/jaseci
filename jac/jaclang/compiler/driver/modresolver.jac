@@ -93,7 +93,7 @@ def _find_spec_no_exec(target: str) -> (ModuleSpec | None) {
     return spec;
 }
 
-def find_project_root(start: (Path | None) = None) -> (tuple[any, ...] | None) {
+def find_project_root(start: (Path | None) = None) -> (tuple[Path, Path] | None) {
     if start is None {
         start = Path.cwd();
     }
@@ -632,7 +632,8 @@ def _resolve_export_target(
         return None;
     }
     if isinstance(target, dict) {
-        for (key, value) in target.items() {
+        target_map: dict[any, any] = target;
+        for (key, value) in target_map.items() {
             if key.startswith('.') {
                 continue;
             }
@@ -651,20 +652,21 @@ def _resolve_pkg_exports(
     exports: object, subpath: str, conditions: tuple[str, ...], pkg_dir: str
 ) -> (str | None) {
     if isinstance(exports, dict) {
-        has_subpath_keys = `any(k.startswith('.') for k in exports.keys());
+        exports_map: dict[any, any] = exports;
+        has_subpath_keys = `any(k.startswith('.') for k in exports_map.keys());
         if not has_subpath_keys {
             if subpath == '.' {
                 return _resolve_export_target(exports, conditions, pkg_dir);
             }
             return None;
         }
-        if subpath in exports {
-            return _resolve_export_target(exports[subpath], conditions, pkg_dir);
+        if subpath in exports_map {
+            return _resolve_export_target(exports_map[subpath], conditions, pkg_dir);
         }
 
         best_key: (str | None) = None;
         best_sub: (str | None) = None;
-        for key in exports.keys() {
+        for key in exports_map.keys() {
             if ('*' not in key or not key.startswith('.')) {
                 continue;
             }
@@ -686,7 +688,7 @@ def _resolve_pkg_exports(
         }
         if best_key is not None {
             return _resolve_export_target(
-                exports[best_key], conditions, pkg_dir, star_sub=best_sub
+                exports_map[best_key], conditions, pkg_dir, star_sub=best_sub
             );
         }
         return None;

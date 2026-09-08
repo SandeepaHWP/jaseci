@@ -99,8 +99,9 @@ impl from_dict(data: any, cls: any) -> any {
         return data;
     }
 
+    raw_data: dict[any, any] = data;
     snake_data: dict[str, any] = {};
-    for (key, value) in data.items() {
+    for (key, value) in raw_data.items() {
         snake_data[_to_snake_case(key)] = value;
     }
 
@@ -212,7 +213,8 @@ impl TextDocument.apply_change(change: any) -> None {
     if isinstance(change, TextDocumentContentChangeEvent_Type1) {
         self._apply_incremental_change(change);
     } elif isinstance(change, dict) and "range" in change {
-        range_data = change["range"];
+        change_data: dict[any, any] = change;
+        range_data = change_data["range"];
         range_obj = Range(
             start=Position(
                 line=range_data["start"]["line"],
@@ -223,7 +225,7 @@ impl TextDocument.apply_change(change: any) -> None {
             )
         );
         typed_change = TextDocumentContentChangeEvent_Type1(
-            range=range_obj, text=change["text"]
+            range=range_obj, text=change_data["text"]
         );
         self._apply_incremental_change(typed_change);
     } else {
@@ -269,7 +271,8 @@ impl TextDocument._apply_incremental_change(
 
 impl TextDocument._apply_full_change(change: any) -> None {
     if isinstance(change, dict) {
-        self._source = change.get("text", "");
+        change_data: dict[any, any] = change;
+        self._source = change_data.get("text", "");
     } else {
         self._source = change.text;
     }

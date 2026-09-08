@@ -69,9 +69,9 @@ impl eject(source: str = ".", output: str = "", force: bool = False) -> int {
     }
     project_name = str(metadata["project_name"]);
     entry_module = str(metadata["entry_module"]);
-    toml_data = dict(metadata["toml_data"]);
+    toml_data: dict[str, any] = dict(metadata["toml_data"]);
 
-    eject_cfg = toml_data.get("eject", {});
+    eject_cfg: dict[str, any] = toml_data.get("eject", {});
     if output {
         out = Path(output).resolve();
     } else {
@@ -239,7 +239,7 @@ impl eject(source: str = ".", output: str = "", force: bool = False) -> int {
         return 1;
     }
 
-    db_cfg = dict(eject_cfg.get("db", {}));
+    db_cfg: dict[str, any] = dict(eject_cfg.get("db", {}));
     project_deps = _resolve_project_python_deps(src, project_name);
     env_files = [
         name
