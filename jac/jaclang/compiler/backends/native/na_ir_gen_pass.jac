@@ -828,6 +828,7 @@ walker NaIRGenPass(Transform) {
     def _container_layout_hash(
         key_type: ir.Type, val_type: (ir.Type | None)
     ) -> dict[any, any];
+
     def _container_struct_fields(layout: dict[any, any]) -> list[any];
     def _emit_live_slot_loop(
         fn: ir.Function,
@@ -1965,6 +1966,7 @@ walker NaIRGenPass(Transform) {
     def _match_map_key(
         kv: uni.MatchKVPair, helpers: dict[any, any]
     ) -> (ir.Value | None);
+
     def _match_arch_fields(pat: uni.MatchArch, arch_name: str) -> (list[any] | None);
     def _match_value_eq(subj: ir.Value, value_node: uni.UniNode) -> (ir.Value | None);
     def _bind_match_pattern(

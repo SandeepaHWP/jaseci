@@ -234,7 +234,7 @@ test "a serial jac check over compiler-tree then client files stays clean" {
             cached.unlink();
         }
     }
-    env = dict(os.environ);
+    env: dict[str, str] = dict(os.environ);
     env["JAC_CHECK_JOBS"] = "0";
     proc = subprocess.run(
         [sys.executable, "-c", CHECK_PROBE, *files],

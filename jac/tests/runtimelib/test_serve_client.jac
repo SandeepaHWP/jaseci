@@ -2870,7 +2870,8 @@ obj _StubWalker {
     static def _from_wire(d: any) -> any {
         inst = _StubWalker();
         if isinstance(d, dict) {
-            for (k, v) in d.items() {
+            wire: dict[any, any] = d;
+            for (k, v) in wire.items() {
                 setattr(inst, k, v);
             }
         }

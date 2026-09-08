@@ -141,7 +141,7 @@ node Person {
     static def __jac_schema__ -> None;       # field-level history hook
 }
 
-def fix_tags(doc: dict) -> None {            # migration callback for the rule below
+def fix_tags(doc: dict[str, any]) -> None {  # migration callback for the rule below
     doc["tags"] = str(doc.get("tags", "")).split(",");
 }
 

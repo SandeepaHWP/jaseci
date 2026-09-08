@@ -85,7 +85,7 @@ def _make_project(tmp_path: Path) {
 
 """Env for a build/run that resolves ONLY from the local wheelhouse (no PyPI)."""
 def _offline_env(wheelhouse: Path) -> dict[any, any] {
-    env = dict(os.environ);
+    env: dict[str, str] = dict(os.environ);
     env["PIP_NO_INDEX"] = "1";
     env["PIP_FIND_LINKS"] = str(wheelhouse);
     env.pop("PIP_INDEX_URL", None);
@@ -177,7 +177,7 @@ test "a fat jab runs offline with its vendored dependency" {
         shutil.copy(jab, shipped);
         shutil.rmtree(wheelhouse, ignore_errors=True);
 
-        run_env = dict(os.environ);
+        run_env: dict[str, str] = dict(os.environ);
         run_env["PIP_NO_INDEX"] = "1";
         os.chdir(elsewhere);
         runres = run(

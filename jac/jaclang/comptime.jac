@@ -156,7 +156,7 @@ def fields(t: type) -> list[FieldInfo] {
         hints = {};
     }
     inner = t?._jac_semstr_inner;
-    sems: dict = inner if isinstance(inner, dict) else {};
+    sems: dict[str, any] = inner if isinstance(inner, dict) else {};
     for f in _record_fields(t) {
         if f.name.startswith("_") {
             continue;

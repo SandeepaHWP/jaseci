@@ -4133,7 +4133,7 @@ test "aarch64 standalone binary runs (issue #6366)" {
     with tempfile.TemporaryDirectory() as tmpdir {
         out_bin = os.path.join(tmpdir, "a64_roundtrip");
         # Step 1: cross-compile for aarch64.
-        comp_env = dict(os.environ);
+        comp_env: dict[str, str] = dict(os.environ);
         comp = subprocess.run(
             [
                 sys.executable,
@@ -4160,7 +4160,7 @@ test "aarch64 standalone binary runs (issue #6366)" {
         # Step 2: run under qemu-user. total = add(40, 2) = 42, surfaced via
         # sys.exit. A dropped MOVW_UABS reloc stores to NULL -> SIGSEGV
         # (returncode -11 / 139) instead of the expected 42.
-        run_env = dict(os.environ);
+        run_env: dict[str, str] = dict(os.environ);
         run_env["QEMU_LD_PREFIX"] = ld_prefix;
         result = subprocess.run(
             [qemu, out_bin], capture_output=True, text=True, timeout=30, env=run_env
@@ -4205,7 +4205,7 @@ test "aarch64 static-musl binary runs (cross vendor-musl, #7626 C1)" {
     fixture = str(os.path.join(FIXTURES, "aarch64_global_roundtrip.jac"));
     with tempfile.TemporaryDirectory() as tmpdir {
         out_bin = os.path.join(tmpdir, "a64_static");
-        comp_env = dict(os.environ);
+        comp_env: dict[str, str] = dict(os.environ);
         comp = subprocess.run(
             [
                 sys.executable,
@@ -6332,7 +6332,7 @@ test "jac test runs .jac test blocks end to end" {
     fixture = os.path.join(FIXTURES, "test_blocks.jac");
     # The fixture holds 3 native `test` blocks, exactly 1 of them a deliberate
     # failure. Serial so the summary is not interleaved by worker output.
-    env = dict(os.environ);
+    env: dict[str, str] = dict(os.environ);
     env["JAC_TEST_JOBS"] = "0";
     result = subprocess.run(
         [sys.executable, "-m", "jaclang", "test", fixture],

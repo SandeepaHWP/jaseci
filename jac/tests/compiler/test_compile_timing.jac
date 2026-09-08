@@ -157,7 +157,7 @@ would be a second, contradicting answer to the one question this harness needs
 the subprocess to answer for itself -- which compiler is running.
 """
 def _probe_env(cache: str) -> dict[str, str] {
-    env = dict(os.environ);
+    env: dict[str, str] = dict(os.environ);
     env.pop("JAC_DEV_SOURCE", None);
     env["XDG_CACHE_HOME"] = cache;
     return env;

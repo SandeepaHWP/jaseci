@@ -152,7 +152,7 @@ def _seed_project(name: str, app: str = "") -> str {
 
 def _child_env(cluster: Cluster, scratch: bool) -> dict[any, any] {
     import jaclang;
-    env = dict(os.environ);
+    env: dict[str, str] = dict(os.environ);
     src = str(Path(jaclang.__file__).parent.parent);
     env["PYTHONPATH"] = src + os.pathsep + env.get("PYTHONPATH", "");
     env["JAC_CACHE_HOME"] = cluster.cache_home;

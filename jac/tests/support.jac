@@ -274,7 +274,7 @@ def native_run(
 ) -> str {
     import os;
     import subprocess;
-    run_env = dict(os.environ);
+    run_env: dict[str, str] = dict(os.environ);
     if env {
         run_env.update(env);
     }

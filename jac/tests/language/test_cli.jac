@@ -237,7 +237,7 @@ test "jac run with no filename and no resolvable entry errors cleanly" {
     # `jac run` with no file is now project-aware: it climbs to the nearest
     # jac.toml and dispatches on the project kind. JAC_ROOT's project declares
     # no entry-point, so this must fail with a clear message (not a crash).
-    env = dict(os.environ);
+    env: dict[str, str] = dict(os.environ);
     env["PYTHONPATH"] = JAC_ROOT;
     result = subprocess.run(
         [sys.executable, "-m", "jaclang", "run"],
@@ -624,7 +624,7 @@ test "discovery prunes hidden and pycache dirs" {
         # A declared `-d` root collects every .jac beneath it regardless of
         # naming (#7151), so good_test.jac is a suite even without a test_
         # prefix.
-        env = dict(os.environ);
+        env: dict[str, str] = dict(os.environ);
         env["JAC_TEST_JOBS"] = "0";
         process = subprocess.Popen(
             ["jac", "test", "-d", tmp_dir, "-v"],
@@ -651,7 +651,7 @@ test "discovery prunes hidden and pycache dirs" {
 test "maxfail spans several files" {
     # --maxfail counts across the whole run, not per file. Serial so the
     # cap trips deterministically rather than racing parallel workers.
-    env = dict(os.environ);
+    env: dict[str, str] = dict(os.environ);
     env["JAC_TEST_JOBS"] = "0";
     process = subprocess.Popen(
         [

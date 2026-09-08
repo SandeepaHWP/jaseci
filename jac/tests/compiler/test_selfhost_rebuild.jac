@@ -57,7 +57,7 @@ def _cold_rebuild -> tuple[int, dict[any, any], int] {
     with open(probe, "w") as fh {
         fh.write(PROBE_SRC);
     }
-    env = dict(os.environ);
+    env: dict[str, str] = dict(os.environ);
     env["HOME"] = work;
     env["XDG_CACHE_HOME"] = os.path.join(work, "cache");
     env["LOCALAPPDATA"] = os.path.join(work, "cache");

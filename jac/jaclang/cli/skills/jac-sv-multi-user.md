@@ -181,7 +181,7 @@ import from jaclang.server.identity.app_tokens {
     token_create, token_peek, token_consume, token_revoke
 }
 
-def invite(role: str) -> dict {
+def invite(role: str) -> dict[str, any] {
     # subject groups tokens for revocation; payload rides along to the redeemer
     tok = token_create(
         "org-invite", subject=jid(root), ttl_seconds=86400,
@@ -190,13 +190,13 @@ def invite(role: str) -> dict {
     return {"token": tok};   # shown once; never stored raw
 }
 
-def accept(token: str) -> dict {
+def accept(token: str) -> dict[str, any] {
     got = token_consume("org-invite", token);   # exactly one caller wins
     if got is None { return {"ok": False}; }    # invalid, expired, or lost race
     return {"ok": True, "role": got["payload"]["role"]};
 }
 
-def cancel_invites -> dict {
+def cancel_invites -> dict[str, any] {
     return {"revoked": token_revoke("org-invite", jid(root))};
 }
 ```

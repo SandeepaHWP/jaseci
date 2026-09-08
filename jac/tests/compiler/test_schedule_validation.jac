@@ -93,7 +93,8 @@ test "every declared requirement is satisfied within the one pipeline" {
         for tag in (getattr(p, 'REQUIRES', ()) or ()) {
             assert tag in provided , f"{p.__name__} requires '{tag}' with no earlier provider";
         }
-        for tag in (getattr(p, 'PROVIDES', ()) or ()) {
+        provides: any = getattr(p, 'PROVIDES', ()) or ();
+        for tag in provides {
             provided.add(tag);
         }
     }

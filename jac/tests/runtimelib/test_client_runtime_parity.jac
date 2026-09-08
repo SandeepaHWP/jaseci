@@ -92,8 +92,9 @@ def _signatures(path: Path) -> dict[str, list[any]] {
         if not name or not _is_public(abl) {
             continue;
         }
-        params = [];
-        for prm in (_as_any(abl.signature).params or []) {
+        params: list[any] = [];
+        sig_params: any = _as_any(abl.signature).params or [];
+        for prm in sig_params {
             type_node = prm.type_tag.tag if prm.type_tag else None;
             params.append(
                 (prm.name.value, _node_text(src, type_node), _node_text(src, prm.value))
@@ -154,7 +155,7 @@ def _render(name: str, params: list[any]) -> str {
 """Names declared by two or more `runtimes` must have identical parameter lists.
 Returns the compared names, so callers can assert the run was not vacuous."""
 def _assert_parity(runtimes: dict[str, Path], label: str) -> set {
-    tables = {};
+    tables: dict[str, dict[str, list[any]]] = {};
     for (target, path) in runtimes.items() {
         tables[target] = _signatures(path);
     }

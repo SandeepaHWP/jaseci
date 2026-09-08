@@ -283,7 +283,7 @@ impl _serve_in_background(server_entry: str, base_path: str) -> Iterator[int] {
     port = sock.getsockname()[1];
     sock.close();
 
-    env = dict(os.environ);
+    env: dict[str, str] = dict(os.environ);
     env["JAC_DATA_PATH"] = base_path;
 
     log_path = Path(base_path) / "cl_test_server.log";
