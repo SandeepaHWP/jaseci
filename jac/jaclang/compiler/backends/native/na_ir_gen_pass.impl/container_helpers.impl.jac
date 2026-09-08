@@ -622,7 +622,9 @@ impl NaIRGenPass._emit_container_trace_fn(
     _managed = self._container_managed_fields(layout);
     _fields = [(fi, dt) for (fi, dt, _k) in _managed];
 
-    def _visit_slot(bl: ir.IRBuilder, i: ir.Value, elem_ptrs: list) -> ir.IRBuilder {
+    def _visit_slot(
+        bl: ir.IRBuilder, i: ir.Value, elem_ptrs: list[any]
+    ) -> ir.IRBuilder {
         for ep in elem_ptrs {
             bl = self._emit_elem_trace(bl, bl.load(ep, name="elem.val"), _vis);
         }

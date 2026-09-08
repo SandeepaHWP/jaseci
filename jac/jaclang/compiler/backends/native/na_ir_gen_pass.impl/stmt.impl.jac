@@ -3675,7 +3675,7 @@ impl NaIRGenPass._try_flow_for_parallel(nd: uni.InForStmt) -> bool {
             }
         }
         self.local_vars[loop_var] = _lv_alloca;
-        _red_slots: list = [];
+        _red_slots: list[any] = [];
         for (_ri, _red) in enumerate(_reds) {
             _rslot = self._entry_alloca(i64, _red[0]);
             self.builder.store(ir.Constant(i64, _red_identity[_red[1]]), _rslot);

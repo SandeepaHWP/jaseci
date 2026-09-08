@@ -57,7 +57,7 @@ def native_unit_demotions(
 ) -> (set[str] | None);
 
 def native_live_call_conflicts(
-    prog: JacProgram, pending: dict, options: CompileOptions
+    prog: JacProgram, pending: dict[any, any], options: CompileOptions
 ) -> dict[str, set[str]];
 
 glob NATIVE_VERDICT_TAINT_BOUND: int = 2048,

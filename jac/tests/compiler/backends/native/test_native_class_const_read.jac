@@ -61,7 +61,7 @@ glob FIXTURES = os.path.join(
      );
 
 """Inspect emitted IR before optimization; runtime parity uses the built binary."""
-def compile_native(fixture: str) -> tuple {
+def compile_native(fixture: str) -> tuple[any, ...] {
     prog = JacProgram();
     options = native_force_opts();
     options.skip_native_engine = True;

@@ -213,7 +213,7 @@ obj CtEvaluator {
         demand: bool = False,
         _failed: set[int] = set(),
         _active: set[tuple[str, int]] = set(),
-        _enum_cache: dict[int, list] = {},
+        _enum_cache: dict[int, list[any]] = {},
         _ret: any = None,
         _ct_root: (Module | None) = None,
         _builtins: dict[any, any] = {};

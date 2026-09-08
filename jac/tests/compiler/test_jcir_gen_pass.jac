@@ -39,7 +39,7 @@ import from jaclang.compiler.backends.py.jcir_gen_pass { JcirGenPass }
 import from jaclang.compiler.backends.py.codegen_shim { compile_ir, transcribe }
 
 """Compile a source string, then re-emit it: (pipeline tree, fresh tree, bytes)."""
-def dual_compile(src: str, path: str, *, codespace: str = "server") -> tuple {
+def dual_compile(src: str, path: str, *, codespace: str = "server") -> tuple[any, ...] {
     prog = JacProgram();
     mod = prog.compile(
         use_str=src,

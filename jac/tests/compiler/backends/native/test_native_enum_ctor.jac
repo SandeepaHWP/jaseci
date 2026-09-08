@@ -51,7 +51,7 @@ def compile_native(fixture: str) -> tuple[any, ...] {
 }
 
 
-def sv_lines(fixture: str) -> list {
+def sv_lines(fixture: str) -> list[any] {
     output = python_run(os.path.join(FIXTURES, fixture), timeout=900);
     return [
         line

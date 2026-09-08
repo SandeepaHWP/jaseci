@@ -150,7 +150,7 @@ def run_js_expr(js_code: str, expr: str) -> any {
 # -----------------------------------------------------------------------
 # NA (Native / LLVM) helpers
 # -----------------------------------------------------------------------
-def compile_native(fixture: str, *, no_ir_cache: bool = False) -> tuple {
+def compile_native(fixture: str, *, no_ir_cache: bool = False) -> tuple[any, ...] {
     prog = JacProgram();
     ir = prog.compile(
         file_path=str(os.path.join(FIXTURES, fixture)),

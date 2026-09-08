@@ -160,7 +160,7 @@ class NativeCompiler {
         return stable_osp_tag(name);
     }
 
-    def _field_annotations(self: NativeCompiler, cls: any) -> dict {
+    def _field_annotations(self: NativeCompiler, cls: any) -> dict[any, any] {
         import from jaclang.runtime.object_interop { fields }
         import from jaclang.runtime.object_model { MISSING }
         out = {};

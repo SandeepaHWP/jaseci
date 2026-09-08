@@ -142,8 +142,8 @@ impl NaIRGenPass._solve_generic_call(
     params = sig.get_parameters() if isinstance(sig, uni.FuncSignature) else [];
     _ft = ability.name_ref.type if ability.name_ref is not None else None;
     _ft_params = list(_ft.parameters) if isinstance(_ft, SemanticFunctionType) else [];
-    positional: list = [];
-    kw_map: dict = {};
+    positional: list[any] = [];
+    kw_map: dict[any, any] = {};
     for a in (nd.params or []) {
         if isinstance(a, uni.KWPair) {
             if a.key is not None {

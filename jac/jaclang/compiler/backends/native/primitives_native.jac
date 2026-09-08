@@ -20,7 +20,7 @@ import from jaclang.compiler.frontend.unitree { Expr, UniNode }
 obj NativeEmitCtx {
     has pass_ref: NaIRGenPass,
         type_key: str = "",
-        call_kwargs: dict = {},
+        call_kwargs: dict[any, any] = {},
         arg_nodes: list[UniNode] = [],
         call_node: UniNode | None = None;
 }

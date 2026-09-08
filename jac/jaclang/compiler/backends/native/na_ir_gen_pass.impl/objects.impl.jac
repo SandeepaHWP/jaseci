@@ -4322,8 +4322,8 @@ impl NaIRGenPass._emit_class_routed_call(
 
 
 impl NaIRGenPass._jc_reference_schema(
-    ft: ir.Type, layouts: dict, semantic: TypeBase | None = None
-) -> (dict | None) {
+    ft: ir.Type, layouts: dict[any, any], semantic: TypeBase | None = None
+) -> (dict[any, any] | None) {
     """Combine semantic reference types with the backend's container ABI.""";
     args = semantic.private.type_args or [] if isinstance(semantic, ClassType) else [];
     semantic_name = semantic.shared.class_name

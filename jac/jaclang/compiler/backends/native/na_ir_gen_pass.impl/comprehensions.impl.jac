@@ -416,7 +416,7 @@ impl NaIRGenPass._codegen_compr_walk(
 }
 
 impl NaIRGenPass._codegen_compr_walk_body(
-    comprs: list,
+    comprs: list[any],
     idx: int,
     kind: str,
     acc: ir.Value,

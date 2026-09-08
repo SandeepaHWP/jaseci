@@ -273,7 +273,7 @@ impl native_unit_demotions(
 }
 
 impl native_live_call_conflicts(
-    prog: JacProgram, pending: dict, options: CompileOptions
+    prog: JacProgram, pending: dict[any, any], options: CompileOptions
 ) -> dict[str, set[str]] {
     conflicts: dict[str, set[str]] = {};
     for (_cc_callee, _cc_names) in (pending or {}).items() {

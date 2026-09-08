@@ -141,7 +141,7 @@ obj NativeFunctionState {
         nested_captures: dict[str, tuple[ir.Function, list[tuple[str, str]]]],
         lambda_captures: dict[str, list[tuple[str, ir.Value]]],
         region_open_stack: list[int],
-        loop_stack: list[tuple],
+        loop_stack: list[tuple[any, ...]],
         _self_owned: bool,
         _self_arch: str | None,
         _di_current_sp: object,
@@ -209,9 +209,9 @@ walker NaIRGenPass(Transform) {
         _loop_coll_seq: int = 0,
         _str_count: int = 0,
         struct_types: dict[str, ir.IdentifiedStructType] = {},
-        struct_field_indices: dict[str, dict] = {},
-        struct_field_order: dict[str, list] = {},
-        struct_field_types: dict[str, dict] = {},
+        struct_field_indices: dict[str, dict[any, any]] = {},
+        struct_field_order: dict[str, list[any]] = {},
+        struct_field_types: dict[str, dict[any, any]] = {},
         struct_field_defaults: dict[str, dict[str, uni.Expr]] = {},
         struct_constructor_order: dict[str, list[str]] = {},
         struct_field_foreign: dict[str, set] = {},
@@ -233,9 +233,9 @@ walker NaIRGenPass(Transform) {
         static_fields: dict[str, ir.GlobalVariable] = {},
         static_field_types: dict[str, ir.Type] = {},
         func_ret_type_key: dict[str, str] = {},
-        func_ret_elem_keys: dict[str, list] = {},
+        func_ret_elem_keys: dict[str, list[any]] = {},
         list_types: dict[str, ir.IdentifiedStructType] = {},
-        list_helpers: dict[str, dict] = {},
+        list_helpers: dict[str, dict[any, any]] = {},
         var_list_elem_struct: dict[str, ir.Type | None] = {},
         _pending_list_elem_struct: (ir.Type | None) = None,
         _self_arch: (str | None) = None,
@@ -274,9 +274,9 @@ walker NaIRGenPass(Transform) {
         global_vars: dict[str, ir.GlobalVariable] = {},
         global_var_types: dict[str, ir.Type] = {},
         dict_types: dict[str, ir.IdentifiedStructType] = {},
-        dict_helpers: dict[str, dict] = {},
+        dict_helpers: dict[str, dict[any, any]] = {},
         set_types: dict[str, ir.IdentifiedStructType] = {},
-        set_helpers: dict[str, dict] = {},
+        set_helpers: dict[str, dict[any, any]] = {},
         _peer_container_ty: (ir.Type | None) = None,
         _exc_state_type: (ir.Type | None) = None,
         _exc_push_fn: (ir.Function | None) = None,
@@ -379,24 +379,24 @@ walker NaIRGenPass(Transform) {
         _di_current_sp: object = None,
         _func_loc: dict[str, int] = {},
         _module_functions: dict[tuple[str, str], ir.Function] = {},
-        _linked_fn_decls: dict[int, tuple] = {},
-        _pyb_base_memo: dict[str, tuple | None] = {},
+        _linked_fn_decls: dict[int, tuple[any, ...]] = {},
+        _pyb_base_memo: dict[str, tuple[any, ...] | None] = {},
         _pyb_helper_fns: dict[str, ir.Function] = {},
         lambda_captures: dict[str, list[tuple[str, ir.Value]]] = {},
-        _pending_lambda_captures: (list[tuple] | None) = None,
+        _pending_lambda_captures: (list[tuple[any, ...]] | None) = None,
         nested_captures: dict[str, tuple[ir.Function, list[tuple[str, str]]]] = {},
-        _nested_predecl: dict = {},
-        _bytearray_fns: dict = {},
+        _nested_predecl: dict[any, any] = {},
+        _bytearray_fns: dict[any, any] = {},
         generator_fns: dict[str, uni.Ability] = {},
         generic_fns: dict[str, uni.Ability] = {},
         _generic_methods: dict[str, uni.Ability] = {},
         _mono_fns: dict[str, ir.Function] = {},
-        _mono_solution: (dict | None) = None,
-        _mono_mangle_map: (dict | None) = None,
-        _ct_bindings: dict = {},
+        _mono_solution: (dict[any, any] | None) = None,
+        _mono_mangle_map: (dict[any, any] | None) = None,
+        _ct_bindings: dict[any, any] = {},
         _gen_ctx: NativeGeneratorState | None = None,
         _gen_try_stack: list[NativeGeneratorHandler] = [],
-        decorated_fns: dict[str, tuple] = {},
+        decorated_fns: dict[str, tuple[any, ...]] = {},
         closure_cell_vars: set[str] = set(),
         closure_cell_handles: dict[str, ir.Value] = {},
         closure_sig_registry:
@@ -406,7 +406,7 @@ walker NaIRGenPass(Transform) {
         closure_thunks: dict[str, ir.Function] = {},
         _closure_uid: int = 0,
         _opt_struct_types: dict[str, ir.IdentifiedStructType] = {},
-        _loop_rebind_memo: dict[tuple, bool] = {};
+        _loop_rebind_memo: dict[tuple[any, ...], bool] = {};
 
     has builder: ir.IRBuilder { getter; }
     has llvm_module: ir.Module { getter; }
@@ -761,7 +761,7 @@ walker NaIRGenPass(Transform) {
     ) -> None;
 
     def _codegen_compr_walk_body(
-        comprs: list,
+        comprs: list[any],
         idx: int,
         kind: str,
         acc: ir.Value,
@@ -824,9 +824,11 @@ walker NaIRGenPass(Transform) {
         b: ir.IRBuilder, val: ir.Value, visitor: ir.Value
     ) -> ir.IRBuilder;
 
-    def _container_layout_dense(data_types: list) -> dict;
-    def _container_layout_hash(key_type: ir.Type, val_type: (ir.Type | None)) -> dict;
-    def _container_struct_fields(layout: dict) -> list;
+    def _container_layout_dense(data_types: list[any]) -> dict[any, any];
+    def _container_layout_hash(
+        key_type: ir.Type, val_type: (ir.Type | None)
+    ) -> dict[any, any];
+    def _container_struct_fields(layout: dict[any, any]) -> list[any];
     def _emit_live_slot_loop(
         fn: ir.Function,
         b: ir.IRBuilder,
@@ -937,7 +939,7 @@ walker NaIRGenPass(Transform) {
     def _llvm_type_str(ty: ir.Type) -> str;
     def _export_native_layout -> None;
     def _exported_accessors(arch_name: str) -> dict[(str, dict[(str, str)])];
-    def _ret_tuple_hints(fname: str, ret_tuple: any) -> (list | None);
+    def _ret_tuple_hints(fname: str, ret_tuple: any) -> (list[any] | None);
     def _ensure_emitters -> dict[str, object];
     def _primitive_method_names(type_name: str) -> set[str];
     def _dispatch_primitive_method(
@@ -959,7 +961,7 @@ walker NaIRGenPass(Transform) {
         arg_nodes: (list[any] | None) = None
     ) -> (ir.Value | None);
 
-    def _split_call_kwargs(nd: uni.FuncCall) -> dict;
+    def _split_call_kwargs(nd: uni.FuncCall) -> dict[any, any];
     def _ct_ctor_slots(target: uni.UniNode) -> list[tuple[str, uni.UniNode]];
     def _emit_rc_roots_globals -> None;
     def _emit_rc_collect_cycles -> None;
@@ -1520,8 +1522,8 @@ walker NaIRGenPass(Transform) {
 
     def _receiver_union_parts(nd: (uni.UniNode | None)) -> (list[str] | None);
     def _jc_reference_schema(
-        ft: ir.Type, layouts: dict, semantic: TypeBase | None = None
-    ) -> (dict | None);
+        ft: ir.Type, layouts: dict[any, any], semantic: TypeBase | None = None
+    ) -> (dict[any, any] | None);
 
     def _codegen_union_member(
         obj_val: ir.Value, field_name: str, nd: uni.AtomTrailer, parts: list[str]
@@ -1727,7 +1729,7 @@ walker NaIRGenPass(Transform) {
     def _emit_random_call(name: str, nd: uni.FuncCall) -> (ir.Value | None);
     def _emit_jacval_slot_drop_fn(elem_mangle: str) -> (ir.Function | None);
     def _drop_fn_for(mangle: str) -> (ir.Function | None);
-    def _drop_spec_for_mangle(mangle: str) -> (tuple | None);
+    def _drop_spec_for_mangle(mangle: str) -> (tuple[any, ...] | None);
     def _nogc_type_arg_mangles_of_str(m: str) -> list[str];
     def _gc_mode -> str;
     def _emit_rc_helpers -> None;
@@ -1953,15 +1955,17 @@ walker NaIRGenPass(Transform) {
         pat: uni.MatchArch, subj: ir.Value, subj_ty: (TypeBase | None) = None
     ) -> (ir.Value | None);
 
-    def _match_seq_parts(pat: uni.MatchSequence) -> tuple;
+    def _match_seq_parts(pat: uni.MatchSequence) -> tuple[any, ...];
     def _match_subj_ty(expr: (uni.UniNode | None)) -> (TypeBase | None);
     def _match_elem_ty_of(
         subj_ty: (TypeBase | None), prefix: str, idx: int
     ) -> (TypeBase | None);
 
     def _match_cast_elem(elem: ir.Value, elem_ty: (TypeBase | None)) -> ir.Value;
-    def _match_map_key(kv: uni.MatchKVPair, helpers: dict) -> (ir.Value | None);
-    def _match_arch_fields(pat: uni.MatchArch, arch_name: str) -> (list | None);
+    def _match_map_key(
+        kv: uni.MatchKVPair, helpers: dict[any, any]
+    ) -> (ir.Value | None);
+    def _match_arch_fields(pat: uni.MatchArch, arch_name: str) -> (list[any] | None);
     def _match_value_eq(subj: ir.Value, value_node: uni.UniNode) -> (ir.Value | None);
     def _bind_match_pattern(
         pat: uni.MatchPattern, subj: ir.Value, subj_ty: (TypeBase | None) = None
@@ -2100,7 +2104,7 @@ walker NaIRGenPass(Transform) {
     def _type_base_is_unknown(tb: any) -> bool;
     def _emit_unlowerable_type(type_expr: uni.UniNode, tb: any) -> ir.Type;
     def _lower_type(t: any) -> (ir.Type | None);
-    def _unify_repr_lowering(reprs: list) -> (ir.Type | None);
+    def _unify_repr_lowering(reprs: list[any]) -> (ir.Type | None);
     def _lower_class_type(t: ClassType) -> (ir.Type | None);
     def _lower_function_type(t: SemanticFunctionType) -> ir.PointerType;
     def _type_key_of(expr: (uni.UniNode | None)) -> (str | None);
@@ -2183,9 +2187,9 @@ walker NaIRGenPass(Transform) {
 
     def _codegen_float_floor_div(left: ir.Value, right: ir.Value) -> ir.Value;
     def _codegen_float_floor_mod(left: ir.Value, right: ir.Value) -> ir.Value;
-    def _spec_name_match(tk: str, names: tuple) -> bool;
+    def _spec_name_match(tk: str, names: tuple[any, ...]) -> bool;
     def _opt_sole_member(t: any) -> (TypeBase | None);
-    def _spec_union_agreement(t: any, names: tuple) -> (any | None);
+    def _spec_union_agreement(t: any, names: tuple[any, ...]) -> (any | None);
     def _elem_storage_llvm(t: any) -> (ir.Type | None);
     def _aos_elem_of(type_expr: uni.UniNode | None) -> (str | None);
     def _infer_type_name(val: ir.Value) -> (str | None);
