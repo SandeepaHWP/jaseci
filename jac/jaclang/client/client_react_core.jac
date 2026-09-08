@@ -1,3 +1,18 @@
+import from jaclang.client.auth_contract { SignupResult }
+import from jaclang.client.endpoint_cache {
+    __jacClearCache,
+    __endpointKey,
+    __getEndpointEffects as cache___getEndpointEffects,
+    __getCacheState as cache___getCacheState,
+    __isFresh as cache___isFresh,
+    __cacheGet as cache___cacheGet,
+    __cacheSet as cache___cacheSet,
+    __evictOldest as cache___evictOldest,
+    __overlaps as cache___overlaps,
+    __invalidateEndpoint as cache___invalidateEndpoint,
+    __cachedEndpointCall as cache___cachedEndpointCall
+}
+
 import from 'react' { * as React }
 import from 'react-hook-form' { useForm }
 import from '@hookform/resolvers/zod' { zodResolver }
@@ -57,9 +72,9 @@ def:pub __normalizeIdentity(x: any) -> dict[any, any];
 def:pub __normalizeCredential(x: any) -> dict[any, any];
 async def:pub jacSignup(
     identities_or_username: (str | list[any]),
-    credential_or_password: (str | dict[str, any]),
-    profile: (dict[str, any] | None) = None
-) -> dict[str, any];
+    credential_or_password: (str | dict[any, any]),
+    profile: (dict[any, any] | None) = None
+) -> SignupResult;
 
 async def:pub jacLogin(
     identity_or_username: (str | dict[str, any]),

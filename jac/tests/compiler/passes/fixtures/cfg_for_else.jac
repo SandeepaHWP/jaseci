@@ -1,4 +1,4 @@
-def find(items: list, target: int) -> bool {
+def find(items: list[any], target: int) -> bool {
     for item in items {
         if item == target {
             return True;

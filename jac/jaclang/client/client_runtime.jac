@@ -1,3 +1,4 @@
+import from jaclang.client.auth_contract { SignupResult }
 import from 'react' { * as React }
 import from 'react' {
     useState as reactUseState,
@@ -114,7 +115,7 @@ async def:pub jacSignup(
     identities_or_username: (str | list[any]),
     credential_or_password: (str | dict[any, any]),
     profile: (dict[any, any] | None) = None
-) -> dict[any, any];
+) -> SignupResult;
 
 async def:pub jacLogin(
     identity_or_username: (str | dict[any, any]),
