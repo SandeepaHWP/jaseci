@@ -90,12 +90,13 @@ def _object_schema(target: type, schemas: (dict[str, any] | None)) -> dict[str, 
     try {
         init_fn = getattr(target, '__init__');
         hints = get_type_hints(init_fn);
-        sig = inspect.signature(init_fn);
+        sig = inspect.signature(target);
     } except Exception {
         return ref;
     }
     for (pname, param) in sig.parameters.items() {
-        if pname in ('self', 'args', 'kwargs') {
+        if param.kind
+            in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD) {
             continue;
         }
         props[pname] = _schema_for_type(hints.get(pname), schemas);

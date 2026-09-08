@@ -38,6 +38,7 @@ glob SYMTAB_SCHED_DEPS: tuple[any, ...] = ('jaclang.compiler.symbol_utils', ),
          'jaclang.compiler.symbol_utils',
          'jaclang.compiler.expr_keys',
          'jaclang.compiler.type_registry',
+         'jaclang.compiler.field_semantics',
          'jaclang.compiler.intrinsic_registry',
          'jaclang.compiler.types.type_evaluator',
          'jaclang.compiler.types.stubcat.modiface',
@@ -50,7 +51,8 @@ glob SYMTAB_SCHED_DEPS: tuple[any, ...] = ('jaclang.compiler.symbol_utils', ),
          'jaclang.compiler.passes.comptime_resolve_pass',
          'jaclang.project.mobui_scope'
      ),
-     ANALYSIS_SCHED_DEPS: tuple[any, ...] = (
+     ANALYSIS_SCHED_DEPS: tuple = (
+         'jaclang.compiler.field_semantics',
          'jaclang.compiler.passes.type_checker_pass',
          'jaclang.compiler.types.type_evaluator',
          'jaclang.compiler.passes.pyast_load_pass',

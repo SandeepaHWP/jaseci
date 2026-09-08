@@ -554,7 +554,7 @@ impl Serializer.coerce(val: object, target_type: object) -> tuple[any, ...] {
 
 impl Serializer.fingerprint(cls: type) -> str {
     field_pairs: list[list[str]] = [];
-    if is_dataclass(cls) {
+    if is_record(cls) {
         for f in fields(cls) {
             field_pairs.append([f.name, str(f.type)]);
         }
@@ -1077,7 +1077,7 @@ impl Serializer._deserialize_archetype(
                     has_default = False;
                     for fd in fields(cls) {
                         if fd.name == k {
-                            if fd.default_factory is not MISSING {
+                            if fd.default_factory is not None {
                                 recovered = fd.default_factory();
                                 has_default = True;
                             } elif fd.`default is not MISSING {
@@ -1157,7 +1157,7 @@ impl Serializer._deserialize_archetype(
             if fd.name in assigned {
                 continue;
             }
-            if fd.default_factory is not MISSING {
+            if fd.default_factory is not None {
                 setattr(arch, fd.name, fd.default_factory());
             } elif fd.`default is MISSING {
                 if (

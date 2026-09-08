@@ -28,8 +28,8 @@ obj AssignVerdict {
 
 def interval_of_op(
     op: str,
-    left: (tuple[any, ...] | None),
-    right: (tuple[any, ...] | None),
+    left: (tuple[int, int] | None),
+    right: (tuple[int, int] | None),
     target: str
 ) -> bool {
     if left is None or right is None {
@@ -60,7 +60,7 @@ def interval_of_op(
     return t_lo <= lo and hi <= t_hi;
 }
 
-def interval_of_expr(expr: (Expr | None)) -> (tuple[any, ...] | None) {
+def interval_of_expr(expr: (Expr | None)) -> (tuple[int, int] | None) {
     if expr is None {
         return None;
     }

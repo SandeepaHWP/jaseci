@@ -36,7 +36,7 @@ impl NaIRGenPass._emit_print(nd: uni.FuncCall) -> (ir.Value | None) {
     fmt_parts = [];
     args: list[ir.Value] = [];
     for (i, param) in enumerate(params) {
-        val = self._str_norm(self._codegen_expr(param));
+        val = self._str_norm_optional(self._codegen_expr(param));
         if val is None {
             continue;
         }
@@ -417,9 +417,9 @@ impl NaIRGenPass._emit_optional_str(
         if _rfn is None {
             return None;
         }
-        _s = self.builder.call(_rfn, [_jv], name="opt.str.jv");
-        self._mark_owned(_s);
-        return _s;
+        boxed_text = self.builder.call(_rfn, [_jv], name="opt.str.jv");
+        self._mark_owned(boxed_text);
+        return boxed_text;
     }
     _none_s = self.builder.bitcast(
         self._make_global_string("None"), i8p, name="opt.str.none"
@@ -464,7 +464,7 @@ impl NaIRGenPass._codegen_fstring(nd: uni.FString) -> (ir.Value | None) {
             text = text.replace("%", "%%");
             fmt_parts.append(text);
         } elif isinstance(part, uni.FormattedValue) {
-            val = self._str_norm(self._codegen_expr(part.format_part));
+            val = self._str_norm_optional(self._codegen_expr(part.format_part));
             if val is None {
                 continue;
             }
@@ -521,7 +521,7 @@ impl NaIRGenPass._codegen_fstring(nd: uni.FString) -> (ir.Value | None) {
             }
             if _spec_val is not None {
                 _dyn = self._emit_dyn_spec_format(val, _spec_val, part);
-                _dyn = self._str_norm(_dyn);
+                _dyn = self._str_norm_optional(_dyn);
                 if _dyn is None {
                     return None;
                 }
@@ -552,7 +552,7 @@ impl NaIRGenPass._codegen_fstring(nd: uni.FString) -> (ir.Value | None) {
                 if _tr is None {
                     _sg = self._make_global_string(_spec_txt, name_prefix=".fspec");
                     _sdyn = self._emit_dyn_spec_format(val, _sg, part);
-                    _sdyn = self._str_norm(_sdyn);
+                    _sdyn = self._str_norm_optional(_sdyn);
                     if _sdyn is None {
                         return None;
                     }
@@ -829,7 +829,9 @@ impl NaIRGenPass._codegen_list_slice(
     self.builder.cbranch(in_range, loop_body, loop_done);
 
     self.builder.position_at_end(loop_body);
-    elem = self.builder.call(helpers["get"], [target_val, cur_i], name="sl.elem");
+    elem: ir.Value = self.builder.call(
+        helpers["get"], [target_val, cur_i], name="sl.elem"
+    );
     if self._nogc_headerless() and elem_type_name == "ptr" {
         elem = self._rc_strdup(elem, name="sl.elem.copy");
     }
@@ -1426,9 +1428,6 @@ impl NaIRGenPass._emit_dyn_spec_format(
     i8p = ir.IntType(8).as_pointer();
     _nval = self._str_norm(val);
     _nspec = self._str_norm(spec_val);
-    if _nval is None or _nspec is None {
-        return None;
-    }
     val = _nval;
     spec_val = _nspec;
     kname: (str | None) = None;
