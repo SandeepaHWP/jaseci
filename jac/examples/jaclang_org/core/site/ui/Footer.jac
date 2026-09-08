@@ -92,7 +92,7 @@ def:pub Footer -> JsxElement {
                             <p className="mb-4 text-sm font-semibold">{col["title"]}</p>
                             <ul className="flex flex-col gap-2.5">
                                 {for (li, lk) in enumerate(
-                                    col["links"] as list[dict]
+                                    col["links"] as list[dict[any, any]]
                                 ) {
                                     <li key={str(li)}>
                                         {if (lk["href"] as str).startswith("/") {

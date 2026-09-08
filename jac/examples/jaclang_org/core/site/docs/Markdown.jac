@@ -561,7 +561,9 @@ def:pub MDBlocks(blocks: list[dict[any, any]]) -> JsxElement {
                     }
                 } elif b["k"] == "list" {
                     <div key={str(bi)} className="mb-4 flex flex-col gap-1.5">
-                        {for (ii, it) in enumerate(b["items"] as list[dict]) {
+                        {for (ii, it) in enumerate(
+                            b["items"] as list[dict[any, any]]
+                        ) {
                             <div
                                 key={str(ii)}
                                 className="flex items-start gap-2 leading-7 text-foreground/90"
@@ -610,7 +612,7 @@ def:pub MDBlocks(blocks: list[dict[any, any]]) -> JsxElement {
                                 <MDLabel text={b["title"] as str}/>
                             </summary>
                             <div className="pl-5 pr-5 pb-4">
-                                <MDBlocks blocks={b["blocks"] as list[dict]}/>
+                                <MDBlocks blocks={b["blocks"] as list[dict[any, any]]}/>
                             </div>
                         </details>
                     } else {
@@ -637,21 +639,27 @@ def:pub MDBlocks(blocks: list[dict[any, any]]) -> JsxElement {
                             >
                                 {b["title"]}
                             </p>
-                            <MDBlocks blocks={b["blocks"] as list[dict]}/>
+                            <MDBlocks blocks={b["blocks"] as list[dict[any, any]]}/>
                         </div>
                     }
                 } elif b["k"] == "tabs" {
                     <Tabs key={str(bi)} defaultValue="t0" className="my-5">
                         <TabsList className="mb-1 flex-wrap">
-                            {for (ti, tb) in enumerate(b["items"] as list[dict]) {
+                            {for (ti, tb) in enumerate(
+                                b["items"] as list[dict[any, any]]
+                            ) {
                                 <TabsTrigger key={str(ti)} value={"t" + str(ti)}>
                                     <MDLabel text={tb["title"] as str}/>
                                 </TabsTrigger>
                             }}
                         </TabsList>
-                        {for (ti, tb) in enumerate(b["items"] as list[dict]) {
+                        {for (ti, tb) in enumerate(
+                            b["items"] as list[dict[any, any]]
+                        ) {
                             <TabsContent key={str(ti)} value={"t" + str(ti)}>
-                                <MDBlocks blocks={tb["blocks"] as list[dict]}/>
+                                <MDBlocks
+                                    blocks={tb["blocks"] as list[dict[any, any]]}
+                                />
                             </TabsContent>
                         }}
                     </Tabs>
@@ -660,7 +668,7 @@ def:pub MDBlocks(blocks: list[dict[any, any]]) -> JsxElement {
                         key={str(bi)}
                         className="my-4 border-l-2 border-border pl-4 text-muted-foreground"
                     >
-                        <MDBlocks blocks={b["blocks"] as list[dict]}/>
+                        <MDBlocks blocks={b["blocks"] as list[dict[any, any]]}/>
                     </div>
                 } elif b["k"] == "table" {
                     <div key={str(bi)} className="my-5 overflow-x-auto">
