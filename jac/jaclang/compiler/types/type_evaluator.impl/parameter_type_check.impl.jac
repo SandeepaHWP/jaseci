@@ -808,7 +808,10 @@ impl TypeEvaluator.assign_type_to_type_var(
                     if isinstance(value, UnionType)
                     else [value];
                 for alternative in value_alternatives {
-                    solutions.setdefault(name, {})[alternative.mangle()] = alternative;
+                    if name not in solutions {
+                        solutions[name] = {};
+                    }
+                    solutions[name][alternative.mangle()] = alternative;
                 }
             }
         }
