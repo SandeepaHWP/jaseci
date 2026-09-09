@@ -383,7 +383,7 @@ walker NaIRGenPass(Transform) {
         _pyb_base_memo: dict[str, tuple[any, ...] | None] = {},
         _pyb_helper_fns: dict[str, ir.Function] = {},
         lambda_captures: dict[str, list[tuple[str, ir.Value]]] = {},
-        _pending_lambda_captures: (list[tuple[any, ...]] | None) = None,
+        _pending_lambda_captures: (list[tuple[str, ir.Value]] | None) = None,
         nested_captures: dict[str, tuple[ir.Function, list[tuple[str, str]]]] = {},
         _nested_predecl: dict[any, any] = {},
         _bytearray_fns: dict[any, any] = {},

@@ -490,7 +490,7 @@ impl NaIRGenPass._codegen_lambda(nd: uni.LambdaExpr) -> (ir.Value | None) {
                 return _clos_val;
             }
         }
-        capture_info: list[tuple[any, ...]] = [];
+        capture_info: list[tuple[str, ir.Value]] = [];
         for (cap_name, _cap_val, _cap_type) in captures {
             capture_info.append((cap_name, self.local_vars[cap_name]));
         }

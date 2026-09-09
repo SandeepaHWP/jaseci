@@ -405,7 +405,7 @@ impl NaIRGenPass._codegen_return(nd: uni.ReturnStmt) -> None {
                 and nd.expr.sym_name not in self.closure_cell_handles {
                 skip_var = nd.expr.sym_name;
             } elif isinstance(nd.expr, uni.TupleVal) {
-                tup_elems: list[any] = nd.expr.values or [];
+                tup_elems: list[any] = list(nd.expr.values or []);
                 for tup_elem in tup_elems {
                     elem_name: (str | None) = None;
                     if isinstance(tup_elem, uni.Name) {
@@ -3153,7 +3153,7 @@ impl NaIRGenPass._codegen_for(nd: uni.InForStmt) -> None {
         and nd.collection.target.is_attr
         and self._get_name(nd.collection.target.right) == "items" {
         items_dict_key = self._dict_key_of(nd.collection.target.target);
-        unpack_targets: list[any] = nd.target.values or [];
+        unpack_targets: list[any] = list(nd.target.values or []);
         if items_dict_key is not None and len(unpack_targets) == 2 {
             key_var_name = self._get_name(unpack_targets[0]);
             val_var_name = self._get_name(unpack_targets[1]);
@@ -3196,7 +3196,7 @@ impl NaIRGenPass._codegen_for(nd: uni.InForStmt) -> None {
     if isinstance(nd.collection, uni.FuncCall)
         and self._get_name(nd.collection.target) == "range"
         and nd.collection.call_kind == "builtin" {
-        params: list[any] = nd.collection.params or [];
+        params: list[any] = list(nd.collection.params or []);
         start_val: (ir.Value | None) = None;
         stop_val: (ir.Value | None) = None;
         step_val: (ir.Value | None) = None;
