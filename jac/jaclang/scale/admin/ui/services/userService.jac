@@ -19,14 +19,14 @@ async def:pub updateUser(
     username: str, role: str, requiresReset: bool, token: str
 ) -> dict[str, any] {
     return await put(
-        "/admin/users/" + encodeURIComponent(username),
+        f"/admin/users/{encodeURIComponent(username)}",
         {"role": role, "requires_password_reset": requiresReset},
         token
     );
 }
 
 async def:pub deleteUser(username: str, token: str) -> dict[any, any] {
-    return await `del("/admin/users/" + encodeURIComponent(username), token);
+    return await `del(f"/admin/users/{encodeURIComponent(username)}", token);
 }
 
 async def:pub getSSOProviders(token: str) -> dict[str, any] {

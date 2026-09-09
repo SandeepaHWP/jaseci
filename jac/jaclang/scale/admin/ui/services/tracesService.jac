@@ -34,5 +34,5 @@ async def:pub searchTraces(
 }
 
 async def:pub getTrace(token: str, traceId: str) -> dict[str, any] {
-    return await get("/admin/traces/" + encodeURIComponent(traceId), token);
+    return await get(f"/admin/traces/{encodeURIComponent(traceId)}", token);
 }
