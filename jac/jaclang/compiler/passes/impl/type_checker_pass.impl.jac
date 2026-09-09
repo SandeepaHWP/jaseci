@@ -1114,8 +1114,6 @@ impl TypeCheckPass._check_bare_generic(
         and ty.is_builtin(BARE_GENERIC_REQUIRED)
         and (not ty.private or not ty.private.type_args)
     ) {
-        # `tuple[()]` solves to no arguments but is written with them, and it
-        # is the only way to name the empty tuple.
         if not (written and self._writes_type_args(ann_node)) {
             self.emit(E1036, node_override=ann_node, type=ty.shared.class_name);
         }
@@ -1127,8 +1125,7 @@ impl TypeCheckPass._check_bare_generic(
 }
 
 impl TypeCheckPass._writes_type_args(ann_node: UniNode) -> bool {
-    return isinstance(ann_node, AtomTrailer)
-        and isinstance(ann_node.right, IndexSlice);
+    return isinstance(ann_node, AtomTrailer) and isinstance(ann_node.right, IndexSlice);
 }
 
 impl TypeCheckPass._check_unresolved_lambda_params -> None {

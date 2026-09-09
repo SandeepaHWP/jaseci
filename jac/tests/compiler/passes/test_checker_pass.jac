@@ -3995,8 +3995,7 @@ test "written_empty_tuple_arguments_are_not_bare" {
     # empty argument list is explicit; a nested bare tuple still is not.
     program = JacProgram();
     mod = program.compile(
-        os.path.join(CHECKER_FIXTURES, "checker_empty_tuple_arg.jac"),
-        options=NO_TC
+        os.path.join(CHECKER_FIXTURES, "checker_empty_tuple_arg.jac"), options=NO_TC
     );
     bare_generic_errors = [
         e

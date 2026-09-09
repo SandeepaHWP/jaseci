@@ -212,6 +212,7 @@ walker TypeCheckPass(UniPass) {
     def _check_bare_generic(
         ann_node: UniNode, ty: object, written: bool = True
     ) -> None;
+
     def _writes_type_args(ann_node: UniNode) -> bool;
     def _check_explicit_any(ann_node: UniNode) -> None;
     def _check_walker_reports_shape(nd: HasVar, declared_type: object) -> None;
