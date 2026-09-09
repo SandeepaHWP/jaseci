@@ -5,7 +5,7 @@ position-weighted sum of the values captures the iteration order without
 boxing strings into the result (int-only, so it isolates ordering).
 """
 
-def dictorder_py() -> dict[str, any] {
+def dictorder_py -> dict[str, any] {
     d: dict[str, int] = {};
     d["zebra"] = 10;
     d["apple"] = 20;
@@ -32,12 +32,12 @@ def dictorder_py() -> dict[str, any] {
     };
 }
 
-def dictorder_cl() -> dict[str, any] {
+def dictorder_cl -> dict[str, any] {
     return {};
 }
 
 
-def dictorder_na() -> dict[str, any] {
+def dictorder_na -> dict[str, any] {
     d: dict[str, int] = {};
     d["zebra"] = 10;
     d["apple"] = 20;
