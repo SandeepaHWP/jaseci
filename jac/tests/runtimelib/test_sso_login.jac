@@ -33,7 +33,7 @@ test "desktop SSO hands off to the broker, polls the session, stores jac_token" 
     window.__JAC_BROKER__ = "/__jac";
     __setLocalStorage("jac_token", "");
 
-    calls = [];
+    calls: list[any] = [];
     globalThis.fetch = lambda (url: any) -> any {
         calls.append(url);
         if url.includes("oauth/start") {

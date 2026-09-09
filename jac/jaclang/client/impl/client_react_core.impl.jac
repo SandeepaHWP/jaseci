@@ -281,7 +281,7 @@ impl __normalizeCredential(x: any) -> dict[str, any] {
 
 impl jacSignup(
     identities_or_username: (str | list[any]),
-    credential_or_password: (str | dict[any, any]),
+    credential_or_password: (str | dict[str, any]),
     profile: (dict[any, any] | None) = None
 ) -> SignupResult {
     base_url = globalThis.__jacGetApiBaseUrl__();
@@ -346,8 +346,8 @@ impl jacSignup(
 }
 
 impl jacLogin(
-    identity_or_username: (str | dict[any, any]),
-    credential_or_password: (str | dict[any, any])
+    identity_or_username: (str | dict[str, any]),
+    credential_or_password: (str | dict[str, any])
 ) -> bool {
     base_url = globalThis.__jacGetApiBaseUrl__();
     identity = __normalizeIdentity(identity_or_username);

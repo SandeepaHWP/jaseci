@@ -329,7 +329,7 @@ test "distinct classes do not share a diagnostic slot" {
         'edges': [],
         'version': 0
     };
-    edge_blob: dict[str, object] = dict(node_blob) | {'__type__': 'EdgeAnchor'};
+    edge_blob: dict[str, object] = node_blob | {'__type__': 'EdgeAnchor'};
     buf = io.StringIO();
     capture = logging.StreamHandler(buf);
     logger = logging.getLogger("jaclang.data.serializer");

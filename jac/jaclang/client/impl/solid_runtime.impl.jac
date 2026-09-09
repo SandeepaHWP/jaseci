@@ -8,15 +8,15 @@ impl jacSpawn(left: str, right: str = "", fields: dict[any, any] = {}) -> any {
 
 impl jacSignup(
     identities_or_username: (str | list[any]),
-    credential_or_password: (str | dict[any, any]),
+    credential_or_password: (str | dict[str, any]),
     profile: (dict[any, any] | None) = None
 ) -> SignupResult {
     return await _jacSignup(identities_or_username, credential_or_password, profile);
 }
 
 impl jacLogin(
-    identity_or_username: (str | dict[any, any]),
-    credential_or_password: (str | dict[any, any])
+    identity_or_username: (str | dict[str, any]),
+    credential_or_password: (str | dict[str, any])
 ) -> bool {
     return await _jacLogin(identity_or_username, credential_or_password);
 }

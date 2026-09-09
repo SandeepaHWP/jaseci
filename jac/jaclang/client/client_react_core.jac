@@ -72,7 +72,7 @@ def:pub __normalizeIdentity(x: any) -> dict[any, any];
 def:pub __normalizeCredential(x: any) -> dict[any, any];
 async def:pub jacSignup(
     identities_or_username: (str | list[any]),
-    credential_or_password: (str | dict[any, any]),
+    credential_or_password: (str | dict[str, any]),
     profile: (dict[any, any] | None) = None
 ) -> SignupResult;
 

@@ -268,7 +268,7 @@ impl __errorMessage(err: any) -> str {
 
 impl jacSignup(
     identities_or_username: (str | list[any]),
-    credential_or_password: (str | dict[any, any]),
+    credential_or_password: (str | dict[str, any]),
     profile: (dict[any, any] | None) = None
 ) -> SignupResult {
     base_url = __getApiBaseUrl();
@@ -334,8 +334,8 @@ impl jacSignup(
 }
 
 impl jacLogin(
-    identity_or_username: (str | dict[any, any]),
-    credential_or_password: (str | dict[any, any])
+    identity_or_username: (str | dict[str, any]),
+    credential_or_password: (str | dict[str, any])
 ) -> bool {
     base_url = __getApiBaseUrl();
     identity = __normalizeIdentity(identity_or_username);
