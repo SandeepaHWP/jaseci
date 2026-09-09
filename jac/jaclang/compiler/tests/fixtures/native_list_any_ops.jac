@@ -100,7 +100,7 @@ def any_literal_na() -> dict[str, any] {
 #     in native codespace and round-trip at runtime (kernel DFS tuple-stack). ---
 def any_stack_py() -> dict[any, any] {
     loc: int = 5;
-    stack: list[any] = [(loc, 0)];
+    stack: list[tuple[int, int]] = [(loc, 0)];
     stack.append((20, 1));
     (cur, phase) = stack.pop();  # (20, 1)
     (cur0, phase0) = stack.pop();  # (5, 0)
@@ -110,7 +110,7 @@ def any_stack_py() -> dict[any, any] {
 
 def any_stack_na() -> dict[str, any] {
     loc: int = 5;
-    stack: list[any] = [(loc, 0)];
+    stack: list[tuple[int, int]] = [(loc, 0)];
     stack.append((20, 1));
     (cur, phase) = stack.pop();
     (cur0, phase0) = stack.pop();
@@ -127,7 +127,7 @@ def dfs_stack_py() -> dict[any, any] {
     queue: list[int] = [100, 200, 300];
     first_out: int = queue.pop(0);
     second_out: int = queue.pop(0);
-    stack: list[any] = [(first_out, 0)];
+    stack: list[tuple[int, int]] = [(first_out, 0)];
     stack.append((second_out, 1));
     n0: int = 0;
     n1: int = 0;
@@ -157,7 +157,7 @@ def dfs_stack_na() -> dict[str, any] {
     queue: list[int] = [100, 200, 300];
     first_out: int = queue.pop(0);
     second_out: int = queue.pop(0);
-    stack: list[any] = [(first_out, 0)];
+    stack: list[tuple[int, int]] = [(first_out, 0)];
     stack.append((second_out, 1));
     n0: int = 0;
     n1: int = 0;
@@ -220,7 +220,7 @@ def any_dict_local_na() -> dict[str, any] {
 
 
 def any_tuple_helper_py(loc: any) -> dict[any, any] {
-    s: list[any] = [(loc, 0)];
+    s: list[tuple[any, int]] = [(loc, 0)];
     (cur, phase) = s.pop();
     return {"cur": cur, "phase": phase};
 }
@@ -231,7 +231,7 @@ def any_tuple_roundtrip_py() -> dict[any, any] {
 
 
 def any_tuple_helper_na(loc: any) -> dict[str, any] {
-    s: list[any] = [(loc, 0)];
+    s: list[tuple[any, int]] = [(loc, 0)];
     (cur, phase) = s.pop();
     return {"cur": cur, "phase": phase};
 }

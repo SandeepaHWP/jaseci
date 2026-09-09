@@ -3,7 +3,7 @@
 Cross-backend equivalence fixture.
 """
 
-def hetero_py -> dict[any, any] {
+def hetero_py -> dict[str, any] {
     l: list[any] = [1, "two", 3.5, True];
     first: int = l[0];
     second: str = l[1];
@@ -16,7 +16,7 @@ def hetero_py -> dict[any, any] {
             total = total + iv;
         }
     }
-    d: dict[any, any] = {"a": 1, "b": "bee", "c": 2.5};
+    d: dict[str, any] = {"a": 1, "b": "bee", "c": 2.5};
     return {
         "first": first,
         "second": second,
@@ -45,7 +45,7 @@ def hetero_na -> dict[str, any] {
             total = total + iv;
         }
     }
-    d: dict[any, any] = {"a": 1, "b": "bee", "c": 2.5};
+    d: dict[str, any] = {"a": 1, "b": "bee", "c": 2.5};
     return {
         "first": first,
         "second": second,
