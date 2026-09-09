@@ -10,7 +10,7 @@ self-checks and prints OK so the same fixture drives the AOT gc-mode runs.
 """
 
 def hl_read_str(s: &str) -> str {
-    l: list = [1, s + "!", 2.5];  # jac:ignore[E1036]
+    l: list[any] = [1, s + "!", 2.5];
     return l[1];
 }
 
@@ -29,7 +29,7 @@ def hl_read_float -> float {
 
 
 def hl_overwrite(s: &str) -> str {
-    l: list = [7, "seed"];  # jac:ignore[E1036]
+    l: list[any] = [7, "seed"];
     l[1] = s + "-one";
     l[1] = s + "-two";
     return l[1];
@@ -58,9 +58,9 @@ def hl_iter_int_total -> int {
 
 
 def hl_repr -> str {
-    # repr() has no native lowering for list[any]; the bare layout is what
-    # this case exercises.
-    l: list = [1, "two", 3.5, True];  # jac:ignore[E1036]
+    # repr() has no native lowering for list[any]; the jacval layout is
+    # what this case exercises.
+    l: list[any] = [1, "two", 3.5, True];
     return repr(l);
 }
 
@@ -93,7 +93,7 @@ def hd_read_int -> int {
 
 
 def hd_overwrite(s: &str) -> str {
-    d: dict = {"k": 1, "pad": 2.5};  # jac:ignore[E1036]
+    d: dict[str, any] = {"k": 1, "pad": 2.5};
     d["k"] = s + "-first";
     d["k"] = s + "-second";
     return d["k"];
@@ -101,23 +101,23 @@ def hd_overwrite(s: &str) -> str {
 
 
 def hd_pop_len(s: &str) -> int {
-    d: dict = {"a": s + "abc", "b": 5};  # jac:ignore[E1036]
+    d: dict[str, any] = {"a": s + "abc", "b": 5};
     x: str = d.pop("a");
     return len(x) + len(d);
 }
 
 
 def hd_clear_len(s: &str) -> int {
-    d: dict = {"a": s + "abc", "b": 5, "c": 1.5};  # jac:ignore[E1036]
+    d: dict[str, any] = {"a": s + "abc", "b": 5, "c": 1.5};
     d.clear();
     return len(d);
 }
 
 
 def hd_repr -> str {
-    # repr() has no native lowering for dict[str, any]; the bare layout is
-    # what this case exercises.
-    d: dict = {"a": 1, "b": "two"};  # jac:ignore[E1036]
+    # repr() has no native lowering for dict[str, any]; the jacval layout
+    # is what this case exercises.
+    d: dict[str, any] = {"a": 1, "b": "two"};
     return repr(d);
 }
 

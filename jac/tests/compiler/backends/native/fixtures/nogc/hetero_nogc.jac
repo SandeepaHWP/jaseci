@@ -16,9 +16,9 @@ def list_churn(n: int) -> int {
     i: int = 0;
     total: int = 0;
     while i < n {
-        # Bare on purpose: list[any] elements are not reclaimed, so the
-        # jacval slot-drop path under test is only reachable this way.
-        m: list = [i, "abcdef", 2.5];  # jac:ignore[E1036]
+        # list[any] elements are not reclaimed, so the jacval slot-drop
+        # path under test is only reachable through a mixed list.
+        m: list[any] = [i, "abcdef", 2.5];
         total = total + len(m);
         i = i + 1;
     }
@@ -29,8 +29,8 @@ def dict_churn(n: int) -> int {
     i: int = 0;
     total: int = 0;
     while i < n {
-        # Bare on purpose: see list_churn above.
-        d: dict = {"num": i, "tag": "abcdef"};  # jac:ignore[E1036]
+        # See list_churn above.
+        d: dict[str, any] = {"num": i, "tag": "abcdef"};
         total = total + len(d);
         i = i + 1;
     }

@@ -251,10 +251,10 @@ def guard_consume_check_na -> dict[str, any] {
 #     keep their unboxed layout, and mixed evidence collapses to the
 #     heterogeneous `any` element rather than a union. ---
 def bare_list_check_py -> dict[any, any] {
-    strs: list[any] = [];
+    strs: list[str] = [];
     strs.append("a");
     strs.append("b");
-    ints: list[any] = [];
+    ints: list[int] = [];
     ints.append(10);
     ints.append(20);
     total: int = 0;
@@ -262,9 +262,9 @@ def bare_list_check_py -> dict[any, any] {
         iv: int = v;
         total += iv;
     }
-    ext: list[any] = [];
+    ext: list[str] = [];
     ext.extend(["x", "y"]);
-    ins: list[any] = [];
+    ins: list[float] = [];
     ins.insert(0, 2.5);
     ins[0] = 3.5;
     mixed: list[any] = [];
@@ -281,10 +281,10 @@ def bare_list_check_py -> dict[any, any] {
 
 
 def bare_list_check_na -> dict[str, any] {
-    strs: list[any] = [];
+    strs: list[str] = [];
     strs.append("a");
     strs.append("b");
-    ints: list[any] = [];
+    ints: list[int] = [];
     ints.append(10);
     ints.append(20);
     total: int = 0;
@@ -292,9 +292,9 @@ def bare_list_check_na -> dict[str, any] {
         iv: int = v;
         total += iv;
     }
-    ext: list[any] = [];
+    ext: list[str] = [];
     ext.extend(["x", "y"]);
-    ins: list[any] = [];
+    ins: list[float] = [];
     ins.insert(0, 2.5);
     ins[0] = 3.5;
     mixed: list[any] = [];
