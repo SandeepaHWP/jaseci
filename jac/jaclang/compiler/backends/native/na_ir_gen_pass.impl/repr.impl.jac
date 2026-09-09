@@ -69,7 +69,7 @@ impl NaIRGenPass._repr_elem_spec_of_key(elem_key: str) -> (tuple[str, any] | Non
     if len(_parts) == 2 and ("NoneType" in _parts or "None" in _parts) {
         return ("jacval", self.jacval_type) if self?.jacval_type else None;
     }
-    if len(_parts) > 1 or elem_key == "any" {
+    if len(_parts) > 1 or elem_key in ("any", "Any") {
         return ("jacval", self.jacval_type) if self?.jacval_type else None;
     }
     if elem_key in ("int", "bool") {
@@ -123,7 +123,7 @@ impl NaIRGenPass._repr_fn_for_type_key(type_key: str) -> (ir.Function | None) {
         if fn is None {
             fn = self._repr_jacval_fn();
         }
-    } elif type_key == "any" {
+    } elif type_key in ("any", "Any") {
         fn = self._repr_jacval_fn();
     } elif type_key == "int" {
         fn = self._repr_leaf_fn("int");

@@ -11,7 +11,7 @@ self-checks and prints OK so the same fixture drives the AOT gc-mode runs.
 
 def hl_read_str(s: &str) -> str {
     l: list[any] = [1, s + "!", 2.5];
-    return l[1];
+    return l.pop(1);
 }
 
 
@@ -32,7 +32,7 @@ def hl_overwrite(s: &str) -> str {
     l: list[any] = [7, "seed"];
     l[1] = s + "-one";
     l[1] = s + "-two";
-    return l[1];
+    return l.pop(1);
 }
 
 
@@ -81,7 +81,7 @@ def hl_annotated(s: &str) -> str {
 
 def hd_read_str -> str {
     d: dict[str, any] = {"a": 1, "b": "be" + "e", "c": 2.5};
-    return d["b"];
+    return d.pop("b");
 }
 
 
@@ -96,7 +96,7 @@ def hd_overwrite(s: &str) -> str {
     d: dict[str, any] = {"k": 1, "pad": 2.5};
     d["k"] = s + "-first";
     d["k"] = s + "-second";
-    return d["k"];
+    return d.pop("k");
 }
 
 
