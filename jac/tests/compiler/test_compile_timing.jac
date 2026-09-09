@@ -196,7 +196,7 @@ def run_probe(tree_dir: str, cache: str, round_no: int = 0) -> list[dict[any, an
 
 """Fold several runs of one tree into one row set, keeping each phase's minimum."""
 def merge_runs(runs: list[list[dict[any, any]]]) -> list[dict[any, any]] {
-    merged = [dict(r) for r in runs[0]];
+    merged: list[dict[any, any]] = [dict(r) for r in runs[0]];
     for later in runs[1:] {
         by_rel = {str(r["rel"]): r for r in later};
         for row in merged {
