@@ -24,7 +24,7 @@ def hl_read_int -> int {
 
 def hl_read_float -> float {
     l: list[any] = [1, "a", 2.5];
-    return l[2];
+    return l.pop(2);
 }
 
 

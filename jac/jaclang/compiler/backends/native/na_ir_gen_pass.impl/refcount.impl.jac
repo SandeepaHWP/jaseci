@@ -1838,6 +1838,10 @@ impl NaIRGenPass._drop_spec_for_mangle(mangle: str) -> (tuple[any, ...] | None) 
     if mangle == "int" or mangle == "bool" {
         return ("i64", ir.IntType(64));
     }
+
+    if mangle in ("any", "Any") {
+        return ("jacval", self.jacval_type) if self?.jacval_type else None;
+    }
     if mangle == "float" {
         return ("f64", ir.DoubleType());
     }
@@ -1865,7 +1869,7 @@ impl NaIRGenPass._drop_fn_for(mangle: str) -> (ir.Function | None) {
     }
     if mangle == "str" {
         _fn = self._get_or_declare_extern("free", ir.VoidType(), [i8p]);
-    } elif "|" in mangle or mangle == "any" {
+    } elif "|" in mangle or mangle in ("any", "Any") {
         _fn = self._emit_jacval_slot_drop_fn(mangle);
     } elif mangle in self.struct_types {
         _fn = self._emit_struct_drop_fn(mangle);
