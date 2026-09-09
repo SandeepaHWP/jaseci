@@ -209,7 +209,10 @@ walker TypeCheckPass(UniPass) {
     can exit_sub_tag with SubTag exit;
     def _eval_unpacking_names(container: Expr) -> None;
     def _body_always_returns(body: list[CodeBlockStmt]) -> bool;
-    def _check_bare_generic(ann_node: UniNode, ty: object) -> None;
+    def _check_bare_generic(
+        ann_node: UniNode, ty: object, written: bool = True
+    ) -> None;
+    def _writes_type_args(ann_node: UniNode) -> bool;
     def _check_explicit_any(ann_node: UniNode) -> None;
     def _check_walker_reports_shape(nd: HasVar, declared_type: object) -> None;
     def _enclosing_walker_report_elem_type(nd: UniNode) -> (TypeBase | None);

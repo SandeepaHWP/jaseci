@@ -3990,6 +3990,25 @@ test "bare_generic_iteration_is_a_hard_error" {
         + "\n---\n".join(e.pretty_print() for e in bare_generic_errors);
 }
 
+test "written_empty_tuple_arguments_are_not_bare" {
+    # `tuple[()]` is the only spelling of the empty tuple, so a written but
+    # empty argument list is explicit; a nested bare tuple still is not.
+    program = JacProgram();
+    mod = program.compile(
+        os.path.join(CHECKER_FIXTURES, "checker_empty_tuple_arg.jac"),
+        options=NO_TC
+    );
+    bare_generic_errors = [
+        e
+        for e in program.errors_had
+        if "E1036" in e.pretty_print()
+    ];
+    assert len(bare_generic_errors) == 1 , f"Expected only the nested bare tuple to report, got {len(
+        bare_generic_errors
+    )}:\n"
+        + "\n---\n".join(e.pretty_print() for e in bare_generic_errors);
+}
+
 test "bare_generic_in_signatures_emits_e1036" {
     # Bare generics in function/method return types and parameter types should
     # also produce E1036 — same as in `has` fields and assignments.

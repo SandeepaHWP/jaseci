@@ -1097,10 +1097,12 @@ impl TypeCheckPass._body_always_returns(body: list[CodeBlockStmt]) -> bool {
     return self.evaluator._collect_return_types(body, []);
 }
 
-impl TypeCheckPass._check_bare_generic(ann_node: UniNode, ty: object) -> None {
+impl TypeCheckPass._check_bare_generic(
+    ann_node: UniNode, ty: object, written: bool = True
+) -> None {
     if isinstance(ty, UnionType) and ty.types {
         for branch in ty.types {
-            self._check_bare_generic(ann_node, branch);
+            self._check_bare_generic(ann_node, branch, written);
         }
         return;
     }
@@ -1112,12 +1114,21 @@ impl TypeCheckPass._check_bare_generic(ann_node: UniNode, ty: object) -> None {
         and ty.is_builtin(BARE_GENERIC_REQUIRED)
         and (not ty.private or not ty.private.type_args)
     ) {
-        self.emit(E1036, node_override=ann_node, type=ty.shared.class_name);
+        # `tuple[()]` solves to no arguments but is written with them, and it
+        # is the only way to name the empty tuple.
+        if not (written and self._writes_type_args(ann_node)) {
+            self.emit(E1036, node_override=ann_node, type=ty.shared.class_name);
+        }
         return;
     }
     for arg in (ty.private.type_args if ty.private else None) or [] {
-        self._check_bare_generic(ann_node, arg);
+        self._check_bare_generic(ann_node, arg, False);
     }
+}
+
+impl TypeCheckPass._writes_type_args(ann_node: UniNode) -> bool {
+    return isinstance(ann_node, AtomTrailer)
+        and isinstance(ann_node.right, IndexSlice);
 }
 
 impl TypeCheckPass._check_unresolved_lambda_params -> None {
