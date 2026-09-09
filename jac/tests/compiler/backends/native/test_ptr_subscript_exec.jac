@@ -27,7 +27,7 @@ test "ptr subscript fixture compiles with no errors, no E9002 ICE (#6707, #6708)
     (prog, _) = _compile("ptr_subscript.jac");
     codes = [
         e.code.code
-        for e in (prog.errors_had or [])
+        for e in prog.errors_had
         if e.code
     ];
     e9002 = [

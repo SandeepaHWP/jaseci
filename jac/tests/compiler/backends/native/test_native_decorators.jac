@@ -122,7 +122,7 @@ test "guardrail: non-static decorator expression demotes its function" {
     (prog, ir) = compile_na_inline_ir(
         "dynamic_dec",
         "def pick(fn: any) -> any { return fn; }\n"
-        "glob decs: list = [];\n"
+        "glob decs: list[any] = [];\n"
         "@ (decs[0])\n"
         "def val(x: int) -> int { return x; }\n"
     );
