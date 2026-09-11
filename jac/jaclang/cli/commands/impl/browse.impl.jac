@@ -29,7 +29,7 @@ def _need(args: list[str], n: int, usage: str) {
 
 impl browse(
     action: str,
-    args: list[any] = [],
+    args: list[str] = [],
     session: str = "default",
     viewport: str = "1280x720"
 ) -> int {

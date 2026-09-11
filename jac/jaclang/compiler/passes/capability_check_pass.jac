@@ -89,7 +89,7 @@ walker PortabilityWarnPass(Transform) {
     has ir_in: Module,
         cancel_token: any = None;
 
-    static has PROVIDES: tuple[any, ...] = ('portability', );
+    static has PROVIDES: tuple[str, ...] = ('portability', );
 
     def postinit -> None;
     def transform(ir_in: Module) -> Module;
@@ -103,7 +103,7 @@ walker PortabilityWarnPass(Transform) {
 }
 
 walker NativeCapabilityCheckPass(Transform) {
-    static has PROVIDES: tuple[any, ...] = ('capability', );
+    static has PROVIDES: tuple[str, ...] = ('capability', );
     has ir_in: Module,
         cancel_token: any = None;
 
@@ -114,7 +114,7 @@ walker NativeCapabilityCheckPass(Transform) {
 }
 
 walker ClientCapabilityCheckPass(Transform) {
-    static has PROVIDES: tuple[any, ...] = ('client_capability', );
+    static has PROVIDES: tuple[str, ...] = ('client_capability', );
     has ir_in: Module,
         cancel_token: any = None;
 

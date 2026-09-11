@@ -24,7 +24,9 @@ impl print_file_progress(file_path: str, success: bool, idx: int, total: int) ->
     console.print(f"{file_path} {status} [{percentage}%]");
 }
 
-impl print_failures(failed_results: list[any], nowarn: bool = False) -> None {
+impl print_failures(
+    failed_results: list[dict[str, any]], nowarn: bool = False
+) -> None {
     import from jaclang.cli.console { console }
     console.print("");
     console.print(separator("FAILURES"));
@@ -32,7 +34,7 @@ impl print_failures(failed_results: list[any], nowarn: bool = False) -> None {
         console.print(separator(r['path'], char='_'));
         for e in r['errors'] {
             if isinstance(e, dict) {
-                err: dict[any, any] = e;
+                err: dict[str, any] = e;
                 console.error(str(err.get('pretty') or err.get('text') or ''));
                 print_guide_hint(err.get('code'), err.get('category'));
             } else {
@@ -42,7 +44,7 @@ impl print_failures(failed_results: list[any], nowarn: bool = False) -> None {
         if not nowarn and r['warnings'] {
             for w in r['warnings'] {
                 if isinstance(w, dict) {
-                    warn: dict[any, any] = w;
+                    warn: dict[str, any] = w;
                     console.warning(str(warn.get('pretty') or warn.get('text') or ''));
                     print_guide_hint(warn.get('code'), warn.get('category'));
                 } else {
@@ -54,7 +56,7 @@ impl print_failures(failed_results: list[any], nowarn: bool = False) -> None {
     }
 }
 
-impl print_failed_summary(failed_results: list[any]) -> None {
+impl print_failed_summary(failed_results: list[dict[str, any]]) -> None {
     import from jaclang.cli.console { console }
     console.print(separator("failed files"));
     for r in failed_results {
@@ -139,7 +141,11 @@ impl print_native_coverage(coverage: dict[str, dict[str, any]]) -> None {
             by_code.setdefault(rec['code'] or '<uncoded>', []).append((p, rec));
         }
         ranked = sorted(
-            by_code.items(), key=lambda (x: tuple[any, ...]) { (-len(x[1]), x[0]); }
+            by_code.items(),
+            key=lambda (x: tuple[str, list[tuple[str, dict[str, any]]]]) { (
+                -len(x[1]),
+                x[0]
+            ); }
         );
         for (code, entries) in ranked {
             console.print(f"  {code}  ({len(entries)})");
@@ -161,7 +167,8 @@ impl print_native_coverage(coverage: dict[str, dict[str, any]]) -> None {
             by_reason.setdefault(rec['detail'] or '<unknown>', []).append(p);
         }
         ranked_r = sorted(
-            by_reason.items(), key=lambda (x: tuple[any, ...]) { (-len(x[1]), x[0]); }
+            by_reason.items(),
+            key=lambda (x: tuple[str, list[str]]) { (-len(x[1]), x[0]); }
         );
         for (reason, paths) in ranked_r {
             console.print(f"  {reason}  ({len(paths)})");

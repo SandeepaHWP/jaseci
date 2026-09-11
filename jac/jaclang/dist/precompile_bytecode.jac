@@ -1,4 +1,5 @@
 import hashlib;
+import type from jaclang.compiler.driver.program { JacProgram }
 import json;
 import marshal;
 import os;
@@ -213,7 +214,7 @@ def placement_facts_map(package_dir: str) -> dict[str, list[str]] {
     return out;
 }
 
-def _emit_unit_diagnostics(jac_path: str, programs: list[any]) {
+def _emit_unit_diagnostics(jac_path: str, programs: list[JacProgram]) {
     import from jaclang.compiler.driver.source_failures {
         compiler_source_failure_details
     }
@@ -262,7 +263,7 @@ def _emit_unit_diagnostics(jac_path: str, programs: list[any]) {
     }
 }
 
-glob _unit_program: list[any] = [];
+glob _unit_program: list[JacProgram] = [];
 
 def _ct_deps_extra(jac_path: str, pkg_root: str) -> dict[int, bytes] {
     try {

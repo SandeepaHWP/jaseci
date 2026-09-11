@@ -461,7 +461,7 @@ def get_symtab_tree_str(
     if ((root_node is None) or (depth == 0) or (root_node.name in dir(builtins))) {
         return '';
     }
-    level_markers: list[any] = level_markers or [];
+    level_markers: list[bool] = level_markers or [];
     markers = (
         ''.join(
             [

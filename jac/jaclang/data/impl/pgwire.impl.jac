@@ -51,7 +51,7 @@ impl _decode_value(oid: int, raw: bytes) -> any {
 }
 
 
-impl _named_to_positional(sql: str, params: dict[any, any]) -> tuple[str, list[any]] {
+impl _named_to_positional(sql: str, params: dict[str, any]) -> tuple[str, list[any]] {
     out: list[str] = [];
     order: dict[str, int] = {};
     args: list[any] = [];

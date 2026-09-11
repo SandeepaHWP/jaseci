@@ -19,8 +19,8 @@ impl ModelPool.postinit -> None {
         self.timeout = _fallback_cfg.get('timeout', 60.0);
     }
     is_fallback = self.strategy == "fallback";
-    model_list: list[any] = [];
-    fallback_names: list[any] = [];
+    model_list: list[dict[str, any]] = [];
+    fallback_names: list[str] = [];
     self._fallback_model_names = [];
     for (i, model) in enumerate(self.models) {
         name = (
@@ -31,7 +31,7 @@ impl ModelPool.postinit -> None {
         if is_fallback {
             self._fallback_model_names.append(name);
         }
-        litellm_params: dict[any, any] = {
+        litellm_params: dict[str, any] = {
             "model": model.model_name,
             "api_key": model.api_key or model.config.get("api_key", "") or None,
 
@@ -81,7 +81,7 @@ impl ModelPool.postinit -> None {
     );
 }
 
-impl ModelPool._get_ctx_window(call_params: dict[any, any]) -> int {
+impl ModelPool._get_ctx_window(call_params: dict[str, any]) -> int {
     `override = int(
         call_params.get("ctx_window")
             or self.ctx_window
@@ -91,7 +91,7 @@ impl ModelPool._get_ctx_window(call_params: dict[any, any]) -> int {
     if `override > 0 {
         return `override;
     }
-    windows: list[any] = [];
+    windows: list[int] = [];
     for m in self.models {
         w = m._get_ctx_window({});
         if w > 0 {
@@ -102,10 +102,10 @@ impl ModelPool._get_ctx_window(call_params: dict[any, any]) -> int {
 }
 
 
-impl ModelPool.model_call_no_stream(params: dict[any, any]) -> dict[any, any] {
+impl ModelPool.model_call_no_stream(params: dict[str, any]) -> dict[str, any] {
     if self.strategy == "cost-based-routing" {
         coro = self._router.acompletion(**params);
-        response: dict[any, any];
+        response: dict[str, any];
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool {
             response = pool.submit(asyncio.run, coro).result();
         }
@@ -115,7 +115,7 @@ impl ModelPool.model_call_no_stream(params: dict[any, any]) -> dict[any, any] {
 }
 
 impl ModelPool.model_call_with_stream(
-    params: dict[any, any]
+    params: dict[str, any]
 ) -> Generator[object, None, None] {
     if self.strategy == "cost-based-routing" {
         async def _collect_stream -> list[any] {
@@ -132,13 +132,13 @@ impl ModelPool.model_call_with_stream(
     }
 
     if self.strategy == "fallback" {
-        model_names: list[any] = self._fallback_model_names;
+        model_names: list[str] = self._fallback_model_names;
         router = self._router;
         def _fallback_gen -> Generator[object, None, None] {
             for (idx, name) in enumerate(model_names) {
                 yielded: bool = False;
                 try {
-                    call_params: dict[any, any] = dict(params);
+                    call_params: dict[str, any] = dict(params);
                     call_params.pop("model", None);
                     messages: list[any] = call_params.pop("messages", []);
                     response = router._completion(

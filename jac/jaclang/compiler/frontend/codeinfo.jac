@@ -21,14 +21,14 @@ import type from jaclang.compiler.backends.native.llvm.binding {
 }
 
 obj ClientManifest {
-    has exports: list[any] = [],
-        globals: list[any] = [],
-        params: dict[(str, list[any])] = field(default_factory=`dict),
+    has exports: list[str] = [],
+        globals: list[str] = [],
+        params: dict[str, list[str]] = field(default_factory=`dict),
         globals_values: dict[(str, any)] = field(default_factory=`dict),
         has_client: bool = False,
         imports: dict[(str, str)] = field(default_factory=`dict),
         runtime_imports: dict[str, list[str]] = field(default_factory=`dict),
-        endpoint_effects: dict[(str, dict[any, any])] = field(default_factory=`dict),
+        endpoint_effects: dict[(str, dict[str, any])] = field(default_factory=`dict),
         tests: list[dict[(str, str)]] = field(default_factory=`list),
         server_imports: list[str] = field(default_factory=`list),
         server_import_routes: dict[(str, dict[(str, str)])] = field(
@@ -44,7 +44,7 @@ obj ClientArtifact {
         native_import_sources: list[str] = field(default_factory=`list),
         source_map: list[tuple[int, int, int, int, str]] = field(default_factory=`list),
         dep_digests: dict[str, str] = field(default_factory=`dict),
-        boundary_contracts: dict[any, any] = field(default_factory=`dict),
+        boundary_contracts: dict[str, any] = field(default_factory=`dict),
         framework: str = "";
 
     def to_bytes -> bytes;
@@ -646,7 +646,7 @@ def native_layout_to_dict(layout: NativeModuleLayout) -> dict[str, any] {
                 "name": s.name,
                 "has_vtable": s.has_vtable,
                 "accessors": {
-                    fname: dict[any, any](kinds)
+                    fname: dict[str, str](kinds)
                     for (fname, kinds) in s.accessors.items()
                 },
                 "fields": [
@@ -709,14 +709,14 @@ obj InteropBinding {
         source_module: (str | None) = None,
         kind: str = 'function',
         provider_app: str = '',
-        native_contract: dict[any, any] = field(default_factory=`dict),
+        native_contract: dict[str, any] = field(default_factory=`dict),
         endpoint_id: str = '';
 
     has is_cross_module: bool { getter; }
 }
 
 obj InteropManifest {
-    has native_host_imports: dict[str, dict[any, any]] = field(default_factory=`dict),
+    has native_host_imports: dict[str, dict[str, any]] = field(default_factory=`dict),
         bindings: dict[(str, InteropBinding)] = field(default_factory=`dict),
         boundary_types: dict[(str, BoundaryTypeInfo)] = field(default_factory=`dict),
         endpoint_effects: dict[(str, dict[str, any])] = field(default_factory=`dict),
@@ -781,7 +781,7 @@ obj CodeGenTarget {
     has interop_manifest: InteropManifest { getter; setter(value: InteropManifest); }
 }
 
-def endpoint_descriptor(module: any, kind: str, name: str) -> dict[any, any] {
+def endpoint_descriptor(module: any, kind: str, name: str) -> dict[str, str] {
     import os;
     import from jaclang.compiler.driver.boundary_classify { owner_app_name_for_path }
     import from jaclang.compiler.placement.workspace { workspace_for_path }

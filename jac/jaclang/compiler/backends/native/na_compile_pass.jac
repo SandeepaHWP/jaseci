@@ -5,6 +5,7 @@ import type from jaclang.compiler.backends.native.llvm.binding {
     ValueRef
 }
 import jaclang.compiler.frontend.unitree as uni;
+import from collections.abc { Callable }
 import from jaclang.compiler.passes.transform { Transform }
 import from jaclang.compiler.frontend.codeinfo {
     CodeGenTarget,
@@ -36,10 +37,10 @@ obj DepClibMeta {
         ct_deps: str = "",
         options_fingerprint: str = "",
         unverified_live_calls: dict[str, list[str]] = {},
-        coverage: dict[any, any] = {};
+        coverage: dict[str, any] = {};
 
-    def to_meta -> dict[any, any];
-    static def from_meta(meta: dict[any, any]) -> DepClibMeta;
+    def to_meta -> dict[str, any];
+    static def from_meta(meta: dict[str, any]) -> DepClibMeta;
     def propagate_to(gen: CodeGenTarget) -> None;
 }
 
@@ -49,7 +50,7 @@ def native_demoted_ir_symbols(llvm_ir_text: str) -> list[str];
 def native_linked_ir_text(module: uni.Module) -> str;
 def native_ir_live_externs(llvm_ir_text: str) -> set[str];
 def native_prune_live_record(
-    pending: dict[any, any], declared: set[str]
+    pending: dict[str, set[str]], declared: set[str]
 ) -> dict[str, set[str]];
 
 def native_unit_demotions(
@@ -57,7 +58,7 @@ def native_unit_demotions(
 ) -> (set[str] | None);
 
 def native_live_call_conflicts(
-    prog: JacProgram, pending: dict[any, any], options: CompileOptions
+    prog: JacProgram, pending: dict[str, set[str]], options: CompileOptions
 ) -> dict[str, set[str]];
 
 glob NATIVE_VERDICT_TAINT_BOUND: int = 2048,

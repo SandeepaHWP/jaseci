@@ -322,7 +322,7 @@ def _internalize_late_bound(mod: ModuleRef) {
 }
 
 def emit_wasm_from_ir(
-    llvm_ir_str: str, export_funcs: list[any] = [], app_imports: (set | None) = None
+    llvm_ir_str: str, export_funcs: list[str] = [], app_imports: (set | None) = None
 ) -> bytes {
     import jaclang.compiler.backends.native.llvm.binding as llvm;
     import from jaclang.compiler.backends.native.wasm_linker { WasmLinker }
@@ -368,7 +368,7 @@ def emit_wasm_from_ir(
     );
 }
 
-def wasm_import_map(wasm_bytes: bytes) -> dict[any, any] {
+def wasm_import_map(wasm_bytes: bytes) -> dict[str, list[str]] {
     import from jaclang.compiler.backends.native.linker_common {
         read_leb_name,
         read_uleb128
@@ -462,7 +462,7 @@ def _assert_ir_rc_free(llvm_ir_str: str, file_path: str) {
     }
 }
 
-def compile_to_wasm(file_path: str, export_funcs: list[any] = []) -> bytes {
+def compile_to_wasm(file_path: str, export_funcs: list[str] = []) -> bytes {
     import from jaclang.compiler.driver.program { JacProgram }
     import from jaclang.compiler.driver.compile_options {
         CompileOptions,

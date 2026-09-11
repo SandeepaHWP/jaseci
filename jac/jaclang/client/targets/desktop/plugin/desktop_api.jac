@@ -1,4 +1,4 @@
-async def _invoke(plugin: str, command: str, args: dict[any, any]) -> any {
+async def _invoke(plugin: str, command: str, args: dict[str, any]) -> any {
     broker = globalThis.__JAC_BROKER__;
     if broker {
         resp = await fetch(
@@ -39,7 +39,7 @@ obj fs {
         await _invoke("jac.fs", "write_file", {"path": path, "content": content});
     }
 
-    static async def list_dir(path: str) -> list[any] {
+    static async def list_dir(path: str) -> list[dict[str, any]] {
         r = await _invoke("jac.fs", "list_dir", {"path": path});
         return r["entries"];
     }
@@ -57,20 +57,20 @@ obj fs {
         await _invoke("jac.fs", "remove", {"path": path});
     }
 
-    static async def stat(path: str) -> dict[any, any] {
+    static async def stat(path: str) -> dict[str, any] {
         return await _invoke("jac.fs", "stat", {"path": path});
     }
 }
 
 
 obj dialog {
-    static async def open_file(title: str = "Open File") -> dict[any, any] {
+    static async def open_file(title: str = "Open File") -> dict[str, any] {
         return await _invoke("jac.dialog", "open_file", {"title": title});
     }
 
     static async def save_file(
         title: str = "Save File", default_name: str = ""
-    ) -> dict[any, any] {
+    ) -> dict[str, any] {
         return await _invoke(
             "jac.dialog", "save_file", {"title": title, "default_name": default_name}
         );
@@ -127,8 +127,8 @@ obj app_window {
 obj shell {
     static async def exec(
         command: str, timeout: int = 30, cwd: str = ""
-    ) -> dict[any, any] {
-        args: dict[any, any] = {"command": command, "timeout": timeout};
+    ) -> dict[str, any] {
+        args: dict[str, any] = {"command": command, "timeout": timeout};
         if cwd {
             args["cwd"] = cwd;
         }

@@ -23,7 +23,7 @@ def _s(v: any) -> str {
 }
 
 
-def _rollout_status(dep: dict[any, any]) -> dict[any, any] {
+def _rollout_status(dep: dict[str, any]) -> dict[str, any] {
     spec: any = dep.get("spec", {}) or {};
     status: any = dep.get("status", {}) or {};
     desired = int(spec.get("replicas", 0) or 0);
@@ -53,7 +53,7 @@ def _rollout_status(dep: dict[any, any]) -> dict[any, any] {
 }
 
 
-def summarize_deployment(dep: dict[any, any]) -> dict[any, any] {
+def summarize_deployment(dep: dict[str, any]) -> dict[str, any] {
     meta: any = dep.get("metadata", {}) or {};
     spec: any = dep.get("spec", {}) or {};
     status: any = dep.get("status", {}) or {};
@@ -61,7 +61,7 @@ def summarize_deployment(dep: dict[any, any]) -> dict[any, any] {
         "containers", []
     )
         or [];
-    images: list[any] = [];
+    images: list[str] = [];
     for c in containers {
         img = c.get("image");
         if img {
@@ -80,7 +80,7 @@ def summarize_deployment(dep: dict[any, any]) -> dict[any, any] {
 }
 
 
-def _container_state(cs: dict[any, any]) -> dict[any, any] {
+def _container_state(cs: dict[str, any]) -> dict[str, any] {
     state: any = cs.get("state", {}) or {};
     if state.get("running") {
         return {"state": "running", "reason": ""};
@@ -106,7 +106,7 @@ def summarize_pod(pod: dict[str, any]) -> dict[str, any] {
 
     ready_count = 0;
     restart_total = 0;
-    containers: list[any] = [];
+    containers: list[dict[str, any]] = [];
     for cs in cstatuses {
         is_ready = bool(cs.get("ready", False));
         if is_ready {
@@ -143,8 +143,8 @@ def summarize_pod(pod: dict[str, any]) -> dict[str, any] {
 
 
 def build_deploy_health(
-    namespace: str, deployments: list[any], pods: list[any]
-) -> dict[any, any] {
+    namespace: str, deployments: list[dict[str, any]], pods: list[dict[str, any]]
+) -> dict[str, any] {
     deps = [summarize_deployment(d) for d in deployments];
     pds = [summarize_pod(p) for p in pods];
     deps.sort(key=lambda (d) { d.get("name", ""); });
@@ -158,7 +158,7 @@ def build_deploy_health(
 }
 
 
-def _collect_deploy_health -> dict[any, any] {
+def _collect_deploy_health -> dict[str, any] {
     if not k8s_available() {
         return {"available": False, "detail": unavailable_detail()};
     }

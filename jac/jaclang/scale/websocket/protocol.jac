@@ -30,7 +30,7 @@ async def ws_reject_pre_accept(websocket: WebSocket, auth_detail: dict[str, any]
 
 async def ws_authenticate(
     websocket: WebSocket, user_manager: any, handshake_timeout: float, max_bytes: int
-) -> (dict[any, any], dict[any, any] | None);
+) -> (dict[str, any], dict[str, any] | None);
 
 async def ws_heartbeat_loop(
     ctx: ConnectionContext, heartbeat_seconds: float, missed_allowed: int
@@ -47,7 +47,7 @@ async def ws_receive_frame(
 async def ws_handle_control(
     websocket: WebSocket,
     ctx: ConnectionContext,
-    data: dict[any, any],
+    data: dict[str, any],
     user_manager: any,
     requires_auth: bool,
     msgs_per_sec: float,

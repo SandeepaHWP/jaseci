@@ -137,9 +137,9 @@ obj ServingTestClient {
         json: any = None,
         data: any = None,
         content: any = None,
-        files: (dict[any, any] | None) = None,
-        params: (dict[any, any] | None) = None,
-        headers: (dict[any, any] | None) = None,
+        files: (dict[str, any] | None) = None,
+        params: (dict[str, any] | None) = None,
+        headers: (dict[str, any] | None) = None,
         follow_redirects: (bool | None) = None
     ) -> TestResponse {
         if follow_redirects is None {
@@ -272,7 +272,7 @@ obj ServingTestClient {
     }
 
     def websocket_connect(
-        path: str, headers: (dict[any, any] | None) = None
+        path: str, headers: (dict[str, any] | None) = None
     ) -> SyncWebSocket {
         port = self._ensure_live_server();
         merged: dict[str, str] = {};
@@ -323,7 +323,7 @@ async def dispatch_and_collect(app: any, request: any) -> tuple[any, bytes] {
     return (response, content);
 }
 
-def _build_multipart(files: dict[any, any], data: any = None) -> tuple[bytes, str] {
+def _build_multipart(files: dict[str, any], data: any = None) -> tuple[bytes, str] {
     boundary = f"jactest{secrets.token_hex(16)}";
     parts: list[bytes] = [];
     for (field, spec) in files.items() {

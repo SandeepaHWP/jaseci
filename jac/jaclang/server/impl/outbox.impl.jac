@@ -4,12 +4,12 @@ glob _COLUMNS = (
      );
 
 
-impl canonical_kwargs(kwargs: dict[any, any]) -> str {
+impl canonical_kwargs(kwargs: dict[str, any]) -> str {
     return json.dumps(kwargs, sort_keys=True, separators=(",", ":"), `default=str);
 }
 
 
-impl default_idempotency_key(app: str, `walker: str, kwargs: dict[any, any]) -> str {
+impl default_idempotency_key(app: str, `walker: str, kwargs: dict[str, any]) -> str {
     material = "\n".join([app, `walker, canonical_kwargs(kwargs)]);
     return hashlib.sha256(material.encode("utf-8")).hexdigest()[:32];
 }
@@ -232,12 +232,12 @@ impl SqlOutboxStore.remember_key(
 }
 
 
-impl PgOutboxStore._exec(sql: str, params: dict[any, any]) -> list[tuple[any, ...]] {
+impl PgOutboxStore._exec(sql: str, params: dict[str, any]) -> list[tuple[any, ...]] {
     return self.store.rows(sql, params);
 }
 
 
-impl PgOutboxStore._exec_count(sql: str, params: dict[any, any]) -> int {
+impl PgOutboxStore._exec_count(sql: str, params: dict[str, any]) -> int {
     return len(self.store.rows(sql + " RETURNING 1", params));
 }
 
@@ -269,7 +269,7 @@ impl SqliteOutboxStore.postinit -> None {
 
 
 impl SqliteOutboxStore._exec(
-    sql: str, params: dict[any, any]
+    sql: str, params: dict[str, any]
 ) -> list[tuple[any, ...]] {
     with self._lock {
         conn = self._conn;
@@ -286,7 +286,7 @@ impl SqliteOutboxStore._exec(
 }
 
 
-impl SqliteOutboxStore._exec_count(sql: str, params: dict[any, any]) -> int {
+impl SqliteOutboxStore._exec_count(sql: str, params: dict[str, any]) -> int {
     with self._lock {
         conn = self._conn;
         if conn is None {
@@ -424,7 +424,7 @@ impl _store_for_seen -> OutboxStore {
 
 
 impl enqueue(
-    app: str, `walker: str, kwargs: dict[any, any], idempotency_key: str = ""
+    app: str, `walker: str, kwargs: dict[str, any], idempotency_key: str = ""
 ) -> str {
     key = idempotency_key or default_idempotency_key(app, `walker, kwargs);
     store = _store_for_request(writable=True);

@@ -62,12 +62,12 @@ obj Tool {
     static def make_finish_tool(resp_type: type) -> Tool;
     def is_finish_tool -> bool;
     def get_json_schema -> dict[str, object];
-    def parse_arguments(args_json: dict[any, any] | str) -> dict[any, any];
+    def parse_arguments(args_json: dict[str, any] | str) -> dict[str, any];
     def _parse_finish_arguments(
-        args_json: dict[any, any], params: dict[any, any]
-    ) -> dict[any, any];
+        args_json: dict[str, any], params: dict[str, any]
+    ) -> dict[str, any];
 
-    def _required_params(params: dict[any, any]) -> list[any];
+    def _required_params(params: dict[str, any]) -> list[str];
 }
 
 obj ToolCall {
@@ -173,7 +173,7 @@ def serialize_media_content(content: list[any]) -> list[dict[str, any]] {
         }
         semstring = "";
         if isinstance(item, tuple) {
-            pair: tuple[any, ...] = item;
+            pair: tuple[object, str | None] = item;
             semstring = pair[1] or "";
             item = pair[0];
         }

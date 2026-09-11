@@ -10,7 +10,7 @@ impl __jacWirePlatformAdapters -> None {
     globalThis.__jacGetLocalStorage__ = __getLocalStorage;
     globalThis.__jacSetLocalStorage__ = __setLocalStorage;
     globalThis.__jacRemoveLocalStorage__ = __removeLocalStorage;
-    globalThis.__jacSeedEndpointEffects__ = lambda -> dict[any, any] {
+    globalThis.__jacSeedEndpointEffects__ = lambda -> dict[str, any] {
         seed = globalThis.__JAC_INIT__;
         effects: any = seed.endpointEffects if seed else None;
         if effects {
@@ -36,7 +36,7 @@ impl __jacGetRenderer -> any {
 }
 
 impl __jacNativeCreate(
-    tag: any, props: dict[any, any] = {}, children: any = []
+    tag: any, props: dict[str, any] = {}, children: any = []
 ) -> JsxElement {
     if tag is None {
         tag = React.Fragment;
@@ -97,7 +97,7 @@ impl __jacNativeCreate(
     return React.createElement(RNView, debug_adapted, *flat);
 }
 
-impl _adaptProps(tag: str, props: dict[any, any]) -> dict[any, any] {
+impl _adaptProps(tag: str, props: dict[str, any]) -> dict[str, any] {
     if not props {
         return {};
     }
@@ -124,7 +124,7 @@ impl _adaptProps(tag: str, props: dict[any, any]) -> dict[any, any] {
     return out;
 }
 
-impl _textStyleFrom(style: any) -> dict[any, any] {
+impl _textStyleFrom(style: any) -> dict[str, any] {
     out = {};
     if _isNil(style) {
         return out;
@@ -168,8 +168,8 @@ impl _isAbsoluteImageUri(src: str) -> bool {
     );
 }
 
-impl _adaptImageProps(props: dict[any, any]) -> dict[any, any] {
-    out: dict[any, any] = {** (props or {})};
+impl _adaptImageProps(props: dict[str, any]) -> dict[str, any] {
+    out: dict[str, any] = {** (props or {})};
     src = out["src"] if out["src"] else None;
     if out["alt"] and not out["accessibilityLabel"] {
         out["accessibilityLabel"] = str(out["alt"]);
@@ -226,7 +226,7 @@ impl _adaptImageProps(props: dict[any, any]) -> dict[any, any] {
     return out;
 }
 
-impl _makeNativeLink(link_props: dict[any, any], children: list[any]) -> JsxElement {
+impl _makeNativeLink(link_props: dict[str, any], children: list[any]) -> JsxElement {
     href = link_props["href"] if link_props["href"] else None;
     rest = {** link_props};
     if rest["href"] {
@@ -324,7 +324,7 @@ impl _getNativeRoutes -> list[any] {
 
 impl _matchRoutePattern(
     pattern_path: str, actual_path: str
-) -> (dict[any, any] | None) {
+) -> (dict[str, any] | None) {
     pattern_parts = _splitRouteParts(pattern_path);
     actual_parts = _splitRouteParts(actual_path);
     if len(pattern_parts) != len(actual_parts) {
@@ -360,7 +360,7 @@ impl _lookupRouteByPath(path: str) -> (RouteMatch | None) {
     return None;
 }
 
-impl _lookupRouteByName(name: str) -> (dict[any, any] | None) {
+impl _lookupRouteByName(name: str) -> (dict[str, any] | None) {
     for route in _getNativeRoutes() {
         if route["name"] == name {
             return route;
@@ -384,7 +384,7 @@ impl _hydratePath(pattern_path: str, params: any) -> str {
     return _normalizeRoutePath("/" + "/".join(hydrated));
 }
 
-impl _stripMetaParams(params: any) -> dict[any, any] {
+impl _stripMetaParams(params: any) -> dict[str, any] {
     if not params {
         return {};
     }
@@ -395,7 +395,7 @@ impl _stripMetaParams(params: any) -> dict[any, any] {
     };
 }
 
-impl _performNavigation(nav: any, target: any, options: dict[any, any] = {}) -> None {
+impl _performNavigation(nav: any, target: any, options: dict[str, any] = {}) -> None {
     if nav is None {
         console.warn("[jac-native-runtime] navigation is unavailable.");
         return;
@@ -511,7 +511,7 @@ impl _makeNativeRouteScreen(route: RouteDef) -> any {
     };
 }
 
-impl __nativeRouter(props: dict[any, any] = {}) -> JsxElement {
+impl __nativeRouter(props: dict[str, any] = {}) -> JsxElement {
     nav_ref = React.useRef(None);
     React.useEffect(lambda { globalThis.__jacNativeNavigationRef__ = nav_ref; }, []);
     def _flushPendingNavigation {
@@ -529,9 +529,9 @@ impl __nativeRouter(props: dict[any, any] = {}) -> JsxElement {
     );
 }
 
-impl __nativeRoutes(props: dict[any, any] = {}) -> JsxElement {
+impl __nativeRoutes(props: dict[str, any] = {}) -> JsxElement {
     routes = React.useMemo(
-        lambda -> list[any] {
+        lambda -> list[RouteDef] {
             out: list[RouteDef] = [];
             _collectNativeRoutes(props["children"], "/", [], out);
             return out;
@@ -541,7 +541,7 @@ impl __nativeRoutes(props: dict[any, any] = {}) -> JsxElement {
     React.useEffect(lambda { _cacheNativeRoutes(routes); }, [routes]);
 
     screens = React.useMemo(
-        lambda -> list[any] { return [
+        lambda -> list[JsxElement] { return [
             React.createElement(
                 _JAC_NATIVE_STACK.Screen,
                 {
@@ -569,11 +569,11 @@ impl __nativeRoutes(props: dict[any, any] = {}) -> JsxElement {
     );
 }
 
-impl __nativeRoute(props: dict[any, any] = {}) -> (JsxElement | None) {
+impl __nativeRoute(props: dict[str, any] = {}) -> (JsxElement | None) {
     return None;
 }
 
-impl __nativeLink(props: dict[any, any] = {}) -> JsxElement {
+impl __nativeLink(props: dict[str, any] = {}) -> JsxElement {
     to = props.get("to", None) or (props.get("href", None) or "/");
     rest = {** props};
     if rest["to"] {
@@ -601,8 +601,8 @@ impl __nativeLink(props: dict[any, any] = {}) -> JsxElement {
     return React.createElement(RNPressable, rest, label);
 }
 
-impl __nativeNavigate(props: dict[any, any] = {}) -> (JsxElement | None) {
-    opts: dict[any, any] = props or {};
+impl __nativeNavigate(props: dict[str, any] = {}) -> (JsxElement | None) {
+    opts: dict[str, any] = props or {};
     target = opts.get("to", None) or "/";
     should_replace = opts.get("replace", None) == True;
     nav_fn = useNavigate();
@@ -615,11 +615,11 @@ impl __nativeNavigate(props: dict[any, any] = {}) -> (JsxElement | None) {
     return None;
 }
 
-impl __nativeOutlet(props: dict[any, any] = {}) -> (JsxElement | None) {
+impl __nativeOutlet(props: dict[str, any] = {}) -> (JsxElement | None) {
     return React.useContext(_JAC_NATIVE_OUTLET_CONTEXT);
 }
 
-impl useRouter -> dict[any, any] {
+impl useRouter -> dict[str, any] {
     nav_fn = useNavigate();
     location = useLocation();
     params = useParams();
@@ -635,13 +635,13 @@ impl useRouter -> dict[any, any] {
 
 impl useNavigate -> any {
     nav = jacUseNavigation();
-    def _navigate(target: any, options: (dict[any, any] | None) = None) {
+    def _navigate(target: any, options: (dict[str, any] | None) = None) {
         _performNavigation(nav, target, options or {});
     }
     return _navigate;
 }
 
-impl useLocation -> dict[any, any] {
+impl useLocation -> dict[str, any] {
     route = jacUseRoute();
     pathname = "/";
     search = "";
@@ -665,7 +665,7 @@ impl useLocation -> dict[any, any] {
     return {"pathname": pathname, "search": search, "hash": hash, "state": state};
 }
 
-impl useParams -> dict[any, any] {
+impl useParams -> dict[str, any] {
     route = jacUseRoute();
     params = route.params if route and route.params else {};
     return _stripMetaParams(params);
@@ -702,7 +702,7 @@ impl __getApiBaseUrl -> str {
     return "";
 }
 
-def _nativeStorageCache -> dict[any, any] {
+def _nativeStorageCache -> dict[str, any] {
     cache: any = globalThis.__jacNativeStorageCache__;
     if not cache {
         cache = {};
@@ -885,7 +885,7 @@ def _unwrapZodSchema(schema_obj: any, depth: int = 0) -> any {
     return schema_obj;
 }
 
-def _getEnumOptions(field_schema: any) -> list[any] {
+def _getEnumOptions(field_schema: any) -> list[str] {
     unwrapped = _unwrapZodSchema(field_schema);
     if unwrapped and unwrapped._def and unwrapped._def.entries {
         return Object.keys(unwrapped._def.entries);
@@ -919,7 +919,7 @@ def _renderSelectField(
     form: any,
     field_name: str,
     selected_value: str,
-    options: list[any],
+    options: list[str],
     placeholder: str
 ) -> JsxElement {
     option_children = [];
@@ -966,7 +966,7 @@ def _renderSelectField(
 }
 
 def _renderRadioField(
-    form: any, field_name: str, selected_value: str, options: list[any]
+    form: any, field_name: str, selected_value: str, options: list[str]
 ) -> JsxElement {
     option_children = [];
     for opt in options {
@@ -1090,7 +1090,7 @@ impl JacForm(props: dict[str, any]) -> JsxElement {
             actualSchema = schema._def.schema;
         }
     } except Exception {}
-    schemaShape: dict[any, any] = actualSchema.shape or {};
+    schemaShape: dict[str, any] = actualSchema.shape or {};
     fieldNames = Object.keys(schemaShape);
     form = useJacForm(validate_mode, schema);
     errors = form.formState.errors;

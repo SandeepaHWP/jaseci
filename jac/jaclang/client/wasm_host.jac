@@ -46,7 +46,7 @@ def _clock_gettime(st: _HostState, clk: int, ts: int) -> int {
     return 0;
 }
 
-def:pub make_jac_host(sh: any) -> dict[any, any] {
+def:pub make_jac_host(sh: any) -> dict[str, any] {
     st = _HostState(sh=sh);
     return {
         "write": lambda (fd: int, ptr: int, n: int) {
@@ -117,9 +117,9 @@ async def:pub instantiate_na_wasm(url: str, sh: any, extra_imports: any = None) 
     return inst;
 }
 
-glob _na_env_cfg: dict[any, any] = {},
-     _na_pending: dict[any, any] = {},
-     _na_contracts: dict[any, any] = {},
+glob _na_env_cfg: dict[str, list[any]] = {},
+     _na_pending: dict[str, any] = {},
+     _na_contracts: dict[str, any] = {},
      _na_exports: any = new(globalThis.WeakMap as any);
 
 def _host_callback(host: any, name: str, contract: any) -> any {

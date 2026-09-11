@@ -70,7 +70,7 @@ obj AnchorRow {
         arch_module: str = '',
         fingerprint: str = '',
         root_id: (UUID | None) = None,
-        `props: dict[any, any] = {},
+        `props: dict[str, any] = {},
         src: (UUID | None) = None,
         dst: (UUID | None) = None,
         undirected: bool = False,
@@ -180,7 +180,7 @@ obj PgStore(Store) {
     def _connect -> any;
     def _main -> any;
     def _side -> any;
-    def _run(sql: str, params: dict[any, any]) -> list[any];
+    def _run(sql: str, params: dict[str, any]) -> list[any];
     def _promotion_columns -> list[tuple[str, str, str]];
     def _promoted_column_type(col: str) -> (str | None);
     def _apply_promotions -> None;

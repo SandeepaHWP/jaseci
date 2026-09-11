@@ -8,8 +8,8 @@ import from jaclang.jac0core.ext_registry {
     language_of
 }
 
-glob _project_root_cache: dict[any, any] = {},
-     _import_base_stack: list[any] = [],
+glob _project_root_cache: dict[str, str | None] = {},
+     _import_base_stack: list[str] = [],
      COMPILER_PACKAGE: str = 'jaclang';
 
 def push_import_base(base_dir: str) {
@@ -549,13 +549,13 @@ def resolve_relative_path(
     return path;
 }
 
-glob NPM_RUNTIME_CONDITIONS: tuple[any, ...] = (
+glob NPM_RUNTIME_CONDITIONS: tuple[str, ...] = (
          'browser',
          'module',
          'import',
          'default'
      ),
-     NPM_TYPES_CONDITIONS: tuple[any, ...] = ('types', 'import', 'default'),
+     NPM_TYPES_CONDITIONS: tuple[str, ...] = ('types', 'import', 'default'),
      NPM_DTS_SUFFIXES: tuple[str, ...] = ('.d.ts', '.d.mts', '.d.cts');
 
 def _find_npm_package(
@@ -632,7 +632,7 @@ def _resolve_export_target(
         return None;
     }
     if isinstance(target, dict) {
-        target_map: dict[any, any] = target;
+        target_map: dict[str, any] = target;
         for (key, value) in target_map.items() {
             if key.startswith('.') {
                 continue;
@@ -652,7 +652,7 @@ def _resolve_pkg_exports(
     exports: object, subpath: str, conditions: tuple[str, ...], pkg_dir: str
 ) -> (str | None) {
     if isinstance(exports, dict) {
-        exports_map: dict[any, any] = exports;
+        exports_map: dict[str, any] = exports;
         has_subpath_keys = `any(k.startswith('.') for k in exports_map.keys());
         if not has_subpath_keys {
             if subpath == '.' {

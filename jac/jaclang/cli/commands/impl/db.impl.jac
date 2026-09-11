@@ -223,7 +223,7 @@ def _db_list(data_dir: str) -> int {
 
 
 def _prune_candidates(
-    rt: any, records: list[any], empty: bool
+    rt: any, records: list[DbRecord], empty: bool
 ) -> list[PruneCandidate] {
     import from jaclang.data.dbcatalog { holds_no_data }
     info = rt.conninfo();

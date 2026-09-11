@@ -291,7 +291,7 @@ impl NaIRGenPass._codegen_type_name_str(name: str) -> ir.Value {
 
 impl NaIRGenPass._codegen_wrapping(nd: uni.FuncCall, name: str) -> (ir.Value | None) {
     params: Sequence[any] = nd.params or [];
-    vals: list[any] = [];
+    vals: list[ir.Value] = [];
     for p in params {
         v = self._codegen_expr(p);
         if v is None or not isinstance(v.type, ir.IntType) {

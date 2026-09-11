@@ -69,7 +69,7 @@ obj ClTestResult {
 
 def compile_cl_module(
     filepath: str
-) -> tuple[str, list[any], dict[any, any], list[any]];
+) -> tuple[str, list[any], dict[str, any], list[any]];
 
 def _compile_runtime -> tuple[str, str];
 
@@ -84,12 +84,12 @@ def _build_harness(
     module_js: str,
     tests: list[any],
     api_base_url: str = "",
-    storage: (dict[any, any] | None) = None
+    storage: (dict[str, any] | None) = None
 ) -> str;
 
 def _collect_local_imports(
     module_js: str, source_dir: str, entry_path: str, allow_runtime: bool = False
-) -> tuple[dict[any, any], dict[any, any]];
+) -> tuple[dict[str, any], dict[str, any]];
 
 def _exported_names(js: str) -> set;
 
@@ -104,7 +104,7 @@ def run_cl_test_file(
     filepath: str,
     api_base_url: (str | None) = None,
     test_name: (str | None) = None,
-    storage: (dict[any, any] | None) = None,
+    storage: (dict[str, any] | None) = None,
     serve: bool = True,
     timeout: float = 120.0
 ) -> list[ClTestResult];
@@ -112,9 +112,9 @@ def run_cl_test_file(
 def _run_harness(
     module_js: str,
     tests: list[any],
-    imports: dict[any, any],
+    imports: dict[str, any],
     api_base_url: str,
-    storage: (dict[any, any] | None),
+    storage: (dict[str, any] | None),
     timeout: float,
     source_path: (str | None) = None
 ) -> list[ClTestResult];

@@ -76,7 +76,7 @@ def _coerce_tool_calls(msg: dict[str, any]) -> dict[str, any] {
         return msg;
     }
     changed = False;
-    coerced: list[any] = [];
+    coerced: list[dict[str, any]] = [];
     for tc in (tcs as list[any]) {
         if isinstance(tc, dict) {
             coerced.append(tc);

@@ -80,8 +80,8 @@ def parse_opts(argv: list[str]) -> dict[str, str] {
 }
 
 """Audit every requested cell; fail if an enforced build has RC machinery."""
-def main(opts: dict[any, any]) {
-    results: dict[any, any] = {};
+def main(opts: dict[str, any]) {
+    results: dict[str, any] = {};
     bad = False;
     for kernel in [
         k

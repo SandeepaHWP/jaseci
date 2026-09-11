@@ -57,7 +57,7 @@ impl validate_app_name(name: str) -> None {
 }
 
 impl parse_apps(
-    project_data: dict[any, any], apps_data: dict[any, any]
+    project_data: dict[str, any], apps_data: dict[str, any]
 ) -> dict[str, AppConfig] {
     import from jaclang.project.kinds { KIND_SPECS }
     if not isinstance(apps_data, dict) {

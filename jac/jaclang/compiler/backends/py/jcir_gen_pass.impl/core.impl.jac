@@ -208,8 +208,8 @@ impl JcirGenPass.nod_loc(
 
 impl JcirGenPass.call_node(
     func: CgNode,
-    args: list[any],
-    keywords: list[any],
+    args: Sequence[CgItem],
+    keywords: Sequence[CgItem],
     jac_node: (UniNode | None) = None
 ) -> CgNode {
     return self.nod(

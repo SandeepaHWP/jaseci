@@ -108,11 +108,11 @@ glob:pub ErrorFallback = ___ErrorFallback,
      __unwrapFormSchema = ___unwrapFormSchema;
 
 def:pub navigate(path: str) -> None;
-def:pub jacSpawn(left: str, right: str = "", fields: dict[any, any] = {}) -> any;
+def:pub jacSpawn(left: str, right: str = "", fields: dict[str, any] = {}) -> any;
 async def:pub jacSignup(
-    identities_or_username: (str | list[any]),
+    identities_or_username: (str | list[str | dict[str, any]]),
     credential_or_password: (str | dict[str, any]),
-    profile: (dict[any, any] | None) = None
+    profile: (dict[str, any] | None) = None
 ) -> SignupResult;
 
 async def:pub jacLogin(
@@ -141,7 +141,7 @@ def:pub Route(props: dict[str, any]) -> JsxElement;
 def:pub Link(props: dict[str, any]) -> JsxElement;
 def:pub Navigate(props: dict[str, any]) -> JsxElement;
 def:pub Outlet(props: dict[str, any] = {}) -> JsxElement | None;
-def:pub useRouter -> dict[any, any];
+def:pub useRouter -> dict[str, any];
 def:pub AuthGuard(redirect: str = "/login", children: any = None) -> JsxElement | None;
 
 def:pub __jacMakeLayoutRoot(layout_component: any) -> any;

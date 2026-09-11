@@ -17,7 +17,7 @@ glob BRIDGE_TOKEN_ENV: str = "JAC_BRIDGE_TOKEN",
      _consumer_providers: dict[str, list[str]] = {},
      _bearer_token: list[str] = [],
      _consumer_app: list[str] = [],
-     _read_cache: dict[tuple[any, ...], any] = {},
+     _read_cache: dict[tuple[str, str, str, str], any] = {},
      _read_cache_flags: list[any] = [],
      _cache_epoch: list[int] = [0],
      _active_writes: dict[str, int] = {};
@@ -163,7 +163,9 @@ def _read_cache_enabled -> bool {
     return flags[consumer];
 }
 
-def _read_cache_key(app: str, fn: str, kwargs: dict[any, any]) -> tuple[any, ...] {
+def _read_cache_key(
+    app: str, fn: str, kwargs: dict[str, any]
+) -> tuple[str, str, str, str] {
     import json;
     return (
         app,
@@ -288,7 +290,7 @@ def _unwrap_envelope(data: any, app: str, name: str) -> any {
 }
 
 def _http_call(
-    app: str, fn: str, kwargs: dict[any, any], headers: dict[str, str]
+    app: str, fn: str, kwargs: dict[str, any], headers: dict[str, str]
 ) -> any {
     import from jaclang.server.serving.client { post_stream_aware_sync }
     import from jaclang.server.serving.sse { consume_sse_events }
@@ -334,7 +336,7 @@ def _rehydrate_walker(envelope: any, stub_cls: any) -> any {
 def _http_spawn(
     app: str,
     walker_name: str,
-    kwargs: dict[any, any],
+    kwargs: dict[str, any],
     stub_cls: any,
     headers: dict[str, str]
 ) -> any {
@@ -369,7 +371,7 @@ async def _await_if_needed(value: any) -> any {
     return value;
 }
 
-async def _local_call(app: str, fn: str, kwargs: dict[any, any]) -> any {
+async def _local_call(app: str, fn: str, kwargs: dict[str, any]) -> any {
     module = _local_providers[app];
     target = getattr(module, fn, None);
     if target is None or not callable(target) {
@@ -378,7 +380,7 @@ async def _local_call(app: str, fn: str, kwargs: dict[any, any]) -> any {
     return await _await_if_needed(target(**kwargs));
 }
 
-async def _local_spawn(app: str, walker_name: str, kwargs: dict[any, any]) -> any {
+async def _local_spawn(app: str, walker_name: str, kwargs: dict[str, any]) -> any {
     import from jaclang { JacRuntime }
     import from jaclang.runtime.context { ExecutionContext }
     module = _local_providers[app];
@@ -435,7 +437,7 @@ async def _local_spawn(app: str, walker_name: str, kwargs: dict[any, any]) -> an
 async def call(
     app: str,
     fn: str,
-    kwargs: dict[any, any],
+    kwargs: dict[str, any],
     effects: (list[str] | None) = None,
     contract: str = ""
 ) -> any {
@@ -485,7 +487,7 @@ async def call(
 async def spawn_walker(
     app: str,
     walker_name: str,
-    kwargs: dict[any, any],
+    kwargs: dict[str, any],
     stub_cls: any,
     idempotency_key: str = ""
 ) -> any {
@@ -513,7 +515,7 @@ async def spawn_walker(
 }
 
 def spawn_deferred(
-    app: str, walker_name: str, kwargs: dict[any, any], idempotency_key: str = ""
+    app: str, walker_name: str, kwargs: dict[str, any], idempotency_key: str = ""
 ) -> str {
     import from jaclang.server.outbox { enqueue }
     return enqueue(app, walker_name, kwargs, idempotency_key);

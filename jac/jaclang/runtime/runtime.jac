@@ -86,7 +86,7 @@ glob logger = getLogger(__name__),
      _shared_root_resolver: list[any] = [None, None];
 
 glob _scale_provider_cache: list[any] = [],
-     _scale_provider_error: list[any] = [None];
+     _scale_provider_error: list[Exception | None] = [None];
 
 glob _persistent_memory_provider: list[any] = [None];
 

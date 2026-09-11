@@ -27,17 +27,17 @@ def _type_to_schema(
     title: str = "",
     desc: str = "",
     info: (Info | str | tuple[any, ...] | None) = None
-) -> dict[any, any];
+) -> dict[str, any];
 
 def _function_to_schema(
     fn: Callable, title: str = "", info: (Info | str | tuple[any, ...] | None) = None
-) -> dict[any, any];
+) -> dict[str, any];
 
 def _name_of_type(ty: type, info: (Info | str | tuple[any, ...] | None) = None) -> str;
-def _convert_dict_to_schema(ty_dict: type) -> dict[any, any];
-def _decode_dict(json_obj: dict[any, any]) -> dict[any, any];
+def _convert_dict_to_schema(ty_dict: type) -> dict[str, any];
+def _decode_dict(json_obj: dict[str, any]) -> dict[str, any];
 def _wrap_to_object(schema: dict[str, object]) -> dict[str, object];
-def _unwrap_from_object(json_obj: dict[any, any]) -> dict[any, any];
+def _unwrap_from_object(json_obj: dict[str, any]) -> dict[str, any];
 def type_to_schema(
     resp_type: type, info: (Info | str | tuple[any, ...] | None) = None
 ) -> dict[str, object];
@@ -46,14 +46,14 @@ def tool_to_schema(
     func: Callable, description: str, params_desc: dict[str, str], info: (Info | None)
 ) -> dict[str, object];
 
-def json_to_instance(json_obj: dict[any, any], ty: type) -> object;
+def json_to_instance(json_obj: dict[str, any], ty: type) -> object;
 
 def _format_enum_hint(values: list[any], names: list[any]) -> str;
 
-def _hints_from_schema(name: str, prop: dict[any, any]) -> list[str];
+def _hints_from_schema(name: str, prop: dict[str, any]) -> list[str];
 
-def schema_to_hint_text(rf: dict[any, any] | None) -> str;
+def schema_to_hint_text(rf: dict[str, any] | None) -> str;
 
-def attach_schema_hint(messages: list[any], rf: dict[any, any] | None) -> list[any];
+def attach_schema_hint(messages: list[any], rf: dict[str, any] | None) -> list[any];
 
-def inject_schema_hint(params: dict[any, any]) -> dict[any, any];
+def inject_schema_hint(params: dict[str, any]) -> dict[str, any];

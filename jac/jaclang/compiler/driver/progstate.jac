@@ -236,7 +236,7 @@ obj BuildScratch {
     has na_dep_units: dict[str, (uni.Module | str)] = {},
         na_dep_inflight: set[str] postinit,
         na_verdict_resolving: set[str] postinit,
-        na_unverified_live: dict[str, dict[any, any]] = {},
+        na_unverified_live: dict[str, dict[str, set[str]]] = {},
         na_verdict_misses: int = 0,
         boundary_parse_memo: dict[str, any] = {},
         compile_depth: int = 0;

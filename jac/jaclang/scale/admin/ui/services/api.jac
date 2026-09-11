@@ -9,7 +9,7 @@ async def _jsonBody(resp: any) -> dict[str, any] {
 async def:pub fetchApi(
     endpoint: str, options: dict[str, any] = {}, token: str = ""
 ) -> dict[str, any] {
-    headers: dict[any, any] = options["headers"] or {};
+    headers: dict[str, str] = options["headers"] or {};
     if token {
         headers["Authorization"] = "Bearer " + token;
     }
@@ -48,6 +48,6 @@ async def:pub put(
     );
 }
 
-async def:pub `del(endpoint: str, token: str = "") -> dict[any, any] {
+async def:pub `del(endpoint: str, token: str = "") -> dict[str, any] {
     return await fetchApi(endpoint, {"method": "DELETE"}, token);
 }

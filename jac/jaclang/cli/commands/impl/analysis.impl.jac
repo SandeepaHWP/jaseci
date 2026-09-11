@@ -21,7 +21,7 @@ def _wire_list(value: any) -> list[any] {
     return value if isinstance(value, list) else [];
 }
 
-def _wire_dict(value: any) -> dict[any, any] {
+def _wire_dict(value: any) -> dict[str, any] {
     return value if isinstance(value, dict) else {};
 }
 
@@ -254,10 +254,10 @@ def _check_file_job(request: dict[(str, any)]) -> dict[(str, any)] {
 }
 
 impl check(
-    paths: list[any],
+    paths: list[str],
     print_errs: bool = True,
-    ignore: (list[any] | None) = None,
-    disable_error_code: (list[any] | None) = None,
+    ignore: (list[str] | None) = None,
+    disable_error_code: (list[str] | None) = None,
     parse_only: bool = False,
     nowarn: bool = False,
     lint_only: bool = False,
@@ -373,8 +373,8 @@ impl check(
     results: list[dict[(str, any)]] = [];
     reached: set[str] = set();
     plan: dict[(str, int)] = {'total': len(units)};
-    placement_report: dict[any, any] = {};
-    coverage_report: dict[any, any] = {};
+    placement_report: dict[str, any] = {};
+    coverage_report: dict[str, any] = {};
 
     def run_units(batch: list[dict[(str, any)]]) -> None {
         if not batch {
@@ -594,7 +594,7 @@ impl check(
     }
 
     multi = len({r['label'] for r in results}) > 1;
-    failed_results: list[dict[any, any]] = [];
+    failed_results: list[dict[str, any]] = [];
     total_errors = failed_files=0;
     for res in results {
         errs = _wire_list(res.get('errors'));
@@ -642,7 +642,7 @@ impl check(
 }
 
 impl lint(
-    paths: list[any], fix: bool = False, ignore: (list[any] | None) = None
+    paths: list[str], fix: bool = False, ignore: (list[str] | None) = None
 ) -> int {
     import from jaclang.compiler.driver.program { JacProgram }
     if isinstance(paths, str) {
@@ -815,14 +815,14 @@ def _format_single_file_worker(
     cache_stamp: str = "",
     cache_anchor: str = "",
     logical_path: str = ""
-) -> dict[any, any] {
+) -> dict[str, any] {
     import os;
     import from jaclang.compiler.driver.program { JacProgram }
     import from jaclang.compiler.frontend.helpers { read_file_with_encoding }
     path_obj = Path(file_path);
 
     effective_logical = logical_path or file_path;
-    result: dict[any, any] = {
+    result: dict[str, any] = {
         'path': file_path,
         'success': False,
         'changed': False,
@@ -1082,14 +1082,14 @@ def _format_single_file_worker(
 }
 
 impl format(
-    paths: list[any],
+    paths: list[str],
     to_screen: bool = False,
     lintfix: bool = False,
     check: bool = False,
     cache: bool = False,
     cache_anchor: str = "",
-    path_map: dict[any, any] | None = None,
-    cache_stats: dict[any, any] | None = None,
+    path_map: dict[str, str] | None = None,
+    cache_stats: dict[str, int] | None = None,
     jobs: str = ""
 ) -> int {
     import os;
@@ -1122,7 +1122,7 @@ impl format(
     }
 
     unformatted_files: list[str] = [];
-    failed_results: list[any] = [];
+    failed_results: list[dict[str, any]] = [];
 
     (all_files, had_path_errors) = _iter_jac_files(paths);
     total_files = len(all_files);
@@ -1145,11 +1145,11 @@ impl format(
         and total_files > 1
     );
 
-    results_by_idx: dict[(int, dict[any, any])] = {};
+    results_by_idx: dict[int, dict[str, any]] = {};
 
     progress: dict[(str, any)] = {"pooled": use_pool, "done": 0};
 
-    def fmt_job(request: dict[(str, any)]) -> dict[any, any] {
+    def fmt_job(request: dict[(str, any)]) -> dict[str, any] {
         fp = str(request["path"]);
         return _format_single_file_worker(
             fp, lintfix, check, covered, cache_stamp, cache_anchor, remap.get(fp, "")
@@ -1213,7 +1213,7 @@ impl format(
     } else {
         pool.run_inline();
     }
-    results: list[dict[any, any]] = [];
+    results: list[dict[str, any]] = [];
     for idx in range(total_files) {
         if idx not in results_by_idx {
             on_record(idx, {'error': 'no result'});
@@ -1360,12 +1360,12 @@ impl format(
 }
 
 impl precommit(
-    paths: (list[any] | None) = None,
+    paths: (list[str] | None) = None,
     staged: bool = False,
     verify: bool = False,
     install: bool = False,
     force: bool = False,
-    cache_stats: dict[any, any] | None = None
+    cache_stats: dict[str, int] | None = None
 ) -> int {
     import os;
     import shutil;
@@ -1424,7 +1424,7 @@ impl precommit(
 
     fmt_targets = targets;
     tmp_root: (str | None) = None;
-    path_map: dict[any, any] = {};
+    path_map: dict[str, str] = {};
     if staged and verify {
         dirty = _staged_dirty_files(git_root, rel_targets);
         if dirty {
@@ -1657,7 +1657,7 @@ def _write_git_hook(hook_path: str, body: str, force: bool) -> int {
 
 impl `test(
     target: str = "",
-    paths: list[any] = [],
+    paths: list[str] = [],
     test_name: str = "",
     filter: str = "",
     xit: bool = False,
@@ -1667,7 +1667,7 @@ impl `test(
     pct_range: str = "",
     resume: bool = False,
     verbose: bool = False,
-    ignore: (list[any] | None) = None,
+    ignore: (list[str] | None) = None,
     jobs: str = ""
 ) -> int {
     import os;
@@ -1875,10 +1875,10 @@ impl grammar(output: str = "", strict: bool = False) -> int {
 }
 
 def _iter_jac_files(
-    paths: list[any], ignore_list: (list[any] | None) = None, include_annex: bool = True
+    paths: list[str], ignore_list: (list[str] | None) = None, include_annex: bool = True
 ) -> tuple[list[str], bool] {
     import os;
-    ignore_list: list[any] = ignore_list or [];
+    ignore_list: list[str] = ignore_list or [];
     result: list[str] = [];
     explicit: set[str] = set();
     had_errors = False;
@@ -1937,7 +1937,7 @@ def _drop_covered_annexes(files: list[str], explicit: set[str]) -> list[str] {
     return kept;
 }
 
-def _normalize_ignore_patterns(ignore: list[any]) -> list[any] {
+def _normalize_ignore_patterns(ignore: list[str]) -> list[str] {
     import from jaclang.compiler.frontend.helpers { normalize_exclude_patterns }
     return normalize_exclude_patterns(ignore);
 }
@@ -1978,7 +1978,7 @@ def _drop_git_ignored(paths: list[str]) -> list[str] {
 }
 
 
-def _should_ignore(file_path: str, ignore_patterns: list[any]) -> bool {
+def _should_ignore(file_path: str, ignore_patterns: list[str]) -> bool {
     import from jaclang.compiler.frontend.helpers { path_matches_exclude }
     return path_matches_exclude(file_path, ignore_patterns);
 }

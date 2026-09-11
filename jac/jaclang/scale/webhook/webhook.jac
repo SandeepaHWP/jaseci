@@ -39,9 +39,9 @@ def _create_api_key_db -> any | None {
 
 obj ApiKeyManager {
     has _db: any | None = _create_api_key_db(),
-        _inmemory_store: dict[any, any] = {},
+        _inmemory_store: dict[str, any] = {},
         _collection: str = 'webhook_api_keys',
-        _rate_window: dict[any, any] = {};
+        _rate_window: dict[str, any] = {};
 
     def postinit -> None;
     def _ensure_indexes -> None;
@@ -54,7 +54,7 @@ obj ApiKeyManager {
 
     def list_api_keys(user_id: str) -> TransportResponse;
     def revoke_api_key(user_id: str, api_key_id: str) -> TransportResponse;
-    def _get_key_doc(api_key_id: str) -> dict[any, any] | None;
-    def resolve_key(api_key: str) -> dict[any, any] | None;
+    def _get_key_doc(api_key_id: str) -> dict[str, any] | None;
+    def resolve_key(api_key: str) -> dict[str, any] | None;
     def check_rate_limit(api_key_id: str, limit_per_minute: int) -> bool;
 }

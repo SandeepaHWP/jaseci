@@ -54,7 +54,7 @@ import from jaclang.compiler.frontend.unitree {
 import from jaclang.compiler.passes.uni_pass { UniPass }
 
 walker CFGBuildPass(UniPass) {
-    static has PROVIDES: tuple[any, ...] = ('CfgSucc', 'CfgTrue', 'CfgFalse');
+    static has PROVIDES: tuple[str, ...] = ('CfgSucc', 'CfgTrue', 'CfgFalse');
 
     def before_pass -> None;
     def link_bbs(source: UniCFGNode, target: UniCFGNode) -> None;

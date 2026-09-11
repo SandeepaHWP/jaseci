@@ -3,7 +3,7 @@ import from jaclang.compiler.frontend.constant { OwnershipKind }
 
 def value_contract(
     expr: any, ownership: OwnershipKind = OwnershipKind.NONE, host: bool = False
-) -> dict[any, any] {
+) -> dict[str, any] {
     if isinstance(expr, UnaryExpr) and expr.ownership != OwnershipKind.NONE {
         ownership = expr.ownership;
         expr = expr.operand;
@@ -54,12 +54,12 @@ def value_contract(
     return {"type": name, "mode": mode, "kind": "handle"};
 }
 
-def function_contract(decl: Ability, host: bool = False) -> dict[any, any] {
+def function_contract(decl: Ability, host: bool = False) -> dict[str, any] {
     sig = decl.signature;
     if not isinstance(sig, FuncSignature) {
         raise ValueError("Wasm exports require a function signature");
     }
-    params: list[dict[any, any]] = [];
+    params: list[dict[str, any]] = [];
     for p in sig.get_parameters() {
         if p.type_tag is None {
             raise ValueError(f"Wasm parameter '{p.sym_name}' requires a type");
@@ -72,7 +72,7 @@ def function_contract(decl: Ability, host: bool = False) -> dict[any, any] {
 }
 
 
-def host_contracts(module: any) -> dict[any, any] {
+def host_contracts(module: any) -> dict[str, dict[str, any]] {
     import from jaclang.compiler.frontend.unitree { Import }
     import from jaclang.compiler.driver.boundary_classify {
         symbol_linked_source_module
@@ -82,7 +82,7 @@ def host_contracts(module: any) -> dict[any, any] {
     }
     visited: set[str] = set();
     todo = [module];
-    contracts: dict[any, any] = {};
+    contracts: dict[str, dict[str, any]] = {};
     while todo {
         current = todo.pop();
         if current is None or current.loc.mod_path in visited {
@@ -151,7 +151,7 @@ def check_host_call(call: any) -> None {
             "Host binding requires statically known export and host types"
         );
     }
-    methods: dict[any, any] = {};
+    methods: dict[str, Ability] = {};
     todo = [scope];
     seen: set[int] = set();
     while todo {

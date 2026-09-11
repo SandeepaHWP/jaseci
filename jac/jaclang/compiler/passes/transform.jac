@@ -82,8 +82,8 @@ walker Transform(BaseTransform) {
     has cur_node: UniNode postinit,
         policy: (DiagnosticPolicy | None) = None;
 
-    static has PROVIDES: tuple[any, ...] = (),
-        REQUIRES: tuple[any, ...] = (),
+    static has PROVIDES: tuple[str, ...] = (),
+        REQUIRES: tuple[str, ...] = (),
         HOST_PASS: bool = False;
 
     def postinit -> None;

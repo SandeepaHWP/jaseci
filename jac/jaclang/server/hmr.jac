@@ -1,4 +1,6 @@
 import threading;
+import type from jaclang.compiler.passes.transform { Alert }
+import type from jaclang.client.client_diagnostics { ClientDiagnostic }
 import from enum { StrEnum }
 import from pathlib { Path }
 import type from jaclang.server.watcher { JacFileWatcher, FileChangeEvent, ChangeType }
@@ -18,10 +20,10 @@ obj HotReloader {
         _client_output_dir: str = ".jac/client/compiled",
         _running: bool = False,
         _build_status: BuildStatus = BuildStatus.OK,
-        _diagnostics: list[any] = [],
-        _vite_diagnostics: list[any] = [],
-        _client_diagnostics: list[any] = [],
-        _runtime_diagnostics: list[any] = [],
+        _diagnostics: list[ClientDiagnostic] = [],
+        _vite_diagnostics: list[ClientDiagnostic] = [],
+        _client_diagnostics: list[ClientDiagnostic] = [],
+        _runtime_diagnostics: list[ClientDiagnostic] = [],
         _reload_nonce: int = 0;
 
     static has _active: (HotReloader | None) = None,
@@ -30,15 +32,15 @@ obj HotReloader {
     def start -> None;
     def stop -> None;
     def on_file_change(event: any) -> None;
-    def build_status -> dict[any, any];
-    def diagnostics -> list[any];
+    def build_status -> dict[str, any];
+    def diagnostics -> list[ClientDiagnostic];
     def attach_client_bundler(bundler: any) -> None;
-    def record_client_event(slot: str, payload: (dict[any, any] | None)) -> None;
+    def record_client_event(slot: str, payload: (dict[str, any] | None)) -> None;
     def record_ok -> None;
     def record_error(
         file_path: str,
         message: str,
-        alerts: (list[any] | None) = None,
+        alerts: (list[Alert] | None) = None,
         line: int = 0,
         column: int = 0
     ) -> None;
@@ -68,4 +70,4 @@ obj HotReloader {
     def _copy_frontend_files(file_path: str) -> None;
 }
 
-def get_build_status -> dict[any, any];
+def get_build_status -> dict[str, any];

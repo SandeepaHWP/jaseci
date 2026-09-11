@@ -185,7 +185,9 @@ impl repair_mode -> str {
 }
 
 
-impl apply_rules(data: dict[any, any], rules: SchemaRules) -> tuple[any, ...] {
+impl apply_rules(
+    data: dict[str, any], rules: SchemaRules
+) -> tuple[dict[str, any], list[str]] {
     steps: list[str] = [];
     changed = False;
     out = dict(data);

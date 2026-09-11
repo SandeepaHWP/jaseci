@@ -19,7 +19,7 @@ glob _NO_TRIGGER = object(),
      _subclass_hook_lock = Lock();
 
 glob _light_edge_types: dict[type, bool] = {},
-     _edge_subtypes: dict[type, tuple[any, ...]] = {},
+     _edge_subtypes: dict[type, tuple[type, ...]] = {},
      _tracked_classes: dict[type, type] = {};
 
 enum AccessLevel { NO_ACCESS = -1, READ = 0, CONNECT = 1, WRITE = 2 }
@@ -31,7 +31,7 @@ def access_level_cast(val: int | str | AccessLevel) -> AccessLevel {
     if isinstance(val, str) {
         val = val.upper();
     }
-    _map: dict[any, any] = {
+    _map: dict[int | str, AccessLevel] = {
         -1: AccessLevel.NO_ACCESS,
         0: AccessLevel.READ,
         1: AccessLevel.CONNECT,
@@ -318,12 +318,12 @@ def is_light_edge_type(cls: type) -> bool {
     return light;
 }
 
-def edge_subtypes(cls: type) -> tuple[any, ...] {
+def edge_subtypes(cls: type) -> tuple[type, ...] {
     known = _edge_subtypes.get(cls);
     if known is not None {
         return known;
     }
-    out: list[any] = [cls];
+    out: list[type] = [cls];
     i = 0;
     while i < len(out) {
         for sub in out[i].__subclasses__() {
@@ -382,7 +382,7 @@ def light_connect(src: NodeAnchor, cls: type, tgt: NodeAnchor) {
     }
 }
 
-def _drop_entry(d: (dict[any, any] | None), cls: type, key: any) -> bool {
+def _drop_entry(d: (dict[type, list[any]] | None), cls: type, key: any) -> bool {
     if d is None {
         return False;
     }
@@ -451,7 +451,7 @@ def light_clear_matching(
     return hit;
 }
 
-def _collect_light(d: dict[any, any], cls: (type | None)) -> list[any] {
+def _collect_light(d: dict[type, list[any]], cls: (type | None)) -> list[any] {
     if cls is None {
         out: list[any] = [];
         for lst in d.values() {
@@ -629,7 +629,9 @@ def _untracked_new(cls: type[Archetype]) -> Archetype {
     return object.__new__(cls);
 }
 
-def _tracked_reduce_ex(self: any, protocol: int) -> tuple[any, ...] {
+def _tracked_reduce_ex(
+    self: any, protocol: int
+) -> tuple[Callable, tuple[type], dict[str, any]] {
     return (_untracked_new, (untracked_class(`type(self)), ), self.__dict__);
 }
 

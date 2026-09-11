@@ -1,4 +1,4 @@
-def:pub SectionRail(items: list[dict[any, any][any, any]]) -> JsxElement {
+def:pub SectionRail(items: list[dict[str, any]]) -> JsxElement {
     has active: str = "",
         visible: bool = False,
         lastRef: Ref[any] = Ref(""),

@@ -243,7 +243,7 @@ impl McpClient.connect -> None {
     }
 }
 
-impl McpClient.get_tools(names: list[str] | None = None) -> list[any] {
+impl McpClient.get_tools(names: list[str] | None = None) -> list[McpTool] {
     state = _get_state(self);
     if not state.connected {
         self.connect();
@@ -306,7 +306,7 @@ impl McpTool.get_json_schema -> dict[str, any] {
     };
 }
 
-impl McpTool.parse_arguments(args_json: dict[any, any]) -> dict[any, any] {
+impl McpTool.parse_arguments(args_json: dict[str, any]) -> dict[str, any] {
     return args_json;
 }
 

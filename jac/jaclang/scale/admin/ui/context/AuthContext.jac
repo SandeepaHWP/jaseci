@@ -7,9 +7,9 @@ import from ..utils.api { getErrorMessage }
 
 glob:pub AuthContext = createContext(None);
 
-async def _jsonBody(resp: Response) -> dict[any, any] {
+async def _jsonBody(resp: Response) -> dict[str, any] {
     body = await resp.json();
-    return body as dict[any, any];
+    return body as dict[str, any];
 }
 
 def:pub AuthProvider(children: any) -> JsxElement {

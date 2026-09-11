@@ -54,7 +54,7 @@ obj KubernetesTargetBase(DeploymentTarget) {
     def _owner_labels -> dict[str, str] {
         return {
             str(k): str(v)
-            for (k, v) in dict[any, any](self.k8s_config.labels or {}).items()
+            for (k, v) in dict[str, any](self.k8s_config.labels or {}).items()
         };
     }
 
@@ -470,7 +470,7 @@ obj KubernetesTargetBase(DeploymentTarget) {
         }
     }
 
-    def get_full_status(app_name: str) -> dict[any, any] {
+    def get_full_status(app_name: str) -> dict[str, any] {
         try {
             self._load_cluster_config();
             apps_v1 = client.AppsV1Api();

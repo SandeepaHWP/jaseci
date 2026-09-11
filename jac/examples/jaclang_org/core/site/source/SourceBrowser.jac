@@ -3,7 +3,7 @@ import from core.site.ui.CodeBlock { CodeLines }
 import from "@hugeicons/react" { HugeiconsIcon }
 import from "@hugeicons/core-free-icons" { ArrowRight01Icon, Folder01Icon }
 
-glob _DOT_COLORS: dict[any, any] = {
+glob _DOT_COLORS: dict[str, any] = {
          "jac": "bg-orange-400",
          "toml": "bg-sky-400",
          "css": "bg-purple-400",
@@ -13,15 +13,15 @@ glob _DOT_COLORS: dict[any, any] = {
 
 def _ancestors_of(d: str) -> list[str];
 
-def _dir_paths(rows: list[dict[any, any]]) -> list[str];
+def _dir_paths(rows: list[dict[str, any]]) -> list[str];
 
-def _build_rows(tree: list[SourceFile]) -> list[dict[any, any]];
+def _build_rows(tree: list[SourceFile]) -> list[dict[str, any]];
 
 def:pub SourceBrowser(
     className: str = "", initial_path: str = "web/main.jac"
 ) -> JsxElement {
     has tree: list[SourceFile] = [],
-        rows: list[dict[any, any]] = [],
+        rows: list[dict[str, any]] = [],
         closed: list[str] = [],
         view: SourceView | None = None,
         busy: bool = False;
@@ -45,7 +45,7 @@ def:pub SourceBrowser(
 
     def toggle_dir(d: str);
 
-    def is_visible(row: dict[any, any]) -> bool;
+    def is_visible(row: dict[str, any]) -> bool;
 
     total_lines: int = 0;
     for f in tree {

@@ -346,7 +346,11 @@ impl SolidBackend.view_runtime_symbols(view: ViewElement) -> list[str] {
 }
 
 impl SolidBackend._jsx_element(
-    name_node: any, attrs: list[any], children: list[any], jac_node: any, sync_loc: any
+    name_node: any,
+    attrs: list[es.JsxAttribute | es.JsxSpreadAttribute],
+    children: list[any],
+    jac_node: any,
+    sync_loc: any
 ) -> es.JsxElement {
     self_closing = len(children) == 0;
     opening = sync_loc(
@@ -369,7 +373,7 @@ impl SolidBackend._jsx_element(
 
 impl SolidBackend._jsx_dynamic(
     component_expr: es.Expression,
-    attrs: list[any],
+    attrs: list[es.JsxAttribute | es.JsxSpreadAttribute],
     children: list[any],
     jac_node: any,
     sync_loc: any

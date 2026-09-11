@@ -569,7 +569,7 @@ def _verify_claims(
 
 
 impl fix(
-    target: str, paths: list[any], dry_run: bool = False, strip_only: bool = False
+    target: str, paths: list[str], dry_run: bool = False, strip_only: bool = False
 ) -> int {
     if target != 'placement' {
         console.error(f"Unknown fix target '{target}'. Available: placement");

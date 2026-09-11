@@ -100,7 +100,7 @@ glob TEST_ASSERT_METHOD_NAMES: tuple[str, ...] = (
      );
 
 walker SymTabBuildPass(UniPass) {
-    static has PROVIDES: tuple[any, ...] = (
+    static has PROVIDES: tuple[str, ...] = (
         'SymOf',
         'Defines',
         'InScope',

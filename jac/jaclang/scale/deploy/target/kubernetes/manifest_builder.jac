@@ -38,7 +38,7 @@ glob GATEWAY_NAME: str = "__gateway__",
          "network request failed",
 
      ),
-     _VITE_BUILD_ENV_FILES: tuple[any, ...] = (
+     _VITE_BUILD_ENV_FILES: tuple[str, ...] = (
          ".env",
          ".env.local",
          ".env.production",
@@ -199,7 +199,7 @@ def pdb_spec(
 }
 
 
-def _is_named_list(items: list[any]) -> bool {
+def _is_named_list(items: list[object]) -> bool {
     if not items {
         return False;
     }
@@ -1027,7 +1027,7 @@ obj ManifestBuilder {
     def _owner_labels -> dict[str, str] {
         return {
             str(k): str(v)
-            for (k, v) in dict[any, any](self.k8s_config.labels or {}).items()
+            for (k, v) in dict[str, any](self.k8s_config.labels or {}).items()
         };
     }
 
@@ -1060,7 +1060,7 @@ obj ManifestBuilder {
             env.append({"name": "JAC_SV_FILE", "value": svc_file});
         }
 
-        trace_cfg: dict[any, any] = dict(self._gateway_cfg().get("tracing", {}));
+        trace_cfg: dict[str, any] = dict(self._gateway_cfg().get("tracing", {}));
         if trace_cfg.get("enabled", False) {
             env.append(
                 {

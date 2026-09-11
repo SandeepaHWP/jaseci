@@ -1,4 +1,4 @@
-def _tool_call_fragments(chunk: object) -> list[dict[any, any]] {
+def _tool_call_fragments(chunk: object) -> list[dict[str, any]] {
     raw: (list[object] | None) = None;
     try {
         if chunk?.choices and chunk?.choices?[0]?.delta {
@@ -16,7 +16,7 @@ def _tool_call_fragments(chunk: object) -> list[dict[any, any]] {
     if not raw {
         return [];
     }
-    out: list[dict[any, any]] = [];
+    out: list[dict[str, any]] = [];
     for (pos, tc) in enumerate(raw) {
         try {
             if isinstance(tc, dict) {
@@ -53,13 +53,13 @@ def _tool_call_fragments(chunk: object) -> list[dict[any, any]] {
 
 
 obj _ToolDeltaCoalescer {
-    has out: list[dict[any, any]],
-        state: dict[any, any] = {},
+    has out: list[dict[str, any]],
+        state: dict[int, dict[str, any]] = {},
         min_chars: int = _TOOL_DELTA_MIN_CHARS,
         min_interval: float = _TOOL_DELTA_MIN_INTERVAL_S,
         max_per_call: int = _TOOL_DELTA_MAX_PER_CALL;
 
-    def observe(frag: dict[any, any]) -> None {
+    def observe(frag: dict[str, any]) -> None {
         idx = frag.get("index", 0);
         st = self.state.get(idx);
         if st is None {
@@ -110,7 +110,7 @@ obj _ToolDeltaCoalescer {
         }
     }
 
-    def _publish(idx: int, st: dict[any, any]) -> None {
+    def _publish(idx: int, st: dict[str, any]) -> None {
         if not st["buf"] and st["sent"] > 0 {
             return;
         }
@@ -138,7 +138,7 @@ obj _ToolDeltaCoalescer {
 }
 
 
-def _tool_stream_settings(mt_run: MTRuntime) -> dict[any, any] {
+def _tool_stream_settings(mt_run: MTRuntime) -> dict[str, any] {
     settings = dict(get_byllm_config().get_tool_stream_config());
     per_call = mt_run.call_params.get("stream_tool_args");
     if per_call is True or per_call is False {
@@ -197,7 +197,7 @@ def _is_prompt_caching_eligible(model_name: str) -> bool {
 }
 
 
-def _mark_message_for_caching(msg: dict[any, any]) {
+def _mark_message_for_caching(msg: dict[str, any]) {
     content = msg.get("content");
     if isinstance(content, str) {
         msg["cache_control"] = _CACHE_CONTROL_EPHEMERAL;
@@ -243,7 +243,7 @@ def _usage_int(usage: any, key: str) -> int {
 }
 
 
-def _apply_prompt_caching(messages: list[object], tools: list[any] | None) {
+def _apply_prompt_caching(messages: list[object], tools: list[dict[str, any]] | None) {
     last_sys_idx = -1;
     last_nonsys_idx = -1;
     for (i, msg) in enumerate(messages) {
@@ -288,7 +288,7 @@ def _existing_cost(usage_obj: object) -> object {
 }
 
 
-def _rebuild_stream_chunks(chunks: list[any], logging_obj: object) -> dict[any, any] {
+def _rebuild_stream_chunks(chunks: list[any], logging_obj: object) -> dict[str, any] {
     rebuilt: any = (
         litellm.stream_chunk_builder(chunks, logging_obj=logging_obj)
             if _STREAM_CHUNK_BUILDER_ACCEPTS_LOGGING_OBJ
@@ -334,7 +334,7 @@ def _attach_call_cost(
 }
 
 
-def _usage_to_dict(usage_obj: object) -> dict[any, any] {
+def _usage_to_dict(usage_obj: object) -> dict[str, any] {
     if usage_obj is None {
         return {};
     }
@@ -430,7 +430,7 @@ def _default_compact(
         return messages;
     }
 
-    lines: list[any] = [];
+    lines: list[str] = [];
     for msg in compact_slice {
         if isinstance(msg, dict) {
             role = msg.get("role", "");
@@ -444,7 +444,7 @@ def _default_compact(
             if str(role) == "assistant" and not content {
                 tool_calls: any = msg.get("tool_calls") or [];
                 if tool_calls {
-                    descs: list[any] = [];
+                    descs: list[str] = [];
                     for tc in tool_calls {
                         fn = tc.get("function", {})
                             if isinstance(tc, dict)
@@ -500,7 +500,7 @@ def _default_compact(
 }
 
 
-impl BaseLLM._get_ctx_window(call_params: dict[any, any]) -> int {
+impl BaseLLM._get_ctx_window(call_params: dict[str, any]) -> int {
     `override = int(
         call_params.get("ctx_window")
             or self.ctx_window
@@ -514,7 +514,7 @@ impl BaseLLM._get_ctx_window(call_params: dict[any, any]) -> int {
 }
 
 
-impl BaseLLM._resolve_compaction_params(mt_run: MTRuntime) -> dict[any, any] {
+impl BaseLLM._resolve_compaction_params(mt_run: MTRuntime) -> dict[str, any] {
     comp_cfg = get_byllm_config().get_compaction_config();
     enabled = bool(
         mt_run.call_params.get("compaction_enabled")
@@ -558,7 +558,7 @@ impl BaseLLM._resolve_compaction_params(mt_run: MTRuntime) -> dict[any, any] {
 
 
 impl BaseLLM._maybe_compact(
-    mt_run: MTRuntime, usage: object, just_compacted: bool, cp: dict[any, any]
+    mt_run: MTRuntime, usage: object, just_compacted: bool, cp: dict[str, any]
 ) -> bool {
     ctx_window = int(cp["ctx_window"]);
     if not (bool(cp["enabled"]) and ctx_window > 0) {
@@ -593,7 +593,7 @@ impl BaseLLM._maybe_compact(
 
 
 impl BaseLLM._emergency_compact_retry(
-    mt_run: MTRuntime, just_compacted: bool, cp: dict[any, any]
+    mt_run: MTRuntime, just_compacted: bool, cp: dict[str, any]
 ) -> CompletionResult {
     if not bool(cp["enabled"]) {
         raise;
@@ -838,7 +838,7 @@ impl BaseLLM._typed_retry_reset(
 
 impl BaseLLM._parse_failure_feedback(
     attempt: int, max_attempts: int, err: object
-) -> tuple[any, ...] {
+) -> tuple[str, str] {
     self.log_info(
         f"[byllm] typed-output attempt {attempt}/{max_attempts} failed to parse: {err}"
     );
@@ -851,7 +851,7 @@ impl BaseLLM._parse_failure_feedback(
 
 impl BaseLLM._nonconforming_feedback(
     attempt: int, max_attempts: int, mt_run: MTRuntime, result: object
-) -> tuple[any, ...] {
+) -> tuple[OutputConversionError, str, str] {
     self.log_info(
         f"[byllm] typed-output attempt {attempt}/{max_attempts} "
             + "returned a non-conforming value; retrying"
@@ -1078,7 +1078,7 @@ impl BaseLLM._invoke_react_loop(mt_run: MTRuntime) -> object {
             }
             return recovery_resp.output;
         }
-        usage: dict[any, any] = resp.usage or {};
+        usage: dict[str, any] = resp.usage or {};
         total_tokens += int(
             usage.get("total_tokens", 0)
                 if isinstance(usage, dict)
@@ -1087,7 +1087,7 @@ impl BaseLLM._invoke_react_loop(mt_run: MTRuntime) -> object {
 
         just_compacted = self._maybe_compact(mt_run, usage, just_compacted, _cp);
         if resp.tool_calls {
-            non_finish_calls: list[any] = [];
+            non_finish_calls: list[ToolCall] = [];
             finish_tc: (ToolCall | None) = None;
             for tc in resp.tool_calls {
                 if tc.is_finish_call() {
@@ -1104,8 +1104,10 @@ impl BaseLLM._invoke_react_loop(mt_run: MTRuntime) -> object {
                         else [[tc] for tc in non_finish_calls]
                 );
                 for batch in batches {
-                    raw_results: list[any] = list(dispatch_batch(batch));
-                    ordered: dict[any, any] = {};
+                    raw_results: list[tuple[ToolCall, Message, float]] = list(
+                        dispatch_batch(batch)
+                    );
+                    ordered: dict[int, tuple[ToolCall, Message, float]] = {};
                     for r in raw_results {
                         idx = _index_by_identity(batch, r[0]);
                         ordered[idx] = r;
@@ -1154,7 +1156,7 @@ impl BaseLLM._invoke_react_loop(mt_run: MTRuntime) -> object {
     return resp.output;
 }
 
-impl BaseLLM.make_model_params(mt_run: MTRuntime) -> dict[any, any] {
+impl BaseLLM.make_model_params(mt_run: MTRuntime) -> dict[str, any] {
     default_temp = _call_params_config.get("temperature");
     default_max_tokens = _call_params_config.get("max_tokens");
 
@@ -1180,8 +1182,8 @@ impl BaseLLM.make_model_params(mt_run: MTRuntime) -> dict[any, any] {
         and mt_run.call_params.get("parallel_hint", True)
         and messages
         and len(messages) > 0 {
-        annotated: list[any] = [];
-        serial_names: list[any] = [];
+        annotated: list[dict[str, any]] = [];
+        serial_names: list[str] = [];
         for (i, schema) in enumerate(tools) {
             tool_obj = mt_run.tools[i] if i < len(mt_run.tools) else None;
             is_serial = bool(getattr(tool_obj, "serialize", False));
@@ -1292,7 +1294,7 @@ impl BaseLLM.log_info(message: str) -> None {
     }
 }
 
-impl BaseLLM.format_prompt(params: dict[any, any]) -> str {
+impl BaseLLM.format_prompt(params: dict[str, any]) -> str {
     MAGENTA = "\033[95m";
     RESET = "\033[0m";
     log_params = params.copy();
@@ -1657,8 +1659,8 @@ impl BaseLLM.dispatch_streaming_with_tools(
         return;
     }
 
-    message: (LiteLLMMessage | dict[any, any] | None) = None;
-    usage_data: dict[any, any] = {};
+    message: (LiteLLMMessage | dict[str, any] | None) = None;
+    usage_data: dict[str, any] = {};
     actual_model = self.model_name;
     try {
         rebuilt = _rebuild_stream_chunks(chunks, _stream_resp?.logging_obj);
@@ -1802,27 +1804,27 @@ impl BaseLLM.adispatch_streaming(mt_run: MTRuntime) {
     }
 }
 
-impl BaseLLM.model_call_no_stream(params: dict[any, any]) -> dict[any, any] {
+impl BaseLLM.model_call_no_stream(params: dict[str, any]) -> dict[str, any] {
     raise NotImplementedError(
         "Subclasses must implement this method for LLM call without streaming."
     );
 }
 
 impl BaseLLM.model_call_with_stream(
-    params: dict[any, any]
+    params: dict[str, any]
 ) -> Generator[object, None, None] {
     raise NotImplementedError(
         "Subclasses must implement this method for LLM call with streaming."
     );
 }
 
-impl BaseLLM.model_call_no_stream_async(params: dict[any, any]) -> dict[any, any] {
+impl BaseLLM.model_call_no_stream_async(params: dict[str, any]) -> dict[str, any] {
     import asyncio;
     return await asyncio.to_thread(self.model_call_no_stream, params);
 }
 
 impl BaseLLM.model_call_with_stream_async(
-    params: dict[any, any]
+    params: dict[str, any]
 ) -> AsyncGenerator[object, None] {
     import asyncio;
     def _next_chunk(gen: Generator[object, None, None]) -> tuple[bool, object] {
@@ -2155,7 +2157,7 @@ impl BaseLLM._invoke_streaming(
             }
             _llm_ms = int((_time.time() - _llm_t0) * 1000);
 
-            usage: dict[any, any] = resp.usage or {};
+            usage: dict[str, any] = resp.usage or {};
             total_tokens += int(
                 usage.get("total_tokens", 0)
                     if isinstance(usage, dict)
@@ -2172,7 +2174,7 @@ impl BaseLLM._invoke_streaming(
             _usage_base = len(mt_run._usage_history);
 
             if resp.tool_calls {
-                non_finish_calls: list[any] = [];
+                non_finish_calls: list[ToolCall] = [];
                 finish_tc: (ToolCall | None) = None;
                 for tc in resp.tool_calls {
                     if tc.is_finish_call() {
@@ -2209,7 +2211,7 @@ impl BaseLLM._invoke_streaming(
                             );
                         }
 
-                        raw_results: list[any] = [];
+                        raw_results: list[tuple[ToolCall, Message, float]] = [];
                         for bres in dispatch_batch(batch) {
                             btc: ToolCall = bres[0];
                             result_msg: Message = bres[1];
@@ -2240,7 +2242,7 @@ impl BaseLLM._invoke_streaming(
                             raw_results.append((btc, result_msg, tool_ms));
                         }
 
-                        ordered: dict[any, any] = {};
+                        ordered: dict[int, tuple[ToolCall, Message, float]] = {};
                         for r in raw_results {
                             idx = _index_by_identity(batch, r[0]);
                             ordered[idx] = r;

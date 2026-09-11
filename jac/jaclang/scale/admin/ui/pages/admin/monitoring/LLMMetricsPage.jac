@@ -7,7 +7,7 @@ import from ....services.llmService { getLLMSummary }
 
 def:pub LLMMetricsPage -> JsxElement {
     has isLoading: bool = True,
-        summary: dict[any, any] = {},
+        summary: dict[str, any] = {},
         autoRefresh: bool = True,
         errorMsg: str = "";
 
@@ -81,8 +81,8 @@ def:pub LLMMetricsPage -> JsxElement {
             </div>;
     }
 
-    perModel: dict[any, any] = summary["per_model"] or {};
-    perCaller: dict[any, any] = summary["per_caller"] or {};
+    perModel: dict[str, any] = summary["per_model"] or {};
+    perCaller: dict[str, any] = summary["per_caller"] or {};
     modelKeys = Object.keys(perModel);
     callerKeys = Object.keys(perCaller);
 

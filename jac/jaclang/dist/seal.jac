@@ -6,7 +6,7 @@ import from pathlib { Path }
 import from jaclang.cli.console { console }
 
 
-def seal_copy_ignore(_dir: str, items: list[any]) -> list[any] {
+def seal_copy_ignore(_dir: str, items: list[str]) -> list[str] {
     drop = [
         "__pycache__",
         "node_modules",
@@ -66,7 +66,7 @@ def resolve_entry_file(config: any, app: str = "") -> (Path | None) {
     return None;
 }
 
-def build_serve_manifest(entry_file: Path, proj_root: Path) -> (dict[any, any] | None) {
+def build_serve_manifest(entry_file: Path, proj_root: Path) -> (dict[str, any] | None) {
     import os;
     import from jaclang.runtime.runtime { JacRuntime as Jac }
     import from jaclang.compiler.frontend.constant { Tokens as Tok }
@@ -105,7 +105,7 @@ def build_serve_manifest(entry_file: Path, proj_root: Path) -> (dict[any, any] |
         }
     }
 
-    client: dict[any, any] = {};
+    client: dict[str, any] = {};
     mod = Jac.get_program().find_module(entry_key);
     if mod and mod.gen.client_manifest {
         if not mod.gen.client_manifest.exports {
@@ -145,7 +145,7 @@ def build_serve_manifest(entry_file: Path, proj_root: Path) -> (dict[any, any] |
     func_access: dict[str, bool] = {};
     walker_access: dict[str, bool] = {};
     endpoint_effects: dict[str, any] = {};
-    cross: list[dict[any, any]] = [];
+    cross: list[dict[str, any]] = [];
     seen: set = set();
     for hub in Jac.get_program()._search_hubs() {
         for hmod in hub.values() {
@@ -355,7 +355,7 @@ def make_sealed_image(
         } except ValueError {}
     }
 
-    def copy_ignore(d: str, items: list[any]) -> list[any] {
+    def copy_ignore(d: str, items: list[str]) -> list[str] {
         skipped = seal_copy_ignore(d, items);
         if out_names and Path(d).resolve() == Path(proj_root).resolve() {
             skipped = list(

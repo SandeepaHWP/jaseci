@@ -222,7 +222,7 @@ impl template_element_raw(text: str) -> str {
 }
 
 impl JSCodeGenerator.gen_template_element(nd: es.TemplateElement) -> str {
-    value: dict[any, any] = nd.value or {};
+    value: dict[str, str] = nd.value or {};
     raw = value.get('raw');
     if raw is not None {
         return raw;

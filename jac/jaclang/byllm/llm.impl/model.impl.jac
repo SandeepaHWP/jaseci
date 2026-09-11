@@ -252,7 +252,7 @@ impl Model._raise_mapped_provider_error(e: Exception) -> None {
     raise;
 }
 
-impl Model.model_call_no_stream(params: dict[any, any]) -> dict[any, any] {
+impl Model.model_call_no_stream(params: dict[str, any]) -> dict[str, any] {
     try {
         if self.http_client {
             response = self.model_call_http(
@@ -277,7 +277,7 @@ impl Model.model_call_no_stream(params: dict[any, any]) -> dict[any, any] {
     return response;
 }
 
-impl Model.model_call_with_stream(params: dict[any, any]) {
+impl Model.model_call_with_stream(params: dict[str, any]) {
     params["stream_options"] = (params.get("stream_options") or {})
         | {"include_usage": True};
     try {
@@ -311,7 +311,7 @@ impl Model.model_call_with_stream(params: dict[any, any]) {
 }
 
 impl Model.model_call_http(
-    url: str, token: str, payload: dict[any, any], ca_bundle: (str | bool | None)
+    url: str, token: str, payload: dict[str, any], ca_bundle: (str | bool | None)
 ) -> object {
     import httpx;
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {token}"};
@@ -322,7 +322,7 @@ impl Model.model_call_http(
     return response.json();
 }
 
-impl Model.model_call_no_stream_async(params: dict[any, any]) -> dict[any, any] {
+impl Model.model_call_no_stream_async(params: dict[str, any]) -> dict[str, any] {
     try {
         if self.http_client {
             response = await self.model_call_http_async(
@@ -353,7 +353,7 @@ impl Model.model_call_no_stream_async(params: dict[any, any]) -> dict[any, any] 
     return response;
 }
 
-impl Model.model_call_with_stream_async(params: dict[any, any]) {
+impl Model.model_call_with_stream_async(params: dict[str, any]) {
     params["stream_options"] = (params.get("stream_options") or {})
         | {"include_usage": True};
     try {
@@ -392,7 +392,7 @@ impl Model.model_call_with_stream_async(params: dict[any, any]) {
 }
 
 impl Model.model_call_http_async(
-    url: str, token: str, payload: dict[any, any], ca_bundle: (str | bool | None)
+    url: str, token: str, payload: dict[str, any], ca_bundle: (str | bool | None)
 ) -> object {
     import httpx;
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {token}"};

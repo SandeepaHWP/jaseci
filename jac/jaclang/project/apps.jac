@@ -37,7 +37,7 @@ obj AppConfig {
 def validate_app_name(name: str) -> None;
 
 def parse_apps(
-    project_data: dict[any, any], apps_data: dict[any, any]
+    project_data: dict[str, any], apps_data: dict[str, any]
 ) -> dict[str, AppConfig];
 
 def implicit_app(config: any) -> AppConfig;

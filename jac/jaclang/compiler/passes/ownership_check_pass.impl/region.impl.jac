@@ -86,7 +86,7 @@ impl OwnershipCheckPass._process_partition_sugar -> None {
     }
 }
 
-glob _REGION_SCALARS: tuple[any, ...] = (
+glob _REGION_SCALARS: tuple[str, ...] = (
          "int",
          "float",
          "bool",

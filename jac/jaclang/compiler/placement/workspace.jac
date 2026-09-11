@@ -5,7 +5,7 @@ import os;
 import from jaclang.compiler.driver.modresolver { find_jac_project_root }
 
 glob KIND_CODESPACE: dict[str, str] = {"js-package": "client"},
-     KIND_HAS_SERVER: tuple[any, ...] = ("web-app", "service", "service-mesh"),
+     KIND_HAS_SERVER: tuple[str, ...] = ("web-app", "service", "service-mesh"),
      KIND_UI: dict[str, str] = {
          "web-app": "dom",
          "web-static": "dom",
@@ -55,7 +55,7 @@ obj WorkspaceSpec {
     def module_dot_path(abs_path: str) -> str;
 }
 
-glob _ws_cache: dict[str, tuple[tuple[any, ...], WorkspaceSpec]] = {};
+glob _ws_cache: dict[str, tuple[tuple[float, ...], WorkspaceSpec]] = {};
 
 def kind_codespace(kind: str) -> str;
 def kind_has_server(kind: str) -> bool;
@@ -70,12 +70,12 @@ def owner_app_for_path(path: str) -> tuple[(AppSpec | None), bool];
 def app_fact_digest(app: (AppSpec | None)) -> str;
 def serving_apps(ws: WorkspaceSpec) -> list[AppSpec];
 def _real(path: str) -> str;
-def _read_toml(toml_path: str) -> dict[any, any];
-def _table(raw: any, *keys: str) -> dict[any, any];
+def _read_toml(toml_path: str) -> dict[str, any];
+def _table(raw: any, *keys: str) -> dict[str, any];
 def _pins_of(raw: any) -> dict[str, str];
 def _npm_names_of(raw: any) -> set[str];
-def _chain_stamp(root_dir: str) -> tuple[any, ...];
-def _implicit_kind(root_dir: str, project: dict[any, any]) -> str;
+def _chain_stamp(root_dir: str) -> tuple[float, ...];
+def _implicit_kind(root_dir: str, project: dict[str, any]) -> str;
 def _build_workspace(
-    root_dir: str, toml_path: str, doc: dict[any, any]
+    root_dir: str, toml_path: str, doc: dict[str, any]
 ) -> WorkspaceSpec;

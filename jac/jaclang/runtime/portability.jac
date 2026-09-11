@@ -7,7 +7,7 @@ glob PY_STDLIB_BY_KIND: dict[str, (set[str] | None)] = {
          "desktop": set(),
          "js-package": set()
      },
-     CLIENT_KINDS: tuple[any, ...] = (
+     CLIENT_KINDS: tuple[str, ...] = (
          "web-app",
          "web-static",
          "mobile",

@@ -88,8 +88,8 @@ def _service_to_pod_regex(service: str) -> str {
 
 
 def _parse_log_body(
-    body: str, pod_labels: dict[any, any], ts_nanos: str
-) -> dict[any, any] {
+    body: str, pod_labels: dict[str, str], ts_nanos: str
+) -> dict[str, any] {
     try {
         ns = int(ts_nanos);
         ts_iso = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(ns / 1_000_000_000))
@@ -98,7 +98,7 @@ def _parse_log_body(
         ts_iso = "";
     }
 
-    out: dict[any, any] = {
+    out: dict[str, any] = {
         "ts": ts_iso,
         "ts_ns": ts_nanos,
         "level": pod_labels.get("level") or "INFO",
@@ -180,7 +180,7 @@ def _build_logql(
 }
 
 
-async def _loki_request(path: str, params: dict[any, any]) -> dict[any, any] {
+async def _loki_request(path: str, params: dict[str, str]) -> dict[str, any] {
     import from jaclang.server.serving.client { ClientConnectionError, arequest }
     base = _loki_base_url();
     url = f"{base}{path}";
@@ -200,9 +200,9 @@ async def _loki_request(path: str, params: dict[any, any]) -> dict[any, any] {
 
 
 def _flatten_loki_response(
-    payload: dict[any, any], ascending: bool = True
-) -> list[dict[any, any]] {
-    out: list[dict[any, any]] = [];
+    payload: dict[str, any], ascending: bool = True
+) -> list[dict[str, any]] {
+    out: list[dict[str, any]] = [];
     data: any = payload.get("data") or {};
     results: any = data.get("result") or [];
     for stream in results {

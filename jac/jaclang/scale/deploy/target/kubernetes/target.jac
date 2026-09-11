@@ -401,7 +401,7 @@ obj KubernetesTarget(KubernetesTargetBase) {
                     continue;
                 }
                 pod_name = str(p.metadata.name);
-                labels: dict[any, any] = p.metadata.labels or {};
+                labels: dict[str, any] = p.metadata.labels or {};
                 app = str(labels.get("app", ""));
                 in_fleet = (app in fleet_app_names) if fleet_app_names else True;
                 if current_hashes and app in fleet_app_names {
@@ -793,7 +793,7 @@ obj KubernetesTarget(KubernetesTargetBase) {
             statuses: list[any] = (pod.status.init_container_statuses or [])
                 + (pod.status.container_statuses or []);
             for cs in statuses {
-                states: list[any] = [];
+                states: list[tuple[str, any]] = [];
                 if cs.state and cs.state.terminated {
                     states.append(("terminated", cs.state.terminated));
                 }
@@ -869,7 +869,7 @@ obj KubernetesTarget(KubernetesTargetBase) {
         gate_label = "elbv2.k8s.aws/pod-readiness-gate-inject";
         try {
             ns = core_v1.read_namespace(name=namespace);
-            labels: dict[any, any] = dict(getattr(ns.metadata, "labels", {}) or {});
+            labels: dict[str, any] = dict(getattr(ns.metadata, "labels", {}) or {});
             if labels.get(gate_label) == "enabled" {
                 return;
             }
@@ -899,7 +899,7 @@ obj KubernetesTarget(KubernetesTargetBase) {
     def _ensure_privileged_namespace(core_v1: any, namespace: str) -> None {
         try {
             ns = core_v1.read_namespace(name=namespace);
-            labels: dict[any, any] = dict(getattr(ns.metadata, "labels", {}) or {});
+            labels: dict[str, any] = dict(getattr(ns.metadata, "labels", {}) or {});
             new_labels = privileged_pss_labels(labels);
             if new_labels is None {
                 if self.logger {

@@ -1,7 +1,7 @@
 import os;
 import sys;
 import from contextlib { contextmanager, AbstractContextManager }
-import from typing { cast }
+import from typing { TextIO, cast }
 
 obj Content {
     has text: str;
@@ -103,18 +103,18 @@ obj ConsoleRenderer {
     def clear_status -> None;
     def emit(spans: list[Span], stream: any = None) -> None;
     def emit_raw(
-        args: list[any], stream: any, style: str | None, kwargs: dict[any, any]
+        args: list[object], stream: any, style: str | None, kwargs: dict[str, any]
     ) -> None;
 
     def header(title: str, version: str | None = None) -> None;
-    def urls(items: list[any], symbol: str = '') -> None;
+    def urls(items: list[tuple[str, str]], symbol: str = '') -> None;
     def next_steps(steps: list[str], title: str = 'Next Steps') -> None;
     def table(
         headers: list[str], rows: list[list[str]], title: str | None = None
     ) -> None;
 
     @contextmanager
-    def status_ctx(args: list[any], kwargs: dict[any, any]) -> object;
+    def status_ctx(args: list[object], kwargs: dict[str, any]) -> object;
 
     @contextmanager
     def spinner_ctx(text: str) -> object;
@@ -155,7 +155,7 @@ obj JacConsole {
 glob _console_instance: JacConsole | None = None;
 
 def _get_console -> JacConsole;
-def use_line_buffered_output(streams: (list[any] | None) = None) -> int;
+def use_line_buffered_output(streams: (list[TextIO] | None) = None) -> int;
 
 class _ConsoleProxy {
     def __getattr__(self: _ConsoleProxy, name: str) -> any {

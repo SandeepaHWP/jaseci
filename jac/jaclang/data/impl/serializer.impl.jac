@@ -67,7 +67,7 @@ impl Serializer._declared_of(owner: object, attr: str) -> object {
             if not isinstance(ann, dict) {
                 continue;
             }
-            annotations: dict[any, any] = ann;
+            annotations: dict[str, any] = ann;
             for (name, tag) in annotations.items() {
                 sized = SIZED_TYPES.get(tag)
                     if isinstance(tag, str)
@@ -403,7 +403,9 @@ impl Serializer.register_alias(old_name: str, cls: type) -> None {
     Serializer._aliases[old_name] = new_name;
 }
 
-impl Serializer.repair(data: dict[str, object], cls: type) -> tuple[any, ...] {
+impl Serializer.repair(
+    data: dict[str, object], cls: type
+) -> tuple[dict[str, object], list[str]] {
     import from jaclang.data.schema_rules { apply_rules, merged_rules_for, repair_mode }
     mode = repair_mode();
     if mode == 'off' {
@@ -437,7 +439,7 @@ impl Serializer.repair(data: dict[str, object], cls: type) -> tuple[any, ...] {
     return (repaired, steps);
 }
 
-impl Serializer.coerce(val: object, target_type: object) -> tuple[any, ...] {
+impl Serializer.coerce(val: object, target_type: object) -> tuple[object, bool] {
     if target_type is None or isinstance(target_type, str) {
         return (val, False);
     }
@@ -559,7 +561,7 @@ impl Serializer.fingerprint(cls: type) -> str {
             field_pairs.append([f.name, str(f.type)]);
         }
     }
-    field_pairs.sort(key=lambda (p: list[any]) { p[0]; });
+    field_pairs.sort(key=lambda (p: list[str]) { p[0]; });
     payload = {'module': cls.__module__, 'name': cls.__name__, 'fields': field_pairs};
     encoded = _json_dumps(payload, sort_keys=True, `default=str).encode('utf-8');
     return sha256(encoded).hexdigest()[:FINGERPRINT_LENGTH];
@@ -994,7 +996,7 @@ impl Serializer._deserialize_permission(data: object) -> (Permission | None) {
         return None;
     }
     perm = Permission();
-    perm_data: dict[any, any] = data;
+    perm_data: dict[str, any] = data;
     perm.all = access_level_cast(perm_data.get('all', -1));
     if (roots := data.get('roots')) {
         perm.roots = Serializer._deserialize_access(roots);
@@ -1043,7 +1045,7 @@ impl Serializer._deserialize_archetype(
         arch: object = cls.__new__(cls);
         field_types = get_field_types(cls);
         known = set(field_types.keys());
-        attic: dict[any, any] = {};
+        attic: dict[str, any] = {};
 
         stored_attic = data.get(ATTIC_KEY);
         if isinstance(stored_attic, dict) {

@@ -22,14 +22,14 @@ import from jaclang.compiler.driver.jir {
 
 glob DIAG_SCHEMA: int = 1,
      IFACE_RETAIN_CAP: int = 1024,
-     _SYMTAB_PROVIDES_MEMO: list[any] = [],
-     _CODEC_MODULES: tuple[any, ...] = (
+     _SYMTAB_PROVIDES_MEMO: list[set[str]] = [],
+     _CODEC_MODULES: tuple[str, ...] = (
          "jaclang.compiler.types.type_evaluator",
          "jaclang.compiler.types.stubcat.reader",
          "jaclang.compiler.types.stubcat.writer",
          "jaclang.compiler.types.stubcat.modiface"
      ),
-     _CODEC_MEMO: list[any] = [];
+     _CODEC_MEMO: list[IfaceCodec] = [];
 
 obj IfaceCodec {
     has build_module_iface: any,
@@ -84,7 +84,7 @@ def _symtab_provides -> set[str] {
     return set(_SYMTAB_PROVIDES_MEMO[0]);
 }
 
-def _span_record(span: any) -> list[any] {
+def _span_record(span: any) -> list[str | int | None] {
     return [
         span.mod_path,
         span.first_line,
@@ -115,8 +115,8 @@ def _span_from_record(rec: list[any]) -> any {
     );
 }
 
-def _alert_record(alert: any) -> dict[any, any] {
-    related: list[any] = [];
+def _alert_record(alert: any) -> dict[str, any] {
+    related: list[list[object]] = [];
     for (label, span) in (alert.related or []) {
         related.append([label, _span_record(span)]);
     }
@@ -129,7 +129,7 @@ def _alert_record(alert: any) -> dict[any, any] {
     };
 }
 
-def _alert_from_record(rec: dict[any, any]) -> any {
+def _alert_from_record(rec: dict[str, any]) -> any {
     import from jaclang.compiler.frontend.diagnostics { DIAGNOSTICS }
     import from jaclang.compiler.passes.transform { Alert, Transform }
     code_str: str = str(rec.get("code") or "");
@@ -520,7 +520,7 @@ obj IfaceRegistry {
         self.prog.analysis.analyses_run.mark(mod, _symtab_provides());
     }
 
-    def _profiles_of(diag_bytes: (bytes | None)) -> (dict[any, any] | None) {
+    def _profiles_of(diag_bytes: (bytes | None)) -> (dict[str, any] | None) {
         import json;
         if diag_bytes is None {
             return None;
@@ -536,8 +536,8 @@ obj IfaceRegistry {
         return payload.get("profiles", {}) or {};
     }
 
-    def _replay_records(prof: dict[any, any], err0: int, warn0: int) {
-        def key_of(alert: any) -> tuple[any, ...] {
+    def _replay_records(prof: dict[str, any], err0: int, warn0: int) {
+        def key_of(alert: any) -> tuple[str, int, int, str | None, str] {
             return (
                 alert.loc.mod_path,
                 alert.loc.first_line,
@@ -547,7 +547,7 @@ obj IfaceRegistry {
             );
         }
 
-        def rec_key(rec: dict[any, any]) -> tuple[any, ...] {
+        def rec_key(rec: dict[str, any]) -> tuple[object, ...] {
             span = rec.get("span") or ["", 0, 0, 0];
             return (span[0], span[1], span[3], rec.get("code"), rec.get("msg", ""));
         }
@@ -618,7 +618,7 @@ obj IfaceRegistry {
         if ent is None {
             return None;
         }
-        prof: (dict[any, any] | None) = None;
+        prof: (dict[str, any] | None) = None;
         if profile_key is not None {
             profiles = self._profiles_of(ent.diags);
             prof = profiles.get(profile_key) if profiles is not None else None;
@@ -837,11 +837,11 @@ obj IfaceRegistry {
         }
         if options.no_cgen {
             profiles = self._existing_profiles(resolved);
-            errors: list[any] = [];
+            errors: list[dict[str, any]] = [];
             for alert in self.prog.errors_had[err_start:] {
                 errors.append(_alert_record(alert));
             }
-            warnings: list[any] = [];
+            warnings: list[dict[str, any]] = [];
             for alert in self.prog.warnings_had[warn_start:] {
                 warnings.append(_alert_record(alert));
             }
@@ -901,7 +901,7 @@ obj IfaceRegistry {
         return codec.read_iface_hash(read_section_bytes(found[0], SEC_IFACE)) or "";
     }
 
-    def _existing_profiles(resolved: str) -> dict[any, any] {
+    def _existing_profiles(resolved: str) -> dict[str, any] {
         import json;
         found = self._module_jir(resolved);
         if found is None {
@@ -1078,7 +1078,7 @@ obj IfaceRegistry {
         }
     }
 
-    def _verify_analysis(resolved: str, options: any, prof: dict[any, any]) {
+    def _verify_analysis(resolved: str, options: any, prof: dict[str, any]) {
         self.verifying = True;
         try {
             import from jaclang.compiler.driver.compile_options { CompileOptions }
@@ -1096,7 +1096,7 @@ obj IfaceRegistry {
                 );
             } except Exception {}
 
-            def digestible(alert: any) -> tuple[any, ...] {
+            def digestible(alert: any) -> tuple[str, int, int, str | None, str] {
                 return (
                     os.path.realpath(alert.loc.mod_path),
                     alert.loc.first_line,
@@ -1106,7 +1106,7 @@ obj IfaceRegistry {
                 );
             }
 
-            def rec_digestible(rec: dict[any, any]) -> tuple[any, ...] {
+            def rec_digestible(rec: dict[str, any]) -> tuple[object, ...] {
                 span = rec.get("span") or ["", 0, 0, 0];
                 return (span[0], span[1], span[3], rec.get("code"), rec.get("msg", ""));
             }

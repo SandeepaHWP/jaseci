@@ -34,8 +34,8 @@ import from jaclang.compiler.frontend.diagnostics {
 }
 
 walker DeclImplMatchPass(Transform) {
-    static has PROVIDES: tuple[any, ...] = ('ImplOf', ),
-        REQUIRES: tuple[any, ...] = ('SymOf', );
+    static has PROVIDES: tuple[str, ...] = ('ImplOf', ),
+        REQUIRES: tuple[str, ...] = ('SymOf', );
 
     has _e2026_reported: set[int] = field(default_factory=`set);
 

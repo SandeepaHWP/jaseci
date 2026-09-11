@@ -41,8 +41,8 @@ obj WindowPlugin(DesktopPlugin) {
     }
 
     def _handle_cef(
-        host: PluginHost, command: str, args: dict[any, any]
-    ) -> dict[any, any] {
+        host: PluginHost, command: str, args: dict[str, any]
+    ) -> dict[str, any] {
         if command == "set_title" {
             title = args.get("title", "");
             if not title {
@@ -86,7 +86,7 @@ obj WindowPlugin(DesktopPlugin) {
         return super.handle(command, args);
     }
 
-    def handle(command: str, args: dict[any, any]) -> dict[any, any] {
+    def handle(command: str, args: dict[str, any]) -> dict[str, any] {
         cef_host = self._host;
         if cef_host is not None {
             return self._handle_cef(cef_host, command, args);

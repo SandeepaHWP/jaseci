@@ -22,19 +22,19 @@ impl __getApiBaseUrl -> str {
     return base or "";
 }
 
-impl __getEndpointEffects -> dict[any, any] {
+impl __getEndpointEffects -> dict[str, any] {
     return cache___getEndpointEffects();
 }
 
-impl __getCacheState -> dict[any, any] {
+impl __getCacheState -> dict[str, any] {
     return cache___getCacheState();
 }
 
-impl __isFresh(`entry: dict[any, any]) -> bool {
+impl __isFresh(`entry: dict[str, any]) -> bool {
     return cache___isFresh(`entry);
 }
 
-impl __cacheGet(key: str) -> dict[any, any] | None {
+impl __cacheGet(key: str) -> dict[str, any] | None {
     return cache___cacheGet(key);
 }
 
@@ -63,7 +63,7 @@ impl __bridgeErrorFor(
     return BridgeError(app=app, name=name, detail=message, status=status);
 }
 
-impl __fetchOrRaise(url: str, init: dict[any, any], app: str, name: str) -> Response {
+impl __fetchOrRaise(url: str, init: dict[str, any], app: str, name: str) -> Response {
     try {
         return await fetch(url, init);
     } except Exception as fetch_err {
@@ -82,7 +82,7 @@ impl __bridgeErrorFromFetch(err: any, app: str = "", name: str = "") -> BridgeEr
     return BridgeUnavailable(app=app, name=name, detail=message);
 }
 
-impl __bridgeApiBase(opts: (dict[any, any] | None) = None) -> str {
+impl __bridgeApiBase(opts: (dict[str, any] | None) = None) -> str {
     base_url = __getApiBaseUrl();
     route = opts["route"] if opts and opts["route"] else "";
     if route {
@@ -94,8 +94,8 @@ impl __bridgeApiBase(opts: (dict[any, any] | None) = None) -> str {
 impl __doWalkerFetch(
     `walker: str,
     nodeId: str,
-    fields: dict[any, any],
-    opts: (dict[any, any] | None) = None
+    fields: dict[str, any],
+    opts: (dict[str, any] | None) = None
 ) -> any {
     app = opts["app"] if opts and opts["app"] else "";
     token = __getLocalStorage("jac_token");
@@ -137,7 +137,7 @@ impl __doWalkerFetch(
 }
 
 impl __doFuncFetch(
-    function_name: str, args: dict[any, any], opts: (dict[any, any] | None) = None
+    function_name: str, args: dict[str, any], opts: (dict[str, any] | None) = None
 ) -> any {
     app = opts["app"] if opts and opts["app"] else "";
     token = __getLocalStorage("jac_token");
@@ -201,8 +201,8 @@ impl __invalidateEffects(writes: list[str]) -> None {
 impl __jacSpawn(
     left: str,
     right: str = "",
-    fields: dict[any, any] = {},
-    opts: (dict[any, any] | None) = None
+    fields: dict[str, any] = {},
+    opts: (dict[str, any] | None) = None
 ) -> any {
     if left == "login"
         or left == "signup"
@@ -223,14 +223,14 @@ impl __jacSpawn(
 impl jacSpawn(
     left: str,
     right: str = "",
-    fields: dict[any, any] = {},
-    opts: (dict[any, any] | None) = None
+    fields: dict[str, any] = {},
+    opts: (dict[str, any] | None) = None
 ) -> any {
     return __jacSpawn(left, right, fields, opts);
 }
 
 impl __jacCallFunction(
-    function_name: str, args: dict[any, any] = {}, opts: (dict[any, any] | None) = None
+    function_name: str, args: dict[str, any] = {}, opts: (dict[str, any] | None) = None
 ) -> any {
     app = opts["app"] if opts and opts["app"] else "";
     endpoint_key = __endpointKey("func", function_name, opts);
@@ -242,14 +242,14 @@ impl __jacCallFunction(
     );
 }
 
-impl __normalizeIdentity(x: any) -> dict[any, any] {
+impl __normalizeIdentity(x: any) -> dict[str, any] {
     if x != None and Object.prototype.toString.call(x) == "[object Object]" {
         return x;
     }
     return {"type": "username", "value": x};
 }
 
-impl __normalizeCredential(x: any) -> dict[any, any] {
+impl __normalizeCredential(x: any) -> dict[str, any] {
     if x != None and Object.prototype.toString.call(x) == "[object Object]" {
         return x;
     }
@@ -267,9 +267,9 @@ impl __errorMessage(err: any) -> str {
 }
 
 impl jacSignup(
-    identities_or_username: (str | list[any]),
+    identities_or_username: (str | list[str | dict[str, any]]),
     credential_or_password: (str | dict[str, any]),
-    profile: (dict[any, any] | None) = None
+    profile: (dict[str, any] | None) = None
 ) -> SignupResult {
     base_url = __getApiBaseUrl();
     credential = __normalizeCredential(credential_or_password);

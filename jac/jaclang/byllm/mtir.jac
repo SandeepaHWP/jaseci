@@ -39,8 +39,8 @@ obj MTRuntime {
         _final_output: object = None,
         _has_final_output: bool = False,
         _stream_reset_count: int = 0,
-        _tool_arg_deltas: list[dict[any, any]] = [],
-        _usage_history: list[dict[any, any]] = [],
+        _tool_arg_deltas: list[dict[str, any]] = [],
+        _usage_history: list[dict[str, any]] = [],
         _call_kind: str = "react_iteration";
 
     static def factory(mtir: MTIR) -> MTRuntime;
@@ -52,6 +52,6 @@ obj MTRuntime {
     def parse_response(response: str) -> any;
     def get_tool(tool_name: str) -> Tool | McpTool | None;
     def get_tool_list -> list[dict[str, any]];
-    def get_output_schema -> dict[any, any] | None;
-    def get_typed_output_schema -> dict[any, any] | None;
+    def get_output_schema -> dict[str, any] | None;
+    def get_typed_output_schema -> dict[str, any] | None;
 }

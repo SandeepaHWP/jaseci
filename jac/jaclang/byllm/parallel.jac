@@ -6,7 +6,7 @@ import logging;
 import os;
 import time;
 
-import from concurrent.futures { ThreadPoolExecutor, as_completed }
+import from concurrent.futures { Future, ThreadPoolExecutor, as_completed }
 import from jaclang.byllm.types { ToolCallResultMsg, normalize_tool_result }
 
 glob _plog = logging.getLogger("byllm.parallel"),
@@ -122,8 +122,8 @@ def _run_one(tc: any) -> tuple[any, ...] {
 }
 
 
-def _tool_names(tool_calls: list[any]) -> list[any] {
-    names: list[any] = [];
+def _tool_names(tool_calls: list[any]) -> list[str] {
+    names: list[str] = [];
     for tc in tool_calls {
         try {
             names.append(tc.tool.get_name());
@@ -174,7 +174,7 @@ def dispatch_batch(tool_calls: list[any]) -> any {
     );
     t_batch = time.time();
 
-    futures: dict[any, any] = {};
+    futures: dict[Future[tuple[any, ...]], any] = {};
     for tc in tool_calls {
         ctx = contextvars.copy_context();
         f = _WORKER_POOL.submit(ctx.run, _run_one, tc);

@@ -169,7 +169,7 @@ def coerce_value(value: any, target: any = None) -> any {
     return value;
 }
 
-def _coerce_union(value: any, options: tuple[any, ...]) -> any {
+def _coerce_union(value: any, options: tuple[object, ...]) -> any {
     none_type = type(None);
     if value is None {
         for opt in options {
@@ -281,7 +281,7 @@ def _fresh_default(value: any) -> any {
 
 def bind_parameters(ep: JEndPoint, request: Request, body_json: any) -> dict[str, any] {
     kwargs: dict[str, any] = {};
-    errors: list[dict[any, any]] = [];
+    errors: list[dict[str, any]] = [];
     declared: set[str] = set();
     for param in (ep.parameters or []) {
         declared.add(param.name);

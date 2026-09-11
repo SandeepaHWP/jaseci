@@ -54,7 +54,7 @@ def _pyb_class_for(
     }
     mod = _pyb_import_module(mod_path);
     base = getattr(mod, base_name);
-    ns: dict[any, any] = {"__module__": getattr(base, "__module__", "jac_native")};
+    ns: dict[str, any] = {"__module__": getattr(base, "__module__", "jac_native")};
     if suppress_postinit {
         def _noop_post_init(self: object) -> None {
             return;
@@ -74,7 +74,7 @@ def _pyb_instantiate(
     mod_path: str,
     base_name: str,
     cls_name: str,
-    kwargs: dict[any, any],
+    kwargs: dict[str, any],
     suppress_postinit: bool,
     owner_addr: int
 ) -> object {
@@ -101,9 +101,9 @@ def _pyb_drop_owner(owner_addr: int) {
 def _pyb_super_call(
     shadow: object,
     anchor_name: str,
-    meth_names: tuple[any, ...],
+    meth_names: tuple[str, ...],
     args: tuple[any, ...],
-    kwargs: dict[any, any]
+    kwargs: dict[str, any]
 ) -> object {
     anchor: (type | None) = None;
     for c in type(shadow).__mro__ {

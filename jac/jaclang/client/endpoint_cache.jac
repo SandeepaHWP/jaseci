@@ -1,4 +1,4 @@
-def:pub __getEndpointEffects -> dict[any, any] {
+def:pub __getEndpointEffects -> dict[str, any] {
     effects: any = globalThis.__jacEndpointEffects__;
     if effects {
         return effects;
@@ -24,7 +24,7 @@ def:pub __getEndpointEffects -> dict[any, any] {
     if initText {
         try {
             data: any = JSON.parse(initText);
-            effects: dict[any, any] = data["endpointEffects"] or {};
+            effects: dict[str, any] = data["endpointEffects"] or {};
         } except Exception as e {
             console.warn(
                 "[jac-client] Failed to parse __jac_init__ data, using empty effects:",
@@ -39,7 +39,7 @@ def:pub __getEndpointEffects -> dict[any, any] {
     return effects;
 }
 
-def:pub __getCacheState -> dict[any, any] {
+def:pub __getCacheState -> dict[str, any] {
     state: any = globalThis.__jacCacheState__;
     if not state {
         state = {
@@ -56,7 +56,7 @@ def:pub __getCacheState -> dict[any, any] {
     return state;
 }
 
-def:pub __isFresh(`entry: dict[any, any][any, any]) -> bool {
+def:pub __isFresh(`entry: dict[str, any]) -> bool {
     if not `entry {
         return False;
     }
@@ -64,7 +64,7 @@ def:pub __isFresh(`entry: dict[any, any][any, any]) -> bool {
     return age < `entry["ttl"];
 }
 
-def:pub __cacheGet(key: str) -> dict[any, any] | None {
+def:pub __cacheGet(key: str) -> dict[str, any] | None {
     state = __getCacheState();
     `entry = state["cache"][key];
     if not `entry {
@@ -214,9 +214,7 @@ def:pub __jacClearCache {
 }
 
 
-def:pub __endpointKey(
-    kind: str, name: str, opts: dict[any, any][any, any] | None
-) -> str {
+def:pub __endpointKey(kind: str, name: str, opts: dict[str, any] | None) -> str {
     app = opts["app"] if opts and opts["app"] else "";
     module = opts["module"] if opts and opts["module"] else "";
     effects = __getEndpointEffects();

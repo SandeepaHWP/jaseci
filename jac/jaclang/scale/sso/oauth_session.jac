@@ -77,7 +77,7 @@ def complete_identity(
     if linked.get("error") {
         return OAuthLogin(error="Could not connect that SSO account.");
     }
-    user: dict[any, any] = manager.get_user(user_id) or {};
+    user: dict[str, any] = manager.get_user(user_id) or {};
     if not user
         or user.get("status", "active") != "active"
         or user.get("role") == "system" {
@@ -154,7 +154,7 @@ obj OAuthSession {
         );
     }
 
-    def record(state: str) -> dict[any, any] | None {
+    def record(state: str) -> dict[str, any] | None {
         record = AuthTokenStore.instance().peek_token(
             state, "oauth_session:" + self.platform
         );

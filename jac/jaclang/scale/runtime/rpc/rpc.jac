@@ -98,7 +98,7 @@ def _provider_url(app_name: str) -> str {
 def service_call(
     module_name: str,
     func_name: str,
-    args: dict[any, any],
+    args: dict[str, any],
     headers: dict[str, str] | None = None
 ) -> any {
     import from jaclang.server { sv_client }
@@ -153,7 +153,7 @@ def service_call(
 def walker_call(
     module_name: str,
     walker_name: str,
-    args: dict[any, any],
+    args: dict[str, any],
     stub_cls: any = None,
     headers: dict[str, str] | None = None
 ) -> any {

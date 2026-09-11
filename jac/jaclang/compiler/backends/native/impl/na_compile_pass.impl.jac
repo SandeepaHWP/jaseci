@@ -67,7 +67,7 @@ impl native_dep_cache_paths(
     );
 }
 
-impl DepClibMeta.to_meta -> dict[any, any] {
+impl DepClibMeta.to_meta -> dict[str, any] {
     return {
         "clib_paths": self.clib_paths,
         "clib_symbol_lib": self.clib_symbol_lib,
@@ -83,7 +83,7 @@ impl DepClibMeta.to_meta -> dict[any, any] {
     };
 }
 
-impl DepClibMeta.from_meta(meta: dict[any, any]) -> DepClibMeta {
+impl DepClibMeta.from_meta(meta: dict[str, any]) -> DepClibMeta {
     return DepClibMeta(
         clib_paths=meta.get("clib_paths", []),
         clib_symbol_lib=meta.get("clib_symbol_lib", {}),
@@ -165,7 +165,7 @@ impl native_ir_live_externs(llvm_ir_text: str) -> set[str] {
 }
 
 impl native_prune_live_record(
-    pending: dict[any, any], declared: set[str]
+    pending: dict[str, set[str]], declared: set[str]
 ) -> dict[str, set[str]] {
     pruned: dict[str, set[str]] = {};
     for (_pr_callee, _pr_names) in (pending or {}).items() {
@@ -273,7 +273,7 @@ impl native_unit_demotions(
 }
 
 impl native_live_call_conflicts(
-    prog: JacProgram, pending: dict[any, any], options: CompileOptions
+    prog: JacProgram, pending: dict[str, set[str]], options: CompileOptions
 ) -> dict[str, set[str]] {
     conflicts: dict[str, set[str]] = {};
     for (_cc_callee, _cc_names) in (pending or {}).items() {
@@ -397,8 +397,8 @@ impl NativeCompilePass._run_impl(ir_in: uni.Module) -> uni.Module {
         native_imports = manifest.native_imports;
         if native_imports {
             import from jaclang.runtime.interop_bridge { register_py_callbacks }
-            py_func_table: dict[any, any] = {};
-            callbacks_list: list[any] = [];
+            py_func_table: dict[str, Callable[..., object]] = {};
+            callbacks_list: list[object] = [];
             register_py_callbacks(manifest, py_func_table, callbacks_list);
             module.gen.interop_py_funcs = py_func_table;
             module.gen._interop_callbacks = callbacks_list;
@@ -534,7 +534,7 @@ impl NativeCompilePass._run_impl(ir_in: uni.Module) -> uni.Module {
         if _native_debug and _debug_obj_path and _all_fn_names {
             try {
                 _text_addr = 0;
-                _fn_addrs: list[any] = [];
+                _fn_addrs: list[tuple[str, int]] = [];
                 for _fn_name in _all_fn_names {
                     _addr = engine.get_function_address(_fn_name);
                     if _addr != 0 {
@@ -644,14 +644,14 @@ impl NativeCompilePass._compile_and_link_native_imports(
     _link_opts = self.prog?.options or _LinkOpts();
     _link_fp = _link_opts.codegen_fingerprint();
 
-    linked_modules: dict[any, any] = {};
+    linked_modules: dict[str, None] = {};
     if module.loc {
         linked_modules[os.path.realpath(module.loc.mod_path)] = None;
     }
 
-    symbol_origins: dict[any, any] = {};
+    symbol_origins: dict[str, str] = {};
 
-    symbol_owned: dict[any, any] = {};
+    symbol_owned: dict[str, bool] = {};
     _MAIN_ORIGIN = "(main module)";
 
     _main_imported_names: set = set();
@@ -877,7 +877,7 @@ impl NativeCompilePass._compile_and_link_native_imports(
                 self.emit(E5024, path=full_path, error="No LLVM IR generated");
                 continue;
             }
-            _uv_record: dict[any, any] = self.prog.scratch.na_unverified_live.get(
+            _uv_record: dict[str, set[str]] = self.prog.scratch.na_unverified_live.get(
                 real_path
             )
                 or {};
@@ -925,7 +925,7 @@ impl NativeCompilePass._compile_and_link_native_imports(
                     _uv_failed = "No LLVM IR generated on re-emission";
                     break;
                 }
-                _uv_record: dict[any, any] = self.prog.scratch.na_unverified_live.get(
+                _uv_record: dict[str, set[str]] = self.prog.scratch.na_unverified_live.get(
                     real_path
                 )
                     or {};
@@ -1095,8 +1095,8 @@ impl NativeCompilePass._compile_and_link_native_imports(
             exported_funcs: list[str] = [];
 
             has_real_collision = False;
-            _benign_dup_funcs: list[any] = [];
-            _benign_dup_gvs: list[any] = [];
+            _benign_dup_funcs: list[ValueRef] = [];
+            _benign_dup_gvs: list[ValueRef] = [];
             for func in _mod_functions(imported_mod) {
                 _func_name = str(func.name);
                 if _func_name.startswith("llvm.") or func.is_declaration {

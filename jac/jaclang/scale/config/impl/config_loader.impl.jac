@@ -321,7 +321,7 @@ impl JacScaleConfig.get_events_config(self: JacScaleConfig) -> dict[str, any] {
 }
 
 impl _ws_positive(
-    ws_config: dict[any, any], key: str, fallback: (int | float)
+    ws_config: dict[str, any], key: str, fallback: (int | float)
 ) -> float {
     raw = ws_config.get(key, fallback);
     if isinstance(raw, bool) or not isinstance(raw, (int, float, str)) {
@@ -343,7 +343,7 @@ impl _ws_positive(
 
 impl JacScaleConfig.get_websocket_config(self: JacScaleConfig) -> dict[str, any] {
     config = self.load();
-    ws_config: dict[any, any] = config.get('websocket', {});
+    ws_config: dict[str, any] = config.get('websocket', {});
     backplane = ws_config.get('backplane');
     if backplane is not None {
         backplane = str(backplane).lower();

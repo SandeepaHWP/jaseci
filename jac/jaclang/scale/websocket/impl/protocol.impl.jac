@@ -1,4 +1,4 @@
-impl ws_error_frame(code: str, message: any, reason: any = None) -> dict[any, any] {
+impl ws_error_frame(code: str, message: any, reason: any = None) -> dict[str, any] {
     err: dict[str, any] = {'code': code, 'message': message};
     if reason {
         err['reason'] = reason;
@@ -6,7 +6,7 @@ impl ws_error_frame(code: str, message: any, reason: any = None) -> dict[any, an
     return {'ok': False, 'error': err};
 }
 
-impl _auth_fail(status: str, reason: str) -> dict[any, any] {
+impl _auth_fail(status: str, reason: str) -> dict[str, any] {
     return {'status': status, 'user_id': None, 'exp': None, 'reason': reason};
 }
 
@@ -44,7 +44,7 @@ impl ws_reject_pre_accept(websocket: WebSocket, auth_detail: dict[str, any]) {
 
 impl ws_authenticate(
     websocket: WebSocket, user_manager: any, handshake_timeout: float, max_bytes: int
-) -> (dict[any, any], dict[any, any] | None) {
+) -> (dict[str, any], dict[str, any] | None) {
     try {
         raw = await asyncio.wait_for(
             websocket.receive_text(), timeout=handshake_timeout
@@ -204,7 +204,7 @@ impl ws_receive_frame(
 impl ws_handle_control(
     websocket: WebSocket,
     ctx: ConnectionContext,
-    data: dict[any, any],
+    data: dict[str, any],
     user_manager: any,
     requires_auth: bool,
     msgs_per_sec: float,

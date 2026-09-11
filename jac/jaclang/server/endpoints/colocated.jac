@@ -33,7 +33,7 @@ def provider_route(config: any, provider_app: str) -> str {
 }
 
 
-def _body(request: Request) -> (dict[any, any] | None) {
+def _body(request: Request) -> (dict[str, any] | None) {
     if not request.body {
         return {};
     }
@@ -156,7 +156,7 @@ def _function_callback(
 def _listing(names: list[str], key: str) -> Callable[..., TransportResponse] {
     async def callback(request: Request, **kwargs: JsonValue) -> TransportResponse {
         return TransportResponse.success(
-            data={key: list[any](names)}, meta=Meta(extra={'http_status': 200})
+            data={key: list[str](names)}, meta=Meta(extra={'http_status': 200})
         );
     }
     return callback;

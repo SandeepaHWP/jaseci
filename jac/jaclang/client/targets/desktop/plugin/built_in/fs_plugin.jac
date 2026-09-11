@@ -10,8 +10,8 @@ glob _RMTREE_ENTRY_LIMIT: int = 500;
 
 obj FsPlugin(DesktopPlugin) {
     has _path_plugin: PathPlugin,
-        _allow_read: list[any] = [],
-        _allow_write: list[any] = [],
+        _allow_read: list[str] = [],
+        _allow_write: list[str] = [],
         _resolved_read: list[str] = [],
         _resolved_write: list[str] = [];
 
@@ -35,7 +35,7 @@ obj FsPlugin(DesktopPlugin) {
         return FsPlugin(DesktopPlugin._coerce_config(config), path_plugin);
     }
 
-    def init(config: dict[any, any], path_plugin: PathPlugin) {
+    def init(config: dict[str, any], path_plugin: PathPlugin) {
         self.plugin_name = "jac.fs";
 
         if not isinstance(config, dict) {
@@ -49,7 +49,7 @@ obj FsPlugin(DesktopPlugin) {
         self._resolved_write = [self._resolve_pattern(p) for p in self._allow_write];
     }
 
-    def handle(command: str, args: dict[any, any]) -> dict[any, any] {
+    def handle(command: str, args: dict[str, any]) -> dict[str, any] {
         if command == "read_file" {
             return self._read_file(args);
         }
@@ -74,7 +74,7 @@ obj FsPlugin(DesktopPlugin) {
         return super.handle(command, args);
     }
 
-    def _read_file(args: dict[any, any]) -> dict[any, any] {
+    def _read_file(args: dict[str, any]) -> dict[str, any] {
         path = self._resolve_path(args.get("path", ""));
         self._check_allowed(path, "read");
         encoding = args.get("encoding", "utf-8");
@@ -94,7 +94,7 @@ obj FsPlugin(DesktopPlugin) {
         return {"content": content};
     }
 
-    def _write_file(args: dict[any, any]) -> dict[any, any] {
+    def _write_file(args: dict[str, any]) -> dict[str, any] {
         path = self._resolve_path(args.get("path", ""));
         content = args.get("content", "");
         self._check_allowed(path, "write");
@@ -114,7 +114,7 @@ obj FsPlugin(DesktopPlugin) {
         return {};
     }
 
-    def _list_dir(args: dict[any, any]) -> dict[any, any] {
+    def _list_dir(args: dict[str, any]) -> dict[str, any] {
         path = self._resolve_path(args.get("path", ""));
         self._check_allowed(path, "read");
         if not path.is_dir() {
@@ -138,14 +138,14 @@ obj FsPlugin(DesktopPlugin) {
         return {"entries": entries};
     }
 
-    def _mkdir(args: dict[any, any]) -> dict[any, any] {
+    def _mkdir(args: dict[str, any]) -> dict[str, any] {
         path = self._resolve_path(args.get("path", ""));
         self._check_allowed(path, "write");
         path.mkdir(parents=True, exist_ok=True);
         return {};
     }
 
-    def _remove(args: dict[any, any]) -> dict[any, any] {
+    def _remove(args: dict[str, any]) -> dict[str, any] {
         path = self._resolve_path(args.get("path", ""));
         self._check_allowed(path, "write");
         if path.is_dir() {
@@ -168,14 +168,14 @@ obj FsPlugin(DesktopPlugin) {
         return {};
     }
 
-    def _exists(args: dict[any, any]) -> dict[any, any] {
+    def _exists(args: dict[str, any]) -> dict[str, any] {
         path = self._resolve_path(args.get("path", ""));
 
         self._check_allowed(path, "read");
         return {"exists": path.exists()};
     }
 
-    def _stat(args: dict[any, any]) -> dict[any, any] {
+    def _stat(args: dict[str, any]) -> dict[str, any] {
         path = self._resolve_path(args.get("path", ""));
         self._check_allowed(path, "read");
         if not path.exists() {

@@ -71,7 +71,7 @@ def isolate_request_walk_stack {
 
 glob _desc_of_cls: dict[(any, WalkerDesc)] = {};
 
-def _trigger_members(trig: any) -> list[any] {
+def _trigger_members(trig: any) -> list[type] {
     if trig is None {
         return [];
     }
@@ -100,7 +100,7 @@ def _slots_from(funcs: list[ObjectSpatialFunction]) -> list[Slot] {
 }
 
 def _mro_funcs(cls: any, attr: str) -> list[any] {
-    merged: dict[any, any] = {};
+    merged: dict[str, any] = {};
     for c in reversed(cls.__mro__) {
         clsfns = c.__dict__.get(attr);
         if clsfns {

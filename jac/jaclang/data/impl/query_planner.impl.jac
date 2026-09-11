@@ -279,7 +279,7 @@ impl resolve_query_edges(mem: Session, q: GraphQuery) -> list[Anchor] {
     }
     (pairs, local, tail) = _resolve_pairs(mem, q, len(q.hops));
     edge_ids: list[any] = [];
-    node_of: dict[any, any] = {};
+    node_of: dict[object, any] = {};
     seen: set = set();
     for (nid, eid) in pairs {
         if eid is None or eid in seen {

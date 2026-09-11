@@ -37,12 +37,12 @@ impl JcirGenPass._fw_helper(name: str) -> CgNode {
 }
 
 impl JcirGenPass._fw_call_node(
-    helper: str, args: list[any], jac_node: UniNode
+    helper: str, args: Sequence[CgItem], jac_node: UniNode
 ) -> CgNode {
     return self.call_node(self._fw_helper(helper), args, [], jac_node=jac_node);
 }
 
-impl JcirGenPass._fw_wrap_call(nd: Expr, helper: str, args: list[any]) -> None {
+impl JcirGenPass._fw_wrap_call(nd: Expr, helper: str, args: Sequence[CgItem]) -> None {
     self.set_out(nd, [self._fw_call_node(helper, args, nd)]);
 }
 
@@ -222,7 +222,7 @@ impl JcirGenPass._fw_call(nd: FuncCall) -> None {
     if row is None or not row.sized or row.is_float or name is None {
         return;
     }
-    call_args: list[any] = [
+    call_args: list[CgNode] = [
         self.const_of(name, jac_node=nd),
         self.const_of(op, jac_node=nd)
     ];

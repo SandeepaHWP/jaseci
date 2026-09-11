@@ -6,15 +6,24 @@ import from jaclang.compiler.frontend.parser { parse }
 import jaclang.compiler.frontend.unitree as uni;
 import type from jaclang.compiler.placement.workspace { WorkspaceSpec }
 
-glob _graphs: dict[str, tuple[any, ...]] = {},
-     _imports: dict[str, tuple[any, ...]] = {};
+glob _graphs:
+         dict[
+             str,
+             tuple[
+                 tuple[str, tuple[tuple[str, tuple[int, int]], ...]],
+                 dict[str, set[str]],
+                 str
+             ]
+         ] = {},
+     _imports:
+         dict[str, tuple[tuple[str, tuple[str, ...], tuple[int, int]], set[str]]] = {};
 
 
 def consumer_graph(ws: WorkspaceSpec) -> tuple[dict[str, set[str]], str] {
     if not ws.explicit or len(ws.serving_apps()) < 2 {
         return ({}, "");
     }
-    files: dict[str, tuple[any, ...]] = {};
+    files: dict[str, tuple[int, int]] = {};
     for (directory, dirs, names) in os.walk(ws.project_root) {
         dirs[:] = sorted(
             d

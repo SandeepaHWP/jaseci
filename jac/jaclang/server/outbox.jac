@@ -16,7 +16,7 @@ import from jaclang.data.store {
 import from jaclang.server.bridge { BridgeRejected }
 
 obj DeliveryReceipt {
-    static def _from_wire(payload: dict[any, any]) -> DeliveryReceipt {
+    static def _from_wire(payload: dict[str, any]) -> DeliveryReceipt {
         return DeliveryReceipt();
     }
 }
@@ -106,7 +106,7 @@ obj OutboxEntry {
     has id: str,
         app: str,
         `walker: str,
-        kwargs: dict[any, any],
+        kwargs: dict[str, any],
         idempotency_key: str,
         attempts: int = 0,
         created_at: float = 0.0,
@@ -132,8 +132,8 @@ obj OutboxStore {
 
 
 obj SqlOutboxStore(OutboxStore) {
-    def _exec(sql: str, params: dict[any, any]) -> list[tuple[any, ...]] abst;
-    def _exec_count(sql: str, params: dict[any, any]) -> int abst;
+    def _exec(sql: str, params: dict[str, any]) -> list[tuple[any, ...]] abst;
+    def _exec_count(sql: str, params: dict[str, any]) -> int abst;
     def ensure_tables -> None abst;
     def put(item: OutboxEntry) -> None;
     def get_by_key(key: str) -> (OutboxEntry | None);
@@ -151,8 +151,8 @@ obj SqlOutboxStore(OutboxStore) {
 obj PgOutboxStore(SqlOutboxStore) {
     has store: PgStore;
 
-    def _exec(sql: str, params: dict[any, any]) -> list[tuple[any, ...]];
-    def _exec_count(sql: str, params: dict[any, any]) -> int;
+    def _exec(sql: str, params: dict[str, any]) -> list[tuple[any, ...]];
+    def _exec_count(sql: str, params: dict[str, any]) -> int;
     def ensure_tables -> None;
     def close -> None;
 }
@@ -164,8 +164,8 @@ obj SqliteOutboxStore(SqlOutboxStore) {
         _lock: threading.RLock = threading.RLock();
 
     def postinit -> None;
-    def _exec(sql: str, params: dict[any, any]) -> list[tuple[any, ...]];
-    def _exec_count(sql: str, params: dict[any, any]) -> int;
+    def _exec(sql: str, params: dict[str, any]) -> list[tuple[any, ...]];
+    def _exec_count(sql: str, params: dict[str, any]) -> int;
     def ensure_tables -> None;
     def close -> None;
 }
@@ -186,14 +186,14 @@ obj OutboxState {
 glob _state: OutboxState = OutboxState();
 
 
-def canonical_kwargs(kwargs: dict[any, any]) -> str;
-def default_idempotency_key(app: str, `walker: str, kwargs: dict[any, any]) -> str;
+def canonical_kwargs(kwargs: dict[str, any]) -> str;
+def default_idempotency_key(app: str, `walker: str, kwargs: dict[str, any]) -> str;
 def backoff_seconds(attempts: int) -> float;
 def outbox_db_path -> str;
 def use_store(store: (OutboxStore | None)) -> None;
 
 def enqueue(
-    app: str, `walker: str, kwargs: dict[any, any], idempotency_key: str = ""
+    app: str, `walker: str, kwargs: dict[str, any], idempotency_key: str = ""
 ) -> str;
 
 def deliver_pending(max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> int;

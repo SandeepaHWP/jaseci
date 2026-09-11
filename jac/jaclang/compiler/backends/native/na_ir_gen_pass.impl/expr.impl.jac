@@ -479,7 +479,7 @@ impl NaIRGenPass._codegen_lambda(nd: uni.LambdaExpr) -> (ir.Value | None) {
             }
         }
         if _all_cells {
-            cap_info: list[any] = [];
+            cap_info: list[tuple[str, str, ir.Type]] = [];
             for (cap_name, _cap_val, cap_type) in captures {
                 cap_info.append((cap_name, "val", cap_type));
             }
@@ -1466,7 +1466,7 @@ impl NaIRGenPass._codegen_compare_chain(
         _name = _o.name if isinstance(_o, uni.Token) else str(_o);
         op_names.append(_name);
     }
-    operands: list[any] = [left];
+    operands: list[ir.Value] = [left];
     result: (ir.Value | None) = None;
     cur = left;
     for (i, op_name) in enumerate(op_names) {
@@ -2158,7 +2158,7 @@ impl NaIRGenPass._codegen_atom_trailer(nd: uni.AtomTrailer) -> (ir.Value | None)
         and nd.right.slices
         and nd.right.is_range {
         target_name = self._get_name(nd.target);
-        slices: list[any] = nd.right.slices or [];
+        slices: list[uni.Slice] = nd.right.slices or [];
         if slices {
             s = slices[0];
 
@@ -2231,7 +2231,7 @@ impl NaIRGenPass._codegen_atom_trailer(nd: uni.AtomTrailer) -> (ir.Value | None)
             if target_val is not None {
                 _shape = self._infer_list_elem_type(target_val);
                 elem_type_name = _shape if _shape is not None else _idx_list_spec;
-                slices: list[any] = nd.right.slices or [];
+                slices: list[uni.Slice] = nd.right.slices or [];
                 if slices {
                     idx_node = slices[0];
                     idx_val = self._codegen_expr(idx_node);
@@ -2263,7 +2263,7 @@ impl NaIRGenPass._codegen_atom_trailer(nd: uni.AtomTrailer) -> (ir.Value | None)
             if target_val is not None
                 and self._str_desc_ty is not None
                 and target_val.type == self._str_desc_ty {
-                _dslices: list[any] = nd.right.slices or [];
+                _dslices: list[uni.Slice] = nd.right.slices or [];
                 if _dslices {
                     _didx_node = _dslices[0];
                     _didx_val = self._codegen_expr(_didx_node);
@@ -2292,7 +2292,7 @@ impl NaIRGenPass._codegen_atom_trailer(nd: uni.AtomTrailer) -> (ir.Value | None)
             );
             if target_val is not None {
                 if self?.jacval_type and target_val.type == self.jacval_type {
-                    _any_slices: list[any] = nd.right.slices or [];
+                    _any_slices: list[uni.Slice] = nd.right.slices or [];
                     if _any_slices {
                         _any_idx_node = _any_slices[0];
                         _any_key = self._codegen_expr(_any_idx_node);
@@ -2311,7 +2311,7 @@ impl NaIRGenPass._codegen_atom_trailer(nd: uni.AtomTrailer) -> (ir.Value | None)
                 }
 
                 if self._is_bytes_value(target_val) {
-                    slices: list[any] = nd.right.slices or [];
+                    slices: list[uni.Slice] = nd.right.slices or [];
                     if slices {
                         idx_node = slices[0];
                         idx_val = self._codegen_expr(idx_node);
@@ -2328,7 +2328,7 @@ impl NaIRGenPass._codegen_atom_trailer(nd: uni.AtomTrailer) -> (ir.Value | None)
                 if target_val.type == i8p {
                     is_known_list = self._list_spec_of(nd.target) is not None;
                     if not is_known_list {
-                        slices: list[any] = nd.right.slices or [];
+                        slices: list[uni.Slice] = nd.right.slices or [];
                         if slices {
                             idx_node = slices[0];
                             idx_val = self._codegen_expr(idx_node);
@@ -2373,7 +2373,7 @@ impl NaIRGenPass._codegen_atom_trailer(nd: uni.AtomTrailer) -> (ir.Value | None)
 
                 elem_type_name = self._infer_list_elem_type(target_val);
                 if elem_type_name is not None {
-                    slices: list[any] = nd.right.slices or [];
+                    slices: list[uni.Slice] = nd.right.slices or [];
                     if slices {
                         idx_node = slices[0];
                         idx_val = self._codegen_expr(idx_node);
@@ -2403,7 +2403,7 @@ impl NaIRGenPass._codegen_atom_trailer(nd: uni.AtomTrailer) -> (ir.Value | None)
 
                 _rd_sname: (str | None) = self._struct_ptr_pointee_name(target_val);
                 if _rd_sname is not None {
-                    slices: list[any] = nd.right.slices or [];
+                    slices: list[uni.Slice] = nd.right.slices or [];
                     if slices {
                         idx_node = slices[0];
                         idx_val = self._codegen_expr(idx_node);
@@ -2424,7 +2424,7 @@ impl NaIRGenPass._codegen_atom_trailer(nd: uni.AtomTrailer) -> (ir.Value | None)
                     tsub_struct = target_val.type.pointee;
                 }
                 if tsub_struct is not None {
-                    slices: list[any] = nd.right.slices or [];
+                    slices: list[uni.Slice] = nd.right.slices or [];
                     if slices {
                         idx_node = slices[0];
                         idx_val = self._codegen_expr(idx_node);
@@ -2442,7 +2442,7 @@ impl NaIRGenPass._codegen_atom_trailer(nd: uni.AtomTrailer) -> (ir.Value | None)
                 dict_type_info = self._infer_dict_type(target_val);
                 if dict_type_info is not None {
                     (key_type_name, val_type_name) = dict_type_info;
-                    slices: list[any] = nd.right.slices or [];
+                    slices: list[uni.Slice] = nd.right.slices or [];
                     if slices {
                         idx_node = slices[0];
                         key_val = self._codegen_expr(idx_node);
@@ -2472,7 +2472,7 @@ impl NaIRGenPass._codegen_atom_trailer(nd: uni.AtomTrailer) -> (ir.Value | None)
                 target_val = self._codegen_expr(nd.target);
                 target_val = self._str_norm_optional(target_val);
                 if target_val is not None {
-                    slices: list[any] = nd.right.slices or [];
+                    slices: list[uni.Slice] = nd.right.slices or [];
                     if slices {
                         idx_node = slices[0];
                         key_val = self._codegen_expr(idx_node);
@@ -2507,7 +2507,7 @@ impl NaIRGenPass._codegen_atom_trailer(nd: uni.AtomTrailer) -> (ir.Value | None)
     return None;
 }
 
-impl NaIRGenPass._infer_dict_type(val: ir.Value) -> (tuple[any, ...] | None) {
+impl NaIRGenPass._infer_dict_type(val: ir.Value) -> (tuple[str, str] | None) {
     if not isinstance(val.type, ir.PointerType) {
         return None;
     }

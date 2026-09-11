@@ -237,7 +237,7 @@ impl NaIRGenPass._codegen_multistring(nd: uni.MultiString) -> (ir.Value | None) 
     return result;
 }
 
-impl NaIRGenPass._static_str_struct_const(data: bytes) -> tuple[any, ...] {
+impl NaIRGenPass._static_str_struct_const(data: bytes) -> tuple[ir.Type, ir.Constant] {
     i64 = ir.IntType(64);
     i8 = ir.IntType(8);
     arr_type = ir.ArrayType(i8, len(data));
@@ -291,7 +291,7 @@ impl NaIRGenPass._fstring_spec_text(spec: uni.Expr) -> (str | None) {
 
 impl NaIRGenPass._fstring_spec_to_printf(
     spec: str, kind: str
-) -> (tuple[any, ...] | None) {
+) -> (tuple[str, str] | None) {
     fill: (str | None) = None;
     align: (str | None) = None;
     i = 0;
@@ -740,7 +740,7 @@ impl NaIRGenPass._codegen_string_index(
 
 impl NaIRGenPass._emit_norm_slice_bounds(
     slice_node: object, src_len: ir.Value
-) -> (tuple[any, ...] | None) {
+) -> (tuple[ir.Value, ir.Value, ir.Value, ir.Value] | None) {
     i64 = ir.IntType(64);
     zero = ir.Constant(i64, 0);
     one = ir.Constant(i64, 1);

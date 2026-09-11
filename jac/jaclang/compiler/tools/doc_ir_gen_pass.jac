@@ -46,7 +46,7 @@ walker DocIRGenPass(UniPass) {
     def _assign_group_concat(nd: uni.UniNode) -> None;
     def _assign_space_group(nd: uni.UniNode) -> None;
     def _assign_operator_chain(
-        nd: uni.UniNode, operands: list[any], ops: list[any]
+        nd: uni.UniNode, operands: list[uni.UniNode], ops: list[uni.UniNode]
     ) -> None;
 
     def _assign_semi_stmt_doc_ir(nd: uni.UniNode) -> None;

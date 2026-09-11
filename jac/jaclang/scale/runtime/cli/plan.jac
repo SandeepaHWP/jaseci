@@ -274,7 +274,7 @@ obj IngressView {
     has rules: list[IngressRuleView];
 
     static def from_manifest(
-        ingress: any, routes: dict[any, any]
+        ingress: any, routes: dict[str, any]
     ) -> IngressView | None {
         if not isinstance(ingress, dict) {
             return None;
@@ -407,10 +407,10 @@ def _render_totals(bundle: any) {
 
 
 obj Plan {
-    has bundle: dict[any, any],
-        routes: dict[any, any],
-        gateway_cfg: dict[any, any],
-        svc_configs: dict[any, any],
+    has bundle: dict[str, any],
+        routes: dict[str, any],
+        gateway_cfg: dict[str, any],
+        svc_configs: dict[str, any],
         cluster_type: str,
         namespace: str,
         services: list[ServiceView],
@@ -425,12 +425,12 @@ obj Plan {
         }
         fleet: (FleetSpec | None) = bundle.get("fleet");
         gateway_cfg_raw: any = bundle.get("gateway_config");
-        gateway_cfg: dict[any, any] = gateway_cfg_raw
+        gateway_cfg: dict[str, any] = gateway_cfg_raw
             if isinstance(gateway_cfg_raw, dict)
             else {};
 
-        routes: dict[any, any] = {};
-        svc_configs: dict[any, any] = {};
+        routes: dict[str, any] = {};
+        svc_configs: dict[str, any] = {};
         if fleet is not None {
             for (name, member) in fleet.members.items() {
                 routes[str(name)] = "/" if member.is_root else str(member.route);
@@ -625,7 +625,7 @@ obj Plan {
 
 def print_plan(
     target: any, app_config: AppConfig, show_yaml: bool = False
-) -> tuple[dict[any, any], list[Diagnostic]] {
+) -> tuple[dict[str, any], list[Diagnostic]] {
     plan = Plan.from_target(target, app_config);
     diagnostics = plan.validate();
     plan.render(diagnostics, show_yaml=show_yaml);

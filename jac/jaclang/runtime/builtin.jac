@@ -70,7 +70,7 @@ def schedule(**kwargs: any) -> Callable;
 
 def new(cls: any, *args: any) -> any;
 
-def unsafe_html(html: any) -> dict[any, any];
+def unsafe_html(html: any) -> dict[str, any];
 
 def managed(x: any) -> any;
 

@@ -156,7 +156,7 @@ impl ApiKeyManager.create_api_key(
     );
 }
 
-def _key_summary(api_key_id: str, doc: dict[any, any]) -> dict[any, any] {
+def _key_summary(api_key_id: str, doc: dict[str, any]) -> dict[str, any] {
     return {
         'api_key_id': api_key_id,
         'name': doc.get('name', ''),
@@ -223,8 +223,8 @@ impl ApiKeyManager.revoke_api_key(user_id: str, api_key_id: str) -> TransportRes
     );
 }
 
-impl ApiKeyManager._get_key_doc(api_key_id: str) -> dict[any, any] | None {
-    doc: dict[any, any] | None = None;
+impl ApiKeyManager._get_key_doc(api_key_id: str) -> dict[str, any] | None {
+    doc: dict[str, any] | None = None;
     if self._db is not None {
         rows = self._db.rows(
             'SELECT doc FROM jac_docs WHERE collection = :c AND id = :i',
@@ -244,7 +244,7 @@ impl ApiKeyManager._get_key_doc(api_key_id: str) -> dict[any, any] | None {
     return doc;
 }
 
-impl ApiKeyManager.resolve_key(api_key: str) -> dict[any, any] | None {
+impl ApiKeyManager.resolve_key(api_key: str) -> dict[str, any] | None {
     key_info = WebhookUtils.validate_api_key(api_key);
     if not key_info {
         return None;

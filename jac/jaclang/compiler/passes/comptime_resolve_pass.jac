@@ -74,7 +74,7 @@ walker ComptimeResolvePass(TypeCheckPass) {
     has _armed: bool = False,
         _keep: set[int] = set();
 
-    static has PROVIDES: tuple[any, ...] = ('comptime', ),
+    static has PROVIDES: tuple[str, ...] = ('comptime', ),
         HOST_PASS: bool = True;
 
     override def before_pass {

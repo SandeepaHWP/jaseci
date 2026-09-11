@@ -39,7 +39,7 @@ obj SolidBackend(FrameworkBackend) {
     def view_runtime_symbols(view: ViewElement) -> list[str];
     def _jsx_element(
         name_node: any,
-        attrs: list[any],
+        attrs: list[es.JsxAttribute | es.JsxSpreadAttribute],
         children: list[any],
         jac_node: any,
         sync_loc: any
@@ -47,7 +47,7 @@ obj SolidBackend(FrameworkBackend) {
 
     def _jsx_dynamic(
         component_expr: es.Expression,
-        attrs: list[any],
+        attrs: list[es.JsxAttribute | es.JsxSpreadAttribute],
         children: list[any],
         jac_node: any,
         sync_loc: any

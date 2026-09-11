@@ -34,7 +34,7 @@ import from jaclang.client.targets.react_native.html_tag_map {
 
 def:pub __jacGetRenderer -> any;
 def:pub __jacNativeCreate(
-    tag: any, props: dict[any, any] = {}, children: any = []
+    tag: any, props: dict[str, any] = {}, children: any = []
 ) -> JsxElement;
 
 glob _UNMAPPED_WARNED = {},
@@ -52,7 +52,7 @@ obj RouteDef {
 obj RouteMatch {
     has name: str,
         path: str,
-        params: dict[any, any] = {};
+        params: dict[str, any] = {};
 }
 
 glob:pub useState = reactUseState,
@@ -66,11 +66,11 @@ glob:pub useState = reactUseState,
      JacClientErrorBoundary = ErrorBoundary,
      JacSchema = __createJacSchema(z);
 
-def _adaptProps(tag: str, props: dict[any, any]) -> dict[any, any];
+def _adaptProps(tag: str, props: dict[str, any]) -> dict[str, any];
 def _isAbsoluteImageUri(src: str) -> bool;
-def _adaptImageProps(props: dict[any, any]) -> dict[any, any];
-def _textStyleFrom(style: any) -> dict[any, any];
-def _makeNativeLink(link_props: dict[any, any], children: list[any]) -> JsxElement;
+def _adaptImageProps(props: dict[str, any]) -> dict[str, any];
+def _textStyleFrom(style: any) -> dict[str, any];
+def _makeNativeLink(link_props: dict[str, any], children: list[any]) -> JsxElement;
 def _toChildrenArray(children: any) -> list[any];
 def _normalizeRoutePath(path: str) -> str;
 def _joinRoutePath(parent_path: str, child_path: str) -> str;
@@ -78,28 +78,28 @@ def _splitRouteParts(path: str) -> list[str];
 def _buildRouteName(path: str) -> str;
 def _cacheNativeRoutes(route_defs: list[RouteDef]) -> None;
 def _getNativeRoutes -> list[any];
-def _matchRoutePattern(pattern_path: str, actual_path: str) -> (dict[any, any] | None);
+def _matchRoutePattern(pattern_path: str, actual_path: str) -> (dict[str, any] | None);
 def _lookupRouteByPath(path: str) -> (RouteMatch | None);
-def _lookupRouteByName(name: str) -> (dict[any, any] | None);
+def _lookupRouteByName(name: str) -> (dict[str, any] | None);
 def _hydratePath(pattern_path: str, params: any) -> str;
-def _stripMetaParams(params: any) -> dict[any, any];
-def _performNavigation(nav: any, target: any, options: dict[any, any] = {}) -> None;
+def _stripMetaParams(params: any) -> dict[str, any];
+def _performNavigation(nav: any, target: any, options: dict[str, any] = {}) -> None;
 def _collectNativeRoutes(
     children: any, parent_path: str, wrappers: list[any], out_routes: list[RouteDef]
 ) -> None;
 
 def _makeNativeRouteScreen(route: RouteDef) -> any;
 
-def:pub __nativeRouter(props: dict[any, any] = {}) -> JsxElement;
-def:pub __nativeRoutes(props: dict[any, any] = {}) -> JsxElement;
-def:pub __nativeRoute(props: dict[any, any] = {}) -> (JsxElement | None);
-def:pub __nativeLink(props: dict[any, any] = {}) -> JsxElement;
-def:pub __nativeNavigate(props: dict[any, any] = {}) -> (JsxElement | None);
-def:pub __nativeOutlet(props: dict[any, any] = {}) -> (JsxElement | None);
-def:pub useRouter -> dict[any, any];
+def:pub __nativeRouter(props: dict[str, any] = {}) -> JsxElement;
+def:pub __nativeRoutes(props: dict[str, any] = {}) -> JsxElement;
+def:pub __nativeRoute(props: dict[str, any] = {}) -> (JsxElement | None);
+def:pub __nativeLink(props: dict[str, any] = {}) -> JsxElement;
+def:pub __nativeNavigate(props: dict[str, any] = {}) -> (JsxElement | None);
+def:pub __nativeOutlet(props: dict[str, any] = {}) -> (JsxElement | None);
+def:pub useRouter -> dict[str, any];
 def:pub useNavigate -> any;
-def:pub useLocation -> dict[any, any];
-def:pub useParams -> dict[any, any];
+def:pub useLocation -> dict[str, any];
+def:pub useParams -> dict[str, any];
 def:pub navigate(path: str) -> None;
 def:pub __getApiBaseUrl -> str;
 def:pub __getLocalStorage(key: str) -> str;

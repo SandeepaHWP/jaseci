@@ -210,7 +210,7 @@ impl JcirGenPass._materialize(v: any, jac_node: UniNode) -> (CgNode | None) {
         return self.name_load(v.__name__, jac_node);
     }
     if isinstance(v, (list, tuple)) {
-        elts: list[any] = [];
+        elts: list[CgNode] = [];
         for item in v {
             m = self._materialize(item, jac_node);
             if m is None {
@@ -223,7 +223,7 @@ impl JcirGenPass._materialize(v: any, jac_node: UniNode) -> (CgNode | None) {
         );
     }
     if isinstance(v, (set, frozenset)) {
-        elts2: list[any] = [];
+        elts2: list[CgNode] = [];
         for item in sorted(v, key=self._ct_order_key) {
             m = self._materialize(item, jac_node);
             if m is None {
@@ -239,8 +239,8 @@ impl JcirGenPass._materialize(v: any, jac_node: UniNode) -> (CgNode | None) {
         );
     }
     if isinstance(v, dict) {
-        keys: list[any] = [];
-        vals: list[any] = [];
+        keys: list[CgNode] = [];
+        vals: list[CgNode] = [];
         for (k, item) in v.items() {
             mk = self._materialize(k, jac_node);
             mv = self._materialize(item, jac_node);
@@ -262,11 +262,11 @@ impl JcirGenPass._materialize(v: any, jac_node: UniNode) -> (CgNode | None) {
     }
     if kind == "CtType" {
         cls_ref = self._class_ref(v.module, v.name, jac_node);
-        ct_args: dict[any, any] = v?.ct_args or {};
+        ct_args: dict[str, any] = v?.ct_args or {};
         if not ct_args {
             return cls_ref;
         }
-        ct_kws: list[any] = [];
+        ct_kws: list[CgNode] = [];
         for (ck, cvv) in ct_args.items() {
             mv = self._materialize(cvv, jac_node);
             if mv is None {
@@ -305,7 +305,7 @@ impl JcirGenPass._materialize(v: any, jac_node: UniNode) -> (CgNode | None) {
         );
     }
     if kind == "CtRecord" {
-        kws: list[any] = [];
+        kws: list[CgNode] = [];
         for (k, item) in v.fields.items() {
             mv = self._materialize(item, jac_node);
             if mv is None {
@@ -349,7 +349,7 @@ impl JcirGenPass._ct_param_decls(cls_expr: Expr) -> (list[TypeParam] | None) {
     return `list(arch.type_params or []);
 }
 
-impl JcirGenPass._ct_ctor_slots(nd: AtomTrailer) -> (list[tuple[any, ...]] | None) {
+impl JcirGenPass._ct_ctor_slots(nd: AtomTrailer) -> (list[tuple[str, UniNode]] | None) {
     if nd.is_attr or not isinstance(nd.right, IndexSlice) or nd.right.is_range {
         return None;
     }
@@ -359,10 +359,10 @@ impl JcirGenPass._ct_ctor_slots(nd: AtomTrailer) -> (list[tuple[any, ...]] | Non
     }
     s0 = nd.right.slices[0] if nd.right.slices else None;
     head = s0.start if s0 is not None else None;
-    vals: list[any] = `list(head.values)
+    vals: list[UniNode] = `list(head.values)
         if isinstance(head, TupleVal)
         else ([head] if head else []);
-    out: list[tuple[any, ...]] = [];
+    out: list[tuple[str, UniNode]] = [];
     for (i, tp) in enumerate(tps) {
         if tp.is_comptime and i < len(vals) {
             out.append((tp.name.value, vals[i], ));

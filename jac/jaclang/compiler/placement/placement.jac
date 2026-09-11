@@ -10,7 +10,7 @@ glob PLACEMENT_SCHEMA: int = 1,
          ("PyInlineCode", uni.PyInlineCode),
          ("JsxElement", uni.JsxElement)
      ),
-     PLACEMENT_NATIVE_REJECT_NODES: tuple[any, ...] = (),
+     PLACEMENT_NATIVE_REJECT_NODES: tuple[tuple[str, type], ...] = (),
      PLACEMENT_INFERENCE_HELD: dict[str, str] = {
          "compiler/frontend/codeinfo.jac": (
              "runtime JIT inference stays conservative: admitting codeinfo "
@@ -20,7 +20,7 @@ glob PLACEMENT_SCHEMA: int = 1,
              "is what B4 (#8323) actually needed"
          )
      },
-     PLACEMENT_HOLD_EXEMPT_ROOTS: tuple[any, ...] = (
+     PLACEMENT_HOLD_EXEMPT_ROOTS: tuple[str, ...] = (
          "/jaclang/compiler/",
          "/jaclang/runtime/",
          "/jaclang/lib/",
@@ -40,7 +40,7 @@ obj ElementSummary {
         import_py_targets: list[str] = field(default_factory=`list),
         reqs: list[list[str]] = field(default_factory=`list),
         refs: list[int] = field(default_factory=`list),
-        escapes: list[list[any]] = field(default_factory=`list),
+        escapes: list[list[int | str]] = field(default_factory=`list),
         glob_writes: list[int] = field(default_factory=`list);
 
     def to_dict -> dict[str, any] {
@@ -786,7 +786,7 @@ def summarize_module(module: uni.Module, with_refs: bool = True) -> PlacementSum
     return ps;
 }
 
-def summary_store(prog: any) -> dict[any, any] {
+def summary_store(prog: any) -> dict[str, any] {
     store = prog?.analysis.placement_summaries;
     if store is None {
         store = {};
@@ -795,7 +795,7 @@ def summary_store(prog: any) -> dict[any, any] {
     return store;
 }
 
-def placement_state(prog: any) -> dict[any, any] {
+def placement_state(prog: any) -> dict[str, any] {
     state = prog?.analysis.placement_state;
     if state is None {
         state = {};

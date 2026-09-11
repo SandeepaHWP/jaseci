@@ -270,7 +270,7 @@ impl TypeCheckPass._check_intrinsic_call(nd: FuncCall) -> None {
     if intr is None {
         return;
     }
-    positional: list[any] = [];
+    positional: list[Expr] = [];
     has_kw = False;
     for p in (nd.params or []) {
         if isinstance(p, KWPair) {
@@ -353,7 +353,7 @@ impl TypeCheckPass.exit_compare_expr with CompareExpr exit {
     }
     _ord_ops = (Tok.LT, Tok.LTE, Tok.GT, Tok.GTE);
     _mem_ops = (Tok.KW_IN, Tok.KW_NIN);
-    operands: list[any] = [here.left];
+    operands: list[Expr] = [here.left];
     operands.extend(here.rights);
     for (i, op) in enumerate(here.ops) {
         _opname = op.name if isinstance(op, Token) else str(op);
@@ -2026,7 +2026,7 @@ impl TypeCheckPass._eval_unpacking_names(container: Expr) -> None {
 impl TypeCheckPass._stamp_fixed_width -> None {
     import from jaclang.compiler.type_registry { JAC_TYPE_REGISTRY }
     import from jaclang.compiler.types.fixed_width { numeric_name_of }
-    stack: list[any] = [self.ir_in];
+    stack: list[UniNode] = [self.ir_in];
     while stack {
         nd = stack.pop();
         if isinstance(nd, Expr) {

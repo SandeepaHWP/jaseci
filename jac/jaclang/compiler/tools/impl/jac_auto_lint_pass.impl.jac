@@ -244,11 +244,13 @@ impl JacAutoLintPass.enter_archetype with uni.Archetype entry {
     self._combine_has_in_node(arch);
 }
 
-impl JacAutoLintPass.combine_consecutive_glob(body: list[any]) -> list[any] {
+impl JacAutoLintPass.combine_consecutive_glob(
+    body: list[uni.ElementStmt | uni.String | uni.EmptyToken]
+) -> list[uni.ElementStmt | uni.String | uni.EmptyToken] {
     if len(body) <= 1 {
         return body;
     }
-    new_body: list[uni.UniNode] = [];
+    new_body: list[uni.ElementStmt | uni.String | uni.EmptyToken] = [];
     i = 0;
     while i < len(body) {
         stmt = body[i];
@@ -312,7 +314,9 @@ impl JacAutoLintPass.combine_consecutive_glob(body: list[any]) -> list[any] {
     return new_body;
 }
 
-impl JacAutoLintPass.combine_consecutive_has(body: list[any]) -> list[any] {
+impl JacAutoLintPass.combine_consecutive_has(
+    body: list[uni.UniNode]
+) -> list[uni.UniNode] {
     if len(body) <= 1 {
         return body;
     }
@@ -429,7 +433,9 @@ impl JacAutoLintPass.can_combine_has(has1: uni.ArchHas, has2: uni.ArchHas) -> bo
     return True;
 }
 
-impl JacAutoLintPass.create_entry_block(stmts: list[any]) -> uni.ModuleCode {
+impl JacAutoLintPass.create_entry_block(
+    stmts: list[uni.CodeBlockStmt]
+) -> uni.ModuleCode {
     entry_block = uni.ModuleCode(name=None, body=stmts, kid=stmts, doc=None);
     new_kid: list[uni.UniNode] = [];
     new_kid.append(entry_block.gen_token(Tok.KW_WITH));
@@ -497,7 +503,7 @@ impl JacAutoLintPass.can_convert_to_glob(assignment: uni.Assignment) -> bool {
 impl JacAutoLintPass.names_unsafe_to_globalize(module: uni.Module) -> set[str] {
     counts: dict[str, int] = {};
     for stmt in module.body {
-        target_lists: list[any] = [];
+        target_lists: list[Sequence[uni.Expr]] = [];
         if isinstance(stmt, uni.GlobalVars) {
             for assign in stmt.assignments {
                 target_lists.append(assign.target);
@@ -561,7 +567,7 @@ impl JacAutoLintPass.enter_module with uni.Module entry {
         }
 
         if isinstance(stmt, uni.ModuleCode) and stmt.name is None {
-            pending_entry_stmts: list[uni.UniNode] = [];
+            pending_entry_stmts: list[uni.CodeBlockStmt] = [];
             for inner_stmt in stmt.body {
                 extracted_stmt: (uni.ElementStmt | None) = None;
                 assign_value: (uni.Expr | uni.YieldExpr | None) = (
@@ -916,7 +922,7 @@ impl JacAutoLintPass.exit_func_call with uni.FuncCall exit {
 }
 
 impl JacAutoLintPass._collect_atom_trailers(
-    uni_node: uni.UniNode, results: list[any]
+    uni_node: uni.UniNode, results: list[uni.AtomTrailer]
 ) -> None {
     if isinstance(uni_node, uni.AtomTrailer) {
         results.append(uni_node);
@@ -1609,7 +1615,7 @@ impl JacAutoLintPass._extract_string_literal_value(expr: uni.Expr) -> (str | Non
     return None;
 }
 
-impl JacAutoLintPass._check_unnecessary_pass(body: list[any]) -> None {
+impl JacAutoLintPass._check_unnecessary_pass(body: list[uni.UniNode]) -> None {
     if self._is_suppressed(W3020) {
         return;
     }
@@ -2114,7 +2120,7 @@ impl JacAutoLintPass._check_unnecessary_none_return(
     }
 }
 
-impl JacAutoLintPass._body_has_return_stmt(body: list[any]) -> bool {
+impl JacAutoLintPass._body_has_return_stmt(body: list[uni.UniNode]) -> bool {
     for stmt in body {
         if isinstance(stmt, uni.ReturnStmt) {
             return True;
@@ -2516,7 +2522,7 @@ impl JacAutoLintPass._strip_noise(nd: uni.Module) -> None {
     }
 
     if not self._is_suppressed(W3050) and nd.source.comments {
-        kept: list[any] = [];
+        kept: list[uni.CommentToken] = [];
         suppression_lines = nd.source.inline_suppressions;
         for comment in list(nd.source.comments) {
             if comment.line_no in suppression_lines {
@@ -2633,7 +2639,8 @@ impl JacAutoLintPass._detect_map_lambda_jsx(
     if sig is None {
         return None;
     }
-    all_params: list[any] = list(sig.posonly_params or []) + list(sig.params or []);
+    all_params: list[uni.ParamVar] = list(sig.posonly_params or [])
+        + list(sig.params or []);
     if len(all_params) != 1 {
         return None;
     }
@@ -2711,7 +2718,7 @@ impl JacAutoLintPass._convert_map_to_comprehension(nd: uni.FuncCall) -> bool {
     }
 
     target_node: uni.Expr = self._make_name_node(nd, item_name);
-    compr_kid: list[any] = [
+    compr_kid: list[uni.UniNode] = [
         nd.gen_token(Tok.KW_FOR),
         target_node,
         nd.gen_token(Tok.KW_IN),
@@ -2801,7 +2808,7 @@ impl JacAutoLintPass._make_accessor_from_ability(
     if sig is not None {
         acc_kid.append(sig);
     }
-    body: (list[any] | None) = None;
+    body: (list[uni.UniNode] | None) = None;
     if isinstance(src.body, list) {
         body = src.body;
         acc_kid.append(src.gen_token(Tok.LBRACE));
@@ -2831,7 +2838,10 @@ impl JacAutoLintPass._make_accessor_from_ability(
 }
 
 impl JacAutoLintPass._build_property_has(
-    ref_node: uni.UniNode, prop_name: str, type_expr: uni.Expr, accessors: list[any]
+    ref_node: uni.UniNode,
+    prop_name: str,
+    type_expr: uni.Expr,
+    accessors: list[uni.Ability]
 ) -> uni.ArchHas {
     name_node = self._make_name_node(ref_node, prop_name);
     colon_tok = ref_node.gen_token(Tok.COLON);

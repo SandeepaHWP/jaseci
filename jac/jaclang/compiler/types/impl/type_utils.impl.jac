@@ -231,8 +231,8 @@ impl types_equivalent(a: TypeBase, b: TypeBase, depth: int = 0) -> bool {
         if a.get_literal_value() != b.get_literal_value() {
             return False;
         }
-        a_args: list[any] = a.private.type_args or [];
-        b_args: list[any] = b.private.type_args or [];
+        a_args: list[TypeBase] = a.private.type_args or [];
+        b_args: list[TypeBase] = b.private.type_args or [];
         if len(a_args) != len(b_args) {
             return False;
         }
@@ -244,8 +244,8 @@ impl types_equivalent(a: TypeBase, b: TypeBase, depth: int = 0) -> bool {
         return True;
     }
     if isinstance(a, FunctionType) and isinstance(b, FunctionType) {
-        a_params: list[any] = a.parameters or [];
-        b_params: list[any] = b.parameters or [];
+        a_params: list[Parameter] = a.parameters or [];
+        b_params: list[Parameter] = b.parameters or [];
         if len(a_params) != len(b_params) {
             return False;
         }
@@ -272,8 +272,8 @@ impl types_equivalent(a: TypeBase, b: TypeBase, depth: int = 0) -> bool {
         return True;
     }
     if isinstance(a, UnionType) and isinstance(b, UnionType) {
-        a_types: list[any] = a.types or [];
-        b_types: list[any] = b.types or [];
+        a_types: list[TypeBase] = a.types or [];
+        b_types: list[TypeBase] = b.types or [];
         if len(a_types) != len(b_types) {
             return False;
         }
@@ -714,8 +714,8 @@ impl apply_solved_type_vars(
         }
 
         if class_type is not None and ty.name {
-            cls_type_params: list[any] = class_type.shared.type_params or [];
-            cls_type_args: list[any] = class_type.private.type_args or [];
+            cls_type_params: list[TypeVarType] = class_type.shared.type_params or [];
+            cls_type_args: list[TypeBase] = class_type.private.type_args or [];
             for (idx, tp) in enumerate(cls_type_params) {
                 if tp.name == ty.name {
                     if idx < len(cls_type_args) {

@@ -82,7 +82,7 @@ obj PlanValidator {
 
     def run -> list[Diagnostic] {
         out: list[Diagnostic] = [];
-        routes: dict[any, any] = self.routes if isinstance(self.routes, dict) else {};
+        routes: dict[str, any] = self.routes if isinstance(self.routes, dict) else {};
         deployments = dget(self.bundle, "deployments");
         scaling = dget(self.bundle, "scaling");
 

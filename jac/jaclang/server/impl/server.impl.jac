@@ -465,7 +465,7 @@ impl ModuleIntrospector._load_manifest -> None {
     if not self._module {
         return;
     }
-    base: dict[any, any] = {};
+    base: dict[str, any] = {};
     mod_path: str = getattr(self._module, '__file__', '');
     if mod_path {
         import from jaclang.server.sealed_serve { serve_manifest_for }
@@ -497,7 +497,7 @@ impl ModuleIntrospector._load_manifest -> None {
         }
     }
 
-    aggregated: dict[any, any] = {};
+    aggregated: dict[str, any] = {};
 
     for hub in Jac.get_program()._search_hubs() {
         for hub_mod in hub.values() {
@@ -804,7 +804,7 @@ impl ModuleIntrospector._collect_cross_boundary_endpoints -> None {
         return None;
     }
 
-    def auth_for(name: str, table: dict[any, any], ast_node: any) -> bool {
+    def auth_for(name: str, table: dict[str, any], ast_node: any) -> bool {
         auth = table.get(name, None);
         if auth is None {
             is_pub = ast_node is not None
@@ -1720,7 +1720,7 @@ impl JacAPIServer._register_scheduled_tasks -> None {
         return target;
     }
     self.introspector.load();
-    registries: list[any] = [
+    registries: list[tuple[dict[str, any], bool]] = [
         (dict(self.introspector._walkers), True),
         (dict(self.introspector._functions), False)
     ];

@@ -165,7 +165,7 @@ impl JacConfig.apply_profile(
         check_data: dict[str, any] = profile["check"];
         for (key, value) in check_data.items() {
             if key == "lint" and isinstance(value, dict) {
-                lint_data: dict[any, any] = value;
+                lint_data: dict[str, any] = value;
                 for (lk, lv) in lint_data.items() {
                     if hasattr(self.check.lint, lk) {
                         setattr(self.check.lint, lk, lv);
@@ -295,7 +295,7 @@ impl JacConfig.merge_from_toml_file(toml_path: Path) -> None {
         check_data: dict[str, any] = data["check"];
         for (key, value) in check_data.items() {
             if key == "lint" and isinstance(value, dict) {
-                lint_data: dict[any, any] = value;
+                lint_data: dict[str, any] = value;
                 for (lk, lv) in lint_data.items() {
                     if hasattr(self.check.lint, lk) {
                         setattr(self.check.lint, lk, lv);
@@ -934,7 +934,7 @@ impl toml_value(value: any) -> str {
         if not value {
             return "{}";
         }
-        table: dict[any, any] = value;
+        table: dict[str, any] = value;
         pairs = [f"{_quote_key(k)} = {toml_value(v)}" for (k, v) in table.items()];
         return "{ " + ", ".join(pairs) + " }";
     } else {
@@ -1000,11 +1000,11 @@ impl JacConfig.remove_dependency(
     return False;
 }
 
-impl _parse_persons(raw: list[any]) -> list[PersonConfig] {
+impl _parse_persons(raw: list[object]) -> list[PersonConfig] {
     result: list[PersonConfig] = [];
     for item in raw {
         if isinstance(item, dict) {
-            fields: dict[any, any] = item;
+            fields: dict[str, any] = item;
             result.append(
                 PersonConfig(name=fields.get("name", ""), email=fields.get("email", ""))
             );
@@ -1564,7 +1564,7 @@ impl JacConfig.default_app.getter -> str {
     return self.project.default_app;
 }
 
-def _apply_build_section(cfg: JacConfig, data: dict[any, any]) -> None {
+def _apply_build_section(cfg: JacConfig, data: dict[str, any]) -> None {
     if "build" not in data or not isinstance(data["build"], dict) {
         return;
     }
@@ -1599,7 +1599,7 @@ def _apply_build_section(cfg: JacConfig, data: dict[any, any]) -> None {
     );
 }
 
-def _apply_memory_native_placement(cfg: JacConfig, data: dict[any, any]) {
+def _apply_memory_native_placement(cfg: JacConfig, data: dict[str, any]) {
     import from jaclang.cli.console { console }
     for (_old, _new) in [("gc", "[memory] profile / enforce / exempt")] {
         if _old in data {

@@ -79,11 +79,11 @@ class ViteBundler {
     ) -> Path;
 
     def _format_config_object(
-        self: ViteBundler, config: dict[any, any], indent: int = 0
+        self: ViteBundler, config: dict[str, any], indent: int = 0
     ) -> str;
 
     def _format_define_entries(
-        self: ViteBundler, api_base_url: str, custom_defines: dict[any, any]
+        self: ViteBundler, api_base_url: str, custom_defines: dict[str, any]
     ) -> str;
 
     def install_packages(

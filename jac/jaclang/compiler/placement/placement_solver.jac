@@ -14,7 +14,11 @@ import from jaclang.compiler.placement.placement {
     summarize_module
 }
 
-glob _na_scan_memo: dict[tuple[any, ...], tuple[any, ...]] = {},
+glob _na_scan_memo:
+         dict[
+             tuple[str, bool],
+             tuple[tuple[tuple[str, int, int], ...], str, list[str]]
+         ] = {},
      _SPACE_BY_NAME: dict[str, CodeContext] = {
          'server': CodeContext.SERVER,
          'client': CodeContext.CLIENT,
@@ -110,7 +114,7 @@ def _native_deps_ok(
         scope_lowering_active
     }
     cap = effective_native_closure_cap();
-    edges: dict[str, list[str]] = {root_path: list[any](root_deps)};
+    edges: dict[str, list[str]] = {root_path: list[str](root_deps)};
     queue: list[str] = list(root_deps);
     while queue {
         if len(edges) > cap {
@@ -961,14 +965,14 @@ def demote_client_pulled_elements(
 }
 
 walker PlacementApplyPass(Transform) {
-    static has PROVIDES: tuple[any, ...] = ('PlacedIn', 'DecidedCodespace'),
-        REQUIRES: tuple[any, ...] = ('SymOf', );
+    static has PROVIDES: tuple[str, ...] = ('PlacedIn', 'DecidedCodespace'),
+        REQUIRES: tuple[str, ...] = ('SymOf', );
 
     has prog: JacProgram,
         ir_in: uni.Module,
         cancel_token: any = None;
 
-    static has PROVIDES: tuple[any, ...] = ('codespace-pull', ),
+    static has PROVIDES: tuple[str, ...] = ('codespace-pull', ),
         HOST_PASS: bool = True;
 
     def postinit -> None;

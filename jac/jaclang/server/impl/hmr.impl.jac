@@ -42,7 +42,7 @@ impl HotReloader.stop -> None {
     logger.debug("Hot reloader stopped");
 }
 
-impl HotReloader.build_status -> dict[any, any] {
+impl HotReloader.build_status -> dict[str, any] {
     diags = self.diagnostics();
     if diags {
         return {
@@ -53,7 +53,7 @@ impl HotReloader.build_status -> dict[any, any] {
     return {"status": self._build_status.value, "diagnostics": []};
 }
 
-impl HotReloader.diagnostics -> list[any] {
+impl HotReloader.diagnostics -> list[ClientDiagnostic] {
     with HotReloader._build_lock {
         if self._build_status is BuildStatus.ERROR {
             return list(self._diagnostics);
@@ -73,14 +73,14 @@ impl HotReloader.attach_client_bundler(bundler: any) -> None {
 }
 
 impl HotReloader.record_client_event(
-    slot: str, payload: (dict[any, any] | None)
+    slot: str, payload: (dict[str, any] | None)
 ) -> None {
     import from jaclang.client.client_diagnostics { classify_client_payload }
     import from jaclang.client.source_mapping { _error_rate_limiter }
     if slot not in ('vite', 'client', 'runtime', 'ready') {
         return;
     }
-    fresh: list[any] = [];
+    fresh: list[ClientDiagnostic] = [];
     if slot != 'ready' and isinstance(payload, dict) and payload.get('message') {
         channel = 'vite' if slot == 'vite' else 'browser';
         try {
@@ -121,7 +121,7 @@ impl HotReloader.record_ok -> None {
 impl HotReloader.record_error(
     file_path: str,
     message: str,
-    alerts: (list[any] | None) = None,
+    alerts: (list[Alert] | None) = None,
     line: int = 0,
     column: int = 0
 ) -> None {
@@ -165,7 +165,7 @@ impl HotReloader._sync_status_file -> None {
     } except OSError {}
 }
 
-impl get_build_status -> dict[any, any] {
+impl get_build_status -> dict[str, any] {
     reloader = HotReloader._active;
     if not reloader {
         return {"status": BuildStatus.UNAVAILABLE.value, "diagnostics": []};

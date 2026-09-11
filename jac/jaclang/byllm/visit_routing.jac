@@ -275,7 +275,7 @@ def _resolve_choice(
 }
 
 
-def route_visit(candidates: list[object], model: BaseLLM) -> list[any] {
+def route_visit(candidates: list[object], model: BaseLLM) -> list[object] {
     import from jaclang.byllm.mtir { MTRuntime }
     import from jaclang.byllm.types { Message, MessageRole }
     import from jaclang.runtime.runtime { JacRuntime as Jac }
@@ -284,7 +284,7 @@ def route_visit(candidates: list[object], model: BaseLLM) -> list[any] {
         return [];
     }
 
-    call_params: dict[any, any] = model?.call_params or {};
+    call_params: dict[str, any] = model?.call_params or {};
     select = call_params.get("select", "all");
 
     if isinstance(select, int) and not isinstance(select, bool) and (select < 1) {
@@ -382,7 +382,7 @@ def route_visit(candidates: list[object], model: BaseLLM) -> list[any] {
 
     selected = raw if isinstance(raw, list) else [raw];
     by_handle = {r["handle"]: r["node"] for r in recs};
-    chosen: list[any] = [];
+    chosen: list[object] = [];
     seen_ids: set[int] = set();
     for item in selected {
         picked = _resolve_choice(item, by_handle, recs);

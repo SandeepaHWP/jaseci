@@ -34,7 +34,7 @@ impl NaIRGenPass._emit_hash_core_helpers(
     key_type_name: str,
     key_size: int,
     layout: dict[str, any]
-) -> dict[any, any] {
+) -> dict[str, any] {
     i8 = ir.IntType(8);
     i32 = ir.IntType(32);
     i64 = ir.IntType(64);
@@ -999,8 +999,8 @@ impl NaIRGenPass._static_key_hash_of(key_node: (uni.UniNode | None)) -> (int | N
 }
 
 impl NaIRGenPass._static_key_op(
-    helpers: dict[any, any], op: str, key_node: (uni.UniNode | None)
-) -> tuple[any, ...] {
+    helpers: dict[str, any], op: str, key_node: (uni.UniNode | None)
+) -> tuple[ir.Function, ir.Value | None] {
     plain = helpers[op];
     ph = helpers.get(f"{op}_ph");
     if ph is None or key_node is None {

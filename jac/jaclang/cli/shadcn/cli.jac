@@ -1,13 +1,13 @@
 import from jaclang.comptime { name as ct_name }
 import from jaclang.cli.command { Arg, CommandSpec }
 
-glob _PENDING_THEME: dict[any, any] = {};
+glob _PENDING_THEME: dict[str, str | None] = {};
 
-def run_shadcn_add(packages: list[any]) -> int;
+def run_shadcn_add(packages: list[str]) -> int;
 
-def run_shadcn_remove(packages: list[any]) -> int;
+def run_shadcn_remove(packages: list[str]) -> int;
 
-def stash_create_theme(overrides: dict[any, any]) -> None;
+def stash_create_theme(overrides: dict[str, str | None]) -> None;
 
 def register_project_template -> dict[str, any] | None;
 
@@ -80,7 +80,7 @@ def retheme(
     import from jaclang.cli.shadcn.theme_handler { retheme_project }
 
     config = get_config();
-    overrides: dict[any, any] = {
+    overrides: dict[str, str | None] = {
         "style": style,
         "baseColor": baseColor,
         "theme": theme,

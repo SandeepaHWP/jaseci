@@ -329,7 +329,9 @@ impl PgIdentityStorage._replace_username(
     if not rows {
         return False;
     }
-    identities: list[any] = list(_pg_load_doc(rows[0][0]).get('identities') or []);
+    identities: list[dict[str, any]] = list(
+        _pg_load_doc(rows[0][0]).get('identities') or []
+    );
     kept = [
         i
         for i in identities

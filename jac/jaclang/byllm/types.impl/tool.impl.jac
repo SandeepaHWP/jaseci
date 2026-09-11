@@ -2,7 +2,7 @@ impl Tool.postinit -> None {
     try {
         annotations = get_type_hints(self.func);
     } except Exception {
-        annotations: dict[any, any] = getattr(self.func, '__annotations__', {}) or {};
+        annotations: dict[str, any] = getattr(self.func, '__annotations__', {}) or {};
     }
     with suppress(Exception) {
         self.func.__annotations__ = annotations;
@@ -87,8 +87,8 @@ impl Tool.get_json_schema -> dict[str, object] {
     );
 }
 
-impl Tool.parse_arguments(args_json: dict[any, any] | str) -> dict[any, any] {
-    annotations: dict[any, any] = {};
+impl Tool.parse_arguments(args_json: dict[str, any] | str) -> dict[str, any] {
+    annotations: dict[str, any] = {};
     try {
         annotations = self.func.__annotations__;
     } except AttributeError {
@@ -133,8 +133,8 @@ impl Tool.parse_arguments(args_json: dict[any, any] | str) -> dict[any, any] {
 }
 
 impl Tool._parse_finish_arguments(
-    args_json: dict[any, any], params: dict[any, any]
-) -> dict[any, any] {
+    args_json: dict[str, any], params: dict[str, any]
+) -> dict[str, any] {
     resp_type = params.get("final_output", object);
 
     candidates: list[any] = [];
@@ -159,13 +159,13 @@ impl Tool._parse_finish_arguments(
     );
 }
 
-impl Tool._required_params(params: dict[any, any]) -> list[any] {
+impl Tool._required_params(params: dict[str, any]) -> list[str] {
     try {
         sig = inspect.signature(self.func);
     } except (TypeError, ValueError) {
         return list(params.keys());
     }
-    required: list[any] = [];
+    required: list[str] = [];
     for (name, param) in sig.parameters.items() {
         if (
             name in params

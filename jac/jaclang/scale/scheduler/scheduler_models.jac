@@ -5,7 +5,7 @@ import from jaclang.server.serving.model { ApiModel, require_str }
 glob TRIGGER_KINDS: set[str] = {'interval', 'cron', 'date'};
 
 
-def _validate_trigger_fields(data: dict[any, any], allowed: set[str]) {
+def _validate_trigger_fields(data: dict[str, any], allowed: set[str]) {
     extra = [
         k
         for k in data.keys()

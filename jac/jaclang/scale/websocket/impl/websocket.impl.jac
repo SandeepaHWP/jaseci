@@ -186,7 +186,7 @@ impl WebSocketConnectionManager.maybe_unsubscribe(target_key: str) -> None {
 }
 
 impl WebSocketConnectionManager._on_backplane_message(
-    channel: str, message: dict[any, any]
+    channel: str, message: dict[str, any]
 ) -> None {
     if not channel.startswith('ws:') {
         return;
@@ -196,7 +196,7 @@ impl WebSocketConnectionManager._on_backplane_message(
 }
 
 impl WebSocketConnectionManager._local_fanout(
-    target_key: str, message: dict[any, any]
+    target_key: str, message: dict[str, any]
 ) -> None {
     per_target = self._by_target.get(target_key, {});
     conns = list(per_target.values());
@@ -208,7 +208,7 @@ impl WebSocketConnectionManager._local_fanout(
 }
 
 impl WebSocketConnectionManager.broadcast_target(
-    target_kind: str, target_name: str, message: dict[any, any]
+    target_kind: str, target_name: str, message: dict[str, any]
 ) -> None {
     target_key = f"{target_kind}:{target_name}";
     await self.ensure_backplane_started();
@@ -221,7 +221,7 @@ impl WebSocketConnectionManager.broadcast_target(
 }
 
 impl WebSocketConnectionManager.send_to(
-    ctx: ConnectionContext, message: dict[any, any]
+    ctx: ConnectionContext, message: dict[str, any]
 ) -> bool {
     if ctx.closed {
         return False;

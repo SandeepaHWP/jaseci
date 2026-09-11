@@ -405,7 +405,7 @@ impl JacBuiltin.printgraph(
     format: str
 ) -> str {
     import from jaclang.runtime.graph_utils { traverse_graph }
-    edge_type: list[any] = edge_type or [];
+    edge_type: list[type] = edge_type or [];
     visited_nodes: list[NodeArchetype] = [];
     node_depths: dict[(NodeArchetype, int)] = {nd: 0};
     queue: list[tuple[NodeArchetype, int]] = [(nd, 0)];
@@ -540,7 +540,7 @@ impl JacContext.reset_graph(root_node: (Root | None) = None) -> int {
     ranchor = root_node.__jac__ if root_node else ctx.user_root;
     deleted_count = 0;
     deleted_ids: set[UUID] = `set();
-    cand_map: dict[any, any] = {};
+    cand_map: dict[UUID, str | None] = {};
     store = mem?.store;
     if store is not None {
         mem.read_barrier();
@@ -1008,7 +1008,7 @@ impl JacGraph.refs(
         ctx = JacRuntimeInterface.get_context();
     }
 
-    def _archetypes(planned: list[any]) -> list[any] {
+    def _archetypes(planned: list[any]) -> list[(NodeArchetype | EdgeArchetype)] {
         out: list[(NodeArchetype | EdgeArchetype)] = [];
         for a in planned {
             arch = a.archetype;
@@ -1037,7 +1037,7 @@ impl JacGraph.refs(
     ctx.note_traversal_reads([nd.__jac__ for nd in path.origin]);
     store_mem = cast(Session, ctx.mem);
 
-    def _run(q: GraphQuery) -> list[any] {
+    def _run(q: GraphQuery) -> list[(NodeArchetype | EdgeArchetype)] {
         return _archetypes(
             resolve_query_edges(store_mem, q)
                 if q.edges_only
@@ -1897,7 +1897,7 @@ impl JacModule.update_walker(
 
 impl JacIntrospection.spawn_node(
     node_name: str,
-    attributes: (dict[any, any] | None) = None,
+    attributes: (dict[str, any] | None) = None,
     module_name: str = '__main__'
 ) -> NodeArchetype {
     node_class = JacRuntimeInterface.get_archetype(module_name, node_name);
@@ -1914,7 +1914,7 @@ impl JacIntrospection.spawn_node(
 
 impl JacIntrospection.spawn_walker(
     walker_name: str,
-    attributes: (dict[any, any] | None) = None,
+    attributes: (dict[str, any] | None) = None,
     module_name: str = '__main__'
 ) -> WalkerArchetype {
     walker_class = JacRuntimeInterface.get_archetype(module_name, walker_name);
@@ -1972,7 +1972,7 @@ impl JacPersistence.store(
     return LocalStorage(base_path=base_path, create_dirs=create_dirs);
 }
 
-impl JacPersistence.get_persistent_memory(config: dict[any, any]) -> any {
+impl JacPersistence.get_persistent_memory(config: dict[str, any]) -> any {
     provider = _persistent_memory_provider[0];
     if provider is not None {
         return provider(config);

@@ -2,7 +2,7 @@
 
 # Extract error message from API response or return fallback.
 def:pub getErrorMessage(
-    result: dict[any, any], fallback: str = "An error occurred"
+    result: dict[str, any], fallback: str = "An error occurred"
 ) -> str {
     if not result {
         return fallback;

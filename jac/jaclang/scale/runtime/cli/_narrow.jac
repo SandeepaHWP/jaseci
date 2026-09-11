@@ -1,4 +1,4 @@
-def dget(blob: any, key: str) -> dict[any, any] {
+def dget(blob: any, key: str) -> dict[str, any] {
     if not isinstance(blob, dict) {
         return {};
     }
@@ -68,7 +68,7 @@ def fget(blob: any, key: str, fallback: float) -> float {
 }
 
 
-def pod_spec(deployment: any) -> dict[any, any] {
+def pod_spec(deployment: any) -> dict[str, any] {
     return dget(dget(dget(deployment, "spec"), "template"), "spec");
 }
 
