@@ -1,5 +1,4 @@
 import asyncio;
-import from collections.abc { Callable }
 import json;
 import logging;
 glob logger = logging.getLogger(__name__);

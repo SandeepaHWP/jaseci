@@ -9,7 +9,9 @@ obj PreparedApplication {
         manifests: dict[str, dict[str, any]] = field(default_factory=`dict),
         client_compiler: any = None,
         client_enabled: bool = False,
-        native: dict[str, tuple[any, ...]] = field(default_factory=`dict),
+        native: dict[str, tuple[object | None, dict[str, object] | None]] = field(
+            default_factory=`dict
+        ),
         services: tuple[str, ...] = (),
         dev: bool = True,
         client_dist: str = "",

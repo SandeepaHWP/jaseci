@@ -165,7 +165,7 @@ impl native_ir_live_externs(llvm_ir_text: str) -> set[str] {
 }
 
 impl native_prune_live_record(
-    pending: dict[str, set[str]], declared: set[str]
+    pending: dict[str, list[str]] | dict[str, set[str]], declared: set[str]
 ) -> dict[str, set[str]] {
     pruned: dict[str, set[str]] = {};
     for (_pr_callee, _pr_names) in (pending or {}).items() {
@@ -273,7 +273,9 @@ impl native_unit_demotions(
 }
 
 impl native_live_call_conflicts(
-    prog: JacProgram, pending: dict[str, set[str]], options: CompileOptions
+    prog: JacProgram,
+    pending: dict[str, list[str]] | dict[str, set[str]],
+    options: CompileOptions
 ) -> dict[str, set[str]] {
     conflicts: dict[str, set[str]] = {};
     for (_cc_callee, _cc_names) in (pending or {}).items() {
@@ -644,7 +646,7 @@ impl NativeCompilePass._compile_and_link_native_imports(
     _link_opts = self.prog?.options or _LinkOpts();
     _link_fp = _link_opts.codegen_fingerprint();
 
-    linked_modules: dict[str, None] = {};
+    linked_modules: dict[str, NativeModuleInfo | None] = {};
     if module.loc {
         linked_modules[os.path.realpath(module.loc.mod_path)] = None;
     }

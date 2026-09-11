@@ -6,11 +6,12 @@ import tempfile;
 import time;
 import from pathlib { Path }
 import type from jaclang.runtime.prepared { PreparedApplication }
+import type from jaclang.compiler.frontend { unitree as uni }
 glob _FORMAT: int = 4,
      _SKIP: set[str] = {'.jac', '.git', '.venv', 'venv', 'node_modules', '__pycache__'};
 
-def _inventory(`root: any, inputs: bool = False) -> dict[str, any] {
-    result = {};
+def _inventory(`root: any, inputs: bool = False) -> dict[str, tuple[int, int]] {
+    result: dict[str, tuple[int, int]] = {};
     for (directory, dirs, files) in os.walk(`root) {
         dirs[:] = sorted(
             d
@@ -36,7 +37,7 @@ def _inventory(`root: any, inputs: bool = False) -> dict[str, any] {
     return result;
 }
 
-def _identity -> tuple[any, ...] {
+def _identity -> tuple[str, str | None, str] {
     import from jaclang.compiler.driver.jir { compiler_generation }
     return (
         compiler_generation(),
@@ -61,7 +62,7 @@ def _write(path: any, value: any) {
     }
 }
 
-def _sections(path: any, program: any) -> dict[str, any] {
+def _sections(path: any, program: any) -> dict[int, bytes] {
     import from jaclang.compiler.driver.compilation_context { cache_scope, program_for }
     actual = program_for(path, program);
     with cache_scope(actual.context_key, actual.options) {
@@ -69,7 +70,7 @@ def _sections(path: any, program: any) -> dict[str, any] {
     }
 }
 
-def _context_sections(path: any) -> dict[str, any] {
+def _context_sections(path: any) -> dict[int, bytes] {
     import from jaclang.compiler.driver.jir {
         get_module_cache_path,
         HEADER_SIZE,
@@ -85,8 +86,8 @@ def _context_sections(path: any) -> dict[str, any] {
     return read_sections(data, (pos + len(SECTIONS_MAGIC))) if (pos >= 0) else {};
 }
 
-def _project_modules(program: any, `root: any) -> dict[str, any] {
-    result = {};
+def _project_modules(program: any, `root: any) -> dict[str, uni.Module] {
+    result: dict[str, uni.Module] = {};
     for hub in program._search_hubs() {
         for (path, module) in `list(hub.items()) {
             if (module and os.path.realpath(path).startswith((`root + os.sep))) {
@@ -188,7 +189,7 @@ def _check(program: any, before: any) {
 }
 
 def _prepare_sealed(
-    `entry: str, program: any, image_root: str, entries: list[any]
+    `entry: str, program: any, image_root: str, entries: list[str]
 ) -> PreparedApplication {
     import json;
     import from jaclang.runtime.prepared { PreparedApplication, publish }

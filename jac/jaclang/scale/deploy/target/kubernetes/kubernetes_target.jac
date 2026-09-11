@@ -545,7 +545,7 @@ obj KubernetesTargetBase(DeploymentTarget) {
             }
         }
 
-        component_defs = [
+        component_defs: list[dict[str, any]] = [
             {'k8s_name': app_name + d[0], 'display': d[1], 'is_sts': d[2]}
             for d in COMPANION_DEFS
         ];

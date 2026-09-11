@@ -5,7 +5,6 @@ import type from jaclang.compiler.backends.native.llvm.binding {
     ValueRef
 }
 import jaclang.compiler.frontend.unitree as uni;
-import from collections.abc { Callable }
 import from jaclang.compiler.passes.transform { Transform }
 import from jaclang.compiler.frontend.codeinfo {
     CodeGenTarget,
@@ -50,7 +49,7 @@ def native_demoted_ir_symbols(llvm_ir_text: str) -> list[str];
 def native_linked_ir_text(module: uni.Module) -> str;
 def native_ir_live_externs(llvm_ir_text: str) -> set[str];
 def native_prune_live_record(
-    pending: dict[str, set[str]], declared: set[str]
+    pending: dict[str, list[str]] | dict[str, set[str]], declared: set[str]
 ) -> dict[str, set[str]];
 
 def native_unit_demotions(
@@ -58,7 +57,9 @@ def native_unit_demotions(
 ) -> (set[str] | None);
 
 def native_live_call_conflicts(
-    prog: JacProgram, pending: dict[str, set[str]], options: CompileOptions
+    prog: JacProgram,
+    pending: dict[str, list[str]] | dict[str, set[str]],
+    options: CompileOptions
 ) -> dict[str, set[str]];
 
 glob NATIVE_VERDICT_TAINT_BOUND: int = 2048,

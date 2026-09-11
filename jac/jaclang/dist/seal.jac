@@ -4,6 +4,7 @@ import subprocess;
 import tempfile;
 import from pathlib { Path }
 import from jaclang.cli.console { console }
+import type from jaclang.project.apps { AppConfig }
 
 
 def seal_copy_ignore(_dir: str, items: list[str]) -> list[str] {
@@ -74,7 +75,7 @@ def build_serve_manifest(entry_file: Path, proj_root: Path) -> (dict[str, any] |
     import from jaclang.server.assembly { service_apps }
     try {
         config = get_config_for_path(proj_root);
-        services = [];
+        services: list[AppConfig] = [];
         if config is not None {
             selected = config.app_for_path(str(entry_file.resolve()));
             if selected is not None
