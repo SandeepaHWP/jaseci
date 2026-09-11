@@ -88,7 +88,7 @@ glob logger = getLogger(__name__),
 glob _scale_provider_cache: list[any] = [],
      _scale_provider_error: list[Exception | None] = [None];
 
-glob _persistent_memory_provider: list[any] = [None];
+glob _persistent_memory_provider: list[Callable | None] = [None];
 
 def _scale_provider -> any {
     if _scale_provider_cache {
