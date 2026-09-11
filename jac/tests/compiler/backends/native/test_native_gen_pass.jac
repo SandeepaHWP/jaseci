@@ -110,7 +110,7 @@ def get_sfunc(
             if sn_addr
             else None
     );
-    _str_buf_cache: dict[str, any] = {};
+    _str_buf_cache: dict[bytes, any] = {};
     def _call(*args: any) -> any {
         c_args: list[any] = [];
         for (a, is_str) in zip(args, str_slots) {
