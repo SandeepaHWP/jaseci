@@ -256,7 +256,9 @@ impl ApiKeyManager.resolve_key(api_key: str) -> dict[str, any] | None {
     return key_doc;
 }
 
-impl rate_window_ok(state: dict, key: str, limit_per_minute: int) -> bool {
+impl rate_window_ok(
+    state: dict[str, list[int]], key: str, limit_per_minute: int
+) -> bool {
     if limit_per_minute <= 0 {
         return True;
     }

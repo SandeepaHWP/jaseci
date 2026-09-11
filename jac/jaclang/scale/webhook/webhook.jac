@@ -28,7 +28,9 @@ obj WebhookUtils {
     static def extract_signature(header_value: str) -> str;
 }
 
-def rate_window_ok(state: dict, key: str, limit_per_minute: int) -> bool;
+def rate_window_ok(
+    state: dict[str, list[int]], key: str, limit_per_minute: int
+) -> bool;
 
 
 def _create_api_key_db -> any | None {
@@ -44,7 +46,7 @@ obj ApiKeyManager {
     has _db: any | None = _create_api_key_db(),
         _inmemory_store: dict[str, any] = {},
         _collection: str = 'webhook_api_keys',
-        _rate_window: dict[str, any] = {};
+        _rate_window: dict[str, list[int]] = {};
 
     def postinit -> None;
     def _ensure_indexes -> None;
