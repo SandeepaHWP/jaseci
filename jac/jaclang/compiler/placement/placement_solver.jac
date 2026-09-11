@@ -163,7 +163,7 @@ def native_default_path_ok(path: str) -> bool {
 }
 
 def native_default_verdict(module: uni.Module) -> tuple[bool, str] {
-    import from jaclang.compiler.driver.schedules { native_pipeline_available }
+    import from jaclang.compiler.driver.pipeline { native_pipeline_available }
     import from jaclang.compiler.placement.placement_pins { _is_demoted_native }
 
     if module.app_kind == 'web-app' {
@@ -338,17 +338,10 @@ def _materialize_module(path: str, prog: any) -> (uni.Module | None) {
         return None;
     }
     try {
-        import from jaclang.compiler.driver.compile_options { CompileOptions }
-        prog.compile(
-            file_path=path,
-            options=CompileOptions(
-                symtab_ir_only=True, no_cgen=True, force_target_program=True
-            )
-        );
+        return prog.load_dependency_module(path, need_tree=True);
     } except Exception {
         return None;
     }
-    return hub_module_for_path(path, prog);
 }
 
 def _import_source_module(elem: uni.Import, prog: any) -> (uni.Module | None) {
@@ -546,8 +539,8 @@ def solve_module_placement(
 
     def _invalidate_stale_codegen {
         if stamp_count[0] and (module.gen.js or module.gen.es_ast is not None) {
-            module.gen.js = '';
-            module.gen.es_ast = None;
+            import from jaclang.compiler.driver.pipeline { invalidate_client_product }
+            invalidate_client_product(prog, module);
         }
     }
 
@@ -893,8 +886,10 @@ def invalidate_importers_es(prog: any, mod_path: str) -> list[uni.Module] {
                 continue;
             }
             if isinstance(target, str) and os.path.realpath(target) == key {
-                m.gen.js = '';
-                m.gen.es_ast = None;
+                import from jaclang.compiler.driver.pipeline {
+                    invalidate_client_product
+                }
+                invalidate_client_product(prog, m);
                 cleared.append(m);
                 break;
             }
@@ -947,8 +942,8 @@ def demote_client_pulled_elements(
     }
     del prog.errors_had[err_mark:];
     del prog.warnings_had[warn_mark:];
-    module.gen.js = '';
-    module.gen.es_ast = None;
+    import from jaclang.compiler.driver.pipeline { invalidate_client_product }
+    invalidate_client_product(prog, module);
     placement_work(prog).changed(module);
     invalidate_importers_es(prog, mod_path);
     try {
@@ -965,15 +960,11 @@ def demote_client_pulled_elements(
 }
 
 walker PlacementApplyPass(Transform) {
-    static has PROVIDES: tuple[str, ...] = ('PlacedIn', 'DecidedCodespace'),
-        REQUIRES: tuple[str, ...] = ('SymOf', );
-
     has prog: JacProgram,
         ir_in: uni.Module,
         cancel_token: any = None;
 
-    static has PROVIDES: tuple[str, ...] = ('codespace-pull', ),
-        HOST_PASS: bool = True;
+    static has HOST_PASS: bool = True;
 
     def postinit -> None;
     def transform(ir_in: uni.Module) -> uni.Module;

@@ -156,15 +156,7 @@ obj NativeFunctionState {
 
 walker NaIRGenPass(Transform) {
     has prog: JacProgram;
-    static has HOST_PASS: bool = True,
-        REQUIRES: tuple[str, ...] = (
-            'TypeOf',
-            'CfgSucc',
-            'ownership',
-            'capability',
-            'rc-facts'
-        );
-
+    static has HOST_PASS: bool = True;
     has ir_in: uni.Module,
         _llvm_module: (ir.Module | None) = None,
         _type_map: (dict[str, ir.Type] | None) = None,

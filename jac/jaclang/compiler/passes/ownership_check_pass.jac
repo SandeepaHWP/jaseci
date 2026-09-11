@@ -127,9 +127,7 @@ walker OwnershipCheckPass(Transform) {
         receiver_probe: set[int] = set(),
         arch_view_syms: set[SymId] = set();
 
-    static has PROVIDES: tuple[str, ...] = ('ownership', ),
-        REQUIRES: tuple[str, ...] = ('CfgSucc', 'TypeOf'),
-        HOST_PASS: bool = True;
+    static has HOST_PASS: bool = True;
 
     def postinit -> None;
     def transform(ir_in: Module) -> Module;

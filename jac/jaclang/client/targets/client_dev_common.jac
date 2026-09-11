@@ -188,6 +188,12 @@ def dev_proxy_paths(
     import from jaclang.client.vite_bundler { DEV_PROXY_PREFIXES }
     import from jaclang.jac0core.ext_registry { base_stem }
     try {
+        import from jaclang.runtime.prepared { prepared_manifest }
+        if prepared_manifest(str(entry_file)) is None {
+            import from jaclang.compiler.driver.application { prepare_application }
+            import from jaclang.runtime.runtime { JacRuntime as Jac }
+            prepare_application(str(entry_file), Jac.get_program(), str(project_dir));
+        }
         import from jaclang.server.server { ModuleIntrospector }
         introspector = ModuleIntrospector(
             module_name=base_stem(entry_file.name), base_path=str(project_dir)

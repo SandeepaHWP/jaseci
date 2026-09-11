@@ -100,13 +100,6 @@ glob TEST_ASSERT_METHOD_NAMES: tuple[str, ...] = (
      );
 
 walker SymTabBuildPass(UniPass) {
-    static has PROVIDES: tuple[str, ...] = (
-        'SymOf',
-        'Defines',
-        'InScope',
-        'ScopeChild'
-    );
-
     has cur_sym_tab: list[UniScopeNode] = [];
 
     def before_pass -> None;

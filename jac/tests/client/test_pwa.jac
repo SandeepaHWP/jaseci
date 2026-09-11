@@ -27,7 +27,7 @@ def _create_jac_toml_with_pwa(
 name = "test-pwa-app"
 version = "1.0.0"
 description = "Test PWA project"
-entry-point = "main.jac"
+entry-point = "main"
 
 [dependencies.npm]
 react = "^19.2.0"
