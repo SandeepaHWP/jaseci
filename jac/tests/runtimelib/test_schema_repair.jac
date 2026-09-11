@@ -20,7 +20,7 @@ import from jaclang.data.schema_rules {
 
 
 """Upgrade callback: legacy comma-string tags become list[str]."""
-def _split_tags(doc: dict[any, any]) -> dict[any, any] {
+def _split_tags(doc: dict[str, any]) -> dict[str, any] {
     doc['tags'] = [
         t.strip()
         for t in doc['tags'].split(',')
@@ -44,7 +44,7 @@ impl _DriftUser.__jac_schema__ -> None {
     schema_drop("legacy_bio");
     schema_upgrade(
         _split_tags,
-        when=(lambda (doc: dict[any, any]) { isinstance(doc.get('tags'), str); })
+        when=(lambda (doc: dict[str, any]) { isinstance(doc.get('tags'), str); })
     );
 }
 
@@ -67,7 +67,7 @@ obj _FactoryDefaults(Root) {
 
 
 """Build a raw stored dict shaped like a pre-rename _DriftUser document."""
-def _old_user_raw -> dict[any, any] {
+def _old_user_raw -> dict[str, any] {
     return {
         '__type__': '_DriftUser',
         '__module__': getattr(_DriftUser, '__module__'),

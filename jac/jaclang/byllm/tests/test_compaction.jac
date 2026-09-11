@@ -50,7 +50,7 @@ test "above threshold compacts and next iteration sees shortened messages" {
         return [msgs[0], msgs[1]];
     }
 
-    iter_msgs: list[any] = [];
+    iter_msgs: list[int] = [];
     original_dispatch = llm.dispatch_no_streaming;
     def capturing_dispatch(mt_run: MTRuntime) -> CompletionResult {
         iter_msgs.append(len(mt_run.get_msg_list()));
@@ -550,12 +550,12 @@ test "LocalLLM ctx_window propagation drives compaction end-to-end" {
     # format_prompt subscripts messages[3] assuming get_msg_list() converted
     # ToolCallResultMsg via to_dict(). On CI this isinstance check evaluates
     # differently and the subscript raises. Bypass it - logging-only helper.
-    def noop_format(p: dict[any, any]) -> str {
+    def noop_format(p: dict[str, any]) -> str {
         return "";
     }
 
     def make_fake_dispatch -> any {
-        step_resp: dict[any, any] = {
+        step_resp: dict[str, any] = {
             "choices": [
                 {
                     "message": {
@@ -574,7 +574,7 @@ test "LocalLLM ctx_window propagation drives compaction end-to-end" {
             "usage": {"prompt_tokens": 850},
             "model": "local:gemma-4-e4b"
         };
-        finish_resp: dict[any, any] = {
+        finish_resp: dict[str, any] = {
             "choices": [
                 {
                     "message": {
@@ -595,7 +595,7 @@ test "LocalLLM ctx_window propagation drives compaction end-to-end" {
             "model": "local:gemma-4-e4b"
         };
         call_count = [0];
-        def fake(params: dict[any, any]) -> dict[any, any] {
+        def fake(params: dict[str, any]) -> dict[str, any] {
             call_count[0] += 1;
             return step_resp if call_count[0] == 1 else finish_resp;
         }

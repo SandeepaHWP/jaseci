@@ -111,7 +111,7 @@ results is a dict mapping relative path -> {ok, used_jac0, error}.
 def _transpile_all_plugins -> tuple[any, ...] {
     tmp = tempfile.mkdtemp();
     src_dir = _plugin_src_dir();
-    results: dict[any, any] = {};
+    results: dict[str, any] = {};
     for jac_file in sorted(src_dir.rglob("*.jac")) {
         # rglob("*.jac") also matches directories named ".jac" (build cache).
         if not jac_file.is_file() {

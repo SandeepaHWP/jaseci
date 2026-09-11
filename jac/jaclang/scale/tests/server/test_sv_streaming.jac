@@ -39,10 +39,10 @@ impl _StubResp.headers.getter -> any {
 obj _StubClient {
     has body_text: str,
         content_type: str = "application/json",
-        headers_seen: list[dict[any, any]] = [];
+        headers_seen: list[dict[str, any]] = [];
 
     def post(
-        path: str, json: any = None, headers: (dict[any, any] | None) = None
+        path: str, json: any = None, headers: (dict[str, any] | None) = None
     ) -> _StubResp {
         self.headers_seen.append(dict(headers or {}));
         return _StubResp(body_text=self.body_text, content_type=self.content_type);
@@ -50,7 +50,7 @@ obj _StubClient {
 }
 
 
-def _sse_body(events: list[dict[any, any]], trailer: str = "end") -> str {
+def _sse_body(events: list[dict[str, any]], trailer: str = "end") -> str {
     parts: list[str] = [];
     for ev in events {
         parts.append("data: " + json.dumps(ev) + "\n\n");
@@ -247,7 +247,7 @@ test "sv_walker_call carries the idempotency header through the scale transport"
 
 
 obj _StubTransport {
-    has calls: list[dict[any, any]] = [];
+    has calls: list[dict[str, any]] = [];
 
     def sv_transport_available -> bool {
         return True;
@@ -256,8 +256,8 @@ obj _StubTransport {
     def sv_service_call(
         app: str,
         func_name: str,
-        args: dict[any, any],
-        headers: (dict[any, any] | None) = None
+        args: dict[str, any],
+        headers: (dict[str, any] | None) = None
     ) -> any {
         self.calls.append(
             {"kind": "fn", "name": func_name, "headers": dict(headers or {})}
@@ -268,9 +268,9 @@ obj _StubTransport {
     def sv_walker_call(
         app: str,
         walker_name: str,
-        args: dict[any, any],
+        args: dict[str, any],
         stub_cls: any,
-        headers: (dict[any, any] | None) = None
+        headers: (dict[str, any] | None) = None
     ) -> any {
         self.calls.append(
             {"kind": "walker", "name": walker_name, "headers": dict(headers or {})}

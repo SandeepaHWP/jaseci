@@ -782,7 +782,7 @@ test "url_for derives when no override is set" {
 # rollout, and a successful looking deploy: exactly the bug this fixes.
 
 obj _FakeSecrets {
-    has created: list[any] = [],
+    has created: list[str] = [],
         version: str = "77";
 
     def create_namespaced_secret(namespace: str, body: any) -> any {
@@ -833,7 +833,7 @@ test "an unusable revision is reported rather than silently skipped" {
 # would leave the suite green while every real redeploy failed on the missing
 # revision.
 obj _FakeSecretsExisting(_FakeSecrets) {
-    has replaced: list[any] = [];
+    has replaced: list[str] = [];
 
     def create_namespaced_secret(namespace: str, body: any) -> any {
         raise ApiException(status=409);

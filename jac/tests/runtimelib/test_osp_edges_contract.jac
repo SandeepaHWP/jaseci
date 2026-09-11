@@ -152,8 +152,8 @@ edge RoundTripEdge {
     has w: int = 0;
 }
 
-def _transcript(origin: any) -> list[any] {
-    out: list[any] = [];
+def _transcript(origin: any) -> list[str] {
+    out: list[str] = [];
     for n in [origin-->] {
         if isinstance(n, RoundTripNode) {
             out.append(n.label);

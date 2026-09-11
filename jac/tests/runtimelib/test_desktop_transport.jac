@@ -13,7 +13,7 @@ needed.
 import from "@jac/runtime" { __jacCallFunction, __setLocalStorage }
 
 """A minimal mock `fetch` Response carrying `body` from `.json()`."""
-def _resp(body: dict[any, any], status: int = 200) -> dict[any, any] {
+def _resp(body: dict[str, any], status: int = 200) -> dict[str, any] {
     return {
         "ok": status < 300,
         "status": status,

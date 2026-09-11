@@ -64,7 +64,7 @@ def _hand_rolled_canary(app: str) -> any {
 
 obj FakeAppsV1 {
     has items: list[any],
-        deleted: list[any] = [];
+        deleted: list[str] = [];
 
     def list_namespaced_deployment(namespace: str, **kwargs: any) -> any {
         return SimpleNamespace(items=list(self.items));
@@ -662,11 +662,11 @@ obj _BrokenFleetApps {
 # stripped of the marker that makes putting it back a no-op.
 
 obj _RollbackApps {
-    has revisions: dict[any, any],
+    has revisions: dict[str, any],
         fail_on: str = "",
         patched: list[any] = [],
         bodies: list[any] = [],
-        reads: list[any] = [];
+        reads: list[str] = [];
 
     def list_namespaced_deployment(namespace: str, **kwargs: any) -> any {
         return SimpleNamespace(
@@ -756,7 +756,7 @@ import jaclang.scale.deploy.target.kubernetes.target as target_mod;
 obj _Serializer {
     def sanitize_for_serialization(value: any) -> any {
         if isinstance(value, SimpleNamespace) {
-            out: dict[any, any] = {};
+            out: dict[str, any] = {};
             for (key, item) in vars(value).items() {
                 out[key] = self.sanitize_for_serialization(item);
             }

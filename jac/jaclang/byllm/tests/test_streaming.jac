@@ -288,7 +288,7 @@ test "a mid-stream drop is retried only when the error is transient" {
             assert raised is None , f"{label}: unexpected {raised!r}";
             # A reset discards what was already delivered, so the caller sees
             # the retry's output once, not the partial prepended to it.
-            buf: list[any] = [];
+            buf: list[str] = [];
             for ev in events {
                 if ev.event_type == "stream_reset" {
                     buf = [];

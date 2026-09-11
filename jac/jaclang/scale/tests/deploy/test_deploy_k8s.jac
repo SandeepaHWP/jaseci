@@ -650,7 +650,7 @@ test "k8s safe slug normalizes names into valid k8s identifiers" {
 }
 
 """Resolve get_kubernetes_config() against a temp project with the given jac.toml."""
-def _k8s_config_for_toml(toml_content: str) -> dict[any, any] {
+def _k8s_config_for_toml(toml_content: str) -> dict[str, any] {
     tmp_dir = Path(mkdtemp());
     (tmp_dir / "jac.toml").write_text(toml_content);
     # get_scale_config() caches a process-wide singleton; reset around the temp project.

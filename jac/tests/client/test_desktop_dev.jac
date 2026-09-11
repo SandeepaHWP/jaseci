@@ -126,7 +126,7 @@ test "generated host source branches on dev_port" {
 # these tests pin the shared handler that desktop (and mobile) rely on.
 obj _FakeJacCompiler {
     has return_mod: any = "MOD",
-        calls: list[any] = [];
+        calls: list[str] = [];
 
     def compile_module(entry_file: any) -> tuple[any, ...] {
         self.calls.append(str(entry_file));

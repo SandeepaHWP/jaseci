@@ -146,7 +146,7 @@ test "gateway-only mode does not report an unserved route healthy" {
         stderr=subprocess.DEVNULL
     );
     try {
-        body: dict[any, any] = {};
+        body: dict[str, any] = {};
         for _ in range(120) {
             if proc.poll() is not None {
                 raise RuntimeError(f"gateway exited early: {proc.returncode}");

@@ -110,7 +110,7 @@ def server_answer(label: str, code: str, name: str) -> int {
         file_path=path, use_str=code, options=CompileOptions(default_codespace='server')
     );
     assert not prog.errors_had , f"server-lane compilation errors: {fmt_errors(prog)}";
-    ns: dict[any, any] = {};
+    ns: dict[str, any] = {};
     exec(compile(ir.gen.py, path, "exec"), ns);
     return ns[name]();
 }

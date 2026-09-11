@@ -25,7 +25,7 @@ import from tempfile { mkdtemp }
 import from jaclang.data.pgembed { PgRuntime }
 import from jaclang.data.store { PgStore }
 
-glob _holder: dict[any, any] = {},
+glob _holder: dict[str, any] = {},
      _LONG_STEM = 'cache:' + ('x' * 70) + ':';
 
 

@@ -44,7 +44,7 @@ import from jaclang.compiler.passes.layout_pass { get_layout_registry }
 glob FIXTURES = os.path.join(
          TESTS_DIR, "compiler", "backends", "native", "fixtures"
      ),
-     EXPECTED: tuple[any, ...] = (
+     EXPECTED: tuple[str, ...] = (
          "0",
          "1",
          "2",
@@ -71,7 +71,7 @@ def compile_native(fixture: str) -> tuple[any, ...] {
 }
 
 
-def sv_lines(fixture: str) -> list[any] {
+def sv_lines(fixture: str) -> list[str] {
     proc = subprocess.run(
         [sys.executable, "-m", "jaclang", "run", os.path.join(FIXTURES, fixture)],
         capture_output=True,
@@ -87,7 +87,7 @@ def sv_lines(fixture: str) -> list[any] {
 }
 
 
-def na_lines(fixture: str) -> list[any] {
+def na_lines(fixture: str) -> list[str] {
     out_bin = os.path.join(tempfile.mkdtemp(), "probe.bin");
     comp = subprocess.run(
         [

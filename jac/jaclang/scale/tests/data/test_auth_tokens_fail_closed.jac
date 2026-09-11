@@ -12,7 +12,7 @@ import from jaclang.server.identity.auth_tokens {
 }
 
 obj BrokenDb {
-    def rows(sql: str, params: dict[any, any]) -> list[any] {
+    def rows(sql: str, params: dict[str, any]) -> list[any] {
         raise RuntimeError("db down");
     }
 

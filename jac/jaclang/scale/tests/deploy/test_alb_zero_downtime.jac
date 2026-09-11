@@ -11,7 +11,7 @@ import from jaclang.scale.deploy.target.kubernetes.manifest_builder { ManifestBu
 import from jaclang.scale.deploy.target.kubernetes.target { KubernetesTarget }
 
 glob READINESS_GATE_LABEL: str = "elbv2.k8s.aws/pod-readiness-gate-inject",
-     _shared: dict[any, any] = {};
+     _shared: dict[str, any] = {};
 
 
 # One real k3s apiserver (testcontainers) shared by the whole file, torn down
@@ -103,7 +103,7 @@ def _live_api(kubeconfig: str) -> tuple[any, ...] {
 }
 
 
-def _live_namespace_labels(kubeconfig: str, namespace: str) -> dict[any, any] {
+def _live_namespace_labels(kubeconfig: str, namespace: str) -> dict[str, any] {
     (core_v1, _, _) = _live_api(kubeconfig);
     ns: any = core_v1.read_namespace(name=namespace);
     return dict(ns.metadata.labels or {});
@@ -119,7 +119,7 @@ def _live_deployments(kubeconfig: str, namespace: str) -> list[any] {
 }
 
 
-def _drain_of(dep: dict[any, any]) -> tuple[any, ...] {
+def _drain_of(dep: dict[str, any]) -> tuple[any, ...] {
     pod = dep["spec"]["template"]["spec"];
     sleep_cmd: str = str(
         pod["containers"][0]["lifecycle"]["preStop"]["exec"]["command"][-1]

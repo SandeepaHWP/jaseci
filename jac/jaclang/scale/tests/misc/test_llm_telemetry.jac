@@ -18,8 +18,8 @@ def make_llm_event(
     response_cost: float = 0.0001,
     response_time: float = 0.5,
     messages: list[any] | None = None,
-    response: dict[any, any] | str | None = None
-) -> dict[any, any] {
+    response: dict[str, any] | str | None = None
+) -> dict[str, any] {
     return {
         "id": f"call-{inv_id}",
         "model": model,
@@ -51,8 +51,8 @@ def make_agent_record(
     status: str = "success",
     latency_ms: float = 500.0,
     conversation_history: list[any] | None = None,
-    caller_args: dict[any, any] | None = None
-) -> dict[any, any] {
+    caller_args: dict[str, any] | None = None
+) -> dict[str, any] {
     return {
         "invocation_id": inv_id,
         "caller_name": caller_name,

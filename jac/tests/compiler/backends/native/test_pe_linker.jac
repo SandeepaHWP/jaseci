@@ -148,7 +148,7 @@ def _cstr(b: bytes, off: int) -> str {
 
 
 """Parse a PE32+ image into a dict of the fields the tests assert on."""
-def parse_pe(b: bytes) -> dict[any, any] {
+def parse_pe(b: bytes) -> dict[str, any] {
     assert b[0:2] == b"MZ" , "missing MZ signature";
     e_lfanew = struct.unpack_from("<I", b, 0x3C)[0];
     assert b[e_lfanew:e_lfanew + 4] == b"PE\x00\x00" , "missing PE signature";
@@ -172,7 +172,7 @@ def parse_pe(b: bytes) -> dict[any, any] {
         sec_names.append(nm);
     }
     # import descriptors -> dll -> [imported names]
-    imports: dict[any, any] = {};
+    imports: dict[str, any] = {};
     base = _rva_to_off(b, secs, imp_rva);
     di = 0;
     while base >= 0 {

@@ -133,8 +133,8 @@ def func_imports(b: bytes) -> list[any] {
 }
 
 """Names exported by the module."""
-def export_names(b: bytes) -> list[any] {
-    out = [];
+def export_names(b: bytes) -> list[str] {
+    out: list[str] = [];
     for (sid, s, e) in sections(b) {
         if sid != 7 {
             continue;

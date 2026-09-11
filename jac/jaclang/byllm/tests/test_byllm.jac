@@ -471,7 +471,7 @@ test "dispatch heals a misnamed finish argument and recovers an unusable one" {
 }
 
 test "response format requests always carry the json word" {
-    def _params(resp_type: type, tools: list[any]) -> dict[any, any] {
+    def _params(resp_type: type, tools: list[any]) -> dict[str, any] {
         model = Model(model_name="test-model");
         mt_run = mk_run(resp_type=resp_type, tools=tools, finish=False);
         return model.make_model_params(mt_run);

@@ -106,7 +106,7 @@ def _post(
     path: str,
     token: str,
     key: str,
-    body: (dict[any, any] | None) = None
+    body: (dict[str, any] | None) = None
 ) -> any {
     headers = {"X-Jac-Idempotency-Key": key};
     if token {

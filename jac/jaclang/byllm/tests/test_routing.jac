@@ -158,7 +158,7 @@ test "a routing call dispatches through the central call_llm entry" {
     rg.llm = llm;
     hub = build_hub([("a", "low")]);
 
-    calls: list[any] = [];
+    calls: list[int] = [];
     original = JacRuntime.call_llm;
 
     def counting(model: any, mt_run: any) -> any {

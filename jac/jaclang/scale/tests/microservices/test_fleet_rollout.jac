@@ -57,7 +57,7 @@ def _pod(
     );
 }
 
-def _bundle(deploy_name: str, app: str) -> dict[any, any] {
+def _bundle(deploy_name: str, app: str) -> dict[str, any] {
     return {
         "deployments": {
             app: {
@@ -96,7 +96,7 @@ def _apis(ready: int, pods: list[any]) -> tuple[any, ...] {
 }
 
 def _run(
-    target: any, bundle: dict[any, any], apps: object, core: object, timeout: int
+    target: any, bundle: dict[str, any], apps: object, core: object, timeout: int
 ) -> object {
     err = None;
     with unittest.mock.patch.object(

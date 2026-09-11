@@ -466,7 +466,7 @@ test "dispatch batch is callable and importable" {
 # Mock MTRuntime for make_model_params tests
 # ---------------------------------------------------------------------------
 obj _MockMTRun {
-    has call_params: dict[any, any] = {},
+    has call_params: dict[str, any] = {},
         tools: list[any] = [],
         stream: bool = False,
         mtir: any = None,

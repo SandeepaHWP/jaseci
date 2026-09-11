@@ -24,7 +24,7 @@ obj TNode {
 }
 
 obj TWalker {
-    has log: list[any] = [],
+    has log: list[str] = [],
         tag: int = 10;
 }
 

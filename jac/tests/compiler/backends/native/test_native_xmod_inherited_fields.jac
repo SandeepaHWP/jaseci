@@ -70,7 +70,7 @@ def seam_report(fixture: str) -> str {
 }
 
 """Field name to slot index, as the consumer's registry holds it."""
-def slots_of(ir: uni.Module, prog: JacProgram, name: str) -> dict[any, any] {
+def slots_of(ir: uni.Module, prog: JacProgram, name: str) -> dict[str, any] {
     layout = get_layout_registry(ir, prog).get_layout(name);
     assert layout is not None , f"no layout for {name}";
     return dict(layout.field_index);

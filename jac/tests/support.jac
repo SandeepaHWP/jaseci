@@ -52,7 +52,7 @@ def native_str_func(eng: any, name: str, restype: type | None, *argtypes: type) 
     addr = eng.get_function_address(name);
     assert addr != 0 , f"Function '{name}' not found in JIT engine";
     real_res: any = JacStrABI if restype == ctypes.c_char_p else restype;
-    str_slots: list[any] = [];
+    str_slots: list[bool] = [];
     real_args: list[any] = [];
     for a in argtypes {
         if a == ctypes.c_char_p {

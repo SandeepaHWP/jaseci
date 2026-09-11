@@ -84,7 +84,7 @@ def _make_project(tmp_path: Path) {
 
 
 """Env for a build/run that resolves ONLY from the local wheelhouse (no PyPI)."""
-def _offline_env(wheelhouse: Path) -> dict[any, any] {
+def _offline_env(wheelhouse: Path) -> dict[str, any] {
     env: dict[str, str] = dict(os.environ);
     env["PIP_NO_INDEX"] = "1";
     env["PIP_FIND_LINKS"] = str(wheelhouse);

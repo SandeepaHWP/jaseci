@@ -33,7 +33,7 @@ glob BITS_1_5 = 4609434218613702656,  # 0x3FF8000000000000
 
 
 def _native_opts(gc_mode: str | None = None) -> any {
-    kwargs: dict[any, any] = {
+    kwargs: dict[str, any] = {
         "force_codespace": "native",
         "force_target_program": True
     };

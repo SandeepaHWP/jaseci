@@ -14,7 +14,7 @@ import from jaclang.byllm.types { Message, MessageRole, Tool }
 import from jaclang.byllm.exceptions { FinishToolError, OutputConversionError }
 
 glob RETRY: str = "__retry__",
-     SHIPPED_DEFAULTS: dict[any, any] = {
+     SHIPPED_DEFAULTS: dict[str, any] = {
          "enabled": False,
          "min_chars": 48,
          "min_interval": 0.15,
@@ -81,7 +81,7 @@ def _frags(
 
 
 """What `stream_chunk_builder` returns for `calls`, each (id, name, args)."""
-def _rebuilt(calls: list[any]) -> dict[any, any] {
+def _rebuilt(calls: list[any]) -> dict[str, any] {
     tcs = [
         types.SimpleNamespace(
             id=c[0],
@@ -102,7 +102,7 @@ def _rebuilt(calls: list[any]) -> dict[any, any] {
 }
 
 
-def _plain(text: str) -> dict[any, any] {
+def _plain(text: str) -> dict[str, any] {
     return {
         "choices": [
             {
@@ -126,9 +126,9 @@ def _run(
     rebuilts: list[any],
     tools: list[any],
     enabled: bool = True,
-    bounds: dict[any, any] | None = None,
+    bounds: dict[str, any] | None = None,
     tolerate_errors: bool = False,
-    probe: dict[any, any] | None = None
+    probe: dict[str, any] | None = None
 ) -> list[any] {
     llm = Model(model_name="gpt-4o");
     wrapped = [Tool(func=t) for t in tools];
@@ -149,7 +149,7 @@ def _run(
     }
     at = [0];
 
-    def _stream(params: dict[any, any]) -> any {
+    def _stream(params: dict[str, any]) -> any {
         i = at[0];
         at[0] += 1;
         if i >= len(turns) {
@@ -179,7 +179,7 @@ def _run(
         );
     }
 
-    def _rebuild(seen: list[any], logging_obj: object = None) -> dict[any, any] {
+    def _rebuild(seen: list[any], logging_obj: object = None) -> dict[str, any] {
         i = at[0] - 1;
         if i < len(rebuilts) and rebuilts[i] is not None {
             return rebuilts[i];
@@ -190,7 +190,7 @@ def _run(
     resolved = dict(bounds) if bounds else dict(SHIPPED_DEFAULTS);
     cfg = _byllm_llm_mod.get_byllm_config();
 
-    def _tool_stream_cfg -> dict[any, any] {
+    def _tool_stream_cfg -> dict[str, any] {
         return dict(resolved);
     }
 
@@ -255,7 +255,7 @@ test "disabled is the shipped default and changes nothing" {
 
 
 test "the gate opens per call or from jac.toml" {
-    def gate(enabled: bool, bounds: dict[any, any] | None) -> list[any] {
+    def gate(enabled: bool, bounds: dict[str, any] | None) -> list[any] {
         return _of(
             _run(
                 [_frags(BODY, "write_file", "c1")],
@@ -323,7 +323,7 @@ test "deltas precede the call, name the tool, and leave execution untouched" {
         [write_file, read_file]
     );
 
-    joined: dict[any, any] = {};
+    joined: dict[str, any] = {};
     for d in _of(events, "tool_call_delta") {
         cid = d.data.get("call_id", "");
         joined[cid] = joined.get(cid, "") + str(d.data.get("arg_fragment", ""));
@@ -435,7 +435,7 @@ test "an abandoned stream is always announced alongside its deltas" {
     ];
 
     for (label, turns, rebuilts, tools, reset_first, tolerate) in cases {
-        seen: dict[any, any] = {};
+        seen: dict[str, any] = {};
         events = _run(turns, rebuilts, tools, tolerate_errors=tolerate, probe=seen);
         kinds = _kinds(events);
 

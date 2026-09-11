@@ -21,20 +21,20 @@ async def _collect(agen: any) -> list[any] {
 }
 
 
-async def _async_producer -> AsyncIterator[dict[any, any]] {
+async def _async_producer -> AsyncIterator[dict[str, any]] {
     yield {"n": 0};
     yield {"n": 1};
     yield {"n": 2};
 }
 
 
-async def _raising_producer -> AsyncIterator[dict[any, any]] {
+async def _raising_producer -> AsyncIterator[dict[str, any]] {
     yield {"ok": 1};
     raise ValueError("boom");
 }
 
 
-def _sync_producer -> Iterator[dict[any, any]] {
+def _sync_producer -> Iterator[dict[str, any]] {
     yield {"a": 1};
     yield {"a": 2};
 }

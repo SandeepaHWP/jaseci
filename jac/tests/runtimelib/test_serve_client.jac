@@ -2580,22 +2580,22 @@ import from jaclang.server.serving.client {
 }
 
 obj _BridgeStubResponse {
-    has payload: dict[any, any],
-        headers: dict[any, any] = {},
+    has payload: dict[str, any],
+        headers: dict[str, any] = {},
         text: str = "";
 
-    def json -> dict[any, any] {
+    def json -> dict[str, any] {
         return self.payload;
     }
 }
 
 obj _BridgeStubClient {
     has calls: list[any] = [],
-        payload: dict[any, any] = {},
+        payload: dict[str, any] = {},
         headers_seen: list[any] = [];
 
     def post(
-        path: str, json: dict[any, any], headers: (dict[any, any] | None) = None
+        path: str, json: dict[str, any], headers: (dict[str, any] | None) = None
     ) -> _BridgeStubResponse {
         self.calls.append((path, json));
         self.headers_seen.append(dict(headers or {}));
@@ -2604,7 +2604,7 @@ obj _BridgeStubClient {
 }
 
 obj _LocalProviderModule {
-    has seen: list[any] = [];
+    has seen: list[str] = [];
 
     def greet(name: str) -> str {
         self.seen.append(name);
@@ -2889,7 +2889,7 @@ obj _StubWalker {
     static def _from_wire(d: any) -> any {
         inst = _StubWalker();
         if isinstance(d, dict) {
-            wire: dict[any, any] = d;
+            wire: dict[str, any] = d;
             for (k, v) in wire.items() {
                 setattr(inst, k, v);
             }

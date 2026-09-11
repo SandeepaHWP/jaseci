@@ -14,7 +14,7 @@ import from jaclang.data.pgembed { PgRuntime }
 import from jaclang.data.store { PgStore }
 import from jaclang.scale.websocket.backplane { PgBackplane }
 
-glob _holder: dict[any, any] = {};
+glob _holder: dict[str, any] = {};
 
 
 def _store -> (PgStore | None) {
@@ -49,15 +49,15 @@ async def _pods -> (tuple[any, ...] | None) {
 
 
 test "message published on pod A reaches a subscriber on pod B" {
-    async def scenario -> (dict[any, any] | None) {
+    async def scenario -> (dict[str, any] | None) {
         pods = await _pods();
         if pods is None {
             return None;
         }
         (a, b, sa, sb) = pods;
-        got: list[dict[any, any]] = [];
+        got: list[dict[str, any]] = [];
 
-        async def handler(channel: str, message: dict[any, any]) {
+        async def handler(channel: str, message: dict[str, any]) {
             got.append(message);
         }
         await b.subscribe('room-1', handler);
@@ -83,15 +83,15 @@ test "message published on pod A reaches a subscriber on pod B" {
 
 
 test "oversized payloads spill through kv and arrive intact" {
-    async def scenario -> (dict[any, any] | None) {
+    async def scenario -> (dict[str, any] | None) {
         pods = await _pods();
         if pods is None {
             return None;
         }
         (a, b, sa, sb) = pods;
-        got: list[dict[any, any]] = [];
+        got: list[dict[str, any]] = [];
 
-        async def handler(channel: str, message: dict[any, any]) {
+        async def handler(channel: str, message: dict[str, any]) {
             got.append(message);
         }
         await b.subscribe('room-big', handler);
@@ -126,13 +126,13 @@ test "publishing pod delivers exactly one copy to its own subscriber (#8000 f2)"
             return None;
         }
         (a, b, sa, sb) = pods;
-        got_a: list[dict[any, any]] = [];
-        got_b: list[dict[any, any]] = [];
+        got_a: list[dict[str, any]] = [];
+        got_b: list[dict[str, any]] = [];
 
-        async def handler_a(channel: str, message: dict[any, any]) {
+        async def handler_a(channel: str, message: dict[str, any]) {
             got_a.append(message);
         }
-        async def handler_b(channel: str, message: dict[any, any]) {
+        async def handler_b(channel: str, message: dict[str, any]) {
             got_b.append(message);
         }
         await a.subscribe('room-self', handler_a);
@@ -163,19 +163,19 @@ test "channels that used to sanitize alike stay distinct broadcasts (#8046)" {
     # 'room-x' and 'room_x' both folded to the pg channel jac_ws_room_x, so a
     # subscriber of one was woken by the other's broadcasts. The backplane now
     # only namespaces the channel and the store keeps the name intact.
-    async def scenario -> (dict[any, any] | None) {
+    async def scenario -> (dict[str, any] | None) {
         pods = await _pods();
         if pods is None {
             return None;
         }
         (a, b, sa, sb) = pods;
-        hyphen: list[dict[any, any]] = [];
-        under: list[dict[any, any]] = [];
+        hyphen: list[dict[str, any]] = [];
+        under: list[dict[str, any]] = [];
 
-        async def on_hyphen(channel: str, message: dict[any, any]) {
+        async def on_hyphen(channel: str, message: dict[str, any]) {
             hyphen.append(message);
         }
-        async def on_under(channel: str, message: dict[any, any]) {
+        async def on_under(channel: str, message: dict[str, any]) {
             under.append(message);
         }
         await b.subscribe('room-x', on_hyphen);
@@ -211,15 +211,15 @@ test "oversized publish from inside an open store transaction is delivered (#800
     # The kv spill used to ride the main connection, so a publish issued while
     # that connection had an open transaction wrote an uncommitted row the
     # receiver could not see. The spill now rides the side connection.
-    async def scenario -> (dict[any, any] | None) {
+    async def scenario -> (dict[str, any] | None) {
         pods = await _pods();
         if pods is None {
             return None;
         }
         (a, b, sa, sb) = pods;
-        got: list[dict[any, any]] = [];
+        got: list[dict[str, any]] = [];
 
-        async def handler(channel: str, message: dict[any, any]) {
+        async def handler(channel: str, message: dict[str, any]) {
             got.append(message);
         }
         await b.subscribe('room-txn', handler);

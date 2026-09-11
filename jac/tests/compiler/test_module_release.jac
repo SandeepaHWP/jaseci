@@ -60,9 +60,9 @@ glob STUB_SRC: str = (
          "}\n"
      );
 
-def _stub_modules(prog: JacProgram) -> dict[any, any] {
+def _stub_modules(prog: JacProgram) -> dict[str, any] {
     import from jaclang.runtime.runtime { JacRuntime as Jac }
-    out: dict[any, any] = {};
+    out: dict[str, any] = {};
     for p in [prog, Jac.get_compiler().selfhost.program] {
         for (path, mod) in p.mod.hub.items() {
             if path.endswith(".pyi") {

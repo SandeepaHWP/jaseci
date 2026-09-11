@@ -71,7 +71,7 @@ def _target -> KubernetesTarget {
 }
 
 
-def _scan(pods: list[any]) -> dict[any, any] {
+def _scan(pods: list[any]) -> dict[str, any] {
     return _target()._scan_for_crash_loop(
         PodListStub(pods=pods),
         "jb-standup",

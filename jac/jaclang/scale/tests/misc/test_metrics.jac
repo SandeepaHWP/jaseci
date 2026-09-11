@@ -17,13 +17,13 @@ test "noop endpoint handler returns callable" {
     assert callable(handler);
 }
 
-glob ENABLED_CONFIG: dict[any, any] = {
+glob ENABLED_CONFIG: dict[str, any] = {
          "enabled": True,
          "namespace": "test_app",
          "walker_metrics": True,
          "histogram_buckets": [0.01, 0.1, 1.0]
      },
-     DISABLED_CONFIG: dict[any, any] = {"enabled": False};
+     DISABLED_CONFIG: dict[str, any] = {"enabled": False};
 
 test "prometheus enabled when configured" {
     collector = PrometheusMetricsCollector(config=ENABLED_CONFIG);

@@ -55,8 +55,8 @@ def _link(ctx: ExecutionContext, src: any, dst: any, kind: any) {
 }
 
 """Serialized fingerprint per content row, which is what a store write sees."""
-def _fingerprints(ctx: ExecutionContext, ids: list[any]) -> dict[any, any] {
-    out: dict[any, any] = {};
+def _fingerprints(ctx: ExecutionContext, ids: list[any]) -> dict[str, any] {
+    out: dict[str, any] = {};
     for i in ids {
         anchor: any = ctx.mem.get(i);
         props = Serializer.serialize(anchor, include_type=True);

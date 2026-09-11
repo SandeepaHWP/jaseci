@@ -16,7 +16,7 @@ def _callback_request(code: str = "auth-code-123") -> Request {
 
 """Stand in for a JSON response from a provider's token or userinfo endpoint."""
 obj _OAuthResp {
-    has payload: dict[any, any],
+    has payload: dict[str, any],
         status_code: int = 200;
 
     def json -> any {
@@ -34,7 +34,7 @@ obj _OAuthResp {
 
 """Serve canned JSON per request, in call order."""
 def _oauth_responder(payloads: list[any]) -> any {
-    seen: dict[any, any] = {"n": 0};
+    seen: dict[str, any] = {"n": 0};
 
     async def _fake_arequest(method: str, url: str, **kwargs: any) -> _OAuthResp {
         i = seen["n"];

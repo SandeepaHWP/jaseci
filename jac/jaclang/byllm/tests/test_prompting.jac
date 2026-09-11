@@ -375,7 +375,7 @@ test "a list-of-obj return parses, and each element feeds the next call" {
 test "the model can be any expression, and a bound call keeps its tools" {
     # `by <expr>` takes a model from anywhere, not just a bare name, and a model
     # already bound with tools= keeps that binding.
-    ran: list[any] = [];
+    ran: list[str] = [];
 
     """Run Python code and return the output, or the error message."""
     def run_and_test_python_code(code: str) -> str {

@@ -14,7 +14,7 @@ import tempfile;
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.driver.compile_options { CompileOptions }
 
-def _proj(files: dict[any, any], pins: str = "") -> str {
+def _proj(files: dict[str, any], pins: str = "") -> str {
     d = tempfile.mkdtemp(prefix="jacplace_");
     toml = "[project]\nname = \"t\"\nentry-point = \"main\"\n";
     if pins != "" {

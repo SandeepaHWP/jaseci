@@ -92,7 +92,7 @@ def ir_hash(text: str) -> str {
 }
 
 test "cross-module enum chain IR is byte-identical under any walk order" {
-    hashes: dict[any, any] = {};
+    hashes: dict[str, any] = {};
     for order in WALK_ORDERS {
         hashes[order or "forward"] = ir_hash(
             compile_ir_text("opcodes_entry.jac", order)
@@ -102,7 +102,7 @@ test "cross-module enum chain IR is byte-identical under any walk order" {
 }
 
 test "imported obj-field chain IR is walk-order independent" {
-    hashes: dict[any, any] = {};
+    hashes: dict[str, any] = {};
     for order in WALK_ORDERS {
         hashes[order or "forward"] = ir_hash(
             toplevel_sorted(compile_ir_text("xmodfield_entry.jac", order))

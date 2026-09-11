@@ -738,7 +738,7 @@ test "get_bytecode busts in-memory hub when .impl.jac changes" {
         def tag_of -> int {
             code = compiler.get_bytecode(mod, prog);
             assert code is not None , "get_bytecode returned None";
-            ns: dict[any, any] = {};
+            ns: dict[str, any] = {};
             exec(code, ns);
             return ns["Thing"]().get_tag();
         }

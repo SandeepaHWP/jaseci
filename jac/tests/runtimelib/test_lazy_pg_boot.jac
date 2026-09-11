@@ -243,7 +243,7 @@ test "first-use schema DDL runs once per database, even from many threads" {
 obj _FirstUseStore(PgStore) {
     has ddl_runs: int = 0;
 
-    def _run(sql: str, params: dict[any, any]) -> list[any] {
+    def _run(sql: str, params: dict[str, any]) -> list[any] {
         self._ensure_ready();
         return [("170000", )];
     }

@@ -64,7 +64,7 @@ def _compile_with_coverage(fixture: str) -> tuple[any, ...] {
 
 
 """The coverage seam list recorded for a fixture path."""
-def _seams_of(coverage: dict[any, any], fixture: str) -> list[str] {
+def _seams_of(coverage: dict[str, any], fixture: str) -> list[str] {
     rec = coverage.get(os.path.realpath(os.path.join(FIXTURES, fixture)));
     if rec is None {
         return [];

@@ -317,7 +317,7 @@ def _interface_methods -> list[str] {
 """Every broker implementation that ships in jaclang.scale.events.streams."""
 def _shipped_brokers -> list[type] {
     found: list[type] = [];
-    pending: list[any] = list(getattr(EventStreamBroker, "__subclasses__")());
+    pending: list[type] = list(getattr(EventStreamBroker, "__subclasses__")());
     while pending {
         candidate = pending.pop();
         pending.extend(candidate.__subclasses__());

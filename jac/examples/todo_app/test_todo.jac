@@ -29,8 +29,8 @@ def _backend_available -> bool {
 
 
 def _call(
-    kind: str, name: str, fields: dict[any, any], anchor: str = ""
-) -> dict[any, any] {
+    kind: str, name: str, fields: dict[str, any], anchor: str = ""
+) -> dict[str, any] {
     import from jaclang.client.targets.desktop.native.inprocess_dispatch {
         boot,
         dispatch
@@ -59,7 +59,7 @@ def _call(
 }
 
 
-def _first_todo(reply: dict[any, any]) -> dict[any, any] {
+def _first_todo(reply: dict[str, any]) -> dict[str, any] {
     reports = reply["body"]["data"]["reports"];
     first = reports[0];
     if isinstance(first, list) {

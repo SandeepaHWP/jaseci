@@ -29,7 +29,7 @@ import from jaclang.server.serving.ws {
 
 
 def _make_app -> ServingApp {
-    def hello -> dict[any, any] {
+    def hello -> dict[str, any] {
         return {"ok": True};
     }
 
@@ -181,7 +181,7 @@ test "PING interleaved in a fragmented message is answered, message survives" {
     # and closed 1002.
     (stop, server) = _spawn();
     try {
-        async def scenario -> dict[any, any] {
+        async def scenario -> dict[str, any] {
             (reader, writer, status) = await _ws_handshake(
                 server.bound_port, "/ws/echo"
             );

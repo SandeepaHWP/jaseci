@@ -205,7 +205,7 @@ test "429 envelope carries RATE_LIMITED code + Retry-After header" {
     assert getattr(resp, "status_code") == 429;
     headers = getattr(resp, "headers");
     assert headers.get("Retry-After") is not None;
-    body: dict[any, any] = json.loads(bytes(getattr(resp, "body")).decode());
+    body: dict[str, any] = json.loads(bytes(getattr(resp, "body")).decode());
     assert body["ok"] == False;
     assert body["error"]["code"] == "RATE_LIMITED";
 }

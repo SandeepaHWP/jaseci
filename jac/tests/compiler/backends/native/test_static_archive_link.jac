@@ -269,7 +269,7 @@ def _link_elf_shared(
     }
     assert ok , "ElfLinker.link(shared) returned False";
     raw = Path(out).read_bytes();
-    symmap: dict[any, any] = {};
+    symmap: dict[str, int] = {};
     for line in Path(out + ".symmap").read_text().splitlines() {
         (n, v) = line.rsplit(" ", 1);
         symmap[n] = int(v, 16);
@@ -279,7 +279,7 @@ def _link_elf_shared(
 
 
 """Parse an ELF image's section headers into {name: (file_off, size)}."""
-def _elf_section_map(raw: bytes) -> dict[any, any] {
+def _elf_section_map(raw: bytes) -> dict[str, any] {
     e_shoff = struct.unpack_from("<Q", raw, 40)[0];
     (e_shentsize, e_shnum, e_shstrndx) = struct.unpack_from("<HHH", raw, 58);
     hdrs: list[any] = [];
@@ -288,7 +288,7 @@ def _elf_section_map(raw: bytes) -> dict[any, any] {
     }
     shstr = hdrs[e_shstrndx];
     sdata = raw[shstr[4]:shstr[4] + shstr[5]];
-    smap: dict[any, any] = {};
+    smap: dict[str, any] = {};
     for h in hdrs {
         end = sdata.index(b"\x00", h[0]);
         smap[sdata[h[0]:end].decode()] = (h[4], h[5]);

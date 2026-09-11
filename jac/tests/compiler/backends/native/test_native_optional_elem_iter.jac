@@ -66,7 +66,7 @@ def native_call(eng: any, name: str) -> int {
 }
 
 """Run the fixture through the sv pathway and return its module globals."""
-def sv_funcs -> dict[any, any] {
+def sv_funcs -> dict[str, any] {
     path = str(os.path.join(FIXTURES, FIXTURE));
     prog = JacProgram();
     ir = prog.compile(
@@ -74,7 +74,7 @@ def sv_funcs -> dict[any, any] {
     );
     errors = [str(e) for e in prog.errors_had] if prog.errors_had else [];
     assert not prog.errors_had , f"sv compilation errors: {errors}";
-    ns: dict[any, any] = {};
+    ns: dict[str, any] = {};
     exec(compile(ir.gen.py, path, "exec"), ns);
     return ns;
 }

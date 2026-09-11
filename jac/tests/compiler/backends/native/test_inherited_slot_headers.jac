@@ -61,7 +61,7 @@ def _compile(fixture: str) -> tuple[any, ...] {
 
 
 """The coverage seams recorded across every module of the compile."""
-def _all_seams(coverage: dict[any, any]) -> list[str] {
+def _all_seams(coverage: dict[str, any]) -> list[str] {
     out: list[str] = [];
     for (_, rec) in coverage.items() {
         for s in (rec.get("seams") or []) {

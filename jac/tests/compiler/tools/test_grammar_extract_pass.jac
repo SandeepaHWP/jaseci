@@ -365,7 +365,7 @@ def mini_pass -> GrammarExtractPass {
     }
 }
 
-def mini_rules -> dict[any, any] {
+def mini_rules -> dict[str, any] {
     return {r.name: r for r in mini_pass().rules};
 }
 

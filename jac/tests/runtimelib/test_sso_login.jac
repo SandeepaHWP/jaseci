@@ -19,7 +19,7 @@ import from "@jac/runtime" {
 }
 
 """A minimal mock `fetch` Response carrying `body` from `.json()`."""
-def _resp(body: dict[any, any]) -> dict[any, any] {
+def _resp(body: dict[str, any]) -> dict[str, any] {
     return {
         "ok": True,
         "status": 200,

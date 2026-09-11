@@ -52,7 +52,7 @@ def _entry(store: any, key: str) -> OutboxEntry {
 
 
 obj _Recorder {
-    has calls: list[dict[any, any]] = [],
+    has calls: list[dict[str, any]] = [],
         fail_with: (Exception | None) = None;
 }
 
@@ -61,7 +61,7 @@ def _fake_spawn(recorder: _Recorder) -> any {
     async def fake_spawn(
         app: str,
         `walker: str,
-        kwargs: dict[any, any],
+        kwargs: dict[str, any],
         stub_cls: any,
         idempotency_key: str = ""
     ) -> any {
@@ -91,7 +91,7 @@ def _make_due(store: SqliteOutboxStore, key: str) {
 
 
 obj _StubResp {
-    has payload: dict[any, any];
+    has payload: dict[str, any];
 
     def json -> any {
         return self.payload;
@@ -101,7 +101,7 @@ obj _StubResp {
 
 obj _StubClient {
     has paths: list[str] = [],
-        headers_seen: list[dict[any, any]] = [];
+        headers_seen: list[dict[str, any]] = [];
 
     def post(path: str, json: any = None, headers: any = None) -> _StubResp {
         self.paths.append(path);
@@ -545,7 +545,7 @@ obj _RecordingPg(PgStore) {
         commits: int = 0,
         _txn: bool = False;
 
-    def rows(sql: str, params: dict[any, any]) -> list[tuple[any, ...]] {
+    def rows(sql: str, params: dict[str, any]) -> list[tuple[any, ...]] {
         self.sql.append(" ".join(sql.split()));
         return [];
     }

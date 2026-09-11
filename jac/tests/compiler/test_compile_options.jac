@@ -19,7 +19,7 @@ import from jaclang.compiler.driver.jir { compute_module_key }
 
 
 def _pinned_opts(**overrides: any) -> CompileOptions {
-    base: dict[any, any] = {
+    base: dict[str, any] = {
         "memory_profile": "managed",
         "nogc_enforce_all": False,
         "memory_enforce": [],

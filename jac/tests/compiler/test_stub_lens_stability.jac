@@ -60,7 +60,7 @@ def _write(dirname: str, stem: str, src: str) -> str {
     return path;
 }
 
-def _stub_keys(hub: dict[any, any]) -> set[str] {
+def _stub_keys(hub: dict[str, any]) -> set[str] {
     return {
         k
         for k in hub.keys()

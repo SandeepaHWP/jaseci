@@ -52,7 +52,7 @@ glob LITERAL_PREFIXES: tuple[any, ...] = (
      );
 
 """Every quote form `Lexer.scan_string` opens a literal with."""
-glob LITERAL_QUOTES: tuple[any, ...] = ("'", '"', "'''", '"""');
+glob LITERAL_QUOTES: tuple[str, ...] = ("'", '"', "'''", '"""');
 
 """The escape alphabet `Lexer.scan_string` admits without a warning."""
 glob LEXER_ESCAPE_CHARS: str = "nrtbfva01234567xNuU\\\"'";

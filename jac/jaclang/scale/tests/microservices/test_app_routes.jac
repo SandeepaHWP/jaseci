@@ -44,7 +44,7 @@ def _gateway_for(port: int, dist_dir: str = "") -> MicroserviceGateway {
             status=ServiceStatus.HEALTHY
         )
     );
-    kwargs: dict[any, any] = {"registry": reg};
+    kwargs: dict[str, any] = {"registry": reg};
     if dist_dir {
         kwargs["client_dist_dir"] = dist_dir;
     }

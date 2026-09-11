@@ -16,7 +16,7 @@ def make_fake_mt_run(
     invocation_id: str = "inv-test-001",
     user_prompt: str = "What is 2+2?",
     caller_name: str = "math_solver",
-    caller_args: dict[any, any] | None = None,
+    caller_args: dict[str, any] | None = None,
     msg_list: list[any] | None = None
 ) -> types.SimpleNamespace {
     # mt_run.messages[1].content[0].text — used for user_prompt extraction
@@ -50,7 +50,7 @@ test "register_agent_callback adds callback to registry" {
     original = _agent_callbacks.copy();
     _agent_callbacks.clear();
     try {
-        def cb(record: dict[any, any]) {}
+        def cb(record: dict[str, any]) {}
         register_agent_callback(cb);
         assert len(_agent_callbacks) == 1;
         assert _agent_callbacks[0] is cb;
@@ -64,7 +64,7 @@ test "register_agent_callback deduplicates same callback" {
     original = _agent_callbacks.copy();
     _agent_callbacks.clear();
     try {
-        def cb(record: dict[any, any]) {}
+        def cb(record: dict[str, any]) {}
         register_agent_callback(cb);
         register_agent_callback(cb);  # Register again — should be ignored
         register_agent_callback(cb);  # Third time — still ignored
@@ -81,8 +81,8 @@ test "register_agent_callback allows different callbacks" {
     original = _agent_callbacks.copy();
     _agent_callbacks.clear();
     try {
-        def cb1(record: dict[any, any]) {}
-        def cb2(record: dict[any, any]) {}
+        def cb1(record: dict[str, any]) {}
+        def cb2(record: dict[str, any]) {}
         register_agent_callback(cb1);
         register_agent_callback(cb2);
         assert len(_agent_callbacks) == 2;
@@ -96,9 +96,9 @@ test "register_agent_callback allows different callbacks" {
 test "emit_agent_telemetry builds record with correct fields" {
     original = _agent_callbacks.copy();
     _agent_callbacks.clear();
-    captured: list[any] = [];
+    captured: list[dict[str, any]] = [];
     try {
-        def capture_cb(record: dict[any, any]) {
+        def capture_cb(record: dict[str, any]) {
             captured.append(record);
         }
         _agent_callbacks.append(capture_cb);
@@ -150,9 +150,9 @@ test "emit_agent_telemetry builds record with correct fields" {
 test "emit_agent_telemetry marks streaming results correctly" {
     original = _agent_callbacks.copy();
     _agent_callbacks.clear();
-    captured: list[any] = [];
+    captured: list[dict[str, any]] = [];
     try {
-        def capture_cb(record: dict[any, any]) {
+        def capture_cb(record: dict[str, any]) {
             captured.append(record);
         }
         _agent_callbacks.append(capture_cb);
@@ -174,9 +174,9 @@ test "emit_agent_telemetry marks streaming results correctly" {
 test "emit_agent_telemetry includes error string on failure" {
     original = _agent_callbacks.copy();
     _agent_callbacks.clear();
-    captured: list[any] = [];
+    captured: list[dict[str, any]] = [];
     try {
-        def capture_cb(record: dict[any, any]) {
+        def capture_cb(record: dict[str, any]) {
             captured.append(record);
         }
         _agent_callbacks.append(capture_cb);
@@ -201,10 +201,10 @@ test "failing callback does not prevent other callbacks from firing" {
     _agent_callbacks.clear();
     results: list[any] = [];
     try {
-        def bad_cb(record: dict[any, any]) {
+        def bad_cb(record: dict[str, any]) {
             raise RuntimeError("I broke!");
         }
-        def good_cb(record: dict[any, any]) {
+        def good_cb(record: dict[str, any]) {
             results.append(record);
         }
 
@@ -228,16 +228,16 @@ test "multiple failing callbacks do not suppress any good callbacks" {
     _agent_callbacks.clear();
     results: list[any] = [];
     try {
-        def bad1(record: dict[any, any]) {
+        def bad1(record: dict[str, any]) {
             raise ValueError("bad1");
         }
-        def good1(record: dict[any, any]) {
+        def good1(record: dict[str, any]) {
             results.append("good1");
         }
-        def bad2(record: dict[any, any]) {
+        def bad2(record: dict[str, any]) {
             raise TypeError("bad2");
         }
-        def good2(record: dict[any, any]) {
+        def good2(record: dict[str, any]) {
             results.append("good2");
         }
 
@@ -262,9 +262,9 @@ test "multiple failing callbacks do not suppress any good callbacks" {
 test "emit handles missing mt_run fields gracefully" {
     original = _agent_callbacks.copy();
     _agent_callbacks.clear();
-    captured: list[any] = [];
+    captured: list[dict[str, any]] = [];
     try {
-        def capture_cb(record: dict[any, any]) {
+        def capture_cb(record: dict[str, any]) {
             captured.append(record);
         }
         _agent_callbacks.append(capture_cb);
@@ -299,9 +299,9 @@ test "emit handles missing mt_run fields gracefully" {
 test "emit record includes parent_invocation_id when set on mt_run" {
     original = _agent_callbacks.copy();
     _agent_callbacks.clear();
-    captured: list[any] = [];
+    captured: list[dict[str, any]] = [];
     try {
-        def capture_cb(record: dict[any, any]) {
+        def capture_cb(record: dict[str, any]) {
             captured.append(record);
         }
         _agent_callbacks.append(capture_cb);
@@ -323,9 +323,9 @@ test "emit record includes parent_invocation_id when set on mt_run" {
 test "emit record has None parent_invocation_id for root calls" {
     original = _agent_callbacks.copy();
     _agent_callbacks.clear();
-    captured: list[any] = [];
+    captured: list[dict[str, any]] = [];
     try {
-        def capture_cb(record: dict[any, any]) {
+        def capture_cb(record: dict[str, any]) {
             captured.append(record);
         }
         _agent_callbacks.append(capture_cb);
@@ -350,9 +350,9 @@ test "ContextVar chains correctly across simulated nested Model.invoke calls" {
 
     original = _agent_callbacks.copy();
     _agent_callbacks.clear();
-    captured: list[any] = [];
+    captured: list[dict[str, any]] = [];
     try {
-        def capture_cb(record: dict[any, any]) {
+        def capture_cb(record: dict[str, any]) {
             captured.append(record);
         }
         _agent_callbacks.append(capture_cb);
@@ -441,9 +441,9 @@ test "ContextVar resets correctly even when inner invocation raises" {
 
     original = _agent_callbacks.copy();
     _agent_callbacks.clear();
-    captured: list[any] = [];
+    captured: list[dict[str, any]] = [];
     try {
-        def capture_cb(record: dict[any, any]) {
+        def capture_cb(record: dict[str, any]) {
             captured.append(record);
         }
         _agent_callbacks.append(capture_cb);

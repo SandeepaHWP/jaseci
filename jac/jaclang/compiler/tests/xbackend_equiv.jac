@@ -79,7 +79,7 @@ def call_py_fixture(fixture_stem: str, func_name: str) -> any {
     }
 }
 
-def run_py_fixture(fixture_stem: str, func_name: str) -> dict[any, any] {
+def run_py_fixture(fixture_stem: str, func_name: str) -> dict[str, any] {
     return json.loads(json.dumps(call_py_fixture(fixture_stem, func_name)));
 }
 
@@ -114,7 +114,7 @@ def compile_fixture_to_js(fixture_name: str) -> str {
     return es_to_js(es_ir.gen.es_ast);
 }
 
-def run_js_function(js_code: str, func_name: str) -> dict[any, any] {
+def run_js_function(js_code: str, func_name: str) -> dict[str, any] {
     # The bundle's own replacer, not a BigInt.prototype patch: this is the same
     # encoder the client transport uses, so what the harness reads is what a
     # browser would put on the wire.
@@ -133,7 +133,7 @@ def run_js_function(js_code: str, func_name: str) -> dict[any, any] {
     return json.loads(result.stdout.strip());
 }
 
-def run_js_module_fixture(fixture: str, func_name: str) -> dict[any, any] {
+def run_js_module_fixture(fixture: str, func_name: str) -> dict[str, any] {
     import from tempfile { TemporaryDirectory }
     import from jaclang.client.jac_client_compiler { JacClientCompiler }
     import from jaclang.compiler.frontend.codeinfo { ClientArtifact, ClientManifest }
@@ -288,7 +288,7 @@ def unbox_jacval(jv: JacVal) -> object {
             ];
         }
         dct_ptr = ctypes.cast(jv.payload, ctypes.POINTER(InnerDictStruct));
-        result: dict[any, any] = {};
+        result: dict[str, any] = {};
         for i in range(dct_ptr.contents.len) {
             slot = dct_ptr.contents.order[i];
             k = dct_ptr.contents.keys[slot].decode("utf-8");
@@ -324,7 +324,7 @@ def unbox_jacval(jv: JacVal) -> object {
 
 def run_native_function(
     eng: object, func_name: str, ir: object = None
-) -> dict[any, any] {
+) -> dict[str, any] {
     # Open-addressing hash-table dict:
     #   {i64 len, i64 cap, i8** keys, JacVal* vals, i8* ctrl, i64 used, i64* order}
     # Live entries sit at sparse hashed slots across `cap`. `order[0..len]` holds
@@ -379,7 +379,7 @@ def run_native_function(
     }
     f = get_func(eng, func_name, ctypes.POINTER(DictStruct));
     dict_ptr = f();
-    result: dict[any, any] = {};
+    result: dict[str, any] = {};
     # Iterate in insertion order via order[0..len].
     for i in range(dict_ptr.contents.len) {
         slot = dict_ptr.contents.order[i];
@@ -394,8 +394,8 @@ def run_native_function(
 # Comparison: intersection-based (only keys present in BOTH dicts)
 # -----------------------------------------------------------------------
 def compare_results(
-    py_result: dict[any, any],
-    backend_result: dict[any, any],
+    py_result: dict[str, any],
+    backend_result: dict[str, any],
     label: str,
     tolerance: float = 1e-9
 ) -> None {
@@ -430,8 +430,8 @@ def compare_results(
 # Dispatch helper: run py reference, then try ES and NA backends
 # -----------------------------------------------------------------------
 def assert_full_parity(
-    py_result: dict[any, any],
-    backend_result: dict[any, any],
+    py_result: dict[str, any],
+    backend_result: dict[str, any],
     label: str,
     allow_missing: (list[any] | None) = None
 ) {

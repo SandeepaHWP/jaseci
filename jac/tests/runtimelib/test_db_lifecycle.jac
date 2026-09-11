@@ -150,7 +150,7 @@ def _seed_project(name: str, app: str = "") -> str {
 }
 
 
-def _child_env(cluster: Cluster, scratch: bool) -> dict[any, any] {
+def _child_env(cluster: Cluster, scratch: bool) -> dict[str, any] {
     import jaclang;
     env: dict[str, str] = dict(os.environ);
     src = str(Path(jaclang.__file__).parent.parent);

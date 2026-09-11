@@ -145,8 +145,8 @@ def assert_bytecode_equal(ref_tree: any, mod_path: str, bytecode: bytes) {
 }
 
 def exec_both(ref_tree: any, got_tree: any, path: str, names: list[any]) {
-    ref_ns: dict[any, any] = {};
-    got_ns: dict[any, any] = {};
+    ref_ns: dict[str, any] = {};
+    got_ns: dict[str, any] = {};
     pyexec(pycompile(ref_tree, path, "exec"), ref_ns);
     pyexec(pycompile(got_tree, path, "exec"), got_ns);
     for name in names {
@@ -514,7 +514,7 @@ with entry {
     (ref_tree, got_tree, _) = dual_compile(src, "lambda_fixture.jac");
     assert_dump_equal(ref_tree, got_tree);
     exec_both(ref_tree, got_tree, "lambda_fixture.jac", ["r1", "r2", "r3", "r4", "r5"]);
-    missing: list[any] = [];
+    missing: list[str] = [];
     for node in pyast.walk(got_tree) {
         if "lineno" in node._attributes {
             # `lineno` lives on concrete nodes, not the `AST` base the stub
