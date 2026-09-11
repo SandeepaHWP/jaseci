@@ -204,7 +204,7 @@ walker NaIRGenPass(Transform) {
         struct_types: dict[str, ir.IdentifiedStructType] = {},
         struct_field_indices: dict[str, dict[str, int]] = {},
         struct_field_order: dict[str, list[str]] = {},
-        struct_field_types: dict[str, dict[str, ir.Type]] = {},
+        struct_field_types: dict[str, dict[str, any]] = {},
         struct_field_defaults: dict[str, dict[str, uni.Expr]] = {},
         struct_constructor_order: dict[str, list[str]] = {},
         struct_field_foreign: dict[str, set] = {},
@@ -335,7 +335,7 @@ walker NaIRGenPass(Transform) {
         rc_push_root_fn: (ir.Function | None) = None,
         rc_collect_cycles_fn: (ir.Function | None) = None,
         rc_trace_lookup_fn: (ir.Function | None) = None,
-        rc_trace_pairs: dict[str, tuple[ir.Function, ir.Function]] = {},
+        rc_trace_pairs: dict[str, tuple[any, ir.Function]] = {},
         rc_retains_emitted: int = 0,
         rc_releases_emitted: int = 0,
         rc_ops_elided: int = 0,
@@ -1704,7 +1704,7 @@ walker NaIRGenPass(Transform) {
         arch_name: str, is_entry: bool
     ) -> list[tuple[int, ir.Function]];
 
-    def _osp_emit_callbacks -> dict[str, ir.Function | None];
+    def _osp_emit_callbacks -> dict[str, any];
     def _osp_pred_pair(
         arch_name: str, compares: list[uni.CompareExpr], nd: uni.UniNode
     ) -> (ir.Value | None);
@@ -1861,7 +1861,7 @@ walker NaIRGenPass(Transform) {
 
     def _release_owned_args(call_args: list[ir.Value], op: str = "call_arg") -> None;
     def _rc_call_with_ctx(
-        fn: ir.Function, args: list[ir.Value], op: str, loc: str = "", name: str = ""
+        fn: ir.Function, args: list[any], op: str, loc: str = "", name: str = ""
     ) -> ir.Value;
 
     def _emit_scope_cleanup(

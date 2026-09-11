@@ -322,14 +322,14 @@ impl NaIRGenPass._osp_build_descriptor(
     return desc;
 }
 
-impl NaIRGenPass._osp_emit_callbacks -> dict[str, ir.Function | None] {
+impl NaIRGenPass._osp_emit_callbacks -> dict[str, any] {
     i8 = ir.IntType(8);
     i32 = ir.IntType(32);
     i64 = ir.IntType(64);
     i8p = i8.as_pointer();
     _fields = self.struct_field_types.get("OspRuntime", {});
     _saved = self._builder;
-    out: dict[str, ir.Function | None] = {};
+    out: dict[str, any] = {};
 
     _tf = self._define_function("__osp_tag_of", _fields["tag_of"].pointee);
     _tf.linkage = "internal";
@@ -1010,7 +1010,7 @@ impl NaIRGenPass._codegen_edge_ref_trailer(
                 }
             }
         }
-        _ec_compares: list[uni.Expr] = [];
+        _ec_compares: list[any] = [];
         if (_fcond is not None) and _fcond.compares {
             _ec_compares = list(_fcond.compares);
         }

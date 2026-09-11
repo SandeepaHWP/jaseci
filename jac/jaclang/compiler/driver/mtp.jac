@@ -63,11 +63,11 @@ obj MethodInfo(FunctionInfo) {
     has parent_class: (ClassInfo | None) = None;
 }
 
-def mk_list(inner: object) -> tuple[object, ...] {
+def mk_list(inner: object) -> tuple[str, any] {
     return ('list', inner);
 }
 
-def mk_dict(key: object, val: object) -> tuple[object, ...] {
+def mk_dict(key: object, val: object) -> tuple[str, any, any] {
     return ('dict', key, val);
 }
 

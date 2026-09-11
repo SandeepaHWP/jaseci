@@ -314,7 +314,7 @@ def prepare_application(
     }
     import from jaclang.compiler.driver.pass_driver { compile_progress }
     started = time.monotonic();
-    active = [];
+    active: list[str] = [];
     completed: list[int] = [0];
     def begin(path: any) {
         active.append(path);
@@ -347,7 +347,7 @@ def prepare_application(
                 }
                 import from jaclang.compiler.driver.compile_options { CompileOptions }
                 import from jaclang.runtime.prepared { publish }
-                applications = [];
+                applications: list[PreparedApplication] = [];
                 for path in entries {
                     options = bind_options(
                         path,
@@ -457,7 +457,7 @@ def _prepare(
     console.print('  Compiling server modules and placement metadata...');
     before = len(program.errors_had);
     import copy;
-    modules = {};
+    modules: dict[str, uni.Module] = {};
     import from jaclang.compiler.driver.pipeline { compile_application }
     for path in entries {
         options = copy.copy(program.options);

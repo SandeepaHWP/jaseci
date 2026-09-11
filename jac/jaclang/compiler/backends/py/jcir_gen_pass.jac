@@ -600,7 +600,7 @@ walker JcirGenPass(BaseAstGenPass[CgItem]) {
     can exit_unary_expr with UnaryExpr exit;
     def _emit_jobj_ref(nd: UnaryExpr) -> None;
     can exit_if_else_expr with IfElseExpr exit;
-    def _multi_string_pieces(str_seq: Sequence[UniNode]) -> list[str | CgNode];
+    def _multi_string_pieces(str_seq: Sequence[UniNode]) -> list[str | bytes | CgNode];
     can exit_multi_string with MultiString exit;
     can exit_f_string with FString exit;
     can exit_formatted_value with FormattedValue exit;

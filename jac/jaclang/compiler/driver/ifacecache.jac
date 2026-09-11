@@ -25,7 +25,7 @@ import from jaclang.compiler.driver.jir {
 
 glob DIAG_SCHEMA: int = 1,
      IFACE_RETAIN_CAP: int = 1024,
-     _SYMTAB_PROVIDES_MEMO: list[set[str]] = [],
+     _SYMTAB_PROVIDES_MEMO: list[set[AnalysisFact]] = [],
      _CODEC_MODULES: tuple[str, ...] = (
          "jaclang.compiler.types.type_evaluator",
          "jaclang.compiler.types.stubcat.reader",

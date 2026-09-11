@@ -173,7 +173,7 @@ def parse_woven(
     prog: (JacProgram | None),
     annexes: list[tuple[str, str]],
     early_context: str = ""
-) -> tuple[Module, bool] {
+) -> tuple[any, bool] {
     nat = _native_parse_woven(source_str, file_path, prog, annexes, early_context);
     if nat is not None {
         return nat;

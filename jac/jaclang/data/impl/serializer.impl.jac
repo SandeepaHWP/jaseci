@@ -374,7 +374,7 @@ impl Serializer.deserialize_api(
     }
     tag = value.get('_jac_type_id', value.get('_jac_type'));
     cls = boundary_types.get(tag, target) if isinstance(tag, str) else target;
-    decoded = {
+    decoded: dict[str, object] = {
         k: Serializer.deserialize_api(v, boundary_types) for (k, v) in value.items()
     };
     if cls is None {

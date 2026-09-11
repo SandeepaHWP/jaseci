@@ -732,7 +732,7 @@ def _create_root_gitignore(project_path: Path, entries: list[str]) {
 
 impl install(
     packages: list[str] = [],
-    editable: list[str] = [],
+    editable: list[any] = [],
     dev: bool = False,
     extras: list[str] = [],
     no_save: bool = False,

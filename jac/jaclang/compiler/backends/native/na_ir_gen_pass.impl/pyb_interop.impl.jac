@@ -801,7 +801,7 @@ impl NaIRGenPass._pyb_build_args(
     i64 = ir.IntType(64);
     i8p = ir.IntType(8).as_pointer();
     pos: list[uni.Expr] = [];
-    kwp: list[uni.KWPair] = [];
+    kwp: list[any] = [];
     for p in (params or []) {
         if isinstance(p, uni.KWPair) {
             if p.key is None {

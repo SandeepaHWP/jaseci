@@ -384,7 +384,7 @@ comptime SPEC_INSTALL: CommandSpec = CommandSpec(
 
 def install(
     packages: list[str] = [],
-    editable: list[str] = [],
+    editable: list[any] = [],
     dev: bool = False,
     extras: list[str] = [],
     no_save: bool = False,

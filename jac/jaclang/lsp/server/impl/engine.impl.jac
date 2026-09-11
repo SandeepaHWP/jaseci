@@ -9,7 +9,7 @@ impl _path_of(uri: str) -> str {
 impl _merge_app_alerts(
     collected: list[tuple[str, list[Alert], list[Alert]]], app_count: int
 ) -> tuple[list[Alert], list[Alert]] {
-    def key_of(alert: Alert) -> tuple[str, int, int, str, str] {
+    def key_of(alert: any) -> tuple[str, int, int, str, str] {
         code = alert.code.code if alert.code else '';
         return (
             alert.loc.mod_path,
@@ -22,9 +22,9 @@ impl _merge_app_alerts(
 
     def merge(index: int) -> list[Alert] {
         seen_apps: dict[tuple[str, int, int, str, str], set[str]] = {};
-        first: dict[tuple[str, int, int, str, str], Alert] = {};
+        first: dict[tuple[str, int, int, str, str], any] = {};
         order: list[tuple[str, int, int, str, str]] = [];
-        tagged: list[tuple[str, Alert]] = [];
+        tagged: list[tuple[str, any]] = [];
         for entry_item in collected {
             app_name = entry_item[0];
             for alert in entry_item[index] {
