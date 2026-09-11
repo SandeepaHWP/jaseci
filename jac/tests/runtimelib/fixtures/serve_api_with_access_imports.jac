@@ -33,11 +33,11 @@ walker LocalDefaultWalker {
 }
 
 # Local public function for comparison
-def:pub localPublicFunc -> dict[any, any] {
+def:pub localPublicFunc -> dict[str, any] {
     return {"message": "Hello from local public function!", "type": "local_public"};
 }
 
 # Local default function (no access modifier - requires auth by default)
-def localDefaultFunc -> dict[any, any] {
+def localDefaultFunc -> dict[str, any] {
     return {"message": "Hello from local default function!", "type": "local_default"};
 }

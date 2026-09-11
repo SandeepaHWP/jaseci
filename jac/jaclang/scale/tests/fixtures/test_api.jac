@@ -15,7 +15,7 @@ def multiply(x: int, y: int) -> int {
     return x * y;
 }
 
-def:pub public_status -> dict[any, any] {
+def:pub public_status -> dict[str, any] {
     return {"status": "ok", "public": True};
 }
 
@@ -355,7 +355,7 @@ async walker PrivateBroadcastChat {
 """Public WebSocket function using @restspec(protocol=APIProtocol.WEBSOCKET).
 Accessible ONLY via ws://host/ws/function/ws_echo."""
 @restspec(protocol=APIProtocol.WEBSOCKET)
-def:pub ws_echo(message: str, client_id: str = "anonymous") -> dict[any, any] {
+def:pub ws_echo(message: str, client_id: str = "anonymous") -> dict[str, any] {
     return {
         "status": "success",
         "echo": message,
@@ -377,7 +377,7 @@ def:pub ws_stream(count: int = 3) -> None {
 
 """Private WebSocket function (requires JWT auth); no `: pub` modifier."""
 @restspec(protocol=APIProtocol.WEBSOCKET)
-def ws_private_echo(message: str = "") -> dict[any, any] {
+def ws_private_echo(message: str = "") -> dict[str, any] {
     return {"status": "success", "message": message, "authenticated": True};
 }
 
@@ -449,12 +449,12 @@ walker:pub NormalWalker {
     }
 }
 
-def normal_func -> dict[any, any] {
+def normal_func -> dict[str, any] {
     return {"message": "normal function endpoint"};
 }
 
 # Exposes the in-memory execution_log so tests can verify scheduled tasks
 # actually fired (not just that they were registered).
-def get_execution_log -> dict[any, any] {
+def get_execution_log -> dict[str, any] {
     return {"log": list(execution_log)};
 }

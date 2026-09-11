@@ -5,7 +5,7 @@ and asserts the outputs match.
 """
 
 with entry {
-    jac_results: list[any] = [];
+    jac_results: list[str] = [];
 
     # Bitwise AND vs comparison: should be (3 & 1) == 1, not 3 & (1 == 1)
     jac_results.append(str(3 & 1 == 1));

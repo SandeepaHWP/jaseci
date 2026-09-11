@@ -31,7 +31,7 @@ impl Greeter.farewell -> str {
     "bye " + self.name
 }
 
-def styled -> dict[any, any] {
+def styled -> dict[str, any] {
     {"color": "red", "size": 4}
 }
 

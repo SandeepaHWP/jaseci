@@ -35,7 +35,7 @@ def:pub app -> any {
         }
     }
 
-    async def apiCall(service: str, endpoint: str, body: dict[any, any] = {}) -> any;
+    async def apiCall(service: str, endpoint: str, body: dict[str, any] = {}) -> any;
     async def fetchProducts -> None;
     async def addToCart(productId: str, name: str, price: float) -> None;
     async def fetchCart -> None;

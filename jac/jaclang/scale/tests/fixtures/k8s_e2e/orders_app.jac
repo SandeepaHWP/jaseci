@@ -14,7 +14,7 @@ Exposes public functions for order operations. Callable via:
 # This app declares the node it writes: a node never crosses an app boundary.
 node Order {
     has id: str,
-        items: list[dict] = [],
+        items: list[dict[str, any]] = [],
         total: float = 0.0,
         status: str = "pending",
         created_at: str = "";
@@ -26,7 +26,7 @@ import from cart_app { view_cart, clear_cart }
 glob _order_counter: int = 0;
 
 
-async def:pub create_order -> dict[any, any] {
+async def:pub create_order -> dict[str, any] {
     # 1. Fetch cart from cart service via sv import (HTTP under the hood)
     cart = await view_cart();
     items = cart.get("items", []) if cart else [];
@@ -64,8 +64,8 @@ async def:pub create_order -> dict[any, any] {
     };
 }
 
-def:pub list_orders -> list[dict[any, any]] {
-    result: list[dict[any, any]] = [];
+def:pub list_orders -> list[dict[str, any]] {
+    result: list[dict[str, any]] = [];
     for o in [root-->][?:Order] {
         result.append(
             {
@@ -80,7 +80,7 @@ def:pub list_orders -> list[dict[any, any]] {
     return result;
 }
 
-def:pub get_order(order_id: str) -> dict[any, any] {
+def:pub get_order(order_id: str) -> dict[str, any] {
     for o in [root-->][?:Order] {
         if o.id == order_id {
             return {
@@ -95,7 +95,7 @@ def:pub get_order(order_id: str) -> dict[any, any] {
     return {"error": "Order not found"};
 }
 
-def:pub cancel_order(order_id: str) -> dict[any, any] {
+def:pub cancel_order(order_id: str) -> dict[str, any] {
     for o in [root-->][?:Order] {
         if o.id == order_id {
             if o.status == "confirmed" {

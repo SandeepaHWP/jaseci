@@ -2,7 +2,7 @@ node City {
     has name: str = "";
 }
 
-glob users: list[dict[any, any]] = [];
+glob users: list[dict[str, any]] = [];
 
 walker Tourist {
     can travel with City entry {
@@ -10,7 +10,7 @@ walker Tourist {
         x = lambda (a: int, b: int) { b + a; };
         y = lambda { 567; };
         sorted_users = sorted(
-            users, key=lambda (x: dict[any, any]) { x["email"]; }, reverse=True
+            users, key=lambda (x: dict[str, any]) { x["email"]; }, reverse=True
         );
     }
 

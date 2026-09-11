@@ -33,7 +33,7 @@ def make_adder(x: int) -> any {
 }
 
 # Test 4: Multiple closures sharing state
-def create_shared_counter() -> dict[any, any] {
+def create_shared_counter() -> dict[str, any] {
     counter = 0;
 
     def increment() -> int {
@@ -54,7 +54,7 @@ def create_shared_counter() -> dict[any, any] {
 }
 
 # Test entry point
-def test_all_closures() -> dict[any, any] {
+def test_all_closures() -> dict[str, any] {
     # Test 1
     counter = make_counter();
     val1 = counter();

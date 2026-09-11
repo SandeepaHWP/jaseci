@@ -37,7 +37,7 @@ node Agent {
 }
 
 walker router {
-    has visited: list[any] = [];
+    has visited: list[str] = [];
 
     can route with Hub entry {
         visit [-->] by llm(select=1, intent="Route to the right agent");
@@ -46,7 +46,7 @@ walker router {
 
 walker picker {
     has options: list[any] = [],
-        visited: list[any] = [];
+        visited: list[str] = [];
 
     can pick with Hub entry {
         visit self.options by llm(select=1, intent="Pick one target");
@@ -54,7 +54,7 @@ walker picker {
 }
 
 walker collector {
-    has visited: list[any] = [];
+    has visited: list[str] = [];
 
     can go with Hub entry {
         visit [-->] by llm(select="all", intent="Visit every item");
@@ -62,7 +62,7 @@ walker collector {
 }
 
 walker leaky {
-    has visited: list[any] = [];
+    has visited: list[str] = [];
 
     can route with Hub entry {
         visit [-->] by llm(
@@ -83,7 +83,7 @@ def route_sink(ev: any) {
 
 
 walker stream_router {
-    has visited: list[any] = [];
+    has visited: list[str] = [];
 
     can route with Hub entry {
         visit [-->] by llm(stream=True, stream_handler=route_sink);

@@ -137,7 +137,7 @@ with entry {
 
     # Test 10: IIFE with object creation
     result10 = (
-        def create_object() -> dict[any, any] {
+        def create_object() -> dict[str, any] {
             my_obj = {"name": "Test", "value": 123, "active": True};
             return my_obj;
         }
