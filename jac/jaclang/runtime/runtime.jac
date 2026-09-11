@@ -85,7 +85,7 @@ glob logger = getLogger(__name__),
      _default_full_target_path: list[str | None] = [None],
      _shared_root_resolver: list[any] = [None, None];
 
-glob _scale_provider_cache: list[any] = [],
+glob _scale_provider_cache: list[type | None] = [],
      _scale_provider_error: list[Exception | None] = [None];
 
 glob _persistent_memory_provider: list[Callable | None] = [None];
@@ -105,7 +105,7 @@ def _scale_provider -> any {
     return result;
 }
 
-def scale_provider_error -> any {
+def scale_provider_error -> Exception | None {
     return _scale_provider_error[0];
 }
 
