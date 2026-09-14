@@ -1,6 +1,5 @@
-"""Bare generic types (e.g. list without type args) are an E1036 error and
-their value type recovers as Unknown, so reads through them are reported
-rather than silently permitted."""
+"""Bare generic types (e.g. list without type args) are an E1036 error; reads
+through them still behave as any, so only the annotation is reported."""
 
 obj Item {
     has name: str,

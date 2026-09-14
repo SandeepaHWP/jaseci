@@ -3962,8 +3962,8 @@ test "root_causes_total_error_count" {
 
 """MRO resolves correctly when base class imported through Python __init__.py re-export."""
 test "bare_generic_iteration_is_a_hard_error" {
-    # A bare generic no longer defaults to [any]; each bare annotation is an
-    # E1036, and its value type recovers as Unknown rather than any.
+    # Each bare annotation is an E1036; reads through the bare container still
+    # behave as any, so only the annotation is reported.
     program = JacProgram();
     mod = program.compile(
         os.path.join(CHECKER_FIXTURES, "checker_bare_generic_iteration.jac"),

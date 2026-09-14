@@ -865,12 +865,9 @@ impl build_type_var_solution(class_type: ClassType) -> dict[str, TypeBase] {
             }
         }
     } elif class_type.shared.type_params {
-        unparameterized: TypeBase = UnknownType()
-            if class_type.is_builtin(BARE_GENERIC_REQUIRED)
-            else AnyType();
         for tp in class_type.shared.type_params {
             if tp.name {
-                solution[tp.name] = unparameterized;
+                solution[tp.name] = AnyType();
             }
         }
     }
