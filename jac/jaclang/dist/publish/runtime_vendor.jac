@@ -247,8 +247,7 @@ def build_runtime_closure(
                     f'{module}.__jac_resources__ must be a list of package-relative glob patterns'
                 );
             }
-            patterns: list[str] = resources;
-            for pattern in patterns {
+            for pattern in resources {
                 matches = [
                     item
                     for item in path.parent.glob(pattern)

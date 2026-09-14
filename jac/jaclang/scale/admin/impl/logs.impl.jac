@@ -204,11 +204,9 @@ def _flatten_loki_response(
 ) -> list[dict[str, any]] {
     out: list[dict[str, any]] = [];
     data: any = payload.get("data") or {};
-    results: any = data.get("result") or [];
-    for stream in results {
+    for stream in (data.get("result") or []) {
         labels: any = stream.get("stream") or {};
-        values: any = stream.get("values") or [];
-        for `entry in values {
+        for `entry in (stream.get("values") or []) {
             if len(`entry) < 2 {
                 continue;
             }

@@ -495,8 +495,7 @@ impl _hints_from_schema(name: str, prop: dict[str, any]) -> list[str] {
     if prop.get("type") == "object" {
         nested = prop.get("properties");
         if isinstance(nested, dict) {
-            nested_props: dict[str, any] = nested;
-            for (sub, sub_prop) in nested_props.items() {
+            for (sub, sub_prop) in nested.items() {
                 if sub != name {
                     out.extend(_hints_from_schema(sub, sub_prop));
                 }
@@ -536,8 +535,7 @@ impl schema_to_hint_text(rf: dict[str, any] | None) -> str {
         return lead;
     }
     lines: list[str] = [];
-    top_props: dict[str, any] = props;
-    for (name, prop) in top_props.items() {
+    for (name, prop) in props.items() {
         if isinstance(prop, dict) {
             lines.extend(_hints_from_schema(name, prop));
         }
@@ -556,8 +554,7 @@ impl attach_schema_hint(messages: list[any], rf: dict[str, any] | None) -> list[
     last_user_idx: int = -1;
     for (i, m) in enumerate(messages) {
         if isinstance(m, dict) {
-            mdict: dict[str, any] = m;
-            if mdict.get("role") == "user" {
+            if m.get("role") == "user" {
                 last_user_idx = i;
             }
         }
@@ -579,15 +576,14 @@ impl attach_schema_hint(messages: list[any], rf: dict[str, any] | None) -> list[
         }
         target["content"] = body_str.rstrip() + "\n\n" + hint;
     } elif isinstance(body, list) {
-        body_list: list[any] = body;
-        for part in body_list {
+        for part in body {
             if isinstance(part, dict) and part.get("type") == "text" {
                 if hint in str(part.get("text", "")) {
                     return messages;
                 }
             }
         }
-        target["content"] = body_list + [{"type": "text", "text": hint}];
+        target["content"] = body + [{"type": "text", "text": hint}];
     } else {
         return messages;
     }

@@ -453,7 +453,7 @@ impl JacLangServer.get_references(
             lspt.Location(
                 uri=_uri_of(cur_node.loc.mod_path),
                 range=utils.create_range(cur_node.loc)
-            ) for cur_node in occurrences
+            ) for cur_node in [*node_selected.sym.defn, *node_selected.sym.uses]
         ];
         return list_of_references;
     }

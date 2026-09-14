@@ -63,8 +63,7 @@ def _first_todo(reply: dict[str, any]) -> dict[str, any] {
     reports = reply["body"]["data"]["reports"];
     first = reports[0];
     if isinstance(first, list) {
-        nested: list[any] = first;
-        return nested[0];
+        return first[0];
     }
     return first;
 }

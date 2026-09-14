@@ -85,8 +85,7 @@ def pod_env_entries(pod: dict[str, any]) -> list[dict[str, any]] {
     if not containers {
         return out;
     }
-    env_entries: any = containers[0].get("env", []) or [];
-    for e in env_entries {
+    for e in (containers[0].get("env", []) or []) {
         source = "";
         value_from = e.get("value_from");
         if value_from {
@@ -179,9 +178,8 @@ def _collect_podenv -> dict[str, any] {
             "pods": []
         };
     }
-    empty: list[any] = [];
     return build_podenv(
-        ns, own_env, [p.to_dict() for p in (pod_objs or empty)], _ENV_ALLOW_PREFIXES
+        ns, own_env, [p.to_dict() for p in (pod_objs or [])], _ENV_ALLOW_PREFIXES
     );
 }
 

@@ -332,7 +332,7 @@ def lint_native_incompatible_usage(
     relative_img_src_hits: set[str] = set();
     bundleable_relative_img_src_hits: set[str] = set();
     unresolved_relative_img_src_hits: set[str] = set();
-    global_patterns: dict[str, any] = {};
+    global_patterns = {};
     for global_name in _WEB_ONLY_GLOBALS {
         global_patterns[global_name] = re.compile(
             r"\b" + re.escape(global_name) + r"\b"

@@ -79,8 +79,7 @@ impl LocalLLM.model_call_no_stream(params: dict[str, any]) -> dict[str, any] {
                 if isinstance(msg, dict) {
                     tcs = msg.get("tool_calls");
                     if isinstance(tcs, list) and tcs {
-                        raw_calls: list[dict[str, any]] = tcs;
-                        msg["tool_calls"] = [wrap_tool_call(tc) for tc in raw_calls];
+                        msg["tool_calls"] = [wrap_tool_call(tc) for tc in tcs];
                     }
                 }
             }

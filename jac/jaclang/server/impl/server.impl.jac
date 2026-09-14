@@ -501,8 +501,7 @@ impl ModuleIntrospector._register_prepared_bindings(
         return getattr(module, name);
     }
 
-    cross_bindings: any = sm.get('cross_bindings', []) or [];
-    for b in cross_bindings {
+    for b in sm.get('cross_bindings', []) or [] {
         name = b.get('name');
         rel = b.get('src');
         if not name or not rel {

@@ -360,16 +360,13 @@ impl MicroserviceGateway.aggregate_graph_data(request: Request) -> Response | No
             continue;
         }
         fragments += 1;
-        frag_map: dict[str, any] = frag;
-        frag_nodes: any = frag_map.get("nodes") or [];
-        for n in frag_nodes {
+        for n in (frag.get("nodes") or []) {
             nid = str(n.get("id"));
             if nid not in merged_nodes {
                 merged_nodes[nid] = n;
             }
         }
-        frag_edges: any = frag_map.get("edges") or [];
-        for e in frag_edges {
+        for e in (frag.get("edges") or []) {
             key = (str(e.get("from")), str(e.get("to")), str(e.get("label", "")));
             if key not in edge_keys {
                 edge_keys.add(key);

@@ -427,8 +427,7 @@ impl JcirGenPass._record_bypasses_init(v: any) -> bool {
     if shared is None {
         return False;
     }
-    mro: any = shared.mro or [];
-    for cls in mro {
+    for cls in (shared.mro or []) {
         arch = cls.shared.symbol_table;
         if not isinstance(arch, Archetype) {
             continue;

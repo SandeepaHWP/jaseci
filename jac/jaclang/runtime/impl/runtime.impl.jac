@@ -1102,7 +1102,7 @@ impl JacGraph.clear_edges(
             }
         }
     }
-    origins: list[any] = origin if isinstance(origin, `list) else [origin];
+    origins = origin if isinstance(origin, `list) else [origin];
     hit = False;
     for o in origins {
         anchor = o.__jac__;

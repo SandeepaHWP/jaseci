@@ -55,14 +55,13 @@ def native_lowering_issues(llvm_ir_text: str) -> list[NativeLoweringIssue] {
                 or not all(isinstance(value, str) for value in values) {
                 raise ValueError("Invalid native lowering metadata");
             }
-            fields: list[str] = values;
             issues.append(
                 NativeLoweringIssue(
-                    symbol=fields[0],
-                    kind=NativeLoweringKind(fields[1]),
-                    source=fields[2],
-                    code=fields[3],
-                    detail=fields[4]
+                    symbol=values[0],
+                    kind=NativeLoweringKind(values[1]),
+                    source=values[2],
+                    code=values[3],
+                    detail=values[4]
                 )
             );
         }

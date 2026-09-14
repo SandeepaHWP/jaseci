@@ -510,7 +510,7 @@ impl WasmLinker.link(
         out += _section(11, _vec(dsegs));
     }
 
-    nm_entries: list[tuple[int, any]] = [];
+    nm_entries = [];
     fi2 = 0;
     for im in kept {
         nm_entries.append((fi2, im[2]));

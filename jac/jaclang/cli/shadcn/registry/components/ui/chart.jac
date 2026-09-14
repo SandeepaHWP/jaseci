@@ -61,10 +61,9 @@ def:pub ChartTooltipContent(props: any) -> JsxElement {
     indicator = props["indicator"] or "dot";
     ctx: any = useContext(ChartContext);
     config = ctx.config if ctx else {};
-    payload_items: list[any] = payload or [];
     filteredPayload: list[any] = [
         item
-        for item in payload_items
+        for item in (payload or [])
         if item.type != "none"
     ];
     hasItems = active and len(filteredPayload);

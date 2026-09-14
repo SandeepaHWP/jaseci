@@ -603,7 +603,7 @@ def test_or_none_default_list(x: list[str] | None) -> None {
 
 # 20b. Assignment-based narrowing: `x = x or []` narrows x to list[str]
 def test_or_reassign_narrows(x: list[str] | None) -> None {
-    x: list[any] = x or [];
+    x = x or [];
     result: list[str] = x;  # <-- Ok: x narrowed to list[str] via assignment
 }
 

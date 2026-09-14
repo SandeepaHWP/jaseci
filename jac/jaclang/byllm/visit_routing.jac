@@ -102,7 +102,7 @@ def _node_run_desc(node_arch: object, wkr: object) -> str {
     }
     funcs: list[ObjectSpatialFunction] = [];
     if isinstance(node_arch, Archetype) {
-        funcs: list[any] = node_arch._jac_entry_funcs_ or [];
+        funcs = node_arch._jac_entry_funcs_ or [];
     }
     parts: list[str] = [];
     for osf in funcs {

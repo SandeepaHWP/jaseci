@@ -758,8 +758,7 @@ impl NaIRGenPass._codegen_varargs_list(
     );
     for e in extras {
         if isinstance(e, tuple) and e and e[0] == "spread.list.val" {
-            _spread: tuple[str, ir.Value] = e;
-            _src = _spread[1];
+            _src = e[1];
             _src_h = None;
             for (_sn, _slt) in self.list_types.items() {
                 if _slt.as_pointer() == _src.type {
@@ -809,8 +808,7 @@ impl NaIRGenPass._codegen_varargs_list(
             continue;
         }
         if isinstance(e, tuple) and e and e[0] == "spread.val" {
-            _one: tuple[str, ir.Value] = e;
-            v = _one[1];
+            v = e[1];
         } else {
             v = self._codegen_expr(e);
             if v is None {

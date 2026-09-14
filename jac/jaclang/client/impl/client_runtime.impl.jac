@@ -41,7 +41,7 @@ impl __jacJsx(tag: any, props: dict[str, any] = {}, children: any = []) -> JsxEl
     if tag == None {
         tag = React.Fragment;
     }
-    childrenArray: list[any] = [];
+    childrenArray = [];
     if children != None {
         if Array.isArray(children) {
             childrenArray = children;

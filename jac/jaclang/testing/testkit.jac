@@ -331,7 +331,6 @@ def _build_multipart(files: dict[str, any], data: any = None) -> tuple[bytes, st
         content: bytes = b'';
         ctype = 'application/octet-stream';
         if isinstance(spec, tuple) {
-            spec: tuple[any, ...] = spec;
             if len(spec) >= 1 and spec[0] {
                 filename = str(spec[0]);
             }

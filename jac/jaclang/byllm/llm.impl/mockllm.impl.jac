@@ -51,8 +51,7 @@ impl MockLLM.dispatch_no_streaming(mt_run: MTRuntime) -> CompletionResult {
     if isinstance(output, list)
         and len(output) > 0
         and isinstance(output[0], MockToolCall) {
-        mock_calls: list[MockToolCall] = output;
-        tool_calls = [o.to_tool_call() for o in mock_calls];
+        tool_calls = [o.to_tool_call() for o in output];
         self.log_info(
             f"Mock LLM call completed with {len(tool_calls)} batch tool calls"
         );

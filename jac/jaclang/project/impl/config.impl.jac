@@ -177,8 +177,7 @@ impl JacConfig.apply_profile(
         check_data: dict[str, any] = profile["check"];
         for (key, value) in check_data.items() {
             if key == "lint" and isinstance(value, dict) {
-                lint_data: dict[str, any] = value;
-                for (lk, lv) in lint_data.items() {
+                for (lk, lv) in value.items() {
                     if hasattr(self.check.lint, lk) {
                         setattr(self.check.lint, lk, lv);
                     }
@@ -307,8 +306,7 @@ impl JacConfig.merge_from_toml_file(toml_path: Path) -> None {
         check_data: dict[str, any] = data["check"];
         for (key, value) in check_data.items() {
             if key == "lint" and isinstance(value, dict) {
-                lint_data: dict[str, any] = value;
-                for (lk, lv) in lint_data.items() {
+                for (lk, lv) in value.items() {
                     if hasattr(self.check.lint, lk) {
                         setattr(self.check.lint, lk, lv);
                     }
@@ -946,8 +944,7 @@ impl toml_value(value: any) -> str {
         if not value {
             return "{}";
         }
-        table: dict[str, any] = value;
-        pairs = [f"{_quote_key(k)} = {toml_value(v)}" for (k, v) in table.items()];
+        pairs = [f"{_quote_key(k)} = {toml_value(v)}" for (k, v) in value.items()];
         return "{ " + ", ".join(pairs) + " }";
     } else {
         return f'"{value}"';
@@ -1016,9 +1013,8 @@ impl _parse_persons(raw: list[object]) -> list[PersonConfig] {
     result: list[PersonConfig] = [];
     for item in raw {
         if isinstance(item, dict) {
-            fields: dict[str, any] = item;
             result.append(
-                PersonConfig(name=fields.get("name", ""), email=fields.get("email", ""))
+                PersonConfig(name=item.get("name", ""), email=item.get("email", ""))
             );
         } elif isinstance(item, str) {
             result.append(PersonConfig(name=item, email=""));

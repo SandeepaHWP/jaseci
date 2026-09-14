@@ -46,7 +46,6 @@ obj CreateJobRequest(ApiModel) {
             raise ValueError('request body must be an object');
         }
 
-        data: dict[str, any] = data;
         comptime allowed: set[str] = {f.name for f in fields(CreateJobRequest)};
         _validate_trigger_fields(data, allowed);
         return CreateJobRequest(
@@ -72,7 +71,6 @@ obj UpdateJobRequest(ApiModel) {
             raise ValueError('request body must be an object');
         }
 
-        data: dict[str, any] = data;
         comptime allowed: set[str] = {f.name for f in fields(UpdateJobRequest)};
         _validate_trigger_fields(data, allowed);
         return UpdateJobRequest(

@@ -125,8 +125,7 @@ def _flatten_tempo_trace(payload: dict[str, any]) -> dict[str, any] {
         service = str(res_attrs.get("service.name", "unknown"));
         scope_spans: any = batch.get("scopeSpans", []) or [];
         for scope in scope_spans {
-            scope_span_list: any = scope.get("spans", []) or [];
-            for span in scope_span_list {
+            for span in (scope.get("spans", []) or []) {
                 start_ns = int(span.get("startTimeUnixNano", 0) or 0);
                 end_ns = int(span.get("endTimeUnixNano", 0) or 0);
                 if start_ns and (min_start == 0 or start_ns < min_start) {

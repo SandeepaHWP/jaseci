@@ -173,9 +173,8 @@ def serialize_media_content(content: list[any]) -> list[dict[str, any]] {
         }
         semstring = "";
         if isinstance(item, tuple) {
-            pair: tuple[object, str | None] = item;
-            semstring = pair[1] or "";
-            item = pair[0];
+            semstring = item[1] or "";
+            item = item[0];
         }
         if semstring {
             blocks.append({"type": "text", "text": semstring});
@@ -292,11 +291,9 @@ def _split_tool_msg_images(
     if not isinstance(content, list) {
         return (msg, []);
     }
-
-    blocks_in: list[dict[str, any]] = content;
     text_blocks: list[dict[str, any]] = [];
     image_blocks: list[dict[str, any]] = [];
-    for block in blocks_in {
+    for block in content {
         if isinstance(block, dict) and block.get("type") in ("image_url", "image") {
             image_blocks.append(block);
         } else {

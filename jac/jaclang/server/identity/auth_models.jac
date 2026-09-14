@@ -104,7 +104,6 @@ obj RegisterRequest(ApiModel) {
             raise ValueError('request body must be an object');
         }
 
-        data: dict[str, any] = data;
         raw_identities = data.get('identities');
         if not isinstance(raw_identities, list) or len(raw_identities) == 0 {
             raise ValueError('identities must be a non-empty list');
@@ -272,7 +271,6 @@ obj UpdateProfileRequest(ApiModel) {
             raise ValueError('request body must be an object');
         }
 
-        data: dict[str, any] = data;
         raw_profile = data.get('profile');
         if raw_profile is None {
             raise ValueError('profile is required and must not be null');

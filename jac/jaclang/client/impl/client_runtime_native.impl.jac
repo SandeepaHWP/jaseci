@@ -180,7 +180,7 @@ impl _adaptImageProps(props: dict[str, any]) -> dict[str, any] {
             out["source"] = src;
         } else {
             uri = str(src);
-            asset_map: any = globalThis.__JAC_RN_ASSET_MAP__ or {};
+            asset_map = globalThis.__JAC_RN_ASSET_MAP__ or {};
             mapped_asset = asset_map[uri] if asset_map else None;
             if mapped_asset is not None {
                 out["source"] = mapped_asset;
@@ -495,7 +495,7 @@ impl _collectNativeRoutes(
 }
 
 impl _makeNativeRouteScreen(route: RouteDef) -> any {
-    wrappers: list[any] = route.wrappers or [];
+    wrappers = route.wrappers or [];
     element = route.element or React.createElement(RNView, None);
     return lambda -> JsxElement {
         content = element;

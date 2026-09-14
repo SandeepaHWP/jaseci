@@ -78,12 +78,11 @@ impl EsastGenPass._es_json_literal(value: any) -> any {
         return es.ArrayExpression(elements=[self._es_json_literal(v) for v in value]);
     }
     if isinstance(value, dict) {
-        json_obj: dict[str, any] = value;
         return es.ObjectExpression(
             properties=[
                 es.Property(
                     key=es.Literal(value=k), value=self._es_json_literal(v), kind='init'
-                ) for (k, v) in json_obj.items()
+                ) for (k, v) in value.items()
             ]
         );
     }

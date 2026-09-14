@@ -54,8 +54,6 @@ def fget(blob: any, key: str, fallback: float) -> float {
     if not isinstance(blob, dict) {
         return fallback;
     }
-
-    blob: dict[str, any] = blob;
     val = blob.get(key);
     if val is None {
         return fallback;

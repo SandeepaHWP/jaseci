@@ -14,7 +14,6 @@ def _render_tool(tool: object) -> str {
         return "";
     }
 
-    fn: dict[str, any] = fn;
     name = str(fn.get("name", "") or "");
     if not name {
         return "";

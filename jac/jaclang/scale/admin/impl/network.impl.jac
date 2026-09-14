@@ -26,8 +26,7 @@ def _s(v: any) -> str {
 def endpoint_ready_counts(ep: dict[str, any]) -> dict[str, int] {
     ready = 0;
     not_ready = 0;
-    subsets: any = ep.get("subsets", []) or [];
-    for subset in subsets {
+    for subset in (ep.get("subsets", []) or []) {
         ready += len(subset.get("addresses", []) or []);
         not_ready += len(subset.get("not_ready_addresses", []) or []);
     }
@@ -42,8 +41,7 @@ def summarize_service(
     spec: any = svc.get("spec", {}) or {};
     name = _s(meta.get("name"));
     ports: list[dict[str, any]] = [];
-    svc_ports: any = spec.get("ports", []) or [];
-    for p in svc_ports {
+    for p in (spec.get("ports", []) or []) {
         ports.append(
             {
                 "port": int(p.get("port", 0) or 0),
@@ -69,12 +67,10 @@ def summarize_ingress(ing: dict[str, any]) -> dict[str, any] {
     spec: any = ing.get("spec", {}) or {};
     status: any = ing.get("status", {}) or {};
     rules_out: list[dict[str, any]] = [];
-    rules: any = spec.get("rules", []) or [];
-    for rule in rules {
+    for rule in (spec.get("rules", []) or []) {
         host = _s(rule.get("host"));
         http: any = rule.get("http", {}) or {};
-        paths: any = http.get("paths", []) or [];
-        for path in paths {
+        for path in (http.get("paths", []) or []) {
             backend: any = path.get("backend", {}) or {};
             svc: any = backend.get("service", {}) or {};
             svc_port: any = svc.get("port", {}) or {};
@@ -89,8 +85,7 @@ def summarize_ingress(ing: dict[str, any]) -> dict[str, any] {
         }
     }
     lb: list[str] = [];
-    ingress_status: any = (status.get("load_balancer", {}) or {}).get("ingress", [])
-        or [];
+    ingress_status = (status.get("load_balancer", {}) or {}).get("ingress", []) or [];
     for `entry in ingress_status {
         addr = `entry.get("hostname") or `entry.get("ip");
         if addr {
@@ -107,8 +102,7 @@ def pvc_claimants(pods: list[dict[str, any]]) -> dict[str, list[str]] {
         meta: any = pod.get("metadata", {}) or {};
         spec: any = pod.get("spec", {}) or {};
         pod_name = _s(meta.get("name"));
-        volumes: any = spec.get("volumes", []) or [];
-        for vol in volumes {
+        for vol in (spec.get("volumes", []) or []) {
             pvc = vol.get("persistent_volume_claim");
             if pvc {
                 claim = _s(pvc.get("claim_name"));
@@ -190,7 +184,7 @@ def _collect_network -> dict[str, any] {
         ep_objs = core.list_namespaced_endpoints(namespace=ns).items;
         pvc_objs = core.list_namespaced_persistent_volume_claim(namespace=ns).items;
         pod_objs = core.list_namespaced_pod(namespace=ns).items;
-        ing_objs: any = [];
+        ing_objs = [];
         if net is not None {
             ing_objs = net.list_namespaced_ingress(namespace=ns).items;
         }
@@ -198,14 +192,13 @@ def _collect_network -> dict[str, any] {
         logger.warning(f"network list failed: {e}");
         return {"available": False, "detail": api_error_detail(e)};
     }
-    empty: list[any] = [];
     return build_network(
         ns,
-        [s.to_dict() for s in (svc_objs or empty)],
-        [e.to_dict() for e in (ep_objs or empty)],
-        [i.to_dict() for i in (ing_objs or empty)],
-        [v.to_dict() for v in (pvc_objs or empty)],
-        [p.to_dict() for p in (pod_objs or empty)]
+        [s.to_dict() for s in (svc_objs or [])],
+        [e.to_dict() for e in (ep_objs or [])],
+        [i.to_dict() for i in (ing_objs or [])],
+        [v.to_dict() for v in (pvc_objs or [])],
+        [p.to_dict() for p in (pod_objs or [])]
     );
 }
 
