@@ -30,6 +30,9 @@ def _build_vite_command(build_dir: Path, args: list[str]) -> list[str] {
 }
 
 impl ViteBundler._get_client_dir(self: ViteBundler) -> Path {
+    if self.build_dir is not None {
+        return self.build_dir;
+    }
     try {
         import from jaclang.project.config { get_config }
         config = get_config();
@@ -49,11 +52,14 @@ impl ViteBundler._get_client_dir(self: ViteBundler) -> Path {
 }
 
 impl ViteBundler._client_app_dir(self: ViteBundler) -> Path {
+    if self.build_dir is not None {
+        return self.build_dir;
+    }
     client_dir = self._get_client_dir();
     try {
         import from jaclang.project.config { get_config }
-        import from jaclang.client.targets.registry { client_workspace_app }
-        app = client_workspace_app(get_config());
+        import from jaclang.project.client_paths { client_workspace_app }
+        app = client_workspace_app(get_config(), self.config_loader.entry_path);
         if app is not None {
             return client_dir / app.name;
         }
@@ -91,10 +97,11 @@ impl ViteBundler.create_package_json(
     dependencies = package_config.get('dependencies', {});
     dev_dependencies = package_config.get('devDependencies', {});
 
+    config_relative = os.path.relpath(configs_dir / 'vite.config.js', self.project_dir);
     scripts = {
-        'build': 'vite build --config .jac/client/configs/vite.config.js',
-        'dev': 'vite dev --config .jac/client/configs/vite.config.js',
-        'preview': 'vite preview --config .jac/client/configs/vite.config.js'
+        'build': f'vite build --config {config_relative}',
+        'dev': f'vite dev --config {config_relative}',
+        'preview': f'vite preview --config {config_relative}'
     };
     user_scripts = package_config.get('scripts', {});
     scripts.update(user_scripts);
@@ -440,6 +447,9 @@ impl ViteBundler._generate_vite_config_content(
     client_paths: (list[str] | None) = None
 ) -> str {
     build_dir = self._get_client_dir();
+    project_relative = Path(
+        os.path.relpath(self.project_dir, build_dir / 'configs')
+    ).as_posix();
     vite_config_data = self.config_loader.get_vite_config();
 
     try {
@@ -463,7 +473,6 @@ impl ViteBundler._generate_vite_config_content(
     compiled_utils_relative = f"{compiled_base}/client_runtime.js";
     compiled_pwa_relative = f"{compiled_base}/pwa_runtime.js";
     compiled_desktop_relative = f"{compiled_base}/desktop_api.js";
-    compiled_wasm_host_relative = f"{compiled_base}/wasm_host.js";
     compiled_ui_relative = f"{compiled_base}/client_mobui.js";
     compiled_assets_relative = f"{compiled_base}/assets";
 
@@ -507,11 +516,18 @@ impl ViteBundler._generate_vite_config_content(
         desktop_alias_str = f'\n      "@jac/desktop": path.resolve(buildDir, "{compiled_desktop_relative}"),';
     }
 
-    wasm_host_alias_str = '';
-    if os.path.isfile(
-        os.path.join(str(self._get_client_dir()), compiled_wasm_host_relative)
-    ) {
-        wasm_host_alias_str = f'\n      "@jac/wasm_host": path.resolve(buildDir, "{compiled_wasm_host_relative}"),';
+    import from jaclang.client.runtime_source { JAC_VIRTUAL_MODULE_SOURCES }
+    virtual_alias_str = '';
+    for (module_name, source_name) in JAC_VIRTUAL_MODULE_SOURCES.items() {
+        if module_name in ('mobui', 'pwa') {
+            continue;
+        }
+        compiled_relative = f"{compiled_base}/{source_name}.js";
+        if os.path.isfile(
+            os.path.join(str(self._get_client_dir()), compiled_relative)
+        ) {
+            virtual_alias_str += f'\n      "@jac/{module_name}": path.resolve(buildDir, "{compiled_relative}"),';
+        }
     }
     plugins = [];
     plugin_imports = [];
@@ -685,7 +701,7 @@ import fs from "fs";
 import {{ fileURLToPath }} from "url";
 {imports_section}const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const buildDir = path.resolve(__dirname, "..");
-const projectRoot = path.resolve(__dirname, "../../..");
+const projectRoot = path.resolve(__dirname, "{project_relative}");
 import jacFastRefresh from "./jac-fast-refresh.js";
 import jacClientEvents, {{ recordClientEvent }} from "./jac-client-events.js";
 
@@ -895,7 +911,7 @@ export default defineConfig({{
   }},
   resolve: {{
     alias: {{
-      "@jac/runtime": path.resolve(buildDir, "{compiled_utils_relative}"),{pwa_alias_str}{desktop_alias_str}{wasm_host_alias_str}{framework_alias_str}{ui_alias_str}
+      "@jac/runtime": path.resolve(buildDir, "{compiled_utils_relative}"),{pwa_alias_str}{desktop_alias_str}{virtual_alias_str}{framework_alias_str}{ui_alias_str}
       "@jac-client/assets": path.resolve(buildDir, "{compiled_assets_relative}"),{user_aliases_str}
     }},
     extensions: [{extensions_str}],
@@ -924,9 +940,9 @@ import path from "path";
 import fs from "fs";
 import {{ fileURLToPath }} from "url";
 {imports_section}const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// Config is in configs/ inside .jac/client/, so go up one level to .jac/client/, then up two more to project root
+// Resolve this configuration relative to its exported workspace.
 const buildDir = path.resolve(__dirname, "..");
-const projectRoot = path.resolve(__dirname, "../../..");
+const projectRoot = path.resolve(__dirname, "{project_relative}");
 
 // Jac source mapper plugin - chains the per-file column maps the Jac client
 // compiler writes, so a bundled stack keeps its way back to .jac coordinates.
@@ -987,7 +1003,7 @@ export default defineConfig({{
   publicDir: false,
 {server_section}  resolve: {{
       alias: {{
-        "@jac/runtime": path.resolve(buildDir, "{compiled_utils_relative}"),{pwa_alias_str}{desktop_alias_str}{wasm_host_alias_str}{framework_alias_str}{ui_alias_str}
+        "@jac/runtime": path.resolve(buildDir, "{compiled_utils_relative}"),{pwa_alias_str}{desktop_alias_str}{virtual_alias_str}{framework_alias_str}{ui_alias_str}
         "@jac-client/assets": path.resolve(buildDir, "{compiled_assets_relative}"),{user_aliases_str}
       }},
       extensions: [{extensions_str}],
@@ -1115,14 +1131,15 @@ impl ViteBundler.init(
     project_dir: Path,
     output_dir: Optional[Path] = None,
     minify: bool = False,
-    config_path: Optional[Path] = None
+    config_path: Optional[Path] = None,
+    entry_path: str = ""
 ) {
     import from jaclang.project.config { find_project_root }
     project_root = find_project_root(project_dir);
     self.project_dir = project_root[0] if project_root else project_dir;
     self.minify = minify;
     self.config_path = config_path;
-    self.config_loader = JacClientConfig(self.project_dir);
+    self.config_loader = JacClientConfig(self.project_dir, entry_path=entry_path);
 
     self.output_dir = output_dir or (self._client_app_dir() / 'dist');
 

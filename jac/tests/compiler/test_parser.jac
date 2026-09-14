@@ -18,7 +18,7 @@ import jaclang.compiler.frontend.unitree as uni;
 import from jaclang.compiler.frontend.constant { CodeContext }
 import from jaclang.compiler.frontend.parser { parse as rd_parse }
 import from jaclang.compiler.driver.program { JacProgram }
-import from jaclang.compiler.frontend.helpers { read_file_with_encoding }
+import from jaclang.project.source { read_file_with_encoding }
 import from jaclang.testing.test { parametrize }
 import from tests.fixtures_list { MICRO_JAC_FILES }
 
@@ -36,6 +36,22 @@ def file_to_str(file_path: str) -> str {
 test "fstring escape brace" {
     (module, had_error) = rd_parse('glob a=f"{{}}", not_b=4;', "");
     assert not had_error;
+}
+
+test "graph object lookup remains distinct from ownership borrows" {
+    import from jaclang.compiler.frontend.constant { OwnershipKind }
+    (module, errors) = rd_parse(
+        "with entry { a = &(id); b = & id; c = &value; d = &mut value; }", ""
+    );
+    assert not errors;
+    expressions = module.get_all_sub_nodes(uni.UnaryExpr);
+    assert [expr.ownership for expr in expressions]
+        == [
+            OwnershipKind.NONE,
+            OwnershipKind.NONE,
+            OwnershipKind.BORROW,
+            OwnershipKind.MUT_BORROW
+        ];
 }
 
 test "parser fam" {
@@ -85,7 +101,7 @@ test "parser mod doc test" {
 
 test "all ast has normalize" {
     import from jaclang.compiler.tools.normalize_pass { NormalizePass }
-    import from jaclang.compiler.frontend.helpers { pascal_to_snake }
+    import from jaclang.project.source { pascal_to_snake }
 
     exclude = [
         "UniNode",

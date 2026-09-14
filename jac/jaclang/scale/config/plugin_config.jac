@@ -1072,7 +1072,7 @@ class JacScalePluginConfig {
                         "namespace": {
                             "type": "string",
                             "default": "jaclang_scale",
-                            "description": "Metrics namespace prefix (e.g., myapp_http_requests_total)"
+                            "description": "Metrics namespace prefix (e.g., myapp_http_requests_total). Sanitized to [a-zA-Z0-9_] before use; a rewritten value logs a warning at startup"
                         },
                         "walker_metrics": {
                             "type": "bool",
@@ -1154,6 +1154,16 @@ class JacScalePluginConfig {
                             "type": "int",
                             "default": 365,
                             "description": "Lifetime of generated webhook API keys in days"
+                        },
+                        "github_secret": {
+                            "type": "string",
+                            "default": "",
+                            "description": "Secret that scheme=\"github\" webhook walkers verify X-Hub-Signature-256 against; the GitHub App's webhook secret"
+                        },
+                        "github_signature_header": {
+                            "type": "string",
+                            "default": "X-Hub-Signature-256",
+                            "description": "Header carrying the GitHub-style signature for scheme=\"github\" walkers"
                         }
                     }
                 },

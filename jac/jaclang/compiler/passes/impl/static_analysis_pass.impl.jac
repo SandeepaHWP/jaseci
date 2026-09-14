@@ -404,6 +404,38 @@ impl StaticAnalysisPass._check_semantic_patterns(mod: Module) -> None {
         }
     }
 
+    for nd in mod.get_all_sub_nodes(typ=AwaitExpr) {
+        in_async = False;
+        parent = nd.parent;
+        while parent is not None {
+            if isinstance(parent, LambdaExpr) {
+                break;
+            }
+            if isinstance(parent, Test) {
+                in_async = parent.in_client_context();
+                break;
+            }
+            if isinstance(parent, Ability) {
+                in_async = parent.is_async;
+                break;
+            }
+            if isinstance(parent, ImplDef) {
+                _dl = parent.decl_link;
+                if isinstance(_dl, Ability) {
+                    in_async = _dl.is_async;
+                }
+                break;
+            }
+            if isinstance(parent, Archetype) {
+                break;
+            }
+            parent = parent.parent;
+        }
+        if not in_async {
+            self.emit(E2085, node_override=nd);
+        }
+    }
+
     for nd in mod.get_all_sub_nodes(typ=Archetype) {
         if nd.src_endpoint is not None and nd.arch_kind != "edge" {
             self.emit(
@@ -450,7 +482,9 @@ impl StaticAnalysisPass._check_client_imports(mod: Module) -> None {
             }
             if isinstance(resolved, str) and resolved.endswith('.jac') {
                 import from jaclang.compiler.frontend.diagnostics { W1105 }
-                import from jaclang.compiler.driver.modresolver { is_client_npm_import }
+                import from jaclang.compiler.placement.placement_pins {
+                    is_client_npm_import
+                }
                 spec = nd.from_loc.dot_path_str;
                 if is_client_npm_import(spec, nd.loc.mod_path or '') {
                     self.emit(W1105, node_override=nd.from_loc, name=spec);
@@ -475,9 +509,9 @@ impl StaticAnalysisPass._check_client_imports(mod: Module) -> None {
             }
             import os;
             import from jaclang.compiler.frontend.diagnostics { W1106 }
-            import from jaclang.compiler.driver.modresolver {
-                is_client_npm_import,
-                is_path_alias_import
+            import from jaclang.project.modresolver { is_path_alias_import }
+            import from jaclang.compiler.placement.placement_pins {
+                is_client_npm_import
             }
             mod_path = nd.loc.mod_path or '';
             sibling_file = os.path.join(os.path.dirname(mod_path), spv);

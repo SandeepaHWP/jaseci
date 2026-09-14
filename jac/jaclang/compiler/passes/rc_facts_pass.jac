@@ -6,12 +6,14 @@ import from jaclang.compiler.frontend.unitree {
     BinaryExpr,
     BoolExpr,
     CompareExpr,
+    ConnectOp,
     DictCompr,
     DictVal,
     Expr,
     FString,
     FuncCall,
     FuncSignature,
+    ImplDef,
     IfElseExpr,
     IfStmt,
     InForStmt,
@@ -28,6 +30,7 @@ import from jaclang.compiler.frontend.unitree {
     ParamVar,
     ReturnStmt,
     SetVal,
+    same_lexical_scope,
     String,
     Symbol,
     Test,
@@ -60,6 +63,11 @@ def result_ownership(expr: (Expr | None)) -> Ownership {
     if isinstance(expr, FuncCall) {
         return Ownership.OWNED;
     }
+    if isinstance(expr, BinaryExpr)
+        and isinstance(expr.op, ConnectOp)
+        and expr.op.capture_edges {
+        return Ownership.OWNED;
+    }
     if isinstance(expr, (ListVal, SetVal, DictVal, ListCompr, DictCompr)) {
         return Ownership.OWNED;
     }
@@ -87,16 +95,23 @@ def loop_body_locals(body: (Sequence[UniNode] | None)) -> list[str] {
     if not body {
         return out;
     }
+    body_names: list[Name] = [];
     for stmt in body {
-        for nm in stmt.get_all_sub_nodes(typ=Name) {
-            sym = nm.sym;
-            if sym is None or not sym.defn {
+        body_names.extend(stmt.get_all_sub_nodes(typ=Name));
+    }
+    body_ids = {id(nm) for nm in body_names};
+    for nm in body_names {
+        sym = nm.sym;
+        if sym is None or not sym.defn {
+            continue;
+        }
+        if sym.defn[0] is nm and nm.sym_name not in seen {
+            seen.add(nm.sym_name);
+
+            if any(id(use) not in body_ids for use in sym.uses) {
                 continue;
             }
-            if sym.defn[0] is nm and nm.sym_name not in seen {
-                seen.add(nm.sym_name);
-                out.append(nm.sym_name);
-            }
+            out.append(nm.sym_name);
         }
     }
     return out;
@@ -107,9 +122,6 @@ walker RcFactsPass(Transform) {
         cancel_token: any = None,
         _node_use: dict[int, set[SymId]] = {},
         _node_def: dict[int, set[SymId]] = {};
-
-    static has PROVIDES: tuple = ('rc-facts', ),
-        REQUIRES: tuple = ('CfgSucc', );
 
     def postinit -> None;
     def transform(ir_in: Module) -> Module;
@@ -123,9 +135,14 @@ walker RcFactsPass(Transform) {
     def _stamp_region_handles(ir_in: Module) -> None;
     def _asn_makes_region_handle(nd: Assignment) -> bool;
     def _use_ok_for_stack(nm: NameAtom) -> bool;
-    def _enclosing_fn_scope(nd: UniNode) -> (UniNode | None);
+    def _enclosing_fn_scope(
+        nd: UniNode, stop_at_comprehension: bool = False
+    ) -> UniNode | None;
+
     def _is_param_sym(sym: Symbol) -> bool;
+    def _last_use_tracked(sym: Symbol) -> bool;
     def _stamp_last_use(ir_in: Module) -> None;
+    def _stamp_scope_cleanup(ir_in: Module) -> None;
     def _stamp_move_in(ir_in: Module) -> None;
     def _collect_last_use(
         owner: UniNode, body: Sequence[UniNode], out: dict[int, list[str]]

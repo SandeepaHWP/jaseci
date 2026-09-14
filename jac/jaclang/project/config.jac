@@ -34,7 +34,7 @@ obj ProjectConfig {
         classifiers: list[str] = [],
         requires_python: str = "",
         jac_version: str = "",
-        entry_point: str = "main.jac",
+        entry_point: str = "main",
         kind: str = "",
         default_app: str = "",
         urls: dict[str, str] = {},
@@ -48,29 +48,31 @@ obj RunConfig {
         diagnostics: str = "error";
 }
 
-obj NativeBuildConfig {
-    has opt_level: int = 2,
-        dump_ir: str = "",
+obj NativeConfig {
+    has require: list[str] = [],
         target: str = "",
+        opt: int = 2,
         debug: bool = False,
-        rc_debug_codegen: bool = False;
+        threads: int = 4;
 }
 
-obj GcEnforceConfig {
-    has modules: list[str] = [],
-        grandfathered: list[str] = [];
+obj MemoryConfig {
+    has profile: str = "managed",
+        enforce: list[str] = [],
+        exempt: list[str] = [];
+
+    def gc_mode -> str {
+        return {"managed": "cycles", "rc": "rc", "nogc": "none"}[self.profile];
+    }
 }
 
-obj GcConfig {
-    has `default: str = "cycles",
-        enforce: GcEnforceConfig = GcEnforceConfig();
+obj PlacementConfig {
+    has default_codespace: str = "native";
 }
 
 obj BuildConfig {
     has dir: str = ".jac",
-        default_codespace: str = "native",
-        native_closure_cap: int = 256,
-        native: NativeBuildConfig = NativeBuildConfig();
+        native_closure_cap: int = 256;
 }
 
 obj TestConfig {
@@ -146,7 +148,10 @@ obj ServeAuthConfig {
     has secret: str = "",
         algorithm: str = "HS256",
         token_ttl_days: int = 7,
-        password_hash_cost: int = 14;
+        password_hash_cost: int = 14,
+        registration_challenge: bool = False,
+        registration_attempts_per_hour: int = 0,
+        registration_challenges_per_10_minutes: int = 0;
 }
 
 obj ServeConfig {
@@ -250,7 +255,9 @@ obj JacConfig {
     has project: ProjectConfig = ProjectConfig(),
         run: RunConfig = RunConfig(),
         build: BuildConfig = BuildConfig(),
-        gc: GcConfig = GcConfig(),
+        native: NativeConfig = NativeConfig(),
+        memory: MemoryConfig = MemoryConfig(),
+        placement: PlacementConfig = PlacementConfig(),
         `test: TestConfig = TestConfig(),
         serve: ServeConfig = ServeConfig(),
         format: FormatConfig = FormatConfig(),
@@ -273,6 +280,7 @@ obj JacConfig {
         toml_path: Path | None = None,
         config_files: list[Path] | None = None,
         active_profile: str = "",
+        profile_override: str | None = None,
         _raw_data: dict[str, any] = {},
         entrypoints: dict[str, dict[str, str]] = {},
         optional_dependencies: dict[str, dict[str, str]] = {},
@@ -285,6 +293,10 @@ obj JacConfig {
     has default_app: str { getter; }
 
     static def discover(
+        start_path: Path | None = None, profile: str | None = None
+    ) -> JacConfig | None;
+
+    static def resolve(
         start_path: Path | None = None, profile: str | None = None
     ) -> JacConfig | None;
 
@@ -329,6 +341,7 @@ obj JacConfig {
     ) -> bool;
 
     def merge_from_toml_file(toml_path: Path) -> None;
+    def merge_apps_table(apps_table: dict[str, any]) -> None;
     def app(name: str) -> AppConfig | None;
     def resolve_app(name: str = "") -> AppConfig;
     def resolved_kind(app: AppConfig) -> str;
@@ -336,7 +349,6 @@ obj JacConfig {
     def app_for_path(abs_path: str) -> AppConfig | None;
     def app_for_target(entry_path: str = "") -> AppConfig | None;
     def serving_apps -> list[AppConfig];
-    def owner_app_for_path(abs_path: str) -> tuple[AppConfig | None, bool];
 }
 
 def _parse_toml_data(data: dict[str, any], toml_path: Path | None = None) -> JacConfig;
@@ -352,7 +364,9 @@ glob _config: JacConfig | None = None,
      _config_by_root: dict[str, JacConfig | None] = {};
 
 def get_config(
-    start_path: Path | None = None, force_discover: bool = False
+    start_path: Path | None = None,
+    force_discover: bool = False,
+    profile: str | None = None
 ) -> JacConfig | None;
 
 def set_config(config: JacConfig | None) -> None;
@@ -363,6 +377,10 @@ def project_scope_is_pinned -> bool;
 
 def get_explicit_config -> JacConfig | None;
 
-def get_config_for_path(start_path: Path) -> JacConfig | None;
+def get_config_for_path(
+    start_path: Path, profile: str | None = None, force_discover: bool = False
+) -> JacConfig | None;
 
 def get_config_for_dir(start_dir: str) -> JacConfig | None;
+
+def active_profile_name(config: JacConfig | None) -> str;

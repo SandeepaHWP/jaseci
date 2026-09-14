@@ -548,7 +548,9 @@ impl PyastBuildPass.proc_slice(nd: py_ast.Slice) -> IndexSlice {
     }
 }
 
-impl PyastBuildPass._proc_compr(nd: py_ast.AST, compr_cls: type) -> UniNode {
+impl PyastBuildPass._proc_compr(
+    nd: PyComprehensionNode, compr_cls: type[ComprT]
+) -> ComprT {
     elt = self.convert(nd.elt);
     generators = [self.convert(gen) for gen in nd.generators];
     valid = [
@@ -2108,7 +2110,7 @@ impl PyastBuildPass.is_canceled -> bool {
 }
 
 impl PyastBuildPass.convert(nd: py_ast.AST) -> UniNode {
-    import from jaclang.compiler.frontend.helpers { pascal_to_snake }
+    import from jaclang.project.source { pascal_to_snake }
     if self.is_canceled() {
         raise StopIteration;
     }

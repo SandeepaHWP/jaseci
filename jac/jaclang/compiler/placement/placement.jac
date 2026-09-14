@@ -1,7 +1,8 @@
 import os;
 import json;
+import from collections.abc { Callable }
 import jaclang.compiler.frontend.unitree as uni;
-import from dataclasses { field }
+import from jaclang.runtime.object_model { field }
 import from jaclang.compiler.frontend.constant { CodeContext, Tokens as Tok }
 
 glob PLACEMENT_SCHEMA: int = 1,
@@ -129,13 +130,26 @@ def summary_to_bytes(ps: PlacementSummary) -> bytes {
     return json.dumps(ps.to_dict()).encode('utf-8');
 }
 
-def summary_from_bytes(data: bytes) -> (PlacementSummary | None) {
+def summary_from_bytes(
+    data: bytes, path_mapper: Callable[[str], str] | None = None
+) -> (PlacementSummary | None) {
     try {
         parsed = json.loads(data.decode('utf-8'));
         if not isinstance(parsed, dict) {
             return None;
         }
-        return PlacementSummary.from_dict(parsed);
+        summary = PlacementSummary.from_dict(parsed);
+        if summary is not None and path_mapper is not None {
+            summary.mod_path = path_mapper(summary.mod_path);
+            summary.jac_deps = [path_mapper(p) for p in summary.jac_deps];
+            for element in summary.elements {
+                element.import_jac_target = path_mapper(element.import_jac_target);
+                element.import_py_targets = [
+                    path_mapper(p) for p in element.import_py_targets
+                ];
+            }
+        }
+        return summary;
     } except Exception {
         return None;
     }
@@ -197,7 +211,7 @@ def project_kind_name(module: (uni.Module | None)) -> str {
 }
 
 def project_has_server(module: (uni.Module | None)) -> bool {
-    import from jaclang.compiler.placement.workspace { kind_codespace }
+    import from jaclang.project.workspace { kind_codespace }
     return kind_codespace(project_kind_name(module)) != 'client';
 }
 
@@ -282,7 +296,9 @@ def _element_reqs(stmt: uni.UniNode) -> list {
         } elif eco == 'py' {
             npm_dep = False;
             if isinstance(stmt, uni.Import) and stmt.from_loc is not None {
-                import from jaclang.compiler.driver.modresolver { is_client_npm_import }
+                import from jaclang.compiler.placement.placement_pins {
+                    is_client_npm_import
+                }
                 mod_path = stmt.loc.mod_path or '';
                 npm_dep = is_client_npm_import(stmt.from_loc.dot_path_str, mod_path);
             }
@@ -509,7 +525,7 @@ def module_anchor_reasons(module: uni.Module) -> list[str] {
             break;
         }
     }
-    import from jaclang.compiler.driver.modresolver { is_client_npm_import }
+    import from jaclang.compiler.placement.placement_pins { is_client_npm_import }
     for imp in module.get_all_sub_nodes(uni.Import) {
         if imp.has_clib_decls or imp.is_virtual_jac or imp.has_string_path {
             continue;
@@ -665,16 +681,13 @@ def scan_native_blockers(
                             item.dot_path_str,
                             _resolve_import_path(item),
                             not imp.is_absorb,
-                            not imp.is_absorb
-                                and item.alias is None
-                                and item.path is not None
-                                and len(item.path) == 1
+                            not imp.is_absorb and item.path is not None
                         )
                     );
                 }
             }
         }
-        for (name, path, is_bare, is_plain_bare) in targets {
+        for (name, path, is_bare, is_module_import) in targets {
             clean = name.lstrip('.') if name else '';
             if is_bare {
                 if clean and clean in NATIVE_SUPPORTED_STDLIB {
@@ -683,7 +696,9 @@ def scan_native_blockers(
                 if clean and is_bundled_native_module(clean) {
                     continue;
                 }
-                if not (is_plain_bare and path is not None and path.endswith('.jac')) {
+                if not (
+                    is_module_import and path is not None and path.endswith('.jac')
+                ) {
                     return (f"non-native import '{clean}'", deps);
                 }
             }

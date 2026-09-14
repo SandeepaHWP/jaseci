@@ -15,7 +15,7 @@ impl EsastGenPass.exit_test with uni.Test exit {
     self.client_manifest.tests.append(
         {
             'name': here.name.sym_name,
-            'description': here.description.lit_value
+            'description': str(here.description.lit_value)
                 if here.description
                 else here.name.sym_name
         }
@@ -248,6 +248,7 @@ impl EsastGenPass.exit_module with uni.Module exit {
         );
     }
     program = self.sync_loc(es.Program(body=body), jac_node=here);
+    self._finalize_runtime_imports(program);
     here.gen.es_ast = program;
     here.gen.js = es_to_js(here.gen.es_ast);
     here.gen.client_manifest = self.client_manifest;
@@ -259,6 +260,7 @@ impl EsastGenPass.get_main_mod -> uni.Module {
     mod = self.prog.mod.hub.get(main_mod_path);
     if not isinstance(mod, uni.Module) {
         self.emit(E5012);
+        raise RuntimeError(f"Missing main module: {main_mod_path}");
     }
     return mod;
 }

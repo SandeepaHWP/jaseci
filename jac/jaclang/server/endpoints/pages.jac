@@ -1,6 +1,6 @@
 import logging;
 import from pathlib { Path }
-import from jaclang.compiler.frontend.constant { Constants as Con }
+import from jaclang.runtime.constants { Constants as Con }
 import from jaclang.runtime.runtime { JacRuntime as Jac }
 import from jaclang.server.serving.datatypes {
     HTMLResponse,
@@ -43,6 +43,12 @@ def _dev_client_elsewhere -> JSONResponse {
 
 
 def _static_base(server: JacAPIServer) -> str {
+    import from jaclang.server.sealed_serve { sealed_root_for }
+    source_path = getattr(server.module, '__file__', '') or '';
+    image_root = sealed_root_for(source_path) if source_path else None;
+    if image_root is not None {
+        return image_root;
+    }
     ctx = Jac.get_context();
     bp = (ctx.base_path_dir if ctx else '') or Jac.get_base_path_dir();
     return bp or server.base_path;
@@ -78,6 +84,15 @@ def register_page_endpoints(server: JacAPIServer) {
     settings = server.resolved_settings();
     config = get_config();
     root_app = server.introspector.resolve_root_app();
+    asset_dist = settings.client_dist;
+    if not asset_dist {
+        import from jaclang.server.sealed_serve { client_dist_for }
+        source_path = getattr(server.module, '__file__', '') or '';
+        sealed_dist = client_dist_for(source_path) if source_path else None;
+        if sealed_dist is not None {
+            asset_dist = str(sealed_dist);
+        }
+    }
 
     def render_page(request: Request, page_name: str, **kwargs: JsonValue) -> Response {
         sibling = sibling_app_dist(config, page_name, server.base_path);
@@ -146,7 +161,7 @@ def register_page_endpoints(server: JacAPIServer) {
     }
 
     def root_index(request: Request, **kwargs: JsonValue) -> Response {
-        index = client_dist_index(settings.client_dist);
+        index = client_dist_index(asset_dist);
         if index is not None {
             return file_response(request, str(index), cache_control='no-cache');
         }
@@ -218,9 +233,7 @@ def register_page_endpoints(server: JacAPIServer) {
     );
 
     def static_file(request: Request, file_path: str) -> Response {
-        candidate = find_static_candidate(
-            _static_base(server), file_path, settings.client_dist
-        );
+        candidate = find_static_candidate(_static_base(server), file_path, asset_dist);
         if candidate is None {
             return JSONResponse(
                 content={'error': 'Static file not found'}, status_code=404
@@ -253,15 +266,13 @@ def register_page_endpoints(server: JacAPIServer) {
         if file_path.startswith(API_PREFIXES) or file_path.startswith(CL_PREFIX) {
             return JSONResponse(content={'error': 'Not found'}, status_code=404);
         }
-        candidate = find_root_asset(
-            _static_base(server), file_path, settings.client_dist
-        );
+        candidate = find_root_asset(_static_base(server), file_path, asset_dist);
         if candidate is not None {
             return file_response(
                 request, str(candidate), cache_control=ASSET_CACHE_CONTROL
             );
         }
-        index = client_dist_index(settings.client_dist);
+        index = client_dist_index(asset_dist);
         if index is not None and not Path(file_path).suffix {
             return file_response(request, str(index), cache_control='no-cache');
         }
@@ -383,7 +394,7 @@ def register_graph_endpoints(server: JacAPIServer) {
 
 def register_diagnostics_endpoints(server: JacAPIServer) {
     async def build_status(request: Request) -> JSONResponse {
-        import from jaclang.server.hmr { get_build_status }
+        import from jaclang.server.build_status { get_build_status }
         return JSONResponse(content=get_build_status());
     }
     server.add_endpoint(

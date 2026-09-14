@@ -1,3 +1,23 @@
+impl NaIRGenPass._hash_key_spec(key_type: ir.Type) -> tuple[str, int] {
+    if isinstance(key_type, ir.DoubleType) {
+        return ("f64", 0);
+    }
+    if self._is_bytes_type(key_type) {
+        return ("bytes", 0);
+    }
+    if isinstance(key_type, ir.PointerType) {
+        if isinstance(key_type.pointee, ir.LiteralStructType) {
+            _sz = self._get_struct_size(key_type.pointee);
+            return (self._tuple_spec_name(key_type.pointee), _sz);
+        }
+        if isinstance(key_type.pointee, ir.IdentifiedStructType) {
+            return ("ref." + key_type.pointee.name, 0);
+        }
+        return ("ptr", 0);
+    }
+    return ("i64", 0);
+}
+
 glob HASH_CTRL_EMPTY: int = 0,
      HASH_CTRL_TOMBSTONE: int = 1,
      HASH_INIT_CAP: int = 8,
@@ -41,6 +61,12 @@ impl NaIRGenPass._emit_hash_core_helpers(
     CTRL_F = layout["ctrl_idx"];
     USED_F = layout["used_idx"];
     ORDER_F = layout["order_idx"];
+    compact_order_fn = self._emit_hash_order_compact_fn(
+        f"{_pre}_order_compact_{_safe}", cont_ptr_type, layout
+    );
+    remove_order_fn = self._emit_hash_order_remove_fn(
+        f"{_pre}_order_remove_{_safe}", cont_ptr_type, layout
+    );
 
     malloc_fn = self._get_or_declare_extern("malloc", i8p, [i64]);
     calloc_fn = self._get_or_declare_extern("calloc", i8p, [i64, i64]);
@@ -63,27 +89,7 @@ impl NaIRGenPass._emit_hash_core_helpers(
         if (_key_sz > 0 and not is_bytes_key and not is_str_key)
         else None;
     if _tkf is not None {
-        _hv: ir.Value = ir.Constant(i64, HASH_FNV_BASIS);
-        for (_fi, _fk) in _tkf {
-            _fv = self._tuple_key_field_val(bhe, hash_fn.args[0], _fi, _fk);
-            if _fk == "str" or _fk == "jacstr" {
-                _fh = bhe.call(self._str_fnv_fn(), [_fv], name=f"tk.sh{_fi}");
-            } elif _fk == "f64" {
-                _fh = bhe.bitcast(_fv, i64, name=f"tk.fb{_fi}");
-            } elif _fk == "ptr" {
-                _fh = bhe.ptrtoint(_fv, i64, name=f"tk.pi{_fi}");
-            } elif isinstance(_fv.type, ir.IntType) and _fv.type.width == 64 {
-                _fh = _fv;
-            } else {
-                _fh = bhe.zext(_fv, i64, name=f"tk.zx{_fi}");
-            }
-            _hv = bhe.mul(
-                bhe.xor(_hv, _fh, name=f"tk.hx{_fi}"),
-                ir.Constant(i64, HASH_FNV_PRIME),
-                name=f"tk.hm{_fi}"
-            );
-        }
-        bhe.ret(_hv);
+        bhe.ret(self._emit_tuple_key_hash(bhe, hash_fn.args[0]));
     } elif is_bytes_key or is_str_key or _key_sz > 0 {
         h_a = bhe.alloca(i64, name="h");
         idx_a = bhe.alloca(i64, name="idx");
@@ -247,6 +253,7 @@ impl NaIRGenPass._emit_hash_core_helpers(
     rehash_fn.args[0].name = "cont";
     brh = ir.IRBuilder(rehash_fn.append_basic_block("entry"));
     d_rh = rehash_fn.args[0];
+    brh.call(compact_order_fn, [d_rh]);
 
     ok_a = brh.alloca(key_type, name="ok");
     ov_a = brh.alloca(val_type, name="ov") if has_vals else None;
@@ -299,9 +306,7 @@ impl NaIRGenPass._emit_hash_core_helpers(
     }
     ncr = brh.call(calloc_fn, [new_cap, ir.Constant(i64, 1)], name="ncr");
 
-    _nord_bytes = brh.mul(new_cap, ir.Constant(i64, 8), name="nordb");
-    nordr = brh.call(malloc_fn, [_nord_bytes], name="nordr");
-    new_order = brh.bitcast(nordr, i64.as_pointer(), name="norder");
+    new_order = self._hash_order_alloc(brh, new_cap);
 
     brh.store(new_cap, cap_prh);
     brh.store(new_keys, keys_prh);
@@ -368,6 +373,7 @@ impl NaIRGenPass._emit_hash_core_helpers(
     cl_d = brd.load(len_prh, name="cl");
 
     brd.store(rsl, brd.gep(new_order, [cl_d], name="nordp"));
+    brd.store(cl_d, self._hash_order_position_ptr(brd, new_order, new_cap, rsl));
     brd.store(brd.add(cl_d, ir.Constant(i64, 1), name="nl"), len_prh);
     cu_d = brd.load(used_prh, name="cu");
     brd.store(brd.add(cu_d, ir.Constant(i64, 1), name="nu"), used_prh);
@@ -375,6 +381,7 @@ impl NaIRGenPass._emit_hash_core_helpers(
     brd.branch(rl_bb);
 
     brf = ir.IRBuilder(rf_bb);
+    brf.store(old_len, self._hash_order_extent_ptr(brf, new_order, new_cap));
     if _hl {
         brf.call(_free_hl, [brf.bitcast(old_keys, i8p, name="oki8")]);
         if has_vals {
@@ -432,6 +439,12 @@ impl NaIRGenPass._emit_hash_core_helpers(
             ov_u: any = bu.load(vsp, name="ov");
             bu.store(v_s, vsp);
             self._emit_elem_release(bu, _vt, ov_u);
+        } elif _hl
+            and isinstance(_vt, ir.PointerType)
+            and self._elem_kind(_vt) != "raw" {
+            ov_hl: any = bu.load(vsp, name="ov");
+            bu.store(v_s, vsp);
+            bu = self._emit_elem_slot_drop(bu, ins_fn, d_s, layout, 1, ov_hl);
         } else {
             bu.store(v_s, vsp);
         }
@@ -520,7 +533,21 @@ impl NaIRGenPass._emit_hash_core_helpers(
     cl_s = bi.load(len_rp, name="cl");
     ord_ip = bi.gep(d_s, [ir.Constant(i32, 0), ir.Constant(i32, ORDER_F)], name="orp");
     ord_a = bi.load(ord_ip, name="ora");
-    bi.store(isl, bi.gep(ord_a, [cl_s], name="oslp"));
+    ord_cap = bi.load(cap_rp);
+    extent_ptr = self._hash_order_extent_ptr(bi, ord_a, ord_cap);
+    order_full = ins_fn.append_basic_block("order.full");
+    order_append = ins_fn.append_basic_block("order.append");
+    bi.cbranch(
+        bi.icmp_unsigned("==", bi.load(extent_ptr), ord_cap), order_full, order_append
+    );
+    bo_full = ir.IRBuilder(order_full);
+    bo_full.call(compact_order_fn, [d_s]);
+    bo_full.branch(order_append);
+    bi = ir.IRBuilder(order_append);
+    position = bi.load(extent_ptr);
+    bi.store(isl, bi.gep(ord_a, [position], name="oslp"));
+    bi.store(position, self._hash_order_position_ptr(bi, ord_a, ord_cap, isl));
+    bi.store(bi.add(position, ir.Constant(i64, 1)), extent_ptr);
     bi.store(bi.add(cl_s, ir.Constant(i64, 1), name="nl"), len_rp);
 
     ntb = bi.not_(was_tb, name="ntb");
@@ -601,6 +628,8 @@ impl NaIRGenPass._emit_hash_core_helpers(
         vv_rm: any = bdel.load(bdel.gep(va_rm, [res_rm], name="vvp"), name="vv");
         if not _hl {
             self._emit_elem_release(bdel, _vt, vv_rm);
+        } elif isinstance(_vt, ir.PointerType) {
+            bdel = self._emit_elem_slot_drop(bdel, remove_fn, d_rm, layout, 1, vv_rm);
         }
         bdel.store(
             ir.Constant(val_type, None), bdel.gep(va_rm, [res_rm], name="vclear")
@@ -613,10 +642,8 @@ impl NaIRGenPass._emit_hash_core_helpers(
     _new_len_rm: any = bdel.sub(cl_rm, ir.Constant(i64, 1), name="nl");
     bdel.store(_new_len_rm, lp_rm);
 
-    bdel2 = self._emit_dict_order_compact(
-        bdel, remove_fn, d_rm, res_rm, _new_len_rm, i32, i64, ORDER_F
-    );
-    bdel2.branch(done_rm);
+    bdel.call(remove_order_fn, [d_rm, res_rm]);
+    bdel.branch(done_rm);
     ir.IRBuilder(done_rm).ret_void();
 
     pop_fn: any = None;
@@ -678,10 +705,8 @@ impl NaIRGenPass._emit_hash_core_helpers(
         _new_len_p: any = bdp.sub(cl_p, ir.Constant(i64, 1), name="nl");
         bdp.store(_new_len_p, lp_p);
 
-        bdp2 = self._emit_dict_order_compact(
-            bdp, pop_fn, d_pop, res_p, _new_len_p, i32, i64, ORDER_F
-        );
-        bdp2.ret(v_out);
+        bdp.call(remove_order_fn, [d_pop, res_p]);
+        bdp.ret(v_out);
         bmp = ir.IRBuilder(miss_p);
         if isinstance(val_type, ir.PointerType) {
             bmp.ret(ir.Constant(val_type, None));
@@ -785,6 +810,12 @@ impl NaIRGenPass._emit_hash_core_helpers(
         ir.Constant(i64, 0),
         bdn_cl.gep(d_cl, [ir.Constant(i32, 0), ir.Constant(i32, USED_F)], name="up")
     );
+    order_cl = bdn_cl.load(
+        bdn_cl.gep(d_cl, [ir.Constant(i32, 0), ir.Constant(i32, ORDER_F)])
+    );
+    bdn_cl.store(
+        ir.Constant(i64, 0), self._hash_order_extent_ptr(bdn_cl, order_cl, cap_cl)
+    );
     bdn_cl.ret_void();
 
     _gk_op = "get_key" if has_vals else "get";
@@ -797,6 +828,7 @@ impl NaIRGenPass._emit_hash_core_helpers(
     get_key_fn.args[1].name = "i";
     bgk = ir.IRBuilder(get_key_fn.append_basic_block("entry"));
     d_gk = get_key_fn.args[0];
+    bgk.call(compact_order_fn, [d_gk]);
     tgt_gk = get_key_fn.args[1];
     len_gk = bgk.load(
         bgk.gep(d_gk, [ir.Constant(i32, 0), ir.Constant(i32, LEN_F)], name="lp"),
@@ -888,6 +920,7 @@ impl NaIRGenPass._emit_hash_core_helpers(
         get_val_fn.args[1].name = "i";
         bgv = ir.IRBuilder(get_val_fn.append_basic_block("entry"));
         d_gv = get_val_fn.args[0];
+        bgv.call(compact_order_fn, [d_gv]);
         tgt_gv = get_val_fn.args[1];
         len_gv = bgv.load(
             bgv.gep(d_gv, [ir.Constant(i32, 0), ir.Constant(i32, LEN_F)], name="lp"),
@@ -1029,14 +1062,15 @@ impl NaIRGenPass._str_fnv_fn -> ir.Function {
     idx_a = b.alloca(i64, name="idx");
     b.store(ir.Constant(i64, HASH_FNV_BASIS), h_a);
     b.store(ir.Constant(i64, 0), idx_a);
+    length = self._call_str_len(b, fn.args[0], name="s.len");
     b.cbranch(
         b.icmp_unsigned("==", fn.args[0], ir.Constant(i8p, None), name="s.null"), rt, lc
     );
     b = ir.IRBuilder(lc);
     idx = b.load(idx_a, name="idx");
-    ch = b.load(b.gep(fn.args[0], [idx], name="cp"), name="ch");
-    b.cbranch(b.icmp_signed("==", ch, ir.Constant(i8, 0), name="end"), rt, lb);
+    b.cbranch(b.icmp_unsigned(">=", idx, length, name="end"), rt, lb);
     b = ir.IRBuilder(lb);
+    ch = b.load(b.gep(fn.args[0], [idx], name="cp"), name="ch");
     cur = b.load(h_a, name="h");
     ce = b.zext(ch, i64, name="ce");
     b.store(
@@ -1051,16 +1085,13 @@ impl NaIRGenPass._str_fnv_fn -> ir.Function {
     return fn;
 }
 
-impl NaIRGenPass._tuple_key_fields(key_type: ir.Type) -> (list | None) {
-    if not isinstance(key_type, ir.PointerType) {
-        return None;
-    }
-    pointee = key_type.pointee;
+impl NaIRGenPass._tuple_key_fields(key_type: ir.Type) -> list[tuple[int, str]] | None {
+    pointee = key_type.pointee if isinstance(key_type, ir.PointerType) else key_type;
     if not isinstance(pointee, ir.LiteralStructType) {
         return None;
     }
     i8p = ir.IntType(8).as_pointer();
-    out: list = [];
+    out: list[tuple[int, str]] = [];
     for (i, ety) in enumerate(pointee.elements) {
         if isinstance(ety, ir.IntType) {
             out.append((i, "int"));
@@ -1070,6 +1101,8 @@ impl NaIRGenPass._tuple_key_fields(key_type: ir.Type) -> (list | None) {
             out.append((i, "str"));
         } elif self._str_desc_ty is not None and ety == self._str_desc_ty {
             out.append((i, "jacstr"));
+        } elif self._tuple_key_fields(ety) is not None {
+            out.append((i, "tuple"));
         } elif isinstance(ety, ir.PointerType) {
             out.append((i, "ptr"));
         } else {
@@ -1083,6 +1116,14 @@ impl NaIRGenPass._tuple_key_field_val(
     b: ir.IRBuilder, key_ptr: ir.Value, idx: int, kind: str
 ) -> ir.Value {
     i32 = ir.IntType(32);
+    if isinstance(key_ptr.type, ir.LiteralStructType) {
+        field = b.extract_value(key_ptr, idx, name=f"tk.f{idx}");
+        if kind == "jacstr" {
+            data_idx = JACSTR_DESC_FIELDS[self._str_desc_kind()].index("data");
+            return b.extract_value(field, data_idx, name=f"tk.data{idx}");
+        }
+        return field;
+    }
     path = [ir.Constant(i32, 0), ir.Constant(i32, idx)];
     if kind == "jacstr" {
         data_idx = JACSTR_DESC_FIELDS[self._str_desc_kind()].index("data");
@@ -1090,6 +1131,34 @@ impl NaIRGenPass._tuple_key_field_val(
     }
     fp = b.gep(key_ptr, path, name=f"tk.fp{idx}");
     return b.load(fp, name=f"tk.f{idx}");
+}
+
+impl NaIRGenPass._emit_tuple_key_hash(b: ir.IRBuilder, value: ir.Value) -> ir.Value {
+    i64 = ir.IntType(64);
+    fields = self._tuple_key_fields(value.type);
+    assert fields is not None;
+    result: ir.Value = ir.Constant(i64, HASH_FNV_BASIS);
+    for (idx, kind) in fields {
+        field = self._tuple_key_field_val(b, value, idx, kind);
+        hashed: ir.Value;
+        if kind in ("str", "jacstr") {
+            hashed = b.call(self._str_fnv_fn(), [field], name="tk.str.hash");
+        } elif kind == "tuple" {
+            hashed = self._emit_tuple_key_hash(b, field);
+        } elif kind == "f64" {
+            zero = b.fcmp_ordered("==", field, ir.Constant(field.type, 0.0));
+            bits = b.bitcast(field, i64, name="tk.float.bits");
+            hashed = b.select(zero, ir.Constant(i64, 0), bits, name="tk.float.hash");
+        } elif kind == "ptr" {
+            hashed = b.ptrtoint(field, i64, name="tk.ptr.hash");
+        } elif field.type == i64 {
+            hashed = field;
+        } else {
+            hashed = b.zext(field, i64, name="tk.int.hash");
+        }
+        result = b.mul(b.xor(result, hashed), ir.Constant(i64, HASH_FNV_PRIME));
+    }
+    return result;
 }
 
 
@@ -1109,6 +1178,13 @@ impl NaIRGenPass._tuple_spec_name(struct_type: ir.LiteralStructType) -> str {
             sig += "s";
         } elif kind == "jacstr" {
             sig += "j";
+        } elif kind == "tuple" {
+            element = struct_type.elements[i];
+            nested = element.pointee
+                if isinstance(element, ir.PointerType)
+                else element;
+            storage = "p" if isinstance(element, ir.PointerType) else "v";
+            sig += "n" + storage + self._tuple_spec_name(nested) + "e";
         } else {
             sig += "p";
         }

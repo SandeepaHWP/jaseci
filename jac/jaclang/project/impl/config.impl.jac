@@ -29,9 +29,7 @@ impl interpolate_env_vars(value: str) -> str {
 }
 
 impl find_project_root(start: Path | None = None) -> tuple[Path, Path] | None {
-    import from jaclang.compiler.driver.modresolver {
-        find_project_root as _find_project_root
-    }
+    import from jaclang.project.modresolver { find_project_root as _find_project_root }
     return _find_project_root(start);
 }
 
@@ -66,6 +64,20 @@ impl JacConfig.load(toml_path: Path) -> JacConfig {
     data = read_toml_with_encoding(str(toml_path));
     config = _parse_toml_data(data, toml_path);
     config.config_files = [toml_path];
+    return config;
+}
+
+impl JacConfig.resolve(
+    start_path: Path | None = None, profile: str | None = None
+) -> JacConfig | None {
+    config = JacConfig.discover(start_path=start_path);
+    if config is not None {
+        config.profile_override = profile.strip() if profile is not None else None;
+        selected = config.profile_override
+            if config.profile_override is not None
+            else active_profile_name(config).strip();
+        config.apply_profile_overlay(selected or None);
+    }
     return config;
 }
 
@@ -214,6 +226,29 @@ impl JacConfig.apply_profile(
     if "scripts" in profile {
         self.scripts.update(profile["scripts"]);
     }
+    if "apps" in profile {
+        self.merge_apps_table(profile["apps"]);
+    }
+}
+
+impl JacConfig.merge_apps_table(apps_table: dict[str, any]) -> None {
+    import copy;
+    if not isinstance(apps_table, dict) or not apps_table {
+        return;
+    }
+    base = self._base_data.get("apps");
+    if not isinstance(base, dict) {
+        raise ValueError(
+            "an overlay declares [apps] but jac.toml does not; "
+            "declare every app in jac.toml and let the overlay retune it"
+        );
+    }
+    merged = _deep_merge(copy.deepcopy(base), copy.deepcopy(apps_table));
+    self._base_data["apps"] = merged;
+    self._raw_data["apps"] = copy.deepcopy(merged);
+    self.apps = parse_apps(
+        self._base_data.get("project", {}), _interpolate_recursive(merged)
+    );
 }
 
 impl JacConfig.apply_profile_overlay(profile_name: str | None = None) -> None {
@@ -292,26 +327,7 @@ impl JacConfig.merge_from_toml_file(toml_path: Path) -> None {
             }
         }
     }
-    if "gc" in data {
-        gc_data = data["gc"];
-        if "default" in gc_data {
-            _gcd = str(gc_data["default"]).strip().lower();
-            if _gcd in ("cycles", "rc", "none") {
-                self.gc.`default = _gcd;
-            }
-        }
-        if "enforce" in gc_data and isinstance(gc_data["enforce"], dict) {
-            enf = gc_data["enforce"];
-            if "modules" in enf {
-                self.gc.enforce.modules = [str(_m) for _m in enf["modules"]];
-            }
-            if "grandfathered" in enf {
-                self.gc.enforce.grandfathered = [
-                    str(_m) for _m in enf["grandfathered"]
-                ];
-            }
-        }
-    }
+    _apply_memory_native_placement(self, data);
     for _feat in CAPABILITY_SECTIONS {
         if _feat in data and isinstance(data[_feat], dict) {
             if _feat in self.plugins {
@@ -377,6 +393,9 @@ impl JacConfig.merge_from_toml_file(toml_path: Path) -> None {
             self._raw_data[key] = value;
         }
     }
+    if "apps" in data {
+        self.merge_apps_table(data["apps"]);
+    }
 }
 
 impl JacConfig.get_plugin_deps(dep_type: str) -> dict[str, any] {
@@ -434,7 +453,7 @@ impl JacConfig.save -> None {
     old_doc: dict[str, any] = {};
     if self.toml_path.exists() {
         import tomllib;
-        import from jaclang.compiler.frontend.helpers { read_file_with_encoding }
+        import from jaclang.project.source { read_file_with_encoding }
         import from jaclang.project.tomlio { MalformedJacTomlError }
         text = read_file_with_encoding(str(self.toml_path));
         try {
@@ -1024,6 +1043,7 @@ impl _parse_toml_data(
         config.project_root = toml_path.parent;
     }
     if "project" in data {
+        import from jaclang.project.apps { validate_entry_point }
         proj = data["project"];
         config.project = ProjectConfig(
             name=proj.get("name", ""),
@@ -1037,7 +1057,7 @@ impl _parse_toml_data(
             classifiers=proj.get("classifiers", []),
             requires_python=proj.get("requires-python", ""),
             jac_version=proj.get("jac-version", ""),
-            entry_point=proj.get("entry-point", "main.jac"),
+            entry_point=validate_entry_point(proj.get("entry-point", "main")),
             kind=proj.get("kind", ""),
             default_app=str(
                 proj.get("default-app", proj.get("default_app", "")) or ""
@@ -1084,88 +1104,8 @@ impl _parse_toml_data(
             diagnostics=run_data.get("diagnostics", "error")
         );
     }
-    if "build" in data {
-        build_data = data["build"];
-        _codespace_aliases = {"sv": "server", "na": "native"};
-        _builtin_cs = BuildConfig().default_codespace;
-        _default_cs = str(
-            build_data.get("default_codespace", _builtin_cs)
-        ).strip().lower();
-        _default_cs = _codespace_aliases.get(_default_cs, _default_cs);
-        if _default_cs not in ("server", "native") {
-            import from jaclang.cli.console { console }
-            console.warning(
-                f"[build] default_codespace='{build_data.get('default_codespace')}' "
-                f"is not one of 'server'/'sv', 'native'/'na'; "
-                f"defaulting to '{_builtin_cs}'."
-            );
-            _default_cs = _builtin_cs;
-        }
-        _builtin_cap = BuildConfig().native_closure_cap;
-        try {
-            _cap = int(build_data.get("native_closure_cap", _builtin_cap));
-        } except (TypeError, ValueError) {
-            _cap = 0;
-        }
-        if _cap < 1 {
-            import from jaclang.cli.console { console }
-            console.warning(
-                f"[build] native_closure_cap="
-                f"'{build_data.get('native_closure_cap')}' must be a positive "
-                f"integer; defaulting to {_builtin_cap}."
-            );
-            _cap = _builtin_cap;
-        }
-        _native_data = build_data.get("native", {});
-        if not isinstance(_native_data, dict) {
-            _native_data = {};
-        }
-        _builtin_native = NativeBuildConfig();
-        try {
-            _native_opt = int(_native_data.get("opt_level", _builtin_native.opt_level));
-        } except (TypeError, ValueError) {
-            import from jaclang.cli.console { console }
-            console.warning(
-                f"[build.native] opt_level="
-                f"'{_native_data.get('opt_level')}' must be an integer; "
-                f"defaulting to {_builtin_native.opt_level}."
-            );
-            _native_opt = _builtin_native.opt_level;
-        }
-        config.build = BuildConfig(
-            dir=build_data.get("dir", ".jac"),
-            default_codespace=_default_cs,
-            native_closure_cap=_cap,
-            native=NativeBuildConfig(
-                opt_level=_native_opt,
-                dump_ir=str(_native_data.get("dump_ir", "")),
-                target=str(_native_data.get("target", "")),
-                debug=bool(_native_data.get("debug", False)),
-                rc_debug_codegen=bool(_native_data.get("rc_debug_codegen", False))
-            )
-        );
-    }
-    if "gc" in data {
-        gc_data = data["gc"];
-        _gc_default = str(gc_data.get("default", "cycles")).strip().lower();
-        if _gc_default not in ("cycles", "rc", "none") {
-            import from jaclang.cli.console { console }
-            console.warning(
-                f"[gc] default='{gc_data.get('default')}' is not one of "
-                "'cycles', 'rc', 'none'; defaulting to 'cycles'."
-            );
-            _gc_default = "cycles";
-        }
-        enforce_cfg = GcEnforceConfig();
-        if "enforce" in gc_data and isinstance(gc_data["enforce"], dict) {
-            enf = gc_data["enforce"];
-            enforce_cfg = GcEnforceConfig(
-                modules=[str(_m) for _m in enf.get("modules", [])],
-                grandfathered=[str(_m) for _m in enf.get("grandfathered", [])]
-            );
-        }
-        config.gc = GcConfig(`default=_gc_default, enforce=enforce_cfg);
-    }
+    _apply_build_section(config, data);
+    _apply_memory_native_placement(config, data);
     if "test" in data {
         test_data = data["test"];
         config.`test = TestConfig(
@@ -1277,7 +1217,16 @@ impl _parse_toml_data(
                 secret=str(auth_data.get("secret", "")),
                 algorithm=str(auth_data.get("algorithm", "HS256")),
                 token_ttl_days=int(auth_data.get("token_ttl_days", 7)),
-                password_hash_cost=int(auth_data.get("password_hash_cost", 14))
+                password_hash_cost=int(auth_data.get("password_hash_cost", 14)),
+                registration_challenge=bool(
+                    auth_data.get("registration_challenge", False)
+                ),
+                registration_attempts_per_hour=max(
+                    0, int(auth_data.get("registration_attempts_per_hour", 0))
+                ),
+                registration_challenges_per_10_minutes=max(
+                    0, int(auth_data.get("registration_challenges_per_10_minutes", 0))
+                )
             )
         );
     }
@@ -1423,15 +1372,25 @@ impl _interpolate_recursive(`obj: any) -> any {
 }
 
 impl get_config(
-    start_path: Path | None = None, force_discover: bool = False
+    start_path: Path | None = None,
+    force_discover: bool = False,
+    profile: str | None = None
 ) -> JacConfig | None {
-    if (_config is None and not _config_explicit) or force_discover {
-        _config = JacConfig.discover(start_path=start_path);
-
+    if force_discover {
+        _config = None;
         _config_explicit = False;
-
-        if force_discover {
-            _config_by_root = {};
+        _config_by_root = {};
+    }
+    if _config_explicit {
+        return _config;
+    }
+    if _config is None or profile is not None {
+        base = start_path or (_config.project_root if _config else None) or Path.cwd();
+        _config = get_config_for_path(base, profile=profile);
+        if _config is not None and _config.project_root is not None {
+            _config.discovered_from_ancestor = (
+                _config.project_root.resolve() != base.resolve()
+            );
         }
     }
     return _config;
@@ -1465,10 +1424,24 @@ impl get_config_for_dir(start_dir: str) -> JacConfig | None {
     return get_config_for_path(Path(start_dir));
 }
 
-impl get_config_for_path(start_path: Path) -> JacConfig | None {
+impl active_profile_name(config: JacConfig | None) -> str {
+    requested = os.environ.get("JAC_PROFILE", "").strip();
+    if requested or config is None {
+        return requested;
+    }
+    return config.environment.default_profile or "";
+}
+
+impl get_config_for_path(
+    start_path: Path, profile: str | None = None, force_discover: bool = False
+) -> JacConfig | None {
     explicit = get_explicit_config();
     if explicit is not None {
-        return explicit;
+        project_root = explicit.project_root;
+        if project_root is None
+            or start_path.resolve().is_relative_to(project_root.resolve()) {
+            return explicit;
+        }
     }
     result = find_project_root(start_path);
     if result is None {
@@ -1476,8 +1449,23 @@ impl get_config_for_path(start_path: Path) -> JacConfig | None {
     }
     (project_root, _) = result;
     key = str(project_root);
-    if key not in _config_by_root {
-        _config_by_root[key] = JacConfig.discover(start_path=project_root);
+    cached = _config_by_root.get(key);
+    if force_discover
+        or key not in _config_by_root
+        or (
+            profile is not None
+            and cached is not None
+            and cached.profile_override != profile.strip()
+        ) {
+        selected = profile
+            if profile is not None
+            else (cached.profile_override if cached is not None else None);
+        _config_by_root[key] = JacConfig.resolve(
+            start_path=project_root, profile=selected
+        );
+        if _config is not None and _config.project_root == project_root {
+            _config = _config_by_root[key];
+        }
     }
     return _config_by_root[key];
 }
@@ -1537,6 +1525,7 @@ impl JacConfig.effective_for_app(name: str) -> JacConfig {
     }
     cfg = _parse_toml_data(data, self.toml_path);
     cfg.discovered_from_ancestor = self.discovered_from_ancestor;
+    cfg.profile_override = self.profile_override;
     if self.toml_path is not None {
         cfg.config_files = [self.toml_path];
     }
@@ -1566,30 +1555,17 @@ impl JacConfig.app_for_target(entry_path: str = "") -> AppConfig | None {
 }
 
 impl JacConfig.app_for_path(abs_path: str) -> AppConfig | None {
+    import from jaclang.runtime.prepared { origin_for_source }
+    abs_path = origin_for_source(abs_path);
     if self.project_root is None {
         return None;
     }
-    root_dir = str(self.project_root);
-    if not self.apps {
-        implicit = implicit_app(self);
-        return implicit if implicit.contains(root_dir, abs_path) else None;
-    }
-    best: AppConfig | None = None;
-    best_depth = -1;
     for app in self.apps.values() {
-        if not app.contains(root_dir, abs_path) {
-            continue;
-        }
-        if app.is_file_rooted() {
+        if app.contains(str(self.project_root), abs_path) {
             return app;
         }
-        depth = len(app.root_dir(root_dir));
-        if depth > best_depth {
-            best = app;
-            best_depth = depth;
-        }
     }
-    return best;
+    return None;
 }
 
 impl JacConfig.serving_apps -> list[AppConfig] {
@@ -1604,22 +1580,121 @@ impl JacConfig.serving_apps -> list[AppConfig] {
     return out;
 }
 
-impl JacConfig.owner_app_for_path(abs_path: str) -> tuple[AppConfig | None, bool] {
-    app = self.app_for_path(abs_path);
-    if app is not None {
-        return (app, False);
-    }
-    serving = self.serving_apps();
-    if len(serving) == 1 {
-        return (serving[0], False);
-    }
-    default_app = self.app(self.default_app) if self.default_app else None;
-    if default_app is not None and default_app in serving {
-        return (default_app, False);
-    }
-    return (None, len(serving) > 1);
-}
-
 impl JacConfig.default_app.getter -> str {
     return self.project.default_app;
+}
+
+def _apply_build_section(cfg: JacConfig, data: dict) -> None {
+    if "build" not in data or not isinstance(data["build"], dict) {
+        return;
+    }
+    import from jaclang.cli.console { console }
+    build_data = data["build"];
+    for (_old_key, _new_home) in [
+        ("default_codespace", "[placement] default"),
+        ("native", "[native]")
+    ] {
+        if _old_key in build_data {
+            console.error(
+                f"jac.toml: [build] {_old_key} was retired; use {_new_home}."
+            );
+        }
+    }
+    _builtin_cap = BuildConfig().native_closure_cap;
+    try {
+        _cap = int(build_data.get("native_closure_cap", _builtin_cap));
+    } except (TypeError, ValueError) {
+        _cap = 0;
+    }
+    if _cap < 1 {
+        console.warning(
+            f"[build] native_closure_cap="
+            f"'{build_data.get('native_closure_cap')}' must be a positive "
+            f"integer; defaulting to {_builtin_cap}."
+        );
+        _cap = _builtin_cap;
+    }
+    cfg.build = BuildConfig(
+        dir=str(build_data.get("dir", BuildConfig().dir)), native_closure_cap=_cap
+    );
+}
+
+def _apply_memory_native_placement(cfg: JacConfig, data: dict) {
+    import from jaclang.cli.console { console }
+    for (_old, _new) in [("gc", "[memory] profile / enforce / exempt")] {
+        if _old in data {
+            console.error(f"jac.toml: the [{_old}] section was retired; use {_new}.");
+        }
+    }
+    if "memory" in data and isinstance(data["memory"], dict) {
+        mem = data["memory"];
+        if "profile" in mem {
+            _prof = str(mem["profile"]).strip().lower();
+            if _prof in ("managed", "rc", "nogc") {
+                cfg.memory.profile = _prof;
+            } else {
+                console.warning(
+                    f"[memory] profile='{mem['profile']}' is not one of managed, rc,"
+                    " nogc; defaulting to 'managed'."
+                );
+            }
+        }
+        if "enforce" in mem {
+            cfg.memory.enforce = [str(_m) for _m in mem["enforce"]];
+        }
+        if "exempt" in mem {
+            cfg.memory.exempt = [str(_m) for _m in mem["exempt"]];
+        }
+        if cfg.memory.profile == "nogc" and (cfg.memory.enforce or cfg.memory.exempt) {
+            console.warning(
+                "[memory] enforce/exempt are ignored under profile = 'nogc': every"
+                " module is held to the contract."
+            );
+        }
+    }
+    if "native" in data and isinstance(data["native"], dict) {
+        nat = data["native"];
+        if "require" in nat {
+            if not isinstance(nat["require"], list)
+                or not all(isinstance(pattern, str) for pattern in nat["require"]) {
+                raise ValueError("[native] require must be a list of module patterns");
+            }
+            cfg.native.require = list(nat["require"]);
+        }
+        cfg.native.target = str(nat.get("target", cfg.native.target));
+        try {
+            cfg.native.opt = int(nat.get("opt", cfg.native.opt));
+        } except (TypeError, ValueError) {
+            console.warning(
+                f"[native] opt='{nat.get('opt')}' must be an integer; defaulting to 2."
+            );
+            cfg.native.opt = 2;
+        }
+        cfg.native.debug = bool(nat.get("debug", cfg.native.debug));
+        try {
+            cfg.native.threads = max(1, int(nat.get("threads", cfg.native.threads)));
+        } except (TypeError, ValueError) {
+            console.warning(
+                f"[native] threads='{nat.get(
+                    'threads'
+                )}' must be an integer; defaulting to 4."
+            );
+            cfg.native.threads = 4;
+        }
+    }
+    if "placement" in data
+        and isinstance(data["placement"], dict)
+        and "default" in data["placement"] {
+        _cs_aliases = {"sv": "server", "na": "native"};
+        _raw = data["placement"]["default"];
+        _cs = _cs_aliases.get(str(_raw).strip().lower(), str(_raw).strip().lower());
+        if _cs in ("server", "native") {
+            cfg.placement.default_codespace = _cs;
+        } else {
+            console.warning(
+                f"[placement] default='{_raw}' is not one of 'server'/'sv', 'native'/'na';"
+                " defaulting to 'native'."
+            );
+        }
+    }
 }

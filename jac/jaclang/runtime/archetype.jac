@@ -1,5 +1,5 @@
 import from collections.abc { Callable }
-import from dataclasses { asdict, dataclass, field, fields, is_dataclass }
+import from jaclang.runtime.object_model { asdict, field, fields, is_jac_object }
 import from functools { cached_property }
 import from inspect { _empty, signature }
 import from logging { getLogger }
@@ -9,7 +9,7 @@ import from types { UnionType }
 import from typing { ClassVar, TypeVar }
 import from uuid { UUID, uuid4 }
 import weakref;
-import from jaclang.compiler.frontend.constant { EdgeDir }
+import from jaclang.runtime.constants { EdgeDir }
 glob logger = getLogger(__name__),
      TARCH = TypeVar('TARCH', bound='Archetype'),
      TANCH = TypeVar('TANCH', bound='Anchor'),
@@ -56,7 +56,6 @@ obj Permission {
         groups: Access = field(default_factory=Access);
 }
 
-@dataclass
 obj PermissionDenied {
     has operation: str,
         target_id: str,
@@ -64,6 +63,28 @@ obj PermissionDenied {
         target_owner: (str | None),
         required: AccessLevel,
         actual: AccessLevel;
+
+    def __eq__(other: object) -> bool {
+        if not isinstance(other, PermissionDenied) or type(other) is not type(self) {
+            return False;
+        }
+        return (
+            self.operation,
+            self.target_id,
+            self.target_type,
+            self.target_owner,
+            self.required,
+            self.actual
+        )
+            == (
+                other.operation,
+                other.target_id,
+                other.target_type,
+                other.target_owner,
+                other.required,
+                other.actual
+            );
+    }
 
     def to_dict -> dict[(str, any)];
     def message -> str;
@@ -109,10 +130,12 @@ obj NodeAnchor(Anchor) {
         mixed: bool = field(`init=False, `default=False);
 
     def __getstate__ -> dict[(str, object)];
+    def __getattr__(name: str) -> object;
     def is_populated -> bool;
     def edge_delta -> (tuple[(set[UUID], set[UUID])] | None);
     def remove_edge(`edge: EdgeAnchor) -> None;
     def all_edges -> list[EdgeAnchor];
+    def loaded_edges -> list[EdgeAnchor];
     def has_heavy_edges -> bool;
     def detach_light -> None;
 }
@@ -221,10 +244,11 @@ class EdgeArchetype(Archetype) {
 }
 
 class WalkerArchetype(Archetype) {
+    has reports: list[any] = field(default_factory=`list);
+
     with entry {
         __jac_async__: ClassVar[bool] = False;
         __jac_base__: ClassVar[bool] = True;
-        reports: list[any] = field(default_factory=`list);
     }
 
     @cached_property
@@ -286,7 +310,7 @@ def is_light_edge_type(cls: type) -> bool {
         return known;
     }
     light = isinstance(cls, `type) and issubclass(cls, EdgeArchetype);
-    if light and is_dataclass(cls) {
+    if light and is_jac_object(cls) {
         for f in fields(cls) {
             light = False;
             break;
