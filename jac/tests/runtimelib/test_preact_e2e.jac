@@ -1,5 +1,7 @@
 """E2E tests for the Preact framework backend (bundle + browser)."""
 
+import from tests.support { jac_command }
+
 import os;
 import re;
 import shutil;
@@ -10,7 +12,7 @@ import from subprocess { Popen }
 import from tempfile { TemporaryDirectory }
 
 import from jaclang.project.config { JacConfig }
-import from jaclang.runtimelib.testing { JacTestClient }
+import from jaclang.testing.testing { JacTestClient }
 
 glob FIXTURES = str(Path(__file__).parent / "fixtures");
 
@@ -20,12 +22,8 @@ def _as_any(v: any) -> any {
 
 """Skip unless the Vite/Bun client toolchain is available."""
 def _require_client_integration {
-    if not os.environ.get("JAC_CLIENT_INTEGRATION") {
-        testskip(
-            "Preact E2E requires the Vite/Bun toolchain; "
-            "set JAC_CLIENT_INTEGRATION=1 to run"
-        );
-    }
+    import from jaclang.testing.requires { require_tool }
+    require_tool("bun");
 }
 
 def _get_free_port -> int {
@@ -58,7 +56,7 @@ def _write_preact_project(dest: Path) {
     (dest / "jac.toml").write_text(
         '[project]\n'
         'name = "preact-e2e"\n'
-        'entry-point = "main.jac"\n'
+        'entry-point = "main"\n'
         '\n'
         '[client]\n'
         'framework = "preact"\n'
@@ -71,9 +69,7 @@ def _write_preact_project(dest: Path) {
         '[dev-dependencies.npm]\n'
         'vite = "^6.4.1"\n'
         '"@vitejs/plugin-react" = "^4.2.1"\n'
-        'typescript = "^5.3.3"\n'
-        '\n'
-        '[client]\n',
+        'typescript = "^5.3.3"\n',
         encoding="utf-8",
     );
     shutil.copy(Path(FIXTURES) / "preact_counter_app.jac", dest / "main.jac");
@@ -82,10 +78,7 @@ def _write_preact_project(dest: Path) {
 """Start `jac run --serve` for a temp preact project. Returns (process, port, url)."""
 def _start_preact_server(project_dir: Path) -> tuple {
     import shutil as sh;
-    import sys;
-    jac_cmd = [sh.which("jac")]
-        if sh.which("jac")
-        else [sys.executable, "-m", "jaclang"];
+    jac_cmd = [sh.which("jac")] if sh.which("jac") else jac_command();
     port = _get_free_port();
     env = os.environ.copy();
     repo_jac = str(Path(__file__).resolve().parents[2]);
@@ -145,7 +138,10 @@ test "preact backend bundles client page with preact hooks" {
             entry_src = (compiled_dir / "_entry.js").read_text(encoding="utf-8");
             main_src = (compiled_dir / "main.js").read_text(encoding="utf-8");
             assert 'from "preact"' in entry_src;
-            assert 'from "preact/hooks"' in main_src;
+            # Compiled modules use the framework-neutral state wrapper; the
+            # runtime maps it onto preact hooks, so no direct hooks import.
+            assert 'useJacState' in main_src;
+            assert 'from "@jac/runtime"' in main_src;
             assert 'from "react-dom/client"' not in entry_src;
             assert 'from "react-dom/client"' not in main_src;
         } finally {

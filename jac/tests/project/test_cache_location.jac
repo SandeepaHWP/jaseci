@@ -4,13 +4,13 @@ while compiler/bootstrap cache remains in the global cache."""
 import os;
 import from pathlib { Path }
 import from tempfile { TemporaryDirectory }
-import from jaclang.jac0core.jir { get_jir_cache_dir, get_module_cache_path }
+import from jaclang.compiler.driver.jir { get_jir_cache_dir, get_module_cache_path }
 import from jaclang.project.config { JacConfig, set_config }
 import jaclang.project.config as config_mod;
 import jaclang;
 
 
-glob JAC_TOML_CONTENT = "[project]\nname = \"test-project\"\nversion = \"0.1.0\"\ndescription = \"A test project\"\nentry-point = \"main.jac\"\n",
+glob JAC_TOML_CONTENT = "[project]\nname = \"test-project\"\nversion = \"0.1.0\"\ndescription = \"A test project\"\nentry-point = \"main\"\n",
      MAIN_JAC_CONTENT = "\"\"\"Test main file.\"\"\"\n\nwith entry {\n    print(\"Hello, World!\");\n}\n";
 
 

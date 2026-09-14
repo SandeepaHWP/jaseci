@@ -1,10 +1,14 @@
 import from pathlib { Path }
-import from jaclang.jac0core.unitree {
+import type from jaclang.compiler.driver.program { JacProgram }
+import type from jaclang.compiler.passes.transform { Transform }
+import type from jaclang.compiler.frontend.diagnostics { DiagnosticInfo }
+import from jaclang.compiler.frontend.unitree {
     Ability,
     Archetype,
     Assignment,
     AstSymbolNode,
     AtomTrailer,
+    BinaryExpr,
     ContextAwareNode,
     ElementStmt,
     Enum as UniEnum,
@@ -23,18 +27,23 @@ import from jaclang.jac0core.unitree {
     ParamVar,
     SubTag,
     Symbol,
+    Token,
     UniNode,
     UniScopeNode
 }
-import from jaclang.jac0core.constant { CodeContext, Tokens as Tok, SymbolType }
-import from jaclang.jac0core.diagnostics { E5082, E5084, W6006, W6007 }
-import from jaclang.jac0core.compiler {
+import from jaclang.compiler.frontend.constant {
+    CodeContext,
+    Tokens as Tok,
+    SymbolType
+}
+import from jaclang.compiler.frontend.diagnostics { E5082, E5084, W6006, W6007 }
+import from jaclang.compiler.driver.boundary_classify {
     ClientImportVerdict,
-    ability_of_symbol,
     classify_client_import_item,
     is_client_boundary_import,
     symbol_linked_source_module
 }
+import from jaclang.compiler.frontend.unitree { ability_of_symbol }
 import from jaclang.compiler.expr_keys {
     classify_condition_key,
     collect_assigned_symbols,
@@ -55,8 +64,10 @@ enum CallKind {
     INTRINSIC = "intrinsic"
 }
 
-def erased_import_binds(nd: UniNode, name: str) -> bool {
-    import from jaclang.jac0core.codeinfo { NATIVE_ERASED_IMPORTS }
+def erased_import_binds(
+    nd: UniNode, name: str, imported_name: str | None = None
+) -> bool {
+    import from jaclang.compiler.frontend.codeinfo { NATIVE_ERASED_IMPORTS }
     mod = nd.find_parent_of_type(Module);
     if mod is None {
         return False;
@@ -66,7 +77,7 @@ def erased_import_binds(nd: UniNode, name: str) -> bool {
             continue;
         }
         allowed = NATIVE_ERASED_IMPORTS.get(imp.from_loc.dot_path_str.lstrip('.'));
-        if allowed is None or name not in allowed {
+        if allowed is None {
             continue;
         }
         for item in imp.items {
@@ -74,7 +85,10 @@ def erased_import_binds(nd: UniNode, name: str) -> bool {
                 continue;
             }
             bound = item.alias if item.alias is not None else item.name;
-            if isinstance(bound, Name) and bound.value == name {
+            if isinstance(bound, Name)
+                and bound.value == name
+                and item.name.value in allowed
+                and (imported_name is None or item.name.value == imported_name) {
                 return True;
             }
         }
@@ -83,7 +97,7 @@ def erased_import_binds(nd: UniNode, name: str) -> bool {
 }
 
 def erased_identity_call_arg(nd: FuncCall) -> (Expr | None) {
-    import from jaclang.jac0core.codeinfo { NATIVE_ERASED_IDENTITY_CALLS }
+    import from jaclang.compiler.frontend.codeinfo { NATIVE_ERASED_IDENTITY_CALLS }
     tgt = nd.target;
     if not isinstance(tgt, Name) or tgt.sym_name not in NATIVE_ERASED_IDENTITY_CALLS {
         return None;
@@ -98,31 +112,6 @@ def erased_identity_call_arg(nd: FuncCall) -> (Expr | None) {
         return None;
     }
     return params[1];
-}
-
-def is_erased_field_marker(nd: FuncCall) -> bool {
-    import from jaclang.jac0core.codeinfo { NATIVE_ERASED_FIELD_MARKERS }
-    owner = nd.parent;
-    if not isinstance(owner, HasVar) or owner.value is not nd {
-        return False;
-    }
-    tgt = nd.target;
-    if not isinstance(tgt, Name) or tgt.sym_name not in NATIVE_ERASED_FIELD_MARKERS {
-        return False;
-    }
-    return erased_import_binds(nd, tgt.sym_name);
-}
-
-def erased_field_marker_default(nd: FuncCall) -> (Expr | None) {
-    for arg in (nd.params or []) {
-        if not isinstance(arg, KWPair) or not isinstance(arg.key, Name) {
-            continue;
-        }
-        if arg.key.sym_name == 'default' and isinstance(arg.value, Expr) {
-            return arg.value;
-        }
-    }
-    return None;
 }
 
 def resolve_expr_symbol(expr: Expr, module: (Module | None) = None) -> (Symbol | None) {
@@ -146,6 +135,42 @@ def resolve_expr_symbol(expr: Expr, module: (Module | None) = None) -> (Symbol |
     return None;
 }
 
+
+def imported_module_name(expr: Expr) -> str | None {
+    import from jaclang.compiler.types.types { ModuleType }
+    if not isinstance(expr.type, ModuleType) {
+        return None;
+    }
+    if isinstance(expr, Name) {
+        sym = resolve_expr_symbol(expr);
+        if sym is None {
+            return None;
+        }
+        decl = sym.decl;
+        if decl is None {
+            return None;
+        }
+        owner = decl.parent;
+        if not isinstance(owner, ModulePath) or owner.is_import_from {
+            return None;
+        }
+        if owner.alias is decl {
+            return owner.dot_path_str;
+        }
+        if owner.path and owner.path[0] is decl {
+            return decl.sym_name;
+        }
+    } elif isinstance(expr, AtomTrailer)
+        and expr.is_attr
+        and isinstance(expr.right, Name) {
+        prefix = imported_module_name(expr.target);
+        if prefix is not None {
+            return prefix + "." + expr.right.sym_name;
+        }
+    }
+    return None;
+}
+
 def _is_user_symbol(sym: Symbol) -> bool {
     scope: (UniScopeNode | None) = sym.parent_tab;
     while scope is not None {
@@ -160,23 +185,6 @@ def _is_user_symbol(sym: Symbol) -> bool {
     return False;
 }
 
-def _symbol_defining_module(sym: Symbol) -> (Module | None) {
-    decl = sym.decl;
-    if decl is None {
-        return None;
-    }
-    return decl.find_parent_of_type(Module);
-}
-
-def _is_local_user_shadow(sym: Symbol, call: FuncCall) -> bool {
-    if not _is_user_symbol(sym) {
-        return False;
-    }
-    call_mod = call.find_parent_of_type(Module);
-    sym_mod = _symbol_defining_module(sym);
-    return call_mod is not None and sym_mod is call_mod;
-}
-
 def intrinsic_registry_if_ready -> object | None {
     import sys;
     _mod = sys.modules.get("jaclang.compiler.intrinsic_registry");
@@ -185,6 +193,10 @@ def intrinsic_registry_if_ready -> object | None {
     }
     import from jaclang.compiler.intrinsic_registry { INTRINSIC_REGISTRY }
     return INTRINSIC_REGISTRY;
+}
+
+def resolved_callee(nd: FuncCall) -> (Ability | None) {
+    return nd.callee_decl or ability_of_symbol(resolve_expr_symbol(nd.target));
 }
 
 def classify_call(nd: FuncCall) -> CallKind {
@@ -220,7 +232,7 @@ def classify_call(nd: FuncCall) -> CallKind {
             return CallKind.CLIB;
         }
     }
-    if sym is not None and _is_local_user_shadow(sym, nd) {
+    if sym is not None and _is_user_symbol(sym) {
         if sym.sym_type
             in (
                 SymbolType.OBJECT_ARCH,
@@ -270,7 +282,7 @@ def collect_field_names(
 }
 
 def collect_method_names(arch: Archetype) -> set[str] {
-    import from jaclang.compiler.passes.main.layout_pass { archetype_accessors }
+    import from jaclang.compiler.passes.layout_pass { archetype_accessors }
     names: set[str] = set();
     if arch.body is not None and isinstance(arch.body, Sequence) {
         for stmt in arch.body {
@@ -314,12 +326,12 @@ def resolve_import_source_module(prog: any, nd: Import) -> (Module | None) {
         return None;
     }
     importer_path = resolve_importer_path_from_node(nd);
-    saved_opts = prog?._compile_options;
+    saved_opts = prog?.options;
     try {
         return prog.load_dependency_module(resolved_path, importer_path=importer_path);
     } finally {
         if saved_opts is not None {
-            prog._compile_options = saved_opts;
+            prog.options = saved_opts;
         }
     }
 }
@@ -331,7 +343,9 @@ def import_target_pinned_server(nd: Import) -> bool {
     try {
         target = nd.from_loc.resolve_relative_path();
         if isinstance(target, str) and target.endswith('.jac') {
-            import from jaclang.jac0core.placement_facts { pinned_module_space }
+            import from jaclang.compiler.placement.placement_facts {
+                pinned_module_space
+            }
             return pinned_module_space(target) == 'server';
         }
     } except Exception {
@@ -354,10 +368,12 @@ def decl_has_access(source_mod: Module, item: ModuleItem) -> bool {
     return owner?.access is not None;
 }
 
-def _already_reported(reporter: any, diag: any, nd: UniNode) -> bool {
+def _already_reported(
+    program: JacProgram, reporter: Transform, diag: DiagnosticInfo, nd: UniNode
+) -> bool {
     for pool in (
-        reporter.prog.errors_had,
-        reporter.prog.warnings_had,
+        program.errors_had,
+        program.warnings_had,
         reporter.errors_had,
         reporter.warnings_had
     ) {
@@ -386,7 +402,7 @@ def report_dead_client_import(reporter: any, nd: Import, item: ModuleItem) -> No
     name = item.name.sym_name if isinstance(item.name, Name) else str(item.name.value);
     module_name = nd.from_loc.dot_path_str if nd.from_loc is not None else '';
     note_unbound_client_name(reporter, name);
-    if _already_reported(reporter, E5082, item) {
+    if _already_reported(reporter.prog, reporter, E5082, item) {
         return;
     }
     reporter.emit(E5082, node_override=item, name=name, module=module_name);
@@ -509,7 +525,7 @@ def _report_client_bare_import_uses(reporter: any, mod: Module, stmt: UniNode) {
             else str(item.name.value);
         note_unbound_client_name(reporter, item_name);
         note_unbound_client_name(reporter, nm.sym_name);
-        already = _already_reported(reporter, E5084, item);
+        already = _already_reported(reporter.prog, reporter, E5084, item);
         if not already {
             reporter.emit(
                 E5084, node_override=item, name=item_name, module=module_name
@@ -519,8 +535,8 @@ def _report_client_bare_import_uses(reporter: any, mod: Module, stmt: UniNode) {
 }
 
 def report_placement_warnings(reporter: any, mod: Module) {
-    import from jaclang.jac0core.placement { get_module_summary }
-    import from jaclang.jac0core.constant { CodeContext }
+    import from jaclang.compiler.placement.placement { get_module_summary }
+    import from jaclang.compiler.frontend.constant { CodeContext }
     ps = get_module_summary(mod, reporter.prog);
     written_glob_idxs: set[int] = set();
     for es in ps.elements {
@@ -539,7 +555,7 @@ def report_placement_warnings(reporter: any, mod: Module) {
         ) {
             es = ps.elements[idx] if idx < len(ps.elements) else None;
             gname = es.name if es is not None else 'glob';
-            if not _already_reported(reporter, W6006, stmt) {
+            if not _already_reported(reporter.prog, reporter, W6006, stmt) {
                 reporter.emit(W6006, node_override=stmt, name=gname);
             }
         }
@@ -551,7 +567,7 @@ def report_placement_warnings(reporter: any, mod: Module) {
         if not isinstance(top, Ability) or client_bridged_endpoint(mod, top) {
             continue;
         }
-        if not _already_reported(reporter, W6007, nm) {
+        if not _already_reported(reporter.prog, reporter, W6007, nm) {
             reporter.emit(W6007, node_override=nm, name=element_display_name(top));
         }
     }
@@ -603,14 +619,14 @@ def _module_top_element(mod: Module, nd: UniNode) -> (UniNode | None) {
 
 
 def client_bridged_endpoint(mod: Module, top: UniNode) -> bool {
-    import from jaclang.jac0core.placement { project_has_server }
+    import from jaclang.compiler.placement.placement { project_has_server }
     return (
         isinstance(top, Ability)
         and isinstance(top, ContextAwareNode)
         and top.access is not None
         and top.access.tag.name == Tok.KW_PUB
         and top.code_context == CodeContext.SERVER
-        and project_has_server(mod.loc.mod_path or '')
+        and project_has_server(mod)
     );
 }
 
@@ -722,8 +738,11 @@ def _import_used_as_value(mod: Module, imp: Import) -> bool {
 def serverless_server_evidence(
     mod: Module, prog: any
 ) -> list[tuple[str, str, UniNode]] {
-    import from jaclang.jac0core.placement { get_module_summary, project_has_server }
-    if project_has_server(mod.loc.mod_path or '') {
+    import from jaclang.compiler.placement.placement {
+        get_module_summary,
+        project_has_server
+    }
+    if project_has_server(mod) {
         return [];
     }
     out: list[tuple[str, str, UniNode]] = [];
@@ -753,19 +772,33 @@ def serverless_server_evidence(
 
 
 def report_serverless_kind_errors(reporter: any, mod: Module) {
-    import from jaclang.jac0core.diagnostics { E5087 }
-    import from jaclang.jac0core.placement { project_kind_name }
+    import from jaclang.compiler.frontend.diagnostics { E5087 }
+    import from jaclang.compiler.placement.placement { project_kind_name }
     evidence = serverless_server_evidence(mod, reporter.prog);
     if not evidence {
         return;
     }
-    kind = project_kind_name(mod.loc.mod_path or '') or 'client-only';
+    kind = project_kind_name(mod) or 'client-only';
     for (name, reason, stmt) in evidence {
-        already = _already_reported(reporter, E5087, stmt);
+        already = _already_reported(reporter.prog, reporter, E5087, stmt);
         if not already {
             reporter.emit(
                 E5087, node_override=stmt, kind=kind, name=name, reason=reason
             );
         }
     }
+}
+
+def return_type_is_jsx(rt: (Expr | None)) -> bool {
+    if rt is None {
+        return False;
+    }
+    if (
+        isinstance(rt, BinaryExpr)
+        and isinstance(rt.op, Token)
+        and rt.op.name == Tok.BW_OR
+    ) {
+        return return_type_is_jsx(rt.left) or return_type_is_jsx(rt.right);
+    }
+    return isinstance(rt, Name) and rt.value in ("JsxElement", "JsxPage", "JsxLayout");
 }

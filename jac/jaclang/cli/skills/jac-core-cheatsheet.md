@@ -1,6 +1,6 @@
 ---
 name: jac-core-cheatsheet
-description: Jac-language baseline - Reading this skill is a must. imports, control flow, match statements, enums, lambdas, glob, entry points, reserved keywords, null-safe operators, string formatting, error handling. Load for basic-syntax questions no specific skill covers.
+description: Look up Jac syntax, imports, scope, match statements, and keyword escapes. Use after jac-essentials when a specific language form needs clarification.
 ---
 
 **Jac is strict-typed.** Every `def` parameter and return, every `has` field needs an explicit type; the escape hatch is lowercase `any` plus the `as` cast - full rules, narrowing patterns, and error codes in `jac-types`. Syntax-wise: Python-flavored, every statement ends with `;`, every block is `{ }`-braced - **except `match`/`case` bodies, which use Python indentation** (see below). One deliberate `;` exception: the final expression of a `def`/ability/lambda body may drop its `;` to become the **implicit return** value (Rust-style tail expression); anywhere else a missing `;` is an error (`E2084`/`E0002`). Top-level code runs inside `with entry { ... }`.
@@ -112,7 +112,7 @@ import from .button { Button }                        # relative (dots)
 import from "@jac/runtime" { Router, Routes, Route }  # npm (quoted)
 ```
 
-**Codespaces are inferred - there is no placement syntax.** JSX and string-path npm imports mark a declaration client, and the helpers/`glob`s/imports client code references join the client bundle (scope-aware propagation, across modules); python imports and graph archetypes anchor code server, which is also the default; `def:pub` endpoints and walkers in server-anchored modules stay server (client calls become auto-RPC); extern C-decl imports (`import from lib { def f(x: f64) -> f64; }`) mark a declaration native and its users follow (consuming a native module is not a signal; a whole anchor-free module compiles native under the default codespace when it can lower, else server with a note; pure code in mixed modules stays server). Overrides live in `jac.toml`: `[placement.pins] "mod.name" = "server"` pins a declaration server-side (or `"client"`/`"native"`). See `jac-codespaces`.
+**Codespaces are inferred, with explicit configuration pins.** JSX and string-path npm imports mark a declaration client, and the helpers/`glob`s/imports client code references join the client bundle (scope-aware propagation, across modules); Python imports and persistent graph operations constrain server placement; `def:pub` endpoints and walkers in server-anchored modules stay server (client calls become auto-RPC); extern C-decl imports (`import from lib { def f(x: f64) -> f64; }`) mark a declaration native and its users follow (consuming a native module is not a signal; a whole anchor-free module compiles native under the default codespace when it can lower, else server with a note; pure code in mixed modules stays server). Overrides live in `jac.toml`: `[placement.pins] "mod.name" = "server"` pins a declaration server-side (or `"client"`/`"native"`). See `jac-codespaces`.
 
 **`main.jac` mixes both sides.** Server imports go at the top (server is the default placement). The client section - CSS import, top-level component, `def:pub app` (no-arg for manual routing; `app(children)` that renders `children` for file-based routing - see `jac-cl-routing`) - is inferred client from its JSX and string-path imports; no wrapper syntax exists or is needed.
 
@@ -130,6 +130,25 @@ import from "@jac/runtime" { Router, Routes, Route }  # npm (quoted)
 A no-dot import is depth-independent: moving a file between directories never changes it. Dot-counted forms (`..`, `...`) DO break when a file moves to a different depth - wrong dot count = silent resolution failure = imported names become `<Unknown>` → cascading type errors.
 
 **Server modules should prefer the no-dot form, and a `..` that climbs out of a package is a bug waiting to happen.** `import from ..shared.github { fetch }` resolves fine under `jac run` but fails `jac test <file>` with `attempted relative import beyond top-level package`, because the test runner roots the package at the target file's own directory. `import from shared.github { fetch }` works in both. Client modules keep the dotted form - that is what the bundler resolves.
+
+## Compile-time values (comptime)
+
+```jac
+comptime import from jaclang.comptime { members }
+
+enum Kind { A, B }
+
+comptime KINDS: int = len(members(Kind));   # evaluated by the compiler, folded to 2
+comptime assert KINDS == 2, "two kinds";     # fails the build, not the run
+
+def repeat(comptime n: int, msg: str) -> str {
+    out = "";
+    comptime for _ in range(n) { out += msg; }   # unrolled per call site value
+    return out;
+}
+```
+
+`comptime` is a reserved word. A comptime site needs a literal-derived value (E0033 otherwise); comptime code is pure (E0108 on I/O, raise, or runaway work). See `jac-comptime`.
 
 ## Also available (Python semantics, brace bodies)
 

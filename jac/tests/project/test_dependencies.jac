@@ -31,10 +31,13 @@ import from jaclang.project.providers {
     InstallContext,
     PythonProvider,
     ResolvedDependency,
+    VENV_DEPS_MARKER,
     get_provider_registry,
     get_python_provider,
     reset_provider_registry,
-    resolve_plan
+    resolve_plan,
+    venv_deps_satisfied,
+    write_venv_deps_marker
 }
 
 """Reset global config singleton."""
@@ -51,7 +54,7 @@ def make_temp_project -> tuple {
 
     jac_toml = project_dir / "jac.toml";
     jac_toml.write_text(
-        '[project]\nname = "test-project"\nversion = "0.1.0"\ndescription = "A test project"\nentry-point = "main.jac"\n\n[dependencies]\nrequests = ">=2.28.0"\n\n[dev-dependencies]\npytest = ">=8.0.0"\n\n[run]\nmain = true\ncache = true\n\n[scripts]\ntest = "jac test"\n'
+        '[project]\nname = "test-project"\nversion = "0.1.0"\ndescription = "A test project"\nentry-point = "main"\n\n[dependencies]\nrequests = ">=2.28.0"\n\n[dev-dependencies]\npytest = ">=8.0.0"\n\n[run]\nmain = true\ncache = true\n\n[scripts]\ntest = "jac test"\n'
     );
 
     src_dir = project_dir / "src";
@@ -792,7 +795,7 @@ test "resolve_plan folds capability deps with manifest priority" {
     try {
         # Manifest pins its own fastapi; the serve capability must not
         # override or duplicate it.
-        toml = '[project]\nname = "svc"\nversion = "0.1.0"\nkind = "service"\nentry-point = "main.jac"\n\n[dependencies]\nfastapi = ">=0.100.0"\n';
+        toml = '[project]\nname = "svc"\nversion = "0.1.0"\nkind = "service"\nentry-point = "main"\n\n[dependencies]\nfastapi = ">=0.100.0"\n';
         project_path = create_test_project(tmp, toml);
         (Path(project_path) / "main.jac").write_text(
             "with entry {\n    print(\"hi\");\n}\n"
@@ -1071,10 +1074,10 @@ test "install pip and npm deps" {
     reset_config();
     reset_provider_registry();
     import from jaclang.cli.commands { project as proj_cmds }
-    import from jaclang.runtimelib.client.npm_provider { NpmProvider }
+    import from jaclang.client.npm_provider { NpmProvider }
     tmp = tempfile.mkdtemp(prefix="jac_test_");
     try {
-        toml = '[project]\nname = "fullstack"\nversion = "0.1.0"\n\n[dependencies]\nrequests = "~=2.31"\nflask = "~=3.0"\n\n[dependencies.npm]\nreact = "^18.0.0"\ntypescript = "^5.0.0"\n\n[dev-dependencies]\npytest = ">=8.0.0"\n';
+        toml = '[project]\nname = "fullstack"\nversion = "0.1.0"\n\n[dependencies]\nrequests = "~=2.31"\nflask = "~=3.0"\n\n[dependencies.npm]\nreact = "^19.2.0"\ntypescript = "^5.0.0"\n\n[dev-dependencies]\npytest = ">=8.0.0"\n';
         project_path = create_test_project(tmp, toml);
         os.makedirs(os.path.join(project_path, ".jac", "venv"), exist_ok=True);
         original_cwd = os.getcwd();
@@ -1119,7 +1122,7 @@ test "install npm-only project dispatches the npm provider" {
     reset_config();
     reset_provider_registry();
     import from jaclang.cli.commands { project as proj_cmds }
-    import from jaclang.runtimelib.client.npm_provider { NpmProvider }
+    import from jaclang.client.npm_provider { NpmProvider }
     tmp = tempfile.mkdtemp(prefix="jac_test_");
     try {
         toml = '[project]\nname = "testproj"\nversion = "0.1.0"\n\n[dependencies]\n\n[dependencies.npm]\nreact = "18.0"\n';
@@ -1154,7 +1157,7 @@ test "install --no-npm skips the npm provider on a full install" {
     reset_config();
     reset_provider_registry();
     import from jaclang.cli.commands { project as proj_cmds }
-    import from jaclang.runtimelib.client.npm_provider { NpmProvider }
+    import from jaclang.client.npm_provider { NpmProvider }
     tmp = tempfile.mkdtemp(prefix="jac_test_");
     try {
         toml = '[project]\nname = "testproj"\nversion = "0.1.0"\n\n[dependencies]\n\n[dependencies.npm]\nreact = "18.0"\n';
@@ -1603,7 +1606,7 @@ test "install --npm warns when a venv-only save flag is ignored" {
         os.chdir(project_path);
         reset_config();
         try {
-            with patch("jaclang.runtimelib.client.cli.run_npm_add") as mock_npm, patch.object(
+            with patch("jaclang.client.cli.run_npm_add") as mock_npm, patch.object(
                 console, "warning"
             ) as mock_warn {
                 mock_npm.return_value = 0;
@@ -2104,5 +2107,87 @@ test "install package failure returns error code" {
         reset_config();
         shutil.rmtree(tmp, ignore_errors=True);
         reset_config();
+    }
+}
+
+# ===== sealed-venv marker fast path =====
+test "venv_deps_satisfied truth table" {
+    (tmp, project_dir) = make_temp_project();
+    try {
+        cases = [
+            (["b==2", "a==1"], True, ["a==1", "b==2"], True),
+            (["b==2", "a==1"], True, ["a==1", "b==3"], False),
+            (["b==2", "a==1"], True, ["a==1"], False),
+            (None, True, ["a==1"], False),
+            (None, False, ["a==1"], False)
+        ];
+        for (i, (marker, venv_exists, query, expected)) in enumerate(cases) {
+            venv_dir = project_dir / ".jac" / f"venv{i}";
+            if venv_exists {
+                venv_dir.mkdir(parents=True);
+            }
+            if marker is not None {
+                write_venv_deps_marker(venv_dir, marker);
+            }
+            assert venv_deps_satisfied(venv_dir, query) == expected , (
+                i,
+                marker,
+                query
+            );
+        }
+    } finally {
+        shutil.rmtree(tmp, ignore_errors=True);
+    }
+}
+
+test "install_specs honors the sealed-venv marker" {
+    # The marker is written only by the seal (pack_jab), never by a local
+    # install. A matching marker must return before ensure_venv, which would
+    # classify the interpreter-less sealed venv as corrupted and delete it;
+    # everything else keeps today's behavior, including never writing the
+    # marker locally.
+    cases = [
+        ("match skips pip", ["b==2", "a==1"], ["a==1", "b==2"], [], False),
+        ("stale runs pip", ["requests>=2.27.0"], ["requests>=2.28.0"], [], True),
+        (
+            "dry run ignores match",
+            ["requests>=2.28.0"],
+            ["requests>=2.28.0"],
+            ["--dry-run"],
+            True
+        ),
+        ("local install writes no marker", None, ["requests>=2.28.0"], [], True)
+    ];
+    for (name, marker, specs, flags, expect_pip) in cases {
+        reset_config();
+        (tmp, project_dir) = make_temp_project();
+        try {
+            config = JacConfig.load(project_dir / "jac.toml");
+            venv_dir = config.get_venv_dir();
+            if marker is not None {
+                venv_dir.mkdir(parents=True);
+                write_venv_deps_marker(venv_dir, marker);
+            }
+            python = PythonProvider();
+            with patch("jaclang.project.providers.ensure_venv") as mock_ev, patch.object(
+                PythonProvider, "_run_project_pip"
+            ) as mock_pip {
+                mock_pip.return_value = (0, "Successfully installed", "");
+                result = python.install_specs(
+                    config, specs, InstallContext(install_flags=flags)
+                );
+            }
+            assert result is True , name;
+            assert mock_pip.called == expect_pip , (name, mock_pip.call_count);
+            assert mock_ev.called == expect_pip , name;
+            assert (venv_dir / VENV_DEPS_MARKER).exists()
+                == (marker is not None) , name;
+            if marker is not None {
+                assert venv_dir.exists() , name;
+            }
+        } finally {
+            shutil.rmtree(tmp, ignore_errors=True);
+            reset_config();
+        }
     }
 }

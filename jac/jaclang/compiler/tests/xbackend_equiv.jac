@@ -24,11 +24,12 @@ import subprocess;
 import sys;
 import from pathlib { Path }
 import jaclang;
-import from jaclang.compiler.passes.ecmascript { EsastGenPass }
-import from jaclang.compiler.passes.ecmascript.es_unparse { es_to_js }
-import from jaclang.compiler.passes.ecmascript.estree { Node as EsNode }
-import from jaclang.jac0core.codeinfo { native_safe_sym }
-import from jaclang.jac0core.program { JacProgram }
+import from jaclang.compiler.backends.es { EsastGenPass }
+import from jaclang.compiler.backends.es.es_unparse { es_to_js }
+import from jaclang.compiler.backends.es.estree { Node as EsNode }
+import from jaclang.compiler.frontend.codeinfo { native_safe_sym }
+import from jaclang.compiler.driver.program { JacProgram }
+import from jaclang.compiler.driver.compile_options { CompileOptions }
 
 glob FIXTURES = str(
          Path(jaclang.__file__).parent / "compiler" / "tests" / "fixtures"
@@ -85,7 +86,7 @@ def run_py_fixture(fixture_stem: str, func_name: str) -> dict {
 """The server lane's API encoder, which is what a walker response travels
 through: Serializer in api_mode applies the wire rule, json.dumps writes it."""
 def encode_py_wire(value: any) -> str {
-    import from jaclang.runtimelib.serializer { Serializer }
+    import from jaclang.data.serializer { Serializer }
     return json.dumps(Serializer.serialize(value, api_mode=True), sort_keys=True);
 }
 
@@ -93,7 +94,7 @@ def encode_py_wire(value: any) -> str {
 # ES (ECMAScript / JavaScript) helpers
 # -----------------------------------------------------------------------
 def compile_fixture_to_js(fixture_name: str) -> str {
-    import from jaclang.compiler.passes.main.type_checker_pass { TypeCheckPass }
+    import from jaclang.compiler.passes.type_checker_pass { TypeCheckPass }
     fixture_path = os.path.join(FIXTURES, fixture_name);
     prog = JacProgram();
     # EsastGenPass consumes core call facts (call_kind/
@@ -132,6 +133,50 @@ def run_js_function(js_code: str, func_name: str) -> dict {
     return json.loads(result.stdout.strip());
 }
 
+def run_js_module_fixture(fixture: str, func_name: str) -> dict {
+    import from tempfile { TemporaryDirectory }
+    import from jaclang.client.jac_client_compiler { JacClientCompiler }
+    import from jaclang.compiler.frontend.codeinfo { ClientArtifact, ClientManifest }
+    prog = JacProgram();
+    source = (Path(_fixture_shadow_dir()) / fixture).resolve();
+    prog.compile(str(source), no_cgen=True);
+    assert not prog.errors_had , "\n".join(str(e) for e in prog.errors_had);
+
+    def compile_module(path: Path) -> ClientArtifact {
+        artifact = prog.get_client_artifact(str(path));
+        assert artifact is not None , "\n".join(str(e) for e in prog.errors_had);
+        return artifact;
+    }
+
+    with TemporaryDirectory() as directory {
+        output = Path(directory);
+        compiler = JacClientCompiler(
+            project_dir=source.parent,
+            runtime_path=None,
+            compile_to_js_func=compile_module,
+            extract_exports_func=lambda (manifest: ClientManifest | None) { return list(
+                manifest.exports
+            )
+                if manifest is not None
+                else []; },
+            extract_globals_func=lambda (manifest: any, module: any) { return {}; },
+            compiled_dir=output
+        );
+        source_root = Path(source.anchor);
+        compiler.emit_dependencies(source, source_root=source_root);
+        (output / "package.json").write_text('{"type":"module"}');
+        js_entry = compiler._output_path_for(source, source_root);
+        with js_entry.open("a") as stream {
+            stream.write("\nconsole.log(JSON.stringify(" + func_name + "()));\n");
+        }
+        result = subprocess.run(
+            ["node", str(js_entry)], capture_output=True, text=True, timeout=30
+        );
+        assert result.returncode == 0 , f"Node.js failed: {result.stderr}";
+        return json.loads(result.stdout.strip());
+    }
+}
+
 """Evaluate one JS expression against a compiled bundle and return its value.
 
 The bundle is in scope, so the expression can reach `_jac` and assert on the
@@ -149,9 +194,12 @@ def run_js_expr(js_code: str, expr: str) -> any {
 # -----------------------------------------------------------------------
 # NA (Native / LLVM) helpers
 # -----------------------------------------------------------------------
-def compile_native(fixture: str) -> tuple {
+def compile_native(fixture: str, *, no_ir_cache: bool = False) -> tuple {
     prog = JacProgram();
-    ir = prog.compile(file_path=str(os.path.join(FIXTURES, fixture)));
+    ir = prog.compile(
+        file_path=str(os.path.join(_fixture_shadow_dir(), fixture)),
+        options=CompileOptions(no_ir_cache=no_ir_cache)
+    );
     errors = [str(e) for e in prog.errors_had] if prog.errors_had else [];
     assert not prog.errors_had , f"Compilation errors in {fixture}: {errors}";
     eng = ir.gen.native_engine;
@@ -406,7 +454,8 @@ def run_with_both(
     tolerance: float = 1e-9,
     require: (list | None) = None,
     strict_keys: bool = True,
-    allow_missing: (list | None) = None
+    allow_missing: (list | None) = None,
+    client_modules: bool = False
 ) {
     # `require` names backends ("cl"/"na") that must actually participate: if a
     # required backend fails to compile/run or shares no comparable keys with
@@ -418,8 +467,12 @@ def run_with_both(
     label = fixture;
     cl_keys: int = 0;
     try {
-        js_code = compile_fixture_to_js(fixture);
-        cl_result = run_js_function(js_code, cl_fn);
+        if client_modules {
+            cl_result = run_js_module_fixture(fixture, cl_fn);
+        } else {
+            js_code = compile_fixture_to_js(fixture);
+            cl_result = run_js_function(js_code, cl_fn);
+        }
         cl_keys = len(set(py_result.keys()) & set(cl_result.keys()));
         if strict_keys and "cl" in reqd {
             assert_full_parity(py_result, cl_result, f"{label} [ES]", allow_missing);

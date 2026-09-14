@@ -212,18 +212,27 @@ def _usage_int(usage: any, key: str) -> int {
         return 0;
     }
     val = usage.get(key) if isinstance(usage, dict) else getattr(usage, key, None);
-    if val is None and key == "cache_read_input_tokens" {
-        ptd = (
-            usage.get("prompt_tokens_details")
-                if isinstance(usage, dict)
-                else usage?.prompt_tokens_details
+    if val is None {
+        detail_key = (
+            "cached_tokens"
+                if key == "cache_read_input_tokens"
+                else "cache_creation_tokens"
+                    if key == "cache_creation_input_tokens"
+                    else None
         );
-        if ptd is not None {
-            val = (
-                ptd.get("cached_tokens")
-                    if isinstance(ptd, dict)
-                    else ptd?.cached_tokens
+        if detail_key {
+            ptd = (
+                usage.get("prompt_tokens_details")
+                    if isinstance(usage, dict)
+                    else usage?.prompt_tokens_details
             );
+            if ptd is not None {
+                val = (
+                    ptd.get(detail_key)
+                        if isinstance(ptd, dict)
+                        else getattr(ptd, detail_key, None)
+                );
+            }
         }
     }
     try {
@@ -274,6 +283,21 @@ def _litellm_ctx_window(model_name: str) -> int {
 }
 
 
+def _existing_cost(usage_obj: object) -> object {
+    return (usage_obj.get("cost") if isinstance(usage_obj, dict) else usage_obj?.cost);
+}
+
+
+def _rebuild_stream_chunks(chunks: list, logging_obj: object) -> dict {
+    rebuilt: any = (
+        litellm.stream_chunk_builder(chunks, logging_obj=logging_obj)
+            if _STREAM_CHUNK_BUILDER_ACCEPTS_LOGGING_OBJ
+            else litellm.stream_chunk_builder(chunks)
+    );
+    return rebuilt;
+}
+
+
 def _attach_call_cost(
     usage_obj: object, model_name: str, response: object = None
 ) -> None {
@@ -283,6 +307,9 @@ def _attach_call_cost(
             or _usage_int(usage_obj, "completion_tokens")
             or _usage_int(usage_obj, "total_tokens")
         ) {
+        return;
+    }
+    if _existing_cost(usage_obj) is not None {
         return;
     }
     try {
@@ -302,10 +329,68 @@ def _attach_call_cost(
     } else {
         try {
             setattr(usage_obj, "cost", cost);
-        } except Exception {
-            ;
-        }
+        } except Exception {}
     }
+}
+
+
+def _usage_to_dict(usage_obj: object) -> dict {
+    if usage_obj is None {
+        return {};
+    }
+    if isinstance(usage_obj, dict) {
+        return dict(usage_obj);
+    }
+    try {
+        dump = usage_obj?.model_dump;
+        result = dump() if callable(dump) else dict(vars(usage_obj));
+        return result if isinstance(result, dict) else {};
+    } except Exception as e {
+        logger.debug(f"usage serialization failed, recording an empty payload: {e}");
+        return {};
+    }
+}
+
+
+def _record_usage(
+    mt_run: MTRuntime,
+    usage_obj: object,
+    model_name: str,
+    call_kind: str | None = None,
+    finish_reason: str | None = None
+) {
+    record = _usage_to_dict(usage_obj);
+    record["model"] = model_name;
+    record["call_kind"] = call_kind or mt_run._call_kind;
+    if finish_reason {
+        record["finish_reason"] = finish_reason;
+    }
+    record["cache_read_input_tokens"] = _usage_int(
+        usage_obj, "cache_read_input_tokens"
+    );
+    record["cache_creation_input_tokens"] = _usage_int(
+        usage_obj, "cache_creation_input_tokens"
+    );
+    mt_run._usage_history.append(record);
+}
+
+
+def _usage_step_events(
+    mt_run: MTRuntime, usage_base: int
+) -> Generator[StreamEvent, None, None] {
+    if len(mt_run._usage_history) > usage_base {
+        yield StreamEvent(
+            event_type="usage_step",
+            data=_aggregate_usage(mt_run._usage_history[usage_base:])
+        );
+    }
+}
+
+
+def _usage_history_total_cost(mt_run: MTRuntime) -> float {
+    return sum(
+        float(record.get("cost", 0.0) or 0.0) for record in mt_run._usage_history
+    );
 }
 
 
@@ -313,13 +398,16 @@ def _copy_for_compaction(model: BaseLLM) -> BaseLLM {
     import copy;
     m = copy.copy(model);
     m.call_params = {"compaction_enabled": False};
-
-    m._usage_history = [];
     return m;
 }
 
 
-def _default_compact(messages: list, keep_recent: int, model: BaseLLM) -> list {
+def _default_compact(
+    messages: list,
+    keep_recent: int,
+    model: BaseLLM,
+    parent_mt_run: MTRuntime | None = None
+) -> list {
     if len(messages) < 4 {
         return messages;
     }
@@ -397,9 +485,13 @@ def _default_compact(messages: list, keep_recent: int, model: BaseLLM) -> list {
         resp_type=str,
         stream=False,
         call_params={"compaction_enabled": False},
-        mtir=None
+        mtir=None,
+        _call_kind="compaction"
     );
     summary = str(model.invoke(comp_mt_run));
+    if parent_mt_run is not None {
+        parent_mt_run._usage_history.extend(comp_mt_run._usage_history);
+    }
     summary_msg = {
         "role": "user",
         "content": f"[Compacted context summary]\n{summary}"
@@ -550,7 +642,9 @@ impl BaseLLM._compact_messages(
         } else {
             model_for_compaction = _copy_for_compaction(self);
         }
-        compacted = _default_compact(msg_dicts, keep_recent, model_for_compaction);
+        compacted = _default_compact(
+            msg_dicts, keep_recent, model_for_compaction, mt_run
+        );
     }
     removed = original_len - len(compacted);
     if removed == 0 and original_len >= 4 {
@@ -591,7 +685,7 @@ impl BaseLLM.__call__(**kwargs: object) -> BaseLLM {
 impl BaseLLM.invoke(mt_run: MTRuntime) -> any {
     handler = mt_run.call_params.get("stream_handler");
     if mt_run.stream and handler is not None and callable(handler) {
-        return self._invoke_with_handler(mt_run, handler);
+        return self._invoke_with_handler(mt_run, cast(Callable, handler));
     }
 
     if mt_run.stream and mt_run.call_params.get("logging", False) {
@@ -847,7 +941,6 @@ impl BaseLLM._invoke_with_handler(mt_run: MTRuntime, on_event: Callable) -> obje
     if len(mt_run.tools) == 0
         and mt_run.resp_type is not None
         and mt_run.resp_type is not str {
-        self._usage_history = [];
         accumulated = "";
         _seen_resets = mt_run._stream_reset_count;
         try {
@@ -880,24 +973,12 @@ impl BaseLLM._invoke_with_handler(mt_run: MTRuntime, on_event: Callable) -> obje
             mt_run.write_back_conversation();
         }
 
-        if self._usage_history {
-            u = self._usage_history[-1];
+        if mt_run._usage_history {
             try {
                 on_event(
                     StreamEvent(
                         event_type="llm_timing",
-                        data={
-                            "duration_ms": 0.0,
-                            "iteration": 0,
-                            "completion_tokens": _usage_int(u, "completion_tokens"),
-                            "prompt_tokens": _usage_int(u, "prompt_tokens"),
-                            "cache_read_input_tokens": _usage_int(
-                                u, "cache_read_input_tokens"
-                            ),
-                            "cache_creation_input_tokens": _usage_int(
-                                u, "cache_creation_input_tokens"
-                            )
-                        }
+                        data={"duration_ms": 0.0, "iteration": 0}
                     )
                 );
             } except Exception as e {
@@ -953,7 +1034,8 @@ impl BaseLLM._invoke_react_loop(mt_run: MTRuntime) -> object {
                 messages=mt_run.messages,
                 last_tool=last_tool,
                 last_result=last_result,
-                total_tokens=total_tokens
+                total_tokens=total_tokens,
+                total_cost=_usage_history_total_cost(mt_run)
             );
             action = on_iteration(ctx);
             if action == IterationAction.ABORT {
@@ -1270,9 +1352,9 @@ def _parse_tool_calls(
 ) -> list[ToolCall] {
     parsed: list[ToolCall] = [];
     for tool_call in tool_calls_list {
-        fn = tool_call?.function;
-        call_id = str(tool_call?.id or "");
-        tool_name = str(fn?.name or "") if fn else "";
+        fn = response_field(tool_call, "function");
+        call_id = str(response_field(tool_call, "id") or "");
+        tool_name = str(response_field(fn, "name") or "") if fn else "";
         tool = mt_run.get_tool(tool_name);
         if tool is None {
             parsed.append(
@@ -1307,7 +1389,8 @@ def _parse_tool_calls(
             continue;
         }
         try {
-            raw_args = (fn?.arguments or "") if fn else "";
+            raw_args = response_field(fn, "arguments") or "";
+            assert isinstance(raw_args, str);
             args_json = json.loads(raw_args) if raw_args else {};
             args = tool.parse_arguments(args_json);
         } except Exception as e {
@@ -1322,18 +1405,19 @@ def _parse_tool_calls(
 }
 
 
-def _sanitize_tool_calls(message: LiteLLMMessage) -> set {
+def _sanitize_tool_calls(message: dict) -> set {
     damaged: set = set();
     tool_calls = (message or {}).get("tool_calls") or [];
     for tc in tool_calls {
-        fn = tc?.function;
+        fn = response_field(tc, "function");
         if fn is None {
             continue;
         }
-        raw = fn?.arguments;
+        raw = response_field(fn, "arguments");
         valid = False;
         had_args = isinstance(raw, str) and bool(raw.strip());
         if had_args {
+            assert isinstance(raw, str);
             try {
                 json.loads(raw);
                 valid = True;
@@ -1343,14 +1427,12 @@ def _sanitize_tool_calls(message: LiteLLMMessage) -> set {
         }
         if not valid {
             if had_args {
-                damaged.add(str(tc?.id or ""));
+                damaged.add(str(response_field(tc, "id") or ""));
             }
-            try {
-                fn.arguments = "{}";
-            } except Exception {
-                if isinstance(fn, dict) {
-                    fn["arguments"] = "{}";
-                }
+            if isinstance(fn, dict) {
+                fn["arguments"] = "{}";
+            } else {
+                setattr(fn, "arguments", "{}");
             }
         }
     }
@@ -1358,13 +1440,13 @@ def _sanitize_tool_calls(message: LiteLLMMessage) -> set {
 }
 
 
-def _truncated_call_ids(message: LiteLLMMessage, finish_reason: str) -> set {
+def _truncated_call_ids(message: dict, finish_reason: str) -> set {
     if finish_reason != "length" {
         return set();
     }
     ids: set = set();
     for tc in ((message or {}).get("tool_calls") or []) {
-        ids.add(str(tc?.id or ""));
+        ids.add(str(response_field(tc, "id") or ""));
     }
     return ids;
 }
@@ -1401,14 +1483,15 @@ impl BaseLLM.dispatch_no_streaming(mt_run: MTRuntime) -> CompletionResult {
     actual_model = response.get("model", self.model_name);
     self.log_info(f"Calling LLM: {actual_model} with params: {log_params}");
 
-    message: LiteLLMMessage = response.get("choices", [])[0].get("message");
+    message = coerce_message_dict(response.get("choices", [])[0].get("message"));
 
     if not self.supports_native_tools {
         message = recover_tool_calls(message, [t.get_name() for t in mt_run.tools]);
     }
     damaged_ids = _sanitize_tool_calls(message);
     mt_run.add_message(message);
-    output_content: str = message.get("content") or "";
+    output_content = message.get("content") or "";
+    assert isinstance(output_content, str);
     self.log_info(f"LLM call completed with response: {output_content}");
     finish_reason = str(
         (response.get("choices") or [{}])[0].get("finish_reason") or ""
@@ -1425,6 +1508,7 @@ impl BaseLLM.dispatch_no_streaming(mt_run: MTRuntime) -> CompletionResult {
         else output_content;
     usage_data = response.get("usage", {});
     _attach_call_cost(usage_data, self.model_name, response);
+    _record_usage(mt_run, usage_data, actual_model, finish_reason=finish_reason);
     return CompletionResult(
         output=output_value, tool_calls=tool_calls, usage=usage_data
     );
@@ -1439,7 +1523,7 @@ impl BaseLLM._should_retry_stream(
         return False;
     }
     if usage_base >= 0 {
-        self._usage_history = self._usage_history[:usage_base];
+        mt_run._usage_history = mt_run._usage_history[:usage_base];
     }
     mt_run._stream_reset_count += 1;
     self.log_info(
@@ -1457,15 +1541,22 @@ impl BaseLLM.dispatch_streaming(mt_run: MTRuntime) -> Generator[str, None, None]
     self.api_base = params.pop("api_base", DEFAULT_BASE_URL);
     params.pop("api_key", None);
     attempt = 0;
-    usage_base = len(self._usage_history);
+    usage_base = len(mt_run._usage_history);
     while True {
+        finish_reason = "";
         try {
             response = self.model_call_with_stream(params);
             for chunk in response {
+                if chunk?.choices and chunk?.choices?[0]?.finish_reason {
+                    finish_reason = str(chunk?.choices?[0]?.finish_reason);
+                }
                 chunk_usage = chunk?.usage;
                 if chunk_usage {
-                    _attach_call_cost(chunk_usage, self.model_name);
-                    self._usage_history.append(chunk_usage);
+                    chunk_model: str = chunk?.model or self.model_name;
+                    _attach_call_cost(chunk_usage, chunk_model);
+                    _record_usage(
+                        mt_run, chunk_usage, chunk_model, finish_reason=finish_reason
+                    );
                 }
                 if chunk?.choices and chunk?.choices?[0]?.delta {
                     delta = chunk?.choices?[0]?.delta;
@@ -1515,7 +1606,8 @@ impl BaseLLM.dispatch_streaming_with_tools(
             max_per_call=int(settings.get("max_per_call", _TOOL_DELTA_MAX_PER_CALL))
         );
         try {
-            for chunk in self.model_call_with_stream(params) {
+            _stream_resp = self.model_call_with_stream(params);
+            for chunk in _stream_resp {
                 chunks.append(chunk);
                 pending_before = len(mt_run._tool_arg_deltas);
                 if stream_args {
@@ -1562,14 +1654,16 @@ impl BaseLLM.dispatch_streaming_with_tools(
         return;
     }
 
-    message: (LiteLLMMessage | dict | None) = None;
+    message: dict | None = None;
     usage_data: dict = {};
+    actual_model = self.model_name;
     try {
-        rebuilt = litellm.stream_chunk_builder(chunks);
+        rebuilt = _rebuild_stream_chunks(chunks, _stream_resp?.logging_obj);
         if rebuilt {
-            message = rebuilt.get("choices", [])[0].get("message");
+            message = coerce_message_dict(rebuilt.get("choices", [])[0].get("message"));
             usage_data = rebuilt.get("usage", {}) or {};
-            _attach_call_cost(usage_data, self.model_name, rebuilt);
+            actual_model = rebuilt.get("model", self.model_name);
+            _attach_call_cost(usage_data, actual_model, rebuilt);
             finish_reason = str(
                 rebuilt.get("choices", [])[0].get("finish_reason") or ""
             );
@@ -1592,7 +1686,8 @@ impl BaseLLM.dispatch_streaming_with_tools(
     }
     damaged_ids = _sanitize_tool_calls(message);
     mt_run.add_message(message);
-    output_content: str = message.get("content") or "";
+    output_content = message.get("content") or "";
+    assert isinstance(output_content, str);
 
     truncated_ids = _truncated_call_ids(message, finish_reason);
     tool_calls: list[ToolCall] = [];
@@ -1602,6 +1697,7 @@ impl BaseLLM.dispatch_streaming_with_tools(
     output_value = mt_run.parse_response(output_content)
         if not tool_calls_list
         else output_content;
+    _record_usage(mt_run, usage_data, actual_model, finish_reason=finish_reason);
     out.append(
         CompletionResult(output=output_value, tool_calls=tool_calls, usage=usage_data)
     );
@@ -1634,14 +1730,15 @@ impl BaseLLM.adispatch_no_streaming(mt_run: MTRuntime) -> CompletionResult {
     }
     actual_model = response.get("model", self.model_name);
     self.log_info(f"Calling LLM: {actual_model} with params: {log_params}");
-    message: LiteLLMMessage = response.get("choices", [])[0].get("message");
+    message = coerce_message_dict(response.get("choices", [])[0].get("message"));
 
     if not self.supports_native_tools {
         message = recover_tool_calls(message, [t.get_name() for t in mt_run.tools]);
     }
     damaged_ids = _sanitize_tool_calls(message);
     mt_run.add_message(message);
-    output_content: str = message.get("content") or "";
+    output_content = message.get("content") or "";
+    assert isinstance(output_content, str);
     self.log_info(f"LLM call completed with response: {output_content}");
     finish_reason = str(
         (response.get("choices") or [{}])[0].get("finish_reason") or ""
@@ -1657,31 +1754,39 @@ impl BaseLLM.adispatch_no_streaming(mt_run: MTRuntime) -> CompletionResult {
         else output_content;
     usage_data = response.get("usage", {});
     _attach_call_cost(usage_data, self.model_name, response);
+    _record_usage(mt_run, usage_data, actual_model, finish_reason=finish_reason);
     return CompletionResult(
         output=output_value, tool_calls=tool_calls, usage=usage_data
     );
 }
 
-impl BaseLLM.adispatch_streaming(mt_run: MTRuntime) {
+impl BaseLLM.adispatch_streaming(mt_run: MTRuntime) -> AsyncIterator[str] {
     params = self.make_model_params(mt_run);
     log_params = self.format_prompt(params);
     self.log_info(f"Calling LLM: {self.model_name} with params:\n{log_params}");
     self.api_base = params.pop("api_base", DEFAULT_BASE_URL);
     params.pop("api_key", None);
     attempt = 0;
-    usage_base = len(self._usage_history);
+    usage_base = len(mt_run._usage_history);
     while True {
+        finish_reason = "";
         try {
             response = await self.model_call_with_stream_async(params);
             async for chunk in response {
+                if chunk?.choices and chunk?.choices?[0]?.finish_reason {
+                    finish_reason = str(chunk?.choices?[0]?.finish_reason);
+                }
                 chunk_usage = chunk?.usage;
                 if chunk_usage {
-                    _attach_call_cost(chunk_usage, self.model_name);
-                    self._usage_history.append(chunk_usage);
+                    chunk_model: str = chunk?.model or self.model_name;
+                    _attach_call_cost(chunk_usage, chunk_model);
+                    _record_usage(
+                        mt_run, chunk_usage, chunk_model, finish_reason=finish_reason
+                    );
                 }
                 if chunk?.choices and chunk?.choices?[0]?.delta {
-                    delta = chunk.choices[0].delta;
-                    yield delta.content or "";
+                    delta = chunk?.choices?[0]?.delta;
+                    yield str(delta?.content or "");
                 }
             }
             break;
@@ -1702,7 +1807,7 @@ impl BaseLLM.model_call_no_stream(params: dict) -> dict {
     );
 }
 
-impl BaseLLM.model_call_with_stream(params: dict) -> Generator[object, None, None] {
+impl BaseLLM.model_call_with_stream(params: dict) -> Iterable[object] {
     raise NotImplementedError(
         "Subclasses must implement this method for LLM call with streaming."
     );
@@ -1713,10 +1818,9 @@ impl BaseLLM.model_call_no_stream_async(params: dict) -> dict {
     return await asyncio.to_thread(self.model_call_no_stream, params);
 }
 
-impl BaseLLM.model_call_with_stream_async(
-    params: dict
-) -> AsyncGenerator[object, None] {
+impl BaseLLM.model_call_with_stream_async(params: dict) -> AsyncIterator[object] {
     import asyncio;
+
     def _next_chunk(gen: Generator[object, None, None]) -> tuple[bool, object] {
         try {
             return (True, next(gen));
@@ -1724,14 +1828,17 @@ impl BaseLLM.model_call_with_stream_async(
             return (False, None);
         }
     }
-    gen = self.model_call_with_stream(params);
-    while True {
-        (has_value, chunk) = await asyncio.to_thread(_next_chunk, gen);
-        if not has_value {
-            break;
+    async def _iter -> AsyncGenerator[object, None] {
+        gen = iter(await asyncio.to_thread(self.model_call_with_stream, params));
+        while True {
+            (has_value, chunk) = await asyncio.to_thread(_next_chunk, gen);
+            if not has_value {
+                break;
+            }
+            yield chunk;
         }
-        yield chunk;
     }
+    return _iter();
 }
 
 impl BaseLLM._force_final_answer(mt_run: MTRuntime) -> object {
@@ -1740,6 +1847,7 @@ impl BaseLLM._force_final_answer(mt_run: MTRuntime) -> object {
         content="Based on the tool calls and their results above, provide only your final answer.",
     );
     mt_run.add_scaffolding_message(final_instruction);
+    original_call_kind = mt_run._call_kind;
     finish_tool_obj = mt_run.get_tool("finish_tool");
     original_tool_choice = mt_run.call_params.pop("tool_choice", None);
     if finish_tool_obj {
@@ -1748,6 +1856,7 @@ impl BaseLLM._force_final_answer(mt_run: MTRuntime) -> object {
             "function": {"name": "finish_tool"}
         };
     }
+    mt_run._call_kind = "final_answer_restream";
     try {
         final_resp = self.dispatch_no_streaming(mt_run);
         if final_resp.tool_calls {
@@ -1760,6 +1869,7 @@ impl BaseLLM._force_final_answer(mt_run: MTRuntime) -> object {
         }
         return str(final_resp.output) if final_resp.output else "";
     } finally {
+        mt_run._call_kind = original_call_kind;
         mt_run.call_params.pop("tool_choice", None);
         if original_tool_choice is not None {
             mt_run.call_params["tool_choice"] = original_tool_choice;
@@ -1776,6 +1886,9 @@ impl BaseLLM._stream_final_answer(mt_run: MTRuntime) -> Generator[str, None, Non
     );
     mt_run.add_scaffolding_message(final_instruction);
 
+    original_call_kind = mt_run._call_kind;
+    mt_run._call_kind = "final_answer_restream";
+
     original_tool_choice = mt_run.call_params.pop("tool_choice", None);
     mt_run.call_params["tool_choice"] = "none";
     accumulated: str = "";
@@ -1785,6 +1898,7 @@ impl BaseLLM._stream_final_answer(mt_run: MTRuntime) -> Generator[str, None, Non
             yield token;
         }
     } finally {
+        mt_run._call_kind = original_call_kind;
         mt_run.call_params.pop("tool_choice", None);
         if original_tool_choice is not None {
             mt_run.call_params["tool_choice"] = original_tool_choice;
@@ -1808,6 +1922,8 @@ impl BaseLLM._attempt_recovery(mt_run: MTRuntime) -> CompletionResult | None {
         content="You must use finish_tool to return your response. Call finish_tool now.",
     );
     mt_run.add_scaffolding_message(recovery_msg);
+    original_call_kind = mt_run._call_kind;
+    mt_run._call_kind = "recovery";
     original_tool_choice = mt_run.call_params.pop("tool_choice", None);
     mt_run.call_params["tool_choice"] = {
         "type": "function",
@@ -1816,6 +1932,7 @@ impl BaseLLM._attempt_recovery(mt_run: MTRuntime) -> CompletionResult | None {
     try {
         return self.dispatch_no_streaming(mt_run);
     } finally {
+        mt_run._call_kind = original_call_kind;
         mt_run.call_params.pop("tool_choice", None);
         if original_tool_choice is not None {
             mt_run.call_params["tool_choice"] = original_tool_choice;
@@ -1824,9 +1941,8 @@ impl BaseLLM._attempt_recovery(mt_run: MTRuntime) -> CompletionResult | None {
 }
 
 impl BaseLLM._yield_recovery_result(
-    recovery_resp: CompletionResult, iter_count: int, mt_run: MTRuntime
+    recovery_resp: CompletionResult, iter_count: int, mt_run: MTRuntime, usage_base: int
 ) -> Generator[StreamEvent, None, None] {
-    self._usage_history.append(recovery_resp.usage);
     finish_found = False;
     if recovery_resp.tool_calls {
         for tool_call in recovery_resp.tool_calls {
@@ -1849,13 +1965,12 @@ impl BaseLLM._yield_recovery_result(
             event_type="chunk", data={"content": str(recovery_resp.output)}
         );
     }
+    yield from _usage_step_events(mt_run, usage_base);
 }
 
 impl BaseLLM._invoke_streaming(
     mt_run: MTRuntime
 ) -> Generator[StreamEvent, None, None] {
-    self._usage_history = [];
-
     if len(mt_run.tools) == 0 {
         _seen_resets = mt_run._stream_reset_count;
         for token in self.dispatch_streaming(mt_run) {
@@ -1886,6 +2001,7 @@ impl BaseLLM._invoke_streaming(
         just_compacted = False;
         while True {
             iter_count += 1;
+            _usage_base = len(mt_run._usage_history);
 
             if on_iteration and iter_count > 1 {
                 ctx = IterationContext(
@@ -1893,7 +2009,8 @@ impl BaseLLM._invoke_streaming(
                     messages=mt_run.messages,
                     last_tool=last_tool,
                     last_result=last_result,
-                    total_tokens=total_tokens
+                    total_tokens=total_tokens,
+                    total_cost=_usage_history_total_cost(mt_run)
                 );
                 action = on_iteration(ctx);
                 if action == IterationAction.ABORT {
@@ -1923,6 +2040,7 @@ impl BaseLLM._invoke_streaming(
                             );
                         }
                     }
+                    yield from _usage_step_events(mt_run, _usage_base);
                     break;
                 }
             }
@@ -1937,6 +2055,7 @@ impl BaseLLM._invoke_streaming(
                         yield StreamEvent(event_type="chunk", data={"content": token});
                     }
                 }
+                yield from _usage_step_events(mt_run, _usage_base);
                 break;
             }
 
@@ -2029,12 +2148,11 @@ impl BaseLLM._invoke_streaming(
                     raise;
                 }
                 yield from self._yield_recovery_result(
-                    recovery_resp, iter_count, mt_run
+                    recovery_resp, iter_count, mt_run, _usage_base
                 );
                 break;
             }
             _llm_ms = int((_time.time() - _llm_t0) * 1000);
-            self._usage_history.append(resp.usage);
 
             usage = resp.usage or {};
             total_tokens += int(
@@ -2045,26 +2163,12 @@ impl BaseLLM._invoke_streaming(
 
             just_compacted = self._maybe_compact(mt_run, usage, just_compacted, _cp);
 
-            _completion_tokens = int(
-                usage.get("completion_tokens", 0)
-                    if isinstance(usage, dict)
-                    else getattr(usage, "completion_tokens", 0)
-            );
             yield StreamEvent(
                 event_type="llm_timing",
-                data={
-                    "duration_ms": _llm_ms,
-                    "iteration": iter_count,
-                    "completion_tokens": _completion_tokens,
-                    "prompt_tokens": _usage_int(usage, "prompt_tokens"),
-                    "cache_read_input_tokens": _usage_int(
-                        usage, "cache_read_input_tokens"
-                    ),
-                    "cache_creation_input_tokens": _usage_int(
-                        usage, "cache_creation_input_tokens"
-                    )
-                }
+                data={"duration_ms": _llm_ms, "iteration": iter_count}
             );
+            yield from _usage_step_events(mt_run, _usage_base);
+            _usage_base = len(mt_run._usage_history);
 
             if resp.tool_calls {
                 non_finish_calls: list = [];
@@ -2172,6 +2276,7 @@ impl BaseLLM._invoke_streaming(
                                 );
                             }
                         }
+                        yield from _usage_step_events(mt_run, _usage_base);
                     }
                     break;
                 }
@@ -2190,32 +2295,14 @@ impl BaseLLM._invoke_streaming(
                     break;
                 }
                 yield from self._yield_recovery_result(
-                    recovery_resp, iter_count, mt_run
+                    recovery_resp, iter_count, mt_run, _usage_base
                 );
                 break;
             }
         }
     }
 
-    if self._usage_history {
-        totals: dict = {};
-        per_call_dicts: list = [];
-        for u in self._usage_history {
-            u_dict = u
-                if isinstance(u, dict)
-                else (u.model_dump() if u?.model_dump else vars(u));
-            per_call_dicts.append(u_dict);
-            for (k, v) in u_dict.items() {
-                if isinstance(v, (int, float)) {
-                    totals[k] = totals.get(k, 0) + v;
-                }
-            }
-        }
-        yield StreamEvent(
-            event_type="usage", data={"total": totals, "per_call": per_call_dicts}
-        );
-        self._usage_history = [];
-    }
+    yield StreamEvent(event_type="usage", data=_aggregate_usage(mt_run._usage_history));
 
     mt_run.write_back_conversation();
 }
