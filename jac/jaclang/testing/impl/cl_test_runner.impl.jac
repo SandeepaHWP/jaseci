@@ -29,7 +29,7 @@ impl compile_cl_module(
 }
 
 impl _compile_runtime -> tuple[str, str] {
-    import from jaclang.compiler.driver.modresolver { resolve_jac_virtual_module_path }
+    import from jaclang.project.modresolver { resolve_jac_virtual_module_path }
 
     runtime_src = resolve_jac_virtual_module_path("@jac/runtime");
     if (not runtime_src) or (not Path(runtime_src).exists()) {

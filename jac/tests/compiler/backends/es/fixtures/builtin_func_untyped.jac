@@ -20,3 +20,23 @@ def combined(a: list[any], b: list[any]) -> list[any] {
     pairs = zip(a, b);
     return [m, x, pairs];
 }
+
+def str_len(s: str) -> int {
+    return len(s);
+}
+
+def min_max_by_key(items: list[any]) -> list[any] {
+    return [min(items, key=str_len), max(items, key=str_len)];
+}
+
+def min_of_empty -> int {
+    return min([]);
+}
+
+def min_of_spread(xs: list[any]) -> int {
+    return min(*xs);
+}
+
+def min_max_varargs(a: int, b: int, c: int) -> list[int] {
+    return [min(a, b, c), max(a, b, c)];
+}

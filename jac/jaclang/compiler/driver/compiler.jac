@@ -37,7 +37,7 @@ import type from jaclang.compiler.frontend.codeinfo {
     ClientArtifact,
     NativeModuleLayout
 }
-import from jaclang.compiler.frontend.helpers { read_file_with_encoding }
+import from jaclang.project.source { read_file_with_encoding }
 import from jaclang.compiler.frontend.constant { CodeContext, Tokens as Tok }
 import from jaclang.compiler.backends.py.jcir_gen_pass { JcirGenPass }
 import from jaclang.compiler.passes.boundary_analysis_pass { BoundaryAnalysisPass }
@@ -162,7 +162,10 @@ obj JacCompiler {
     ) -> None;
 
     def _restore_sections(
-        full_target: str, actual_program: JacProgram, secs: dict[int, bytes]
+        full_target: str,
+        actual_program: JacProgram,
+        secs: dict[int, bytes],
+        base_dir: str = ""
     ) -> None;
 
     def _get_precompiled_jir_bytecode(

@@ -298,6 +298,7 @@ obj CatalogWriter {
         type_ids: dict[any, int] postinit,
         _ident_visiting: set[int] postinit,
         _type_ident_memo: dict[int, any] postinit,
+        _canonical_paths: dict[str, str] postinit,
         types: list[TypeBase] postinit,
         pending_types: list[int] postinit,
         shared_ids: dict[any, int] postinit,
@@ -314,6 +315,7 @@ obj CatalogWriter {
         base_dir: str postinit,
         external_modules: set[any] postinit,
         boundary: (Module | None) = None,
+        path_mapper: Callable[[str], str] | None = None,
         failures: int = 0,
         evaluated: int = 0,
         failure_log: list[str] = [],
@@ -346,10 +348,20 @@ obj CatalogWriter {
         self.sym_types = {};
         self.sym_props = {};
         self.forced_scopes = set();
-        self.base_dir = os.path.realpath(self.pkg_dir);
+        self._canonical_paths = {};
+        self.base_dir = self._real_path(self.pkg_dir);
         self.external_modules = set();
         self._ident_visiting = set();
         self._type_ident_memo = {};
+    }
+
+    def _real_path(path: str) -> str {
+        found = self._canonical_paths.get(path);
+        if found is None {
+            found = os.path.realpath(path);
+            self._canonical_paths[path] = found;
+        }
+        return found;
     }
 
     def in_boundary(mod: (Module | None)) -> bool {
@@ -368,7 +380,7 @@ obj CatalogWriter {
             if not bpath or not mpath {
                 return False;
             }
-            return os.path.realpath(mpath) == os.path.realpath(bpath);
+            return self._real_path(mpath) == self._real_path(bpath);
         } except Exception {
             return False;
         }
@@ -387,7 +399,7 @@ obj CatalogWriter {
             mpath = "";
         }
         if mpath {
-            return os.path.realpath(mpath);
+            return self._real_path(mpath);
         }
         return id(mod);
     }
@@ -485,12 +497,12 @@ obj CatalogWriter {
         if not path {
             return "";
         }
-        real = os.path.realpath(path);
+        real = self._real_path(path);
         prefix = self.base_dir + os.sep;
         if real.startswith(prefix) {
             return real[len(prefix):].replace(os.sep, "/");
         }
-        return real;
+        return self.path_mapper(real) if self.path_mapper is not None else real;
     }
 
     def add_module(mod: Module, dotted: str) -> None {
@@ -1089,9 +1101,16 @@ obj CatalogWriter {
         if self._sym_ident(sym) not in self.sym_types {
             self.force_symbol(sym);
         }
+        target = sym;
+        if sym.imported {
+            try {
+                target = self.evaluator.resolve_to_definition_symbol(sym);
+            } except Exception {}
+        }
         out = bytearray();
         put_uvar(out, self.sid(sym.sym_name));
-        put_uvar(out, self.sid(str(sym.sym_type.value)));
+
+        put_uvar(out, self.sid(str(target.sym_type.value)));
         access = ACCESS_PUBLIC;
         if sym.access.value == "private" {
             access = ACCESS_PRIVATE;
@@ -1112,11 +1131,6 @@ obj CatalogWriter {
         alias_mod = -1;
         alias_name = "";
         if sym.imported {
-            try {
-                target = self.evaluator.resolve_to_definition_symbol(sym);
-            } except Exception {
-                target = sym;
-            }
             if target is not sym {
                 target_mod = module_of(home_scope(target));
                 alias_mod = self.ref_module(target_mod);

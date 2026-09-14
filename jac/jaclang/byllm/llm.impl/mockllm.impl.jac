@@ -33,9 +33,9 @@ impl MockLLM.dispatch_no_streaming(mt_run: MTRuntime) -> CompletionResult {
                 and isinstance(first[0], MockToolCall)
             )
         );
-        second_is_usage = isinstance(second, dict)
-            and all(k in _usage_keys for k in second.keys());
-        if first_is_tool and second_is_usage {
+        if first_is_tool
+            and isinstance(second, dict)
+            and all(k in _usage_keys for k in second.keys()) {
             output = first;
             usage = second;
         }
@@ -51,7 +51,8 @@ impl MockLLM.dispatch_no_streaming(mt_run: MTRuntime) -> CompletionResult {
     if isinstance(output, list)
         and len(output) > 0
         and isinstance(output[0], MockToolCall) {
-        tool_calls = [o.to_tool_call() for o in output];
+        mock_calls: list[MockToolCall] = output;
+        tool_calls = [o.to_tool_call() for o in mock_calls];
         self.log_info(
             f"Mock LLM call completed with {len(tool_calls)} batch tool calls"
         );
@@ -81,7 +82,7 @@ impl MockLLM.adispatch_no_streaming(mt_run: MTRuntime) -> CompletionResult {
     return self.dispatch_no_streaming(mt_run);
 }
 
-impl MockLLM.adispatch_streaming(mt_run: MTRuntime) {
+impl MockLLM.adispatch_streaming(mt_run: MTRuntime) -> AsyncIterator[str] {
     import asyncio;
 
     output = self.config["outputs"].pop(0);

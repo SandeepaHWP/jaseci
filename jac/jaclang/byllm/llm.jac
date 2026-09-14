@@ -6,7 +6,9 @@ import json;
 import random;
 import time;
 
-import from typing { AsyncGenerator, Generator }
+import from typing { AsyncGenerator, Generator, cast }
+import type from litellm { Router }
+import type from llama_cpp { Llama }
 import from jaclang.byllm.mtir { MTRuntime }
 import from jaclang.byllm._optdeps.litellm { litellm, _disable_debugging }
 import from jaclang.byllm._optdeps.openai { openai, OpenAI, AsyncOpenAI }
@@ -22,6 +24,7 @@ import from jaclang.byllm.exceptions {
 }
 import from jaclang.byllm.types {
     CompletionResult,
+    response_dict,
     LiteLLMMessage,
     MockToolCall,
     MockRawResponse,
@@ -48,7 +51,12 @@ import from jaclang.byllm.parallel {
     _PARALLEL_TOOL_HINT
 }
 import from jaclang.byllm.schema { inject_schema_hint }
-import from jaclang.byllm.tool_protocol { inject_tool_hint, recover_tool_calls }
+import from jaclang.byllm.tool_protocol {
+    inject_tool_hint,
+    recover_tool_calls,
+    coerce_message_dict,
+    response_field
+}
 
 glob _byllm_config = get_byllm_config(),
      _litellm_config = _byllm_config.get_litellm_config(),
@@ -147,12 +155,9 @@ obj BaseLLM {
     ) -> Generator[str, None, None];
 
     async def adispatch_no_streaming(mt_run: MTRuntime) -> CompletionResult;
-    async def adispatch_streaming(mt_run: MTRuntime);
+    async def adispatch_streaming(mt_run: MTRuntime) -> AsyncIterator[str];
     def model_call_no_stream(params: dict[str, any]) -> dict[str, any];
-    def model_call_with_stream(
-        params: dict[str, any]
-    ) -> Generator[object, None, None];
-
+    def model_call_with_stream(params: dict[str, any]) -> Iterable[object];
     async def model_call_no_stream_async(params: dict[str, any]) -> dict[str, any];
     async def model_call_with_stream_async(
         params: dict[str, any]
@@ -192,21 +197,18 @@ obj MockLLM(BaseLLM) {
     override def dispatch_no_streaming(mt_run: MTRuntime) -> CompletionResult;
     override async def adispatch_no_streaming(mt_run: MTRuntime) -> CompletionResult;
     override def dispatch_streaming(mt_run: MTRuntime) -> Generator[str, None, None];
-    override async def adispatch_streaming(mt_run: MTRuntime);
+    override async def adispatch_streaming(mt_run: MTRuntime) -> AsyncIterator[str];
 }
 
 obj LocalLLM(BaseLLM) {
     has alias: str = "",
         spec: dict[str, any] = {},
-        _llama: object = None;
+        _llama: Llama | None = None;
 
     def postinit -> None;
-    def _ensure_llama -> object;
+    def _ensure_llama -> Llama;
     override def model_call_no_stream(params: dict[str, any]) -> dict[str, any];
-    override def model_call_with_stream(
-        params: dict[str, any]
-    ) -> Generator[object, None, None];
-
+    override def model_call_with_stream(params: dict[str, any]) -> Iterable[object];
     override def _get_ctx_window(call_params: dict[str, any]) -> int;
 }
 
@@ -216,15 +218,12 @@ obj ModelPool(BaseLLM) {
         strategy: str | None = None,
         num_retries: int | None = None,
         timeout: float | None = None,
-        _router: object = None,
+        _router: Router | None = None,
         _fallback_model_names: list[str] = [];
 
     def postinit -> None;
     override def model_call_no_stream(params: dict[str, any]) -> dict[str, any];
-    override def model_call_with_stream(
-        params: dict[str, any]
-    ) -> Generator[object, None, None];
-
+    override def model_call_with_stream(params: dict[str, any]) -> Iterable[object];
     override def _get_ctx_window(call_params: dict[str, any]) -> int;
 }
 
@@ -241,13 +240,16 @@ obj Model(BaseLLM) {
     def _raise_mapped_provider_error(e: Exception) -> None;
     def model_call_no_stream(params: dict[str, any]) -> dict[str, any];
     async def model_call_no_stream_async(params: dict[str, any]) -> dict[str, any];
-    def model_call_with_stream(params: dict[str, any]);
-    async def model_call_with_stream_async(params: dict[str, any]);
+    def model_call_with_stream(params: dict[str, any]) -> Iterable[object];
+    async def model_call_with_stream_async(
+        params: dict[str, any]
+    ) -> AsyncIterator[object];
+
     def model_call_http(
         url: str, token: str, payload: dict[str, any], ca_bundle: (str | bool | None)
-    ) -> object;
+    ) -> dict[str, any];
 
     async def model_call_http_async(
         url: str, token: str, payload: dict[str, any], ca_bundle: (str | bool | None)
-    ) -> object;
+    ) -> dict[str, any];
 }
