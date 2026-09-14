@@ -12,7 +12,7 @@ import from jaclang.server.serving.authcrypt {
 import from datetime { UTC, datetime, timedelta }
 import from jaclang.server.transport { TransportResponse, Meta }
 import from jaclang.scale.config.config_loader { get_scale_config }
-import from jaclang.scale.persistence.pg { open_docs_store }
+import from jaclang.server.shared_store { open_docs_store }
 
 glob logger = logging.getLogger(__name__);
 
@@ -27,6 +27,9 @@ obj WebhookUtils {
     static def validate_api_key(api_key: str) -> dict[str, str] | None;
     static def extract_signature(header_value: str) -> str;
 }
+
+def rate_window_ok(state: dict, key: str, limit_per_minute: int) -> bool;
+
 
 def _create_api_key_db -> any | None {
     try {

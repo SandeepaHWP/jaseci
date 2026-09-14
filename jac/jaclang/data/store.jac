@@ -11,8 +11,9 @@ import from jaclang.runtime.exceptions { WriteConflict }
 glob logger = logging.getLogger(__name__),
      SCHEMA_VERSION = 1,
      SCHEMA_STAMP_KEY = 'schema_fingerprint',
-     _schema_ready: set[str] = set(),
+     _schema_ready: dict[str, str] = {},
      _schema_gate = threading.Lock(),
+     _schema_extensions: dict[str, list[str]] = {},
      __all__ = [
          'AnchorRow',
          'Store',
@@ -21,8 +22,17 @@ glob logger = logging.getLogger(__name__),
          'TxnIsolation',
          'SCHEMA_VERSION',
          'SCHEMA_STAMP_KEY',
-         'SessionConflictError'
+         'SessionConflictError',
+         'register_schema_extension'
      ];
+
+def register_schema_extension(name: str, statements: list[str]) {
+    _schema_extensions[name] = list(statements);
+}
+
+def _schema_extension_key -> str {
+    return ",".join(sorted(_schema_extensions));
+}
 
 
 enum TxnIsolation(StrEnum) {
@@ -65,8 +75,7 @@ obj AnchorRow {
         dst: (UUID | None) = None,
         undirected: bool = False,
         ancestry: list[str] = [],
-        version: int = 0,
-        adjacency: (list[UUID] | None) = None;
+        version: int = 0;
 }
 
 
@@ -94,6 +103,10 @@ obj Store {
     def in_txn -> bool abst;
     def txn_isolation -> (TxnIsolation | None) abst;
     def load_full(ids: list[UUID]) -> dict[UUID, AnchorRow] abst;
+    def adjacency(
+        node_id: UUID, after: (tuple[int, UUID] | None), limit: int
+    ) -> list[tuple[int, UUID]] abst;
+
     def upsert(rows_in: list[AnchorRow]) -> None abst;
     def delete(ids: list[UUID]) -> None abst;
     def existing(ids: list[UUID]) -> set[UUID] abst;
@@ -104,6 +117,8 @@ obj Store {
     def kv_put(key: str, value: str) -> None abst;
     def kv_put_ttl(key: str, value: str, ttl_seconds: int) -> None abst;
     def kv_delete(key: str) -> None abst;
+    def kv_acquire_lease(key: str, ttl_seconds: int, owner: str) -> bool abst;
+    def kv_release_lease(key: str, owner: str) -> bool abst;
     def quarantine(
         missing_id: UUID, referrer_id: (UUID | None), kind: str
     ) -> None abst;
@@ -147,6 +162,10 @@ obj PgStore(Store) {
     def in_txn -> bool;
     def txn_isolation -> (TxnIsolation | None);
     def load_full(ids: list[UUID]) -> dict[UUID, AnchorRow];
+    def adjacency(
+        node_id: UUID, after: (tuple[int, UUID] | None), limit: int
+    ) -> list[tuple[int, UUID]];
+
     def upsert(rows_in: list[AnchorRow]) -> None;
     def delete(ids: list[UUID]) -> None;
     def existing(ids: list[UUID]) -> set[UUID];
@@ -157,6 +176,8 @@ obj PgStore(Store) {
     def kv_put(key: str, value: str) -> None;
     def kv_put_ttl(key: str, value: str, ttl_seconds: int) -> None;
     def kv_delete(key: str) -> None;
+    def kv_acquire_lease(key: str, ttl_seconds: int, owner: str) -> bool;
+    def kv_release_lease(key: str, owner: str) -> bool;
     def quarantine(missing_id: UUID, referrer_id: (UUID | None), kind: str) -> None;
     def notify(channel: str, payload: str) -> None;
     def listen(channel: str, callback: any) -> None;

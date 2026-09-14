@@ -3,6 +3,7 @@ import from jaclang.compiler.frontend.unitree {
     ArchSpec,
     Archetype,
     AtomTrailer,
+    Assignment,
     CtrlStmt,
     EdgeOpRef,
     EdgeRefTrailer,
@@ -30,12 +31,14 @@ import from jaclang.compiler.frontend.unitree {
     SubTag,
     Token,
     UnaryExpr,
+    TupleVal,
+    ListVal,
     UniNode,
     YieldExpr
 }
 import from jaclang.compiler.passes.transform { Transform }
-import from jaclang.compiler.backends.py.module_codegen_pass {
-    ModuleCodegenPass,
+import from jaclang.compiler.frontend.module_facts {
+    ModuleFacts,
     client_capability_violations
 }
 import from jaclang.compiler.frontend.constant { SymbolType }
@@ -86,8 +89,6 @@ walker PortabilityWarnPass(Transform) {
     has ir_in: Module,
         cancel_token: any = None;
 
-    static has PROVIDES: tuple = ('portability', );
-
     def postinit -> None;
     def transform(ir_in: Module) -> Module;
     def _run_impl(ir_in: Module) -> Module;
@@ -100,7 +101,6 @@ walker PortabilityWarnPass(Transform) {
 }
 
 walker NativeCapabilityCheckPass(Transform) {
-    static has PROVIDES: tuple = ('capability', );
     has ir_in: Module,
         cancel_token: any = None;
 
@@ -111,7 +111,6 @@ walker NativeCapabilityCheckPass(Transform) {
 }
 
 walker ClientCapabilityCheckPass(Transform) {
-    static has PROVIDES: tuple = ('client_capability', );
     has ir_in: Module,
         cancel_token: any = None;
 

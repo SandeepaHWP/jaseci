@@ -1,11 +1,11 @@
-import from jaclang.scale.deploy.target.kubernetes.manifest_builder {
-    ManifestBuilder,
-    GATEWAY_NAME
-}
+import from jaclang.scale.deploy.target.kubernetes.manifest_builder { ManifestBuilder }
+import from jaclang.scale.runtime.context.util { GATEWAY_NAME }
 import from jaclang.scale.deploy.target.kubernetes.target { KubernetesTarget }
 import from jaclang.scale.deploy.target.kubernetes.kubernetes_config {
     KubernetesConfig
 }
+
+import from jaclang.scale.runtime.fleet { fleet_of }
 
 
 def _builder(
@@ -13,7 +13,7 @@ def _builder(
 ) -> ManifestBuilder {
     return ManifestBuilder(
         k8s_config=k8s_config or KubernetesConfig(app_name="t", namespace="t-ns"),
-        microservices_config={"services": services},
+        fleet=fleet_of({}, overrides=services),
         dry_run=True
     );
 }
@@ -143,9 +143,7 @@ test "malformed hpa.behavior warns and falls back to the empty fragment" {
     logger = unittest.mock.MagicMock();
     b = ManifestBuilder(
         k8s_config=KubernetesConfig(app_name="t", namespace="t-ns"),
-        microservices_config={
-            "services": {"billing_ops": {"hpa": {"behavior": "gentle"}}}
-        },
+        fleet=fleet_of({}, overrides={"billing_ops": {"hpa": {"behavior": "gentle"}}}),
         dry_run=True,
         logger=logger
     );

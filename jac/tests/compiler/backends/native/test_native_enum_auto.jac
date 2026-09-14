@@ -31,9 +31,8 @@ import contextlib;
 import io;
 import os;
 import subprocess;
-import sys;
 import tempfile;
-import from tests.support { TESTS_DIR, native_force_opts }
+import from tests.support { jac_command, TESTS_DIR, native_force_opts }
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.passes.layout_pass { get_layout_registry }
 
@@ -66,7 +65,7 @@ def seam_report(fixture: str) -> str {
 
 def sv_lines(fixture: str) -> list {
     proc = subprocess.run(
-        [sys.executable, "-m", "jaclang", "run", os.path.join(FIXTURES, fixture)],
+        jac_command("run", os.path.join(FIXTURES, fixture)),
         capture_output=True,
         text=True,
         timeout=900
@@ -83,15 +82,9 @@ def sv_lines(fixture: str) -> list {
 def na_lines(fixture: str) -> list {
     out_bin = os.path.join(tempfile.mkdtemp(), "probe.bin");
     comp = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "jaclang",
-            "nacompile",
-            os.path.join(FIXTURES, fixture),
-            "-o",
-            out_bin
-        ],
+        jac_command(
+            "build", "--native", os.path.join(FIXTURES, fixture), "-o", out_bin
+        ),
         capture_output=True,
         text=True,
         timeout=900
@@ -159,7 +152,7 @@ test "generated values answer as CPython does" {
 
 test "a module-local auto is not read as the enum's" {
     seams = seam_report("enum_auto_shadow.jac");
-    assert "attribute access 'Soft'" in seams , (
+    assert "demoting loudness" in seams , (
         f"this module's own `auto` was counted as a generated value:\n{seams}"
     );
     (prog, ir) = compile_native("enum_auto_shadow.jac");

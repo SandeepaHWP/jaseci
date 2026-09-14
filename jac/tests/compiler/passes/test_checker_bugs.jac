@@ -110,6 +110,13 @@ Bug index:
                 scope check, and an impl block was not recognized as a scope
                 at all, so `impl C.m(v: T)` and every class parameter used in
                 a method body reported E1065 (#8230)
+  #SELFOVL-1 - overload selection never looked at the receiver, so typeshed's
+               `def split(self: LiteralString, ...) -> list[LiteralString]`
+               won for a plain `str` and `lines.insert(0, str(1))` was E1053;
+               and assignment narrowing read the raw right-hand type where
+               the declaration path widens literals, so an annotated
+               `list[str]` local was narrowed to `list[LiteralString]` anyway
+               (#8982 item 12)
 """
 
 import os;
@@ -2021,5 +2028,22 @@ test "bug_liteq_1_int_literal_comparison_keeps_int_arm" {
     # A str literal never collapsed its arm; pinned so the two stay symmetric.
     assert "str | NoneType" in by_line.get(39, "") , (
         f"Bug #LITEQ-1: the str arm must survive too. Got: {by_line.get(39)}"
+    );
+}
+
+test "bug_selfovl1_receiver_selects_the_self_typed_overload" {
+    program = compile_and_check("checker_self_typed_overload.jac");
+    e1053 = [
+        e.pretty_print()
+        for e in program.errors_had
+        if e.code and e.code.code == "E1053"
+    ];
+    assert not e1053 , (
+        "a `str` receiver still resolved to the LiteralString overload, or a "
+        f"declared list[str] was narrowed away:\n"
+        + "\n".join(e1053)
+    );
+    assert len(program.errors_had) == 0 , "\n".join(
+        e.pretty_print() for e in program.errors_had
     );
 }

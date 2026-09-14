@@ -17,7 +17,7 @@ impl MockLLM.dispatch_no_streaming(mt_run: MTRuntime) -> CompletionResult {
     if isinstance(output, MockError) {
         raise output.error;
     }
-    message = "{'role': 'assistant', 'content': {'text': 'Mock response'}}";
+    message: any = "{'role': 'assistant', 'content': {'text': 'Mock response'}}";
     mt_run.add_message(message);
 
     _usage_keys = ["prompt_tokens", "completion_tokens", "total_tokens"];
@@ -40,6 +40,7 @@ impl MockLLM.dispatch_no_streaming(mt_run: MTRuntime) -> CompletionResult {
             usage = second;
         }
     }
+    _record_usage(mt_run, usage, self.model_name);
 
     if isinstance(output, MockRawResponse) {
         return CompletionResult(
@@ -80,8 +81,42 @@ impl MockLLM.adispatch_no_streaming(mt_run: MTRuntime) -> CompletionResult {
     return self.dispatch_no_streaming(mt_run);
 }
 
+impl MockLLM.adispatch_streaming(mt_run: MTRuntime) -> AsyncIterator[str] {
+    import asyncio;
+
+    output = self.config["outputs"].pop(0);
+    usage: dict[str, object] = {};
+    if isinstance(output, tuple) and len(output) == 2 {
+        first = output[0];
+        second = output[1];
+        if isinstance(first, str) and isinstance(second, dict) {
+            output = first;
+            usage = second;
+        }
+    }
+    if mt_run.stream {
+        while output {
+            chunk_len = random.randint(3, 10);
+            yield output[:chunk_len];
+            await asyncio.sleep(random.uniform(0.01, 0.05));
+            output = output[chunk_len:];
+        }
+    }
+
+    _record_usage(mt_run, usage, self.model_name);
+}
+
 impl MockLLM.dispatch_streaming(mt_run: MTRuntime) -> Generator[str, None, None] {
     output = self.config["outputs"].pop(0);
+    usage: dict[str, object] = {};
+    if isinstance(output, tuple) and len(output) == 2 {
+        first = output[0];
+        second = output[1];
+        if isinstance(first, str) and isinstance(second, dict) {
+            output = first;
+            usage = second;
+        }
+    }
     if mt_run.stream {
         while output {
             chunk_len = random.randint(3, 10);
@@ -91,5 +126,5 @@ impl MockLLM.dispatch_streaming(mt_run: MTRuntime) -> Generator[str, None, None]
         }
     }
 
-    self._usage_history.append({});
+    _record_usage(mt_run, usage, self.model_name);
 }
