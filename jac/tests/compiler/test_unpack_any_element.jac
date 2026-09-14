@@ -6,11 +6,8 @@ second: `_extract_tuple_element_type` returned None for anything that was
 not a `ClassType`, `Any` included, so each destructured target fell through
 to `Unknown`, and every *use* of such a target then errored (E1053/E1055).
 
-The fixture spells its containers `tuple[any, any]` / `list[any]` rather than
-the bare `tuple`/`list` it was written with: those are E1036 since #8080 and
-their elements are now `Unknown` by design. The explicit spelling reaches the
-same code path only because the `is_any_instance()` fix below landed -- before
-it, an explicit `any` element destructured to `Unknown`.
+The fixture spells its containers `tuple[any, any]` / `list[any]`, since bare
+`tuple`/`list` annotations are now an error; they reach the same unpacking path.
 
 The follow-up that #8039 flagged and left open -- unpacking a value whose
 *declared* annotation is `any` (`pair: any; (nm, ty) = pair;`) raising E1020
@@ -60,7 +57,7 @@ test "unpacking elements of an Any-erased container type-checks clean" {
 test "a destructured Any target is usable where its type is constrained" {
     errs = check_errors("unpack_any_element.jac");
     # `takes_type(ty)` constrains a destructured target to `type`, and
-    # `str(nm)` constrains the other. Both were E1053/E1055 before.
+    # `nm + ...` constrains the other to `str`. Both were E1053/E1055 before.
     joined = " ".join(errs);
     assert "E1053" not in joined , f"Unknown leaked into a parameter: {errs}";
     assert "E1055" not in joined , f"Unknown leaked into an operator: {errs}";

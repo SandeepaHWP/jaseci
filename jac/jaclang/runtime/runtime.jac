@@ -298,7 +298,7 @@ class JacGraph {
         right: (NodeArchetype | list[NodeArchetype]),
         `edge: type[EdgeArchetype] | EdgeArchetype | None = None,
         undir: bool = False,
-        conn_assign: (tuple[(tuple[str], tuple[any])] | None) = None,
+        conn_assign: (tuple[(tuple[str, ...], tuple[any, ...])] | None) = None,
         edges_only: bool = False
     ) -> (NodeArchetype | list[NodeArchetype] | list[EdgeArchetype]);
 
@@ -310,7 +310,7 @@ class JacGraph {
     ) -> bool;
 
     static def assign_all(
-        target: list[T], attr_val: tuple[(tuple[str], tuple[any])]
+        target: list[T], attr_val: tuple[(tuple[str, ...], tuple[any, ...])]
     ) -> list[T];
 
     static def root -> Root;
@@ -318,7 +318,7 @@ class JacGraph {
     static def build_edge(
         is_undirected: bool,
         conn_type: type[EdgeArchetype] | EdgeArchetype | None,
-        conn_assign: (tuple[(tuple[str], tuple[any])] | None)
+        conn_assign: (tuple[(tuple[str, ...], tuple[any, ...])] | None)
     ) -> Callable[([NodeAnchor, NodeAnchor], EdgeArchetype)];
 
     static def heavy_edge(

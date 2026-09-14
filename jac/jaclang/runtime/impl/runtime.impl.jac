@@ -1189,7 +1189,7 @@ impl JacGraph.disconnect(
 }
 
 impl JacGraph.assign_all(
-    target: list[T], attr_val: tuple[(tuple[str], tuple[any])]
+    target: list[T], attr_val: tuple[(tuple[str, ...], tuple[any, ...])]
 ) -> list[T] {
     for `obj in target {
         (attrs, values) = attr_val;

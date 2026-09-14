@@ -1,5 +1,5 @@
 """A generic written without type arguments is a hard error at every
-annotation site, and its value type recovers as Unknown."""
+annotation site; reads through it still behave as any."""
 
 def bare_dict_ret -> dict {
     return {"a": 1};

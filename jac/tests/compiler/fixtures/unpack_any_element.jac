@@ -8,7 +8,7 @@ def takes_type(t: type) -> str {
 def loop_unpack_tuple -> str {
     out = "";
     for (nm, ty) in ANY_TUPLE {
-        out += str(nm) + takes_type(ty);
+        out += nm + takes_type(ty);
     }
     return out;
 }
@@ -16,7 +16,7 @@ def loop_unpack_tuple -> str {
 def loop_unpack_list -> str {
     out = "";
     for (num, label) in ANY_LIST {
-        out += str(num) + str(label);
+        out += str(num) + label;
     }
     return out;
 }
