@@ -10,24 +10,21 @@ a corrupted database must exit 0 and return the surviving neighbours; these
 tests corrupt the store out of band and drive the real read path end to end.
 """
 
+import from tests.support { jac_command }
+
 import subprocess;
-import sys;
 import from pathlib { Path }
 import from tempfile { TemporaryDirectory }
 import from uuid { UUID }
-import from jaclang.runtimelib.pgembed { PgRuntime }
-import from jaclang.runtimelib.session { shared_pg_data_dir }
-import from jaclang.runtimelib.store { PgStore, TxnIsolation }
+import from jaclang.data.pgembed { PgRuntime }
+import from jaclang.server.session { shared_pg_data_dir }
+import from jaclang.data.store { PgStore, TxnIsolation }
 
 
 """Run `python -m jaclang <args>` in cwd; return (rc, stdout, stderr)."""
 def _jac(cwd: str, args: list) -> tuple[int, str, str] {
     result = subprocess.run(
-        [sys.executable, "-m", "jaclang"] + args,
-        cwd=cwd,
-        capture_output=True,
-        text=True,
-        timeout=180
+        jac_command() + args, cwd=cwd, capture_output=True, text=True, timeout=180
     );
     return (int(result.returncode), str(result.stdout), str(result.stderr));
 }

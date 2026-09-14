@@ -1,46 +1,36 @@
 """Tests for the byllm agent-level telemetry callback registry and emit logic.
 """
 
-import types;
+import asyncio;
+import from jaclang.byllm.mtir { MTIR, MTRuntime }
+import from jaclang.byllm.types { Message, MessageRole, Text }
+import jaclang.byllm.llm as _byllm_llm_mod;
 import from jaclang.byllm.telemetry {
     register_agent_callback,
     _emit_agent_telemetry,
     _agent_callbacks
 }
 
-#  Helpers
-"""Build a fake mt_run via types.SimpleNamespace (same pattern as test_byllm.jac)."""
-def make_fake_mt_run(
+def make_mt_run(
     invocation_id: str = "inv-test-001",
     user_prompt: str = "What is 2+2?",
     caller_name: str = "math_solver",
-    caller_args: dict | None = None,
-    msg_list: list | None = None
-) -> types.SimpleNamespace {
-    # mt_run.messages[1].content[0].text — used for user_prompt extraction
-    msg_content = types.SimpleNamespace(text=user_prompt);
-    msg1 = types.SimpleNamespace(content=[msg_content]);
-
-    # mt_run.mtir.caller.__name__ — used for caller_name
-    caller = types.SimpleNamespace(__name__=caller_name);
-    args = caller_args or {"x": "10", "y": "20"};
-    mtir = types.SimpleNamespace(caller=caller, args=args);
-
-    # mt_run.get_msg_list() — used for conversation_history
-    history = msg_list
-        or [
-            {"role": "system", "content": "You are a math expert."},
-            {"role": "user", "content": user_prompt}
-        ];
-
-    mt = types.SimpleNamespace(
-        _invocation_id=invocation_id,
-        messages=[types.SimpleNamespace(), msg1],
-        mtir=mtir,
-        get_msg_list=lambda { history; }
+    caller_args: dict | None = None
+) -> MTRuntime {
+    def caller {}
+    caller.__name__ = caller_name;
+    return MTRuntime(
+        messages=[
+            Message(MessageRole.SYSTEM, "You are a math expert."),
+            Message(MessageRole.USER, [Text(user_prompt)])
+        ],
+        resp_type=str,
+        stream=False,
+        tools=[],
+        call_params={},
+        mtir=MTIR(caller, caller_args or {"x": "10", "y": "20"}, {}, None),
+        _invocation_id=invocation_id
     );
-
-    return mt;
 }
 
 #  1. register_agent_callback — deduplication
@@ -48,7 +38,7 @@ test "register_agent_callback adds callback to registry" {
     original = _agent_callbacks.copy();
     _agent_callbacks.clear();
     try {
-        def cb(record: dict) { }
+        def cb(record: dict) {}
         register_agent_callback(cb);
         assert len(_agent_callbacks) == 1;
         assert _agent_callbacks[0] is cb;
@@ -62,7 +52,7 @@ test "register_agent_callback deduplicates same callback" {
     original = _agent_callbacks.copy();
     _agent_callbacks.clear();
     try {
-        def cb(record: dict) { }
+        def cb(record: dict) {}
         register_agent_callback(cb);
         register_agent_callback(cb);  # Register again — should be ignored
         register_agent_callback(cb);  # Third time — still ignored
@@ -79,8 +69,8 @@ test "register_agent_callback allows different callbacks" {
     original = _agent_callbacks.copy();
     _agent_callbacks.clear();
     try {
-        def cb1(record: dict) { }
-        def cb2(record: dict) { }
+        def cb1(record: dict) {}
+        def cb2(record: dict) {}
         register_agent_callback(cb1);
         register_agent_callback(cb2);
         assert len(_agent_callbacks) == 2;
@@ -101,7 +91,7 @@ test "emit_agent_telemetry builds record with correct fields" {
         }
         _agent_callbacks.append(capture_cb);
 
-        mt = make_fake_mt_run(
+        mt = make_mt_run(
             invocation_id="inv-field-check",
             user_prompt="What is the capital of France?",
             caller_name="geography_agent",
@@ -155,7 +145,7 @@ test "emit_agent_telemetry marks streaming results correctly" {
         }
         _agent_callbacks.append(capture_cb);
 
-        mt = make_fake_mt_run();
+        mt = make_mt_run();
         # Pass a generator as result — should produce "[streaming]"
         gen = (x for x in [1, 2, 3]);
 
@@ -179,7 +169,7 @@ test "emit_agent_telemetry includes error string on failure" {
         }
         _agent_callbacks.append(capture_cb);
 
-        mt = make_fake_mt_run();
+        mt = make_mt_run();
         err = ValueError("Rate limit exceeded");
         _emit_agent_telemetry(mt, None, "gpt-4o", 50.0, "error", err);
 
@@ -209,7 +199,7 @@ test "failing callback does not prevent other callbacks from firing" {
         _agent_callbacks.append(bad_cb);
         _agent_callbacks.append(good_cb);
 
-        mt = make_fake_mt_run(invocation_id="inv-fail-iso");
+        mt = make_mt_run(invocation_id="inv-fail-iso");
         _emit_agent_telemetry(mt, "answer", "gpt-4o", 100.0, "success", None);
 
         # good_cb should still have been called despite bad_cb throwing
@@ -244,7 +234,7 @@ test "multiple failing callbacks do not suppress any good callbacks" {
         _agent_callbacks.append(bad2);
         _agent_callbacks.append(good2);
 
-        mt = make_fake_mt_run();
+        mt = make_mt_run();
         _emit_agent_telemetry(mt, "ok", "gpt-4o", 50.0, "success", None);
 
         assert "good1" in results;
@@ -267,16 +257,14 @@ test "emit handles missing mt_run fields gracefully" {
         }
         _agent_callbacks.append(capture_cb);
 
-        # Minimal mt_run with empty messages and no mtir — SimpleNamespace, no MagicMock
+        # Empty context still emits a record when message collection fails.
         def fail_get_msg_list -> list {
             raise Exception("no messages");
         }
-        mt = types.SimpleNamespace(
-            _invocation_id="inv-minimal",
-            messages=[],
-            mtir=None,
-            get_msg_list=fail_get_msg_list
-        );
+        mt = make_mt_run(invocation_id="inv-minimal");
+        mt.messages = [];
+        mt.mtir = None;
+        mt.get_msg_list = fail_get_msg_list;
 
         _emit_agent_telemetry(mt, "fallback", "gpt-4o", 80.0, "success", None);
 
@@ -304,7 +292,7 @@ test "emit record includes parent_invocation_id when set on mt_run" {
         }
         _agent_callbacks.append(capture_cb);
 
-        mt = make_fake_mt_run(invocation_id="child-inv-001");
+        mt = make_mt_run(invocation_id="child-inv-001");
         mt._parent_invocation_id = "parent-inv-001";
 
         _emit_agent_telemetry(mt, "result", "gpt-4o", 100.0, "success", None);
@@ -328,8 +316,8 @@ test "emit record has None parent_invocation_id for root calls" {
         }
         _agent_callbacks.append(capture_cb);
 
-        mt = make_fake_mt_run(invocation_id="root-inv-001");
-        # No _parent_invocation_id set — simulates root call
+        mt = make_mt_run(invocation_id="root-inv-001");
+        # Root invocations retain the declared None parent.
         _emit_agent_telemetry(mt, "result", "gpt-4o", 100.0, "success", None);
 
         assert len(captured) == 1;
@@ -356,7 +344,7 @@ test "ContextVar chains correctly across simulated nested Model.invoke calls" {
         _agent_callbacks.append(capture_cb);
 
         # --- Simulate outer Model.invoke ---
-        outer_mt = make_fake_mt_run(caller_name="outer_agent");
+        outer_mt = make_mt_run(caller_name="outer_agent");
         outer_mt._parent_invocation_id = _current_invocation_id.get(None);
         outer_mt._invocation_id = "outer-id-001";
         outer_token = _current_invocation_id.set(outer_mt._invocation_id);
@@ -366,7 +354,7 @@ test "ContextVar chains correctly across simulated nested Model.invoke calls" {
         assert outer_mt._parent_invocation_id is None;  # root call
 
         # --- Simulate inner Model.invoke (nested by llm() tool call) ---
-        inner_mt = make_fake_mt_run(caller_name="inner_agent");
+        inner_mt = make_mt_run(caller_name="inner_agent");
         inner_mt._parent_invocation_id = _current_invocation_id.get(None);
         inner_mt._invocation_id = "inner-id-001";
         inner_token = _current_invocation_id.set(inner_mt._invocation_id);
@@ -376,7 +364,7 @@ test "ContextVar chains correctly across simulated nested Model.invoke calls" {
         assert _current_invocation_id.get() == "inner-id-001";
 
         # --- Simulate deepest Model.invoke (3-level nesting) ---
-        deep_mt = make_fake_mt_run(caller_name="deep_agent");
+        deep_mt = make_mt_run(caller_name="deep_agent");
         deep_mt._parent_invocation_id = _current_invocation_id.get(None);
         deep_mt._invocation_id = "deep-id-001";
         deep_token = _current_invocation_id.set(deep_mt._invocation_id);
@@ -447,13 +435,13 @@ test "ContextVar resets correctly even when inner invocation raises" {
         _agent_callbacks.append(capture_cb);
 
         # Outer invoke
-        outer_mt = make_fake_mt_run(caller_name="outer");
+        outer_mt = make_mt_run(caller_name="outer");
         outer_mt._parent_invocation_id = _current_invocation_id.get(None);
         outer_mt._invocation_id = "outer-err-001";
         outer_token = _current_invocation_id.set(outer_mt._invocation_id);
 
         # Inner invoke that "fails"
-        inner_mt = make_fake_mt_run(caller_name="inner");
+        inner_mt = make_mt_run(caller_name="inner");
         inner_mt._parent_invocation_id = _current_invocation_id.get(None);
         inner_mt._invocation_id = "inner-err-001";
         inner_token = _current_invocation_id.set(inner_mt._invocation_id);
@@ -493,4 +481,40 @@ test "ContextVar resets correctly even when inner invocation raises" {
         _agent_callbacks.extend(original);
         _current_invocation_id.set(None);  # type: ignore
     }
+}
+
+test "_astream_with_telemetry does not leak the invocation id into the consumer" {
+    import from jaclang.byllm.telemetry { _current_invocation_id }
+    import from typing { AsyncGenerator }
+
+    async def _inner_agen -> AsyncGenerator[object, None] {
+        yield "a";
+        yield "b";
+    }
+
+    mt = make_mt_run(invocation_id="stream-leak-001");
+
+    def _drive -> list {
+        seen: list = [];
+        async def _consume {
+            agen: AsyncGenerator[object, None] = _byllm_llm_mod._astream_with_telemetry(
+                _inner_agen(), mt, "gpt-4o", 0.0
+            );
+            async for _item in agen {
+                seen.append(_current_invocation_id.get(None));
+            }
+        }
+        coro: any = _consume();
+        asyncio.run(coro);
+        return seen;
+    }
+
+    seen_during_iteration = _drive();
+    assert seen_during_iteration == [None, None] , (
+        "the consumer's own context must never observe the wrapped call's "
+        f"invocation id between yields, saw {seen_during_iteration}"
+    );
+    assert _current_invocation_id.get(None) is None , (
+        "the invocation id must not leak past the generator's own driver either"
+    );
 }

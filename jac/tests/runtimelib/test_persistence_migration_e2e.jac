@@ -8,9 +8,10 @@ Complements test_persistence_migration.jac which is the unit-level suite
 for SqliteMemory internals (schema, quarantine, legacy pickle migration).
 """
 
+import from tests.support { jac_command }
+
 import os;
 import subprocess;
-import sys;
 import from pathlib { Path }
 import from tempfile { TemporaryDirectory }
 
@@ -18,7 +19,7 @@ import from tempfile { TemporaryDirectory }
 """Run `jac enter <file> <entrypoint>` and return (rc, stdout, stderr)."""
 def _jac_enter(cwd: str, app_path: str, entrypoint: str) -> tuple {
     result = subprocess.run(
-        [sys.executable, "-m", "jaclang", "run", "--entry", entrypoint, app_path],
+        jac_command("run", "--entry", entrypoint, app_path),
         cwd=cwd,
         capture_output=True,
         text=True,
@@ -103,9 +104,9 @@ test "added field survives schema drift end-to-end" {
         # Drift should be logged but cause zero data loss: quarantine empty.
         import hashlib;
         import os;
-        import from jaclang.runtimelib.pgembed { PgRuntime }
-        import from jaclang.runtimelib.session { shared_pg_data_dir }
-        import from jaclang.runtimelib.store { PgStore, TxnIsolation }
+        import from jaclang.data.pgembed { PgRuntime }
+        import from jaclang.server.session { shared_pg_data_dir }
+        import from jaclang.data.store { PgStore, TxnIsolation }
         digest = hashlib.sha1(os.path.realpath(tmpdir).encode('utf-8')).hexdigest()[:8];
         admin_rt = PgRuntime(data_dir=shared_pg_data_dir(), database='postgres');
         admin = PgStore(conninfo=admin_rt.ensure());

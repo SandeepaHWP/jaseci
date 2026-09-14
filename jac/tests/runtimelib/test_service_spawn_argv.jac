@@ -9,6 +9,8 @@ healthy". These tests capture the argv each spawn site actually builds (Popen
 is mocked - nothing runs) and feed it to the parser the `jac` binary really
 uses, so a flag rename fails here instead of in production."""
 
+import from tests.support { jac_command }
+
 import os;
 import unittest.mock;
 import from pathlib { Path }
@@ -17,7 +19,7 @@ import from tempfile { TemporaryDirectory }
 import jaclang.cli.commands.execution;
 import from jaclang.cli.manifest { get_command_meta }
 import from jaclang.cli.manifest_parse { build_command_parser }
-import from jaclang.runtimelib { sv_client }
+import from jaclang.server { sv_client }
 
 
 """Assert the parser the `jac` entrypoint builds accepts `argv` headless."""
@@ -50,25 +52,10 @@ def _capture_popen(captured: list) -> any {
 }
 
 
-test "sv-to-sv sibling spawn (scale plugin) argv is accepted by the real CLI" {
-    import from jaclang.scale.plugin { JacScalePlugin }
-    with TemporaryDirectory() as tmpdir {
-        (Path(tmpdir) / "argv_probe_plugin.jac").write_text(
-            "def:pub ping() -> int { return 1; }"
-        );
-        captured: list = [];
-        with unittest.mock.patch("subprocess.Popen", _capture_popen(captured)) {
-            with unittest.mock.patch(
-                "jaclang.scale.runtime.context.util.wait_for_health", return_value=True
-            ) {
-                JacScalePlugin.ensure_sv_service("argv_probe_plugin", tmpdir);
-            }
-        }
-        sv_client.unregister("argv_probe_plugin");
-        assert len(captured) == 1 , f"expected one spawn, got {captured}";
-        # captured[0][0] is the jac executable; the rest is the CLI invocation.
-        _parse_with_real_cli(captured[0][1:]);
-    }
+test "headless start args, the argv every fleet spawn site builds, are accepted by the real CLI" {
+    argv = sv_client.headless_start_args("argv_probe.jac", 18496);
+    assert argv[0] == "run" and "argv_probe.jac" in argv , argv;
+    _parse_with_real_cli(argv);
 }
 
 test "orchestrator start_service argv is accepted by the real CLI" {
@@ -106,14 +93,12 @@ test "orchestrator start_service argv is accepted by the real CLI" {
 }
 
 test "client dev backend spawn argv is accepted by the real CLI" {
-    import from jaclang.runtimelib.client.targets.client_dev_common {
-        start_backend_server_common
-    }
+    import from jaclang.client.targets.client_dev_common { start_backend_server_common }
     captured: list = [];
     with unittest.mock.patch("subprocess.Popen", _capture_popen(captured)) {
         start_backend_server_common(Path("app.jac"), Path("."), 8321);
     }
     assert len(captured) == 1 , f"expected one spawn, got {captured}";
-    # argv is [sys.executable, "-m", "jaclang", <cli invocation...>].
+    # argv is jac_command(<cli invocation...>).
     _parse_with_real_cli(captured[0][3:]);
 }

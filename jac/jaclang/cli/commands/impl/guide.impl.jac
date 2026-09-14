@@ -6,13 +6,15 @@ import from jaclang.cli.console { console }
 import from jaclang.cli.guide_store {
     Guide,
     list_guides,
+    guide_sections,
     list_docs,
     get_guide,
     guide_group,
     grouped_guides,
     doc_corpora,
     corpus_blurb,
-    grep_guides
+    grep_guides,
+    nav_manifest
 }
 
 def _emit(text: str) {
@@ -103,6 +105,59 @@ def _search_guides(query: str, as_json: bool) -> int {
     return 0;
 }
 
+def _print_nav(as_json: bool) -> int {
+    manifest = nav_manifest();
+    if not manifest {
+        if as_json {
+            _emit(
+                json.dumps(
+                    {
+                        "error": "No docs navigation is bundled with this Jac installation"
+                    }
+                )
+            );
+        } else {
+            console.error("No docs navigation is bundled with this Jac installation.");
+        }
+        return 1;
+    }
+    if as_json {
+        _emit(json.dumps(manifest, indent=2));
+        return 0;
+    }
+
+    def walk(items: list, depth: int) {
+        pad = "  " * (depth + 1);
+        for item in items {
+            if not isinstance(item, dict) {
+                continue;
+            }
+            title = str(item.get("title", "")).strip();
+            if "page" in item {
+                name = str(item["page"]);
+                if name.endswith(".md") {
+                    name = name[:-3];
+                }
+                _emit(f"{pad}{title}  [{name}]");
+            } elif "items" in item {
+                console.print(f"{pad}{title}", style="bold");
+                walk(item["items"] as list, depth + 1);
+            } elif "url" in item {
+                _emit(f"{pad}{title}  {item['url']}");
+            }
+        }
+    }
+    console.print();
+    console.print("Bundled docs navigation", style="bold");
+    console.print();
+    walk(manifest.get("nav", []) as list, 0);
+    console.print();
+    console.print("Read a doc with:  jac guide <name>", style="muted");
+    console.print("Manifest as JSON: jac guide --nav --json", style="muted");
+    console.print();
+    return 0;
+}
+
 def _index_payload -> list[dict] {
     payload = [
         {
@@ -124,15 +179,34 @@ def _index_payload -> list[dict] {
 }
 
 impl guide(
-    topic: str = "", search: str = "", export: str = "", as_json: bool = False
+    topic: str = "",
+    search: str = "",
+    export: str = "",
+    nav: bool = False,
+    as_json: bool = False,
+    section: str = "",
+    sections: bool = False
 ) -> int {
+    if (section or sections)
+        and (not topic or export or nav or search or (section and sections)) {
+        message = "Use --section or --sections with one topic, without --search, --nav, or --export.";
+        if as_json {
+            _emit(json.dumps({"error": message}));
+        } else {
+            console.error(message);
+        }
+        return 1;
+    }
     if export {
         return _export_guides(export);
+    }
+    if nav {
+        return _print_nav(as_json);
     }
 
     if topic {
         for (ns, members) in doc_corpora() {
-            if topic.strip("/") == ns {
+            if topic.strip("/") == ns and not (section or sections) {
                 return _corpus_listing(ns, members, as_json);
             }
         }
@@ -149,6 +223,72 @@ impl guide(
                 );
             }
             return 1;
+        }
+        if section or sections {
+            entries = guide_sections(g);
+            if sections {
+                if as_json {
+                    _emit(
+                        json.dumps(
+                            {
+                                "name": g.name,
+                                "sections": [
+                                    {
+                                        "title": e.title,
+                                        "slug": e.slug,
+                                        "level": e.level,
+                                        "line": e.line_no
+                                    } for e in entries
+                                ]
+                            },
+                            indent=2
+                        )
+                    );
+                } else {
+                    for e in entries {
+                        _emit(f"{e.slug}  {e.title}");
+                    }
+                }
+                return 0;
+            }
+            matches = [
+                e
+                for e in entries
+                if e.slug == section
+            ];
+            if not matches {
+                matches = [
+                    e
+                    for e in entries
+                    if e.title.lower() == section.lower()
+                ];
+            }
+            if len(matches) != 1 {
+                message = f"Section '{section}' not found or ambiguous. Use 'jac guide {g.name} --sections' for exact slugs.";
+                if as_json {
+                    _emit(json.dumps({"error": message}));
+                } else {
+                    console.error(message);
+                }
+                return 1;
+            }
+            selected = matches[0];
+            if as_json {
+                _emit(
+                    json.dumps(
+                        {
+                            "name": g.name,
+                            "section": selected.slug,
+                            "title": selected.title,
+                            "body": selected.body
+                        },
+                        indent=2
+                    )
+                );
+            } else {
+                _emit(selected.body);
+            }
+            return 0;
         }
         if as_json {
             _emit(
@@ -199,6 +339,10 @@ impl guide(
         sets = " | ".join([ns for (ns, _) in corpora]);
         console.print(f"List a doc set:       jac guide {sets}", style="muted");
     }
+    console.print(
+        "Read selectively:    jac guide <name> --sections / --section <slug>",
+        style="muted"
+    );
     console.print("Search everything:    jac guide --search <keywords>", style="muted");
     console.print("Full index as JSON:   jac guide --json", style="muted");
     console.print();
