@@ -227,17 +227,17 @@ def content_preview(content: any, max_len: int) -> str {
 
 
 def reroute_tool_images_to_user_message(
-    messages: list[dict[str, any]]
-) -> list[dict[str, any]] {
+    messages: list[dict[str, object] | LiteLLMMessage]
+) -> list[dict[str, object] | LiteLLMMessage] {
     if not any(_tool_msg_has_image(m) for m in messages) {
         return messages;
     }
 
-    out: list[dict[str, any]] = [];
+    out: list[dict[str, object] | LiteLLMMessage] = [];
     pending: list[dict[str, any]] = [];
 
     for msg in messages {
-        if _tool_msg_has_image(msg) {
+        if isinstance(msg, dict) and _tool_msg_has_image(msg) {
             (stripped, images) = _split_tool_msg_images(msg);
             out.append(stripped);
             name = msg.get("name", "tool");
