@@ -4880,29 +4880,6 @@ impl TypeEvaluator._find_symbol_by_key(key: str, condition: Expr) -> Symbol | No
     return None;
 }
 
-impl TypeEvaluator._literal_type_of(expr: Expr) -> TypeBase | None {
-    if const_type := self._literal_type_from_expr(expr) {
-        return const_type;
-    }
-    operand = expr.operand
-        if isinstance(expr, UnaryExpr) and expr.op.name == Tok.MINUS
-        else expr;
-    if isinstance(operand, Float) {
-        return self.get_type_of_expression(expr);
-    }
-    return None;
-}
-
-impl TypeEvaluator._is_exact_literal(narrow_type: TypeBase | None) -> bool {
-    if narrow_type is None {
-        return False;
-    }
-    members = narrow_type.types
-        if isinstance(narrow_type, UnionType)
-        else [narrow_type];
-    return all(isinstance(m, ClassType) and m.is_literal_type() for m in members);
-}
-
 impl TypeEvaluator.classify_condition(condition: Expr) -> ConditionInfo | None {
     import from jaclang.compiler.frontend.constant { Tokens as Tok }
     import from jaclang.compiler.types.type_evaluator { ConditionInfo, NarrowingKind }
@@ -4958,60 +4935,53 @@ impl TypeEvaluator.classify_condition(condition: Expr) -> ConditionInfo | None {
         and len(condition.rights) == 1
     ) {
         left_key = self.create_key_for_reference(condition.left);
-        right_expr = condition.rights[0];
-        literal_type = self._literal_type_of(right_expr);
-        if left_key is not None and literal_type is not None {
-            op_name = condition.ops[0].name;
-            if op_name == Tok.EE {
+        op_name = condition.ops[0].name;
+        if left_key is not None and op_name in (Tok.EE, Tok.NE) {
+            literal_type = self._extract_literal_operand_type(condition.rights[0]);
+            if literal_type is not None {
                 return ConditionInfo(
-                    kind=NarrowingKind.LITERAL_EQ,
-                    key=left_key,
-                    narrow_type=literal_type
-                );
-            } elif op_name == Tok.NE {
-                return ConditionInfo(
-                    kind=NarrowingKind.LITERAL_NE,
+                    kind=(
+                        NarrowingKind.LITERAL_EQ
+                            if op_name == Tok.EE
+                            else NarrowingKind.LITERAL_NE
+                    ),
                     key=left_key,
                     narrow_type=literal_type
                 );
             }
         }
-
+        container = condition.rights[0];
         if left_key is not None
-            and isinstance(right_expr, (TupleVal, ListVal))
-            and right_expr.values {
+            and op_name in (Tok.KW_IN, Tok.KW_NIN)
+            and isinstance(container, (TupleVal, ListVal))
+            and container.values {
             elem_types: list[TypeBase] = [];
-            all_literal = True;
-            for elem in right_expr.values {
-                elem_type = self._literal_type_of(elem)
-                    if isinstance(elem, Expr)
-                    else None;
+            for elem in container.values {
+                elem_type = (
+                    self._extract_literal_operand_type(elem)
+                        if isinstance(elem, Expr)
+                        else None
+                );
                 if elem_type is None {
-                    all_literal = False;
+                    elem_types = [];
                     break;
                 }
                 elem_types.append(elem_type);
             }
-            if all_literal and elem_types {
-                op_name = condition.ops[0].name;
-                narrow_type = (
-                    elem_types[0]
-                        if len(elem_types) == 1
-                        else UnionType(types=elem_types)
+            if elem_types {
+                return ConditionInfo(
+                    kind=(
+                        NarrowingKind.MEMBERSHIP_IN
+                            if op_name == Tok.KW_IN
+                            else NarrowingKind.MEMBERSHIP_NOT_IN
+                    ),
+                    key=left_key,
+                    narrow_type=(
+                        elem_types[0]
+                            if len(elem_types) == 1
+                            else UnionType(types=elem_types)
+                    )
                 );
-                if op_name == Tok.KW_IN {
-                    return ConditionInfo(
-                        kind=NarrowingKind.MEMBERSHIP_IN,
-                        key=left_key,
-                        narrow_type=narrow_type
-                    );
-                } elif op_name == Tok.KW_NIN {
-                    return ConditionInfo(
-                        kind=NarrowingKind.MEMBERSHIP_NOT_IN,
-                        key=left_key,
-                        narrow_type=narrow_type
-                    );
-                }
             }
         }
     }
@@ -5255,7 +5225,7 @@ impl TypeEvaluator._find_predicate_for(
                     key=key,
                     narrow_type=literal_type,
                     is_inverted=False,
-                    narrows_on_false=self._is_exact_literal(literal_type)
+                    narrows_on_false=False
                 );
 
             case NarrowingKind.LITERAL_NE | NarrowingKind.MEMBERSHIP_NOT_IN:
@@ -5267,7 +5237,7 @@ impl TypeEvaluator._find_predicate_for(
                     key=key,
                     narrow_type=literal_type,
                     is_inverted=True,
-                    narrows_on_true=self._is_exact_literal(literal_type)
+                    narrows_on_true=False
                 );
 
             case NarrowingKind.TRUTHINESS:
@@ -5421,7 +5391,7 @@ impl TypeEvaluator._specialize_narrow_from_base(
         if not isinstance(m, ClassType) {
             continue;
         }
-        args = m.private.type_args or [];
+        args: list[TypeBase] = m.private.type_args or [];
         if len(args) != want or m.shared.same_class(narrow_type.shared) {
             continue;
         }
@@ -5604,20 +5574,6 @@ impl TypeEvaluator._union_narrowed_types(types_list: list[TypeBase]) -> TypeBase
     return UnionType(types=unique);
 }
 
-impl TypeEvaluator._excluded_by(member: TypeBase, to_exclude: TypeBase) -> bool {
-    if isinstance(to_exclude, UnionType) and to_exclude.types {
-        return any(self._excluded_by(member, t) for t in to_exclude.types);
-    }
-    # A literal rules out only itself, never the bare class it belongs to.
-    if isinstance(to_exclude, ClassType) and to_exclude.is_literal_type() {
-        return isinstance(member, ClassType)
-            and member.is_literal_type()
-            and member.shared.same_class(to_exclude.shared)
-            and member.get_literal_value() == to_exclude.get_literal_value();
-    }
-    return self._type_matches_isinstance(member, to_exclude);
-}
-
 impl TypeEvaluator.exclude_type_from_union(
     original: TypeBase, to_exclude: TypeBase
 ) -> TypeBase {
@@ -5625,7 +5581,7 @@ impl TypeEvaluator.exclude_type_from_union(
     remaining = [
         member
         for member in members
-        if not self._excluded_by(member, to_exclude)
+        if not self._type_matches_isinstance(member, to_exclude)
     ];
     if len(remaining) == len(members) {
         return original;
@@ -5923,6 +5879,26 @@ impl TypeEvaluator._extract_callable_info(condition: Expr) -> str | None {
     return self.create_key_for_reference(argument)
         if isinstance(argument, Expr)
         else None;
+}
+
+impl TypeEvaluator._extract_literal_operand_type(operand: Expr) -> TypeBase | None {
+    if self.create_key_for_reference(operand) is not None {
+        return None;
+    }
+    if isinstance(operand, AtomUnit) {
+        wrapped = operand.value;
+        if isinstance(wrapped, Expr) {
+            return self._extract_literal_operand_type(wrapped);
+        }
+        return None;
+    }
+    if isinstance(operand, Literal) {
+        if isinstance(operand, (Null, Ellipsis, BuiltinType)) {
+            return None;
+        }
+        return self.get_type_of_expression(operand);
+    }
+    return self._literal_type_from_expr(operand);
 }
 
 impl TypeEvaluator._extract_hasattr_info(condition: Expr) -> tuple[str, str] | None {
