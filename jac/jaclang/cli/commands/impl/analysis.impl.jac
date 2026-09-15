@@ -1379,7 +1379,7 @@ impl precommit(
     }
     console.print("precommit: formatting (--lintfix)", style="muted");
 
-    stats: dict = cache_stats if cache_stats is not None else {};
+    stats: dict[str, int] = cache_stats if cache_stats is not None else {};
     fmt_ret = format(
         fmt_targets,
         to_screen=False,

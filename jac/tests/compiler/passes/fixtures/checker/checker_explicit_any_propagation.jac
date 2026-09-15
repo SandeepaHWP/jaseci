@@ -13,6 +13,10 @@ def nested_list -> list[any] {
     return [["a"]];
 }
 
+def nested_tuple -> tuple[any, ...] {
+    return (("a", ), );
+}
+
 def explicit_dict_chained -> str {
     d: dict[str, any] = nested_dict();
     return d["sys"]["country"];
@@ -26,6 +30,11 @@ def explicit_dict_attr -> str {
 def explicit_list_chained -> str {
     l: list[any] = nested_list();
     return l[0][0];
+}
+
+def explicit_tuple_chained -> str {
+    t: tuple[any, ...] = nested_tuple();
+    return t[0][0];
 }
 
 def explicit_dict_iter -> str {

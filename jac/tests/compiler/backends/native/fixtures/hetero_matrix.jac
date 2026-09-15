@@ -58,8 +58,6 @@ def hl_iter_int_total -> int {
 
 
 def hl_repr -> str {
-    # repr() has no native lowering for list[any]; the jacval layout is
-    # what this case exercises.
     l: list[any] = [1, "two", 3.5, True];
     return repr(l);
 }
@@ -115,8 +113,6 @@ def hd_clear_len(s: &str) -> int {
 
 
 def hd_repr -> str {
-    # repr() has no native lowering for dict[str, any]; the jacval layout
-    # is what this case exercises.
     d: dict[str, any] = {"a": 1, "b": "two"};
     return repr(d);
 }

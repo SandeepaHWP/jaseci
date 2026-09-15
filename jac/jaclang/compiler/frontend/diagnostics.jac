@@ -456,6 +456,12 @@ glob E0001 = _err("E0001", Category.SYNTAX, "Expected '{expected}', got '{got}'"
          " explicitly with \"dict[str, any]\"; a bare \"{type}\" no longer"
          " defaults to any."
      ),
+     W1036 = _warn(
+         "W1036",
+         Category.TYPE,
+         "Generic type \"{type}\" used without type arguments, defaulting to"
+         " \"{type}[any]\"; consider adding explicit type arguments"
+     ),
      W1037 = _warn(
          "W1037",
          Category.TYPE,

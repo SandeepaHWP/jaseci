@@ -380,6 +380,7 @@ Emitted by `OwnershipCheckPass` only in **nogc-enforced** native modules (`jac b
 
 | Code | Message |
 |------|---------|
+| `W1036` | Generic type "{type}" used without type arguments, defaulting to "{type}[any]"; consider adding explicit type arguments |
 | `W1037` | Explicit 'any' type annotation disables type checking here; consider a more specific type |
 | `W1050` | Unknown intrinsic JSX element '<{tag}>' |
 | `W1051` | Expression type could not be resolved (Unknown) |

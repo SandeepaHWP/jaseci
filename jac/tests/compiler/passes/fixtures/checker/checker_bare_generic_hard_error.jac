@@ -1,6 +1,8 @@
 """A generic written without type arguments is a hard error at every
 annotation site; reads through it still behave as any."""
 
+import typing;
+
 def bare_dict_ret -> dict {
     return {"a": 1};
 }
@@ -27,4 +29,9 @@ def nested_dict_of_list(rows: dict[str, list]) -> None {
 
 with entry {
     deep: dict[str, list[tuple]] = {};
+}
+
+# The Optional brackets belong to Optional, so they do not excuse the dict.
+def optional_dict(x: typing.Optional[dict]) -> None {
+    print(x);
 }

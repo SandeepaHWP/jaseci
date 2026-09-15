@@ -3988,6 +3988,10 @@ test "bare_generic_iteration_is_a_hard_error" {
         bare_generic_errors
     )}:\n"
         + "\n---\n".join(e.pretty_print() for e in bare_generic_errors);
+    assert len(program.errors_had) == 4 , f"Expected 4 errors (3 E1036 and the int to str), got {len(
+        program.errors_had
+    )}:\n"
+        + "\n---\n".join(e.pretty_print() for e in program.errors_had);
 }
 
 test "written_empty_tuple_arguments_are_not_bare" {
@@ -4028,14 +4032,23 @@ test "bare_generic_in_signatures_emits_e1036" {
     #   3. `-> list | None`        union branch in return type
     #   4. `x: list`, `y: dict`    two params on `both_bare`
     #   5. `-> tuple`              decl method return type
-    # `-> set` and `items: frozenset` are out of scope: only dict/list/tuple
-    # require explicit type arguments.
+    # `-> set` and `items: frozenset` keep the W1036 advisory instead: only
+    # dict/list/tuple require explicit type arguments.
     # Properly-parameterized signatures and impl-side annotations (deduped
     # against the decl) should NOT warn.
     assert len(bare_generic_errors) == 6 , f"Expected 6 E1036 errors (signatures), got {len(
         bare_generic_errors
     )}:\n"
         + "\n---\n".join(e.pretty_print() for e in bare_generic_errors);
+    advisories = [
+        w
+        for w in program.warnings_had
+        if "W1036" in w.pretty_print()
+    ];
+    assert len(advisories) == 2 , f"Expected 2 W1036 warnings (set, frozenset), got {len(
+        advisories
+    )}:\n"
+        + "\n---\n".join(w.pretty_print() for w in advisories);
 }
 
 test "bare_generic_hard_error_at_every_site" {
@@ -4053,7 +4066,7 @@ test "bare_generic_hard_error_at_every_site" {
         for e in program.errors_had
         if "E1036" in e.pretty_print()
     ];
-    assert len(bare_generic_errors) == 8 , f"Expected 8 E1036 errors, got {len(
+    assert len(bare_generic_errors) == 9 , f"Expected 9 E1036 errors, got {len(
         bare_generic_errors
     )}:\n"
         + "\n---\n".join(e.pretty_print() for e in program.errors_had);
