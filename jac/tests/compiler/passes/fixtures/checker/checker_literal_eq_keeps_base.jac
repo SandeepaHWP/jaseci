@@ -23,3 +23,11 @@ def ok_eq_literal_then_none_guard(x: int | None) -> int {
     }
     return x;
 }
+
+def fail_eq_literal_else_rejects_none_binding(x: int | None) -> None {
+    if x == 0 {
+        return None;
+    }
+    n: None = x;
+    return n;
+}

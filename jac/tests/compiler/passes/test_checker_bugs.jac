@@ -2003,9 +2003,9 @@ test "bug_liteq_1_int_literal_comparison_keeps_int_arm" {
         if e.loc
     };
 
-    assert len(program.errors_had) == 2 , (
-        "Bug #LITEQ-1: only the two optional returns may report. "
-        f"Got: {[str(e) for e in program.errors_had]}"
+    assert len(program.errors_had) == 4 , (
+        "Bug #LITEQ-1: only the two optional returns and the two None-binding "
+        f"reports may fire. Got: {[str(e) for e in program.errors_had]}"
     );
 
     # Both read plain "NoneType" before the fix.
@@ -2013,6 +2013,18 @@ test "bug_liteq_1_int_literal_comparison_keeps_int_arm" {
         assert "int | NoneType" in by_line.get(line, "") , (
             "Bug #LITEQ-1: an int-literal comparison must leave the int arm "
             f"standing. Line {line} reported: {by_line.get(line)}"
+        );
+    }
+
+    # The collapse was unsound, not just mislabelled: before the fix the else
+    # branch bound a live `int` to a `None` name and reported nothing.
+    for (line, expected) in [
+        (31, "Cannot assign int | NoneType to NoneType"),
+        (32, "Cannot return int | NoneType, expected NoneType")
+    ] {
+        assert expected in by_line.get(line, "") , (
+            "Bug #LITEQ-1: the else branch of an int-literal comparison must "
+            f"not admit the int arm. Line {line} reported: {by_line.get(line)}"
         );
     }
 }
