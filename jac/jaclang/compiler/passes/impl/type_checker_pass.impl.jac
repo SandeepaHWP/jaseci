@@ -1106,8 +1106,6 @@ impl TypeCheckPass._body_always_returns(body: list[CodeBlockStmt]) -> bool {
 impl TypeCheckPass._check_bare_generic(
     ann_node: UniNode, ty: object, shape: (UniNode | None) = None, nested: bool = False
 ) -> None {
-    # `shape` is this type's own piece of the annotation: only its brackets can
-    # excuse it, and a nested type with no matching piece gets None.
     at = shape if nested else ann_node;
     if isinstance(ty, UnionType) and ty.types {
         leaves = self._union_leaves(at);
