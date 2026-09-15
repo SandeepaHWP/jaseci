@@ -5848,20 +5848,10 @@ impl TypeEvaluator._extract_callable_info(condition: Expr) -> str | None {
 }
 
 impl TypeEvaluator._extract_literal_operand_type(operand: Expr) -> TypeBase | None {
-    if self.create_key_for_reference(operand) is not None {
-        return None;
+    if isinstance(operand, AtomUnit) and isinstance(operand.value, Expr) {
+        return self._extract_literal_operand_type(operand.value);
     }
-    if isinstance(operand, AtomUnit) {
-        wrapped = operand.value;
-        if isinstance(wrapped, Expr) {
-            return self._extract_literal_operand_type(wrapped);
-        }
-        return None;
-    }
-    if isinstance(operand, Literal) {
-        if isinstance(operand, (Null, Ellipsis, BuiltinType)) {
-            return None;
-        }
+    if isinstance(operand, Float) {
         return self.get_type_of_expression(operand);
     }
     return self._literal_type_from_expr(operand);

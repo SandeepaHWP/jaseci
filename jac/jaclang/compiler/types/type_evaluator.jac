@@ -67,7 +67,6 @@ import from jaclang.compiler.frontend.unitree {
     LambdaExpr,
     ListCompr,
     ListVal,
-    Literal,
     MatchArch,
     MatchAs,
     MatchCase,
