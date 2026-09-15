@@ -39,7 +39,7 @@ The auto-generated `jac.toml` for a `--kind web-static` project looks like:
 name = "myapp"
 version = "1.0.0"
 description = "Jac client application: myapp"
-entry-point = "main.jac"
+entry-point = "main"
 kind = "web-static"
 
 [dependencies.npm]
@@ -65,7 +65,7 @@ Project metadata. `entry-point` and `kind` describe the project's single app (in
 name = "myapp"
 version = "1.0.0"
 description = "My Jac application"
-entry-point = "main.jac"
+entry-point = "main"
 kind = "service"   # drives `jac run` (omit to infer from the entry-point); not allowed alongside [apps]
 jac-version = "==0.34.3"   # stamped by `jac create`; widen to `>=`, `<=`, or a range
 # default-app = "web"      # workspaces only: the app a bare `jac run` / `jac build` / `jac test` targets
@@ -88,7 +88,7 @@ repository = "https://github.com/user/repo"
 | `name` | string | Project / PyPI package name (required) |
 | `version` | string | Semantic version (default: `0.1.0`) |
 | `description` | string | One-line summary (also shown on PyPI) |
-| `entry-point` | string | Main file for `jac run` (default: `main.jac`). Single-app projects only -- in a workspace each app declares its own under `[apps.<name>]`, and setting it here is a hard error |
+| `entry-point` | string | Dotted entry module for `jac run` (default: `main`). Single-app projects only -- in a workspace each app declares its own under `[apps.<name>]`, and setting it here is a hard error |
 | `kind` | string | Project kind that drives `jac run` dispatch (execute / serve / build). Empty = inferred from the entry-point codespace. One of: `cli`, `cli-native`, `native-binary`, `native-lib`, `service`, `service-mesh`, `py-package`, `js-package`, `web-app`, `web-static`, `desktop`, `mobile`. Single-app projects only; a workspace sets `kind` per app |
 | `default-app` | string | Workspaces only. The app that a bare `jac run`, `jac build`, `jac test` or `jac setup` targets. Must name a key of `[apps]`. With one app it is implied; with several and no default, the bare form errors and lists the apps |
 | `jac-version` | string | Jac toolchain version the project targets, as a PEP 440-style specifier. `jac create` stamps `==<current>`; at `jac scale deploy` the pod runtime binary, admin console, and base image are all taken from the release that satisfies it, and the deploy aborts if none does. See [jac-version](#jac-version). |
@@ -134,21 +134,19 @@ default-app = "web"
 
 [apps.web]
 kind = "web-app"                 # required: any project kind
-path = "web"                     # dir root, relative to the project root
-entry-point = "main.jac"         # relative to path; default = the kind's entry
+entry-point = "web.main"
 platform = ""                    # default platform (mobile: android | ios | web; desktop: windows | macos | linux)
 route = "/api/web"               # default "/api/<name>"; serving kinds only
 
-[apps.social_graph]              # file-rooted: no path, the entry file is the whole app
+[apps.social_graph]              # declared service entry
 kind = "service"
-entry-point = "core/social_graph.jac"
+entry-point = "core.social_graph"
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `kind` | string | **Required.** The app's project kind (same values as `[project] kind`). The kind decides the client too: `web-app`, `web-static`, `desktop` and `js-package` render React DOM; `mobile` renders native views through `@jac/mobui` (its modules are under the `E1105` host-tag guard) |
-| `path` | string | Directory root of the app, relative to the project root; omit for a file-rooted app |
-| `entry-point` | string | Entry file, relative to `path` (or to the project root without one); default = the kind's entry |
+| `entry-point` | string | **Required.** Dotted entry module relative to the project root (for example, `core.api`; no extension or path separators) |
 | `platform` | string | Default platform: `android`, `ios` or `web` for a `mobile` app; `windows`, `macos` or `linux` for a `desktop` app. `--platform` overrides it for one command |
 | `route` | string | Public route prefix for apps with a server; must start with `/`; default `/api/<name>`. Two serving apps claiming one prefix is a config error |
 
@@ -265,6 +263,18 @@ The `diagnostics` setting controls how compilation errors and warnings are repor
 
 The CLI flag `-e` / `--diagnostics` overrides this setting.
 
+### Execution backend override
+
+Use `jac run --backend python app.jac` to execute Jac source through the Python
+bytecode backend, or `jac run --backend native app.jac` to require native
+execution. Without `--backend`, the project and placement settings select the
+backend automatically. The override applies only to this invocation.
+
+Put run options before the source path; arguments after the path are passed to
+the program. For example, `jac run --backend python app.jac -- input.txt` passes
+`input.txt` to the program. Backend selection applies to source execution, not
+serving, building, sealed bundles, `--debug`, or `--entry`.
+
 ---
 
 ### [serve]
@@ -375,10 +385,8 @@ Build configuration:
 ```toml
 [build]
 dir = ".jac"                # Build artifacts directory
-default_codespace = "native"  # Codespace for markerless .jac modules: "native"/"na" or "server"/"sv"
+native_closure_cap = 256    # Largest native closure the whole-module path will link
 ```
-
-`default_codespace` controls how a plain `.jac` module (not a `.jac` implementation variant) is treated when whole-module native compilation is possible. With `"native"` (the default) the compiler infers: a module with no server-requiring constructs, and whose imported plain `.jac` modules are likewise native-clean, is compiled whole-module in the native codespace and executed through the native engine. Modules with server-requiring constructs (OSP archetypes, python imports, serve endpoints, test blocks, JSX, and similar) compile in the server codespace exactly as before, and an inferred-native module that does not lower yet is transparently recompiled server-side with a dim `note:` -- the preference is always safe. Set `"server"` to opt a project out of native inference entirely; `[placement.pins]` entries mapping to `"native"` and forced builds (`jac nacompile`, `jac build --as native`, `CompileOptions(force_codespace='native')`) remain strict mandates.
 
 The `dir` setting controls where all build artifacts are stored:
 
@@ -389,18 +397,14 @@ The `dir` setting controls where all build artifacts are stored:
 
 ---
 
-### [placement.pins]
+### [placement]
 
-Placement overrides. Element placement (server / client / native) is inferred
-by the compiler from evidence in the source (see
-[Placement](../placement.md)); this table is the escape hatch when a decision
-must be forced. Keys are
-[fnmatch](https://docs.python.org/3/library/fnmatch.html) patterns matched
-against an element's dotted path -- `module` or `module.element`, relative to
-the project root -- and values are `"server"`, `"client"`, or `"native"`
-(any other value is a hard error at load time):
+Where markerless code runs, and the pins that override the solver:
 
 ```toml
+[placement]
+default = "native"        # markerless .jac modules: "native"/"na" or "server"/"sv"
+
 [placement.pins]
 "app.API_KEY"   = "server"    # one element: keep a secret out of the JS bundle
 "app.summarize" = "server"    # client calls to it bridge over RPC instead
@@ -408,39 +412,62 @@ the project root -- and values are `"server"`, `"client"`, or `"native"`
 helpers         = "client"    # module-level pin: the whole module
 ```
 
-A pinned element is immovable to the placement solver; everything else
-re-solves around it. Module-level `"server"` pins additionally give client
-imports of that module full service-boundary semantics (non-`:pub` items
-callable with auth, boundary types collected). Pins are part of the program:
-changing them invalidates the compilation cache, and
-`jac check --placements` reports them in each element's evidence chain.
+`default` controls how a plain `.jac` module (not a `.jac` implementation variant) is treated when whole-module native compilation is possible. With `"native"` (the default) the compiler infers: a module with no server-requiring constructs, and whose imported plain `.jac` modules are likewise native-clean, is compiled whole-module in the native codespace and executed through the native engine. Modules with server-requiring constructs (OSP archetypes, python imports, serve endpoints, test blocks, JSX, and similar) compile in the server codespace, and an inferred-native module that does not lower yet is transparently recompiled server-side with a dim `note:` -- the preference is always safe. Set `"server"` to opt a project out of native inference entirely; `[placement.pins]` entries mapping to `"native"` and forced builds (`jac build --native`, `CompileOptions(force_codespace='native')`) remain strict mandates.
 
-Pins can also be overlaid per app -- `[apps.<name>.placement.pins]` merges
-over this table for that app's modules -- and a pin is one way to name the
-**owner** of a server-placed shared module when several apps serve
-(`E5107`). Declaring that a module runs as its own **service** is a different
-fact with a different home: an `[apps.<name>]` table with `kind = "service"`
-(see [Workspaces & Apps](../apps.md)); imports of what that app owns lower to
-typed-async bridge stubs automatically.
+Element placement (server / client / native) is inferred by the compiler from evidence in the source (see [Placement](../placement.md)); `[placement.pins]` is the escape hatch when a decision must be forced. Keys are [fnmatch](https://docs.python.org/3/library/fnmatch.html) patterns matched against an element's dotted path -- `module` or `module.element`, relative to the project root -- and values are `"server"`, `"client"`, or `"native"` (any other value is a hard error at load time).
+
+A pinned element is immovable to the placement solver; everything else re-solves around it. Module-level `"server"` pins additionally give client imports of that module full service-boundary semantics (non-`:pub` items callable with auth, boundary types collected). Pins are part of the program: changing them invalidates the compilation cache, and `jac explain placement` reports them in each element's evidence chain.
+
+`[apps.<name>.placement.pins]` merges over the project pins in that app's
+compilation context. Pins select codespaces. A service boundary is declared with
+`[apps.<name>] kind = "service"` and `entry-point`; imports of its public surface
+lower to awaited bridge calls. See [Workspaces & Apps](../apps.md).
 
 ---
 
-### [gc]
+### [memory]
 
-Memory-management defaults for **native** compilation (`jac nacompile`):
+The one declaration of memory intent, checked on every backend and reported by `jac check` without a native build:
 
 ```toml
-[gc]
-default = "cycles"    # gc mode emitted when --gc is not passed: "cycles", "rc", or "none"
-
-[gc.enforce]
-modules = []          # module-name patterns compiled under zero-RC nogc enforcement
-grandfathered = []    # patterns exempted from enforcement (checked before `modules`)
+[memory]
+profile = "managed"       # managed | rc | nogc   (artifact-wide)
+enforce = ["core.*"]      # incremental only: hold these modules to the nogc contract under a managed profile
+exempt  = ["legacy.*"]    # both lists are ignored, with a warning, when profile = "nogc"
 ```
 
-`default` selects the memory-management runtime the native backend emits when `jac nacompile` is invoked without an explicit `--gc`: `cycles` (reference counting plus the cycle collector), `rc` (reference counting only), or `none` (no retain/release call sites).
+| | `managed` | `rc` | `nogc` |
+|---|---|---|---|
+| Runtime emitted | reference counting plus the cycle collector, collecting automatically | reference counting only | none |
+| Contract | opt-in per binding; `enforce` patterns for modules ahead of the flip | same | every module, no exemptions |
+| Self-checks | none | none | RC-free IR scan, always on; a failure is a compiler bug |
 
-`[gc.enforce] modules` lists `fnmatch`-style patterns matched against compiled module names; a native module matching one is compiled under **nogc enforcement**, which makes zero-RC ownership coverage a compile-time contract -- every heap-typed parameter, return type, and `has` field must be in the owned world, and violations are hard [`E1401`-`E1406`](../diagnostics.md#zero-rc-enforcement-errors) errors that block codegen. `grandfathered` patterns exempt matching modules, so a codebase can adopt enforcement incrementally. The `jac nacompile --enforce-nogc` flag enforces the compiled module regardless of these patterns. See [Zero-RC ownership compilation](../language/native-pathway.md#zero-rc-ownership-compilation).
+`enforce` lists `fnmatch`-style patterns matched against compiled module names; a native module matching one is compiled under **nogc enforcement**, which makes zero-RC ownership coverage a compile-time contract -- every heap-typed parameter, return type, and `has` field must be in the owned world, and violations are hard [`E1401`-`E1407`](../diagnostics.md#zero-rc-enforcement-errors) errors that block codegen. `exempt` patterns exclude matching modules, so a codebase can adopt enforcement incrementally. `jac build <file> --native --memory nogc` overrides the profile for one build. See [Zero-RC ownership compilation](../language/native-pathway.md#zero-rc-ownership-compilation).
+
+---
+
+### [native]
+
+How `jac build --native` emits code:
+
+```toml
+[native]
+target = ""               # "" or "host" (default), "wasm32", or an LLVM triple
+opt = 2                   # optimization level
+debug = false             # DWARF, unoptimized JIT path, and the RC trace machinery, together
+threads = 4               # `flow for` width; a built binary can override with JAC_THREADS
+require = []              # Module-name patterns whose native lowering must succeed
+```
+
+`require` makes matching modules native-only during checking and building. For
+example, `require = ["jaclang.runtime.python.*"]` covers JacPython's runtime
+modules and bindings. Lowering failures remain errors; Python fallback and
+opaque field erasure cannot satisfy this contract. Required dependencies stay
+in the target compilation, and checks verify the native dependency closure
+without executing it. The policy is included in analysis and code-generation
+cache identities.
+
+A built binary reads two environment variables at run time and no others: `JAC_GC=off` disables collection for leak debugging (collection is on by default under `managed`), and `JAC_THREADS` overrides the `flow for` width. Nothing at compile time reads the environment; `jac explain memory|placement|ir` replaces the old diagnostic variables.
 
 ---
 
@@ -679,6 +706,8 @@ secret = "your-webhook-secret-key"
 signature_header = "X-Webhook-Signature"
 verify_signature = true
 api_key_expiry_days = 365
+github_secret = "${GITHUB_APP_WEBHOOK_SECRET}"   # scheme="github" walkers verify X-Hub-Signature-256 against it
+github_signature_header = "X-Hub-Signature-256"
 ```
 
 **Gateway and fleet topology (scale):**
@@ -865,6 +894,24 @@ Activate a profile:
 JAC_PROFILE=production jac run main.jac
 ```
 
+Profile selection uses `--profile` first, then `JAC_PROFILE`, then
+`[environment].default_profile`. CLI commands, compiler configuration, plugins,
+and deployment fleet generation share the resolved project configuration. A
+profile applies to both top-level settings such as `[scale.gateway]` and
+per-app settings such as `[apps.orders.scale]`, including nested HPA and pod
+overrides. `jac.local.toml` is applied last, even when no named profile is selected.
+
+Code that reads project settings should use `get_config()` or
+`get_config_for_path()` from `jaclang.project.config`. These cache the resolved
+configuration per project root. `get_config(force_discover=True)` refreshes that
+cache after configuration files or the environment change;
+`get_config_for_path(path, force_discover=True)` refreshes one root while preserving
+its explicit profile selection. New plugin configuration instances refresh that
+shared root, so existing readers see the updated settings too. `JacConfig.resolve()`
+resolves a fresh configuration; `JacConfig.load()` and `JacConfig.discover()`
+remain available for raw configuration inspection. An explicit profile is carried
+across CLI project discovery; otherwise each project uses its own default.
+
 ---
 
 ## Environment Variable Interpolation
@@ -970,7 +1017,7 @@ jac run --port 3000
 name = "my-ai-app"
 version = "1.0.0"
 description = "An AI-powered application"
-entry-point = "main.jac"
+entry-point = "main"
 
 [dependencies]
 byllm = ">=0.4.8"

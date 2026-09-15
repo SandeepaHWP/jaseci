@@ -1,7 +1,7 @@
 import hashlib;
 import from collections.abc { Sequence }
 import from contextvars { ContextVar }
-import from dataclasses { field }
+import from jaclang.runtime.object_model { field }
 import from jaclang.compiler.frontend.constant {
     NATIVE_ERASED_ANNOTATIONS,
     NATIVE_ERASED_TYPE_MARKERS,
@@ -13,7 +13,8 @@ import type from jaclang.compiler.backends.es.estree { Node as EsNode }
 import type from jaclang.compiler.frontend.unitree { CommentToken }
 import type from jaclang.compiler.tools.doc_ir { Doc }
 import type from jaclang.compiler.frontend.unitree { Source, Token }
-import type from jaclang.runtime.osp_model { OspModel }
+import type from jaclang.compiler.passes.osp_analysis { OspModel }
+import type from jaclang.compiler.backends.native.llvm.ir { Module as IRModule }
 import type from jaclang.compiler.backends.native.llvm.binding {
     ModuleRef,
     ExecutionEngine
@@ -26,6 +27,7 @@ obj ClientManifest {
         globals_values: dict[(str, any)] = field(default_factory=`dict),
         has_client: bool = False,
         imports: dict[(str, str)] = field(default_factory=`dict),
+        runtime_imports: dict[str, list[str]] = field(default_factory=`dict),
         endpoint_effects: dict[(str, dict)] = field(default_factory=`dict),
         tests: list[dict[(str, str)]] = field(default_factory=`list),
         server_imports: list[str] = field(default_factory=`list),
@@ -42,6 +44,7 @@ obj ClientArtifact {
         native_import_sources: list[str] = field(default_factory=`list),
         source_map: list[tuple[int, int, int, int, str]] = field(default_factory=`list),
         dep_digests: dict[str, str] = field(default_factory=`dict),
+        boundary_contracts: dict = field(default_factory=`dict),
         framework: str = "";
 
     def to_bytes -> bytes;
@@ -159,6 +162,21 @@ def native_safe_sym(src: str) -> str {
     return f"{safe}_{hashlib.sha1(src.encode()).hexdigest()[:8]}";
 }
 
+def native_library_function_symbol(mod_path: str, name: str) -> str {
+    import os;
+    library_root = native_stdlib_root();
+    if library_root is None {
+        return name;
+    }
+    source = os.path.realpath(mod_path);
+    root_path = os.path.realpath(library_root) + os.sep;
+    if not source.startswith(root_path) {
+        return name;
+    }
+    module_name = source[len(root_path):].replace(os.sep, "/");
+    return f"__jac_lib_{native_safe_sym(module_name)}_{name}";
+}
+
 def module_dotted_name(mod_path: str, mod_name: str = "") -> str {
     import os;
     path = mod_path.replace("\\", "/");
@@ -246,7 +264,8 @@ glob NATIVE_SUPPORTED_STDLIB: set[str] = {
      _effective_codespace_ctx: ContextVar[str] = ContextVar(
          "jac_effective_default_codespace"
      ),
-     _closure_cap_ctx: ContextVar[int] = ContextVar("jac_native_closure_cap");
+     _closure_cap_ctx: ContextVar[int] = ContextVar("jac_native_closure_cap"),
+     _native_target_ctx: ContextVar[str | None] = ContextVar("jac_native_target");
 
 glob NATIVE_ERASED_ABC_BASES: frozenset = frozenset({"ABC"});
 
@@ -258,7 +277,7 @@ glob NATIVE_ERASED_FIELD_MARKERS: frozenset = frozenset({"field"});
 
 glob NATIVE_ERASED_IMPORTS: dict[str, frozenset] = {
          "abc": NATIVE_ERASED_ABC_BASES,
-         "dataclasses": NATIVE_ERASED_FIELD_MARKERS,
+         "jaclang.runtime.object_model": NATIVE_ERASED_FIELD_MARKERS,
          "typing": TYPE_PARAM_CONSTRUCTORS
              | NATIVE_ERASED_IDENTITY_CALLS
              | NATIVE_ERASED_TYPE_MARKERS
@@ -292,12 +311,12 @@ def effective_default_codespace -> str {
         return cur;
     }
     try {
-        import from jaclang.project.config { get_config, BuildConfig }
+        import from jaclang.project.config { get_config, PlacementConfig }
         cfg = get_config();
         if cfg is not None {
-            return cfg.build.default_codespace;
+            return cfg.placement.default_codespace;
         }
-        return BuildConfig().default_codespace;
+        return PlacementConfig().default_codespace;
     } except Exception {
         return "server";
     }
@@ -379,12 +398,19 @@ def bundled_stdlib_module_of(file_path: str) -> (str | None) {
     return None;
 }
 
-glob CLIENT_RUNTIME_SOURCE_PATHS: list[str] = [
+glob SHARED_RUNTIME_MODULES: tuple[str, ...] = (
+         "jaclang.runtime.graph_fragment",
+
+     ),
+     CLIENT_RUNTIME_SOURCE_PATHS: list[str] = [
          "client/client_runtime.jac",
          "client/client_runtime_core.jac",
          "client/solid_runtime.jac",
          "client/pwa_runtime.jac",
          "client/wasm_host.jac",
+         "client/webgl.jac",
+         "client/endpoint_cache.jac",
+         "client/auth_contract.jac",
          "client/client_mobui.jac",
          "client/client_react_core.jac",
          "client/client_runtime_native.jac",
@@ -408,6 +434,20 @@ def is_client_by_location(file_path: str) -> bool {
     return False;
 }
 
+def is_shared_runtime_module(file_path: str) -> bool {
+    import os;
+    import jaclang;
+    if not file_path or not jaclang?.__file__ {
+        return False;
+    }
+    package = os.path.dirname(os.path.realpath(str(jaclang.__file__)));
+    path = os.path.realpath(file_path);
+    return any(
+        path == os.path.join(package, *module.split('.')[1:]) + '.jac'
+        for module in SHARED_RUNTIME_MODULES
+    );
+}
+
 def is_bundled_native_module(module_name: str) -> bool {
     import os;
     stdlib_dir = native_stdlib_root();
@@ -418,10 +458,29 @@ def is_bundled_native_module(module_name: str) -> bool {
     return _native_variant_path(os.path.join(stdlib_dir, path_name)) is not None;
 }
 
+def set_native_target_override(triple: str | None) -> (str | None) {
+    prev = _native_target_ctx.get(None);
+    _native_target_ctx.set(triple);
+    return prev;
+}
+
+def effective_native_target -> str {
+    cur = _native_target_ctx.get(None);
+    if cur is not None {
+        return cur;
+    }
+    try {
+        import from jaclang.project.config { get_config }
+        cfg = get_config();
+        return cfg.native.target if cfg is not None else "";
+    } except Exception {
+        return "";
+    }
+}
+
 def native_target_os -> str {
-    import os;
     import sys;
-    _t = os.environ.get("JAC_NATIVE_TARGET", "");
+    _t = effective_native_target();
     if _t {
         if ("darwin" in _t) or ("apple" in _t) {
             return "darwin";
@@ -458,6 +517,10 @@ def _inferred_native_path(candidate: (str | None)) -> (str | None) {
     if candidate is None {
         return None;
     }
+    import from jaclang.compiler.native_scope { scope_allows_inferred_path }
+    if not scope_allows_inferred_path(candidate) {
+        return None;
+    }
     import from jaclang.compiler.placement.placement_solver { native_default_path_ok }
     return candidate if native_default_path_ok(candidate) else None;
 }
@@ -469,12 +532,45 @@ def resolve_native_module(
     clean = module_name.lstrip('.');
     path_name = clean.replace('.', os.sep);
 
+    if clean.startswith('jaclang.') {
+        import from jaclang.project.modresolver { resolve_module }
+        import from jaclang.compiler.native_scope {
+            in_native_scope_path,
+            scope_lowering_active
+        }
+        (candidate, language) = resolve_module(clean, os.path.join(base_dir, ""));
+        if language != 'jac' or not candidate.endswith('.jac') {
+            return (None, None);
+        }
+        candidate = os.path.realpath(candidate);
+        if (scope_lowering_active() and in_native_scope_path(candidate))
+            or clean in SHARED_RUNTIME_MODULES {
+            return (candidate, candidate);
+        }
+        if allow_inferred {
+            search = os.path.abspath(base_dir);
+            while True {
+                local = _native_variant_path(os.path.join(search, path_name));
+                if local is not None {
+                    native = _inferred_native_path(candidate);
+                    return (native, native);
+                }
+                parent = os.path.dirname(search);
+                if parent == search {
+                    break;
+                }
+                search = parent;
+            }
+        }
+        return (None, None);
+    }
+
     if allow_inferred {
         local = _inferred_native_path(
             _native_variant_path(os.path.join(base_dir, clean))
         );
         if local is not None {
-            return (f"{clean}.jac", local);
+            return (str(os.path.relpath(local, os.path.abspath(base_dir))), local);
         }
         if path_name != clean {
             search = os.path.abspath(base_dir);
@@ -491,22 +587,6 @@ def resolve_native_module(
                     break;
                 }
                 search = parent;
-            }
-        }
-    }
-
-    if clean.startswith('jaclang.') {
-        import from jaclang.compiler.native_scope {
-            in_native_scope_path,
-            scope_lowering_active
-        }
-        if scope_lowering_active() {
-            import jaclang as _jl;
-            _pkg = os.path.dirname(os.path.abspath(_jl.__file__));
-            _parts = clean.split('.')[1:];
-            _cand = os.path.join(_pkg, *_parts) + '.jac';
-            if in_native_scope_path(_cand) and os.path.isfile(_cand) {
-                return (path_name, _cand);
             }
         }
     }
@@ -625,6 +705,8 @@ def native_layout_to_dict(layout: NativeModuleLayout) -> dict {
 obj BoundaryTypeInfo {
     has name: str,
         kind: str,
+        type_id: str = '',
+        type_scope: str = '',
         fields: list[tuple[(str, str)]] = field(default_factory=`list),
         field_defaults: dict[(str, any)] = field(default_factory=`dict),
         enum_members: list[tuple[(str, any)]] = field(default_factory=`list),
@@ -640,15 +722,20 @@ obj InteropBinding {
         param_names: list[str] = [],
         ast_node: any = None,
         source_module: (str | None) = None,
+        type_scope: str = '',
         kind: str = 'function',
-        provider_app: str = '';
+        provider_app: str = '',
+        native_contract: dict = field(default_factory=`dict),
+        endpoint_id: str = '';
 
     has is_cross_module: bool { getter; }
 }
 
 obj InteropManifest {
-    has bindings: dict[(str, InteropBinding)] = field(default_factory=`dict),
+    has native_host_imports: dict[str, dict] = field(default_factory=`dict),
+        bindings: dict[(str, InteropBinding)] = field(default_factory=`dict),
         boundary_types: dict[(str, BoundaryTypeInfo)] = field(default_factory=`dict),
+        boundary_type_names: dict[str, dict[str, str]] = field(default_factory=`dict),
         endpoint_effects: dict[(str, dict)] = field(default_factory=`dict),
         func_access: dict[(str, bool)] = field(default_factory=`dict),
         walker_access: dict[(str, bool)] = field(default_factory=`dict),
@@ -663,9 +750,12 @@ obj InteropManifest {
     has native_imports: list[InteropBinding] { getter; }
     has native_exports: list[InteropBinding] { getter; }
     has native_cross_module_imports: list[InteropBinding] { getter; }
+    has native_dependency_sources: list[str] { getter; }
     has client_native_imports: list[InteropBinding] { getter; }
     has server_exports_to_client: list[InteropBinding] { getter; }
     has server_exports_to_server: list[InteropBinding] { getter; }
+
+    def boundary_types_for(scope: str) -> dict[str, BoundaryTypeInfo];
 }
 
 obj NodeComments {
@@ -686,7 +776,7 @@ obj CodeGenTarget {
         py_bytecode: (bytes | None) = None,
         jcir: (bytes | None) = None,
         es_ast: EsNode | Sequence[EsNode] | SliceInfo | IndexInfo | None = None,
-        llvm_ir: (ModuleRef | None) = None,
+        llvm_ir: (ModuleRef | IRModule | None) = None,
         native_engine: (ExecutionEngine | None) = None,
         native_bitcode: (bytes | None) = None,
         native_linked_ir: (str | None) = None,
@@ -695,6 +785,7 @@ obj CodeGenTarget {
         _interop_callbacks: list[any] = field(default_factory=`list),
         native_layout: (NativeModuleLayout | None) = None,
         osp_model: (OspModel | None) = None,
+        component_call_abi: str = "",
         jc_layout: (str | None) = None,
         has_root_access: (bool | None) = None,
         nogc_enforced: bool = False,
@@ -708,4 +799,26 @@ obj CodeGenTarget {
     has doc_ir: Doc { getter; setter(value: Doc); }
     has client_manifest: ClientManifest { getter; setter(value: ClientManifest); }
     has interop_manifest: InteropManifest { getter; setter(value: InteropManifest); }
+}
+
+def endpoint_descriptor(module: any, kind: str, name: str) -> dict {
+    import os;
+    import from jaclang.project.workspace { workspace_for_path }
+    path = module.loc.mod_path;
+    workspace = workspace_for_path(path);
+    owner = workspace.app_for_path(path) if workspace else None;
+    app = owner.name if owner is not None else "";
+    source = os.path.relpath(path, workspace.project_root)
+        if workspace
+        else module.name;
+    source = source.replace(os.sep, "/");
+    return {"app": app, "module": source, "kind": kind, "name": name};
+}
+
+def endpoint_key(module: any, kind: str, name: str) -> str {
+    import json;
+    d = endpoint_descriptor(module, kind, name);
+    return "["
+        + ",".join([json.dumps(part) for part in [d["app"], d["module"], kind, name]])
+        + "]";
 }

@@ -109,6 +109,9 @@ test "kernel parse materializes the store parser's tree" {
         (nat_mod, nat_err) = parse_woven(SNIPPET, "kernel_eq.jac", None, []);
         (py_mod, py_err) = parse(SNIPPET, "kernel_eq.jac");
         assert nat_err == py_err;
+        assert nat_mod._gen is None;
+        import from jaclang.compiler.frontend.codeinfo { CodeGenTarget }
+        assert isinstance(nat_mod.gen, CodeGenTarget);
         assert kernel.skipped() == 0 , (
             "kernel skipped objects during materialization"
         );
@@ -133,6 +136,44 @@ def _rss_kb -> (int | None) {
         return None;
     }
     return None;
+}
+
+test "kernel materialization releases every borrowed input reference" {
+    import ctypes;
+    import from jaclang.compiler.native_compiler { ensure_loaded }
+    import from jaclang.compiler.frontend.codeinfo { HDR_RC_OFF }
+    kernel = ensure_loaded();
+    if kernel is None {
+        return;
+    }
+    src = b'def f(x: int) -> int { return x + 1; }';
+    path = b'kernel_ownership.jac';
+    source_root = kernel.lib.jac_str_new(src, len(src));
+    path_root = kernel.lib.jac_str_new(path, len(path));
+    release = kernel.lib.jac_release;
+    release.argtypes = [ctypes.c_void_p];
+    release.restype = None;
+    try {
+        assert kernel.lib.jc_run(
+            source_root, source_root, len(src), path_root, path_root, len(path)
+        )
+            == 0;
+        mod = kernel.take_module();
+        assert mod is not None;
+        assert not kernel.take_diags();
+        assert not kernel.take_lexdiags();
+        kernel.take_comments();
+        for (name, buffer_ptr) in [("source", source_root), ("path", path_root)] {
+            refs = ctypes.c_int64.from_address(buffer_ptr + HDR_RC_OFF).value;
+            assert refs == 1 , (
+                f"{name} has {refs} native references after materialization; "
+                "only the caller's reference may survive the parse region"
+            );
+        }
+    } finally {
+        release(path_root);
+        release(source_root);
+    }
 }
 
 def _parse_and_drop(src: str, path: str) {

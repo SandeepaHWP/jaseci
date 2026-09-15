@@ -1,6 +1,7 @@
 import from jaclang.compiler.tools.unparse_pass { unparse_node }
 
 impl JacAutoLintPass.postinit -> None {
+    import from jaclang.compiler.driver.compilation_context { context_app }
     import from jaclang.compiler.driver.pass_driver { diagnostic_policy_for }
     import from jaclang.project.config {
         JacConfig,
@@ -15,7 +16,7 @@ impl JacAutoLintPass.postinit -> None {
     )
         or JacConfig();
     if mod_path {
-        _app = config.app_for_path(str(Path(mod_path).resolve()));
+        _app = context_app(str(Path(mod_path).resolve()));
         if _app is not None and not _app.implicit and _app.name in config.apps {
             config = config.effective_for_app(_app.name);
         }
@@ -35,7 +36,7 @@ impl JacAutoLintPass.postinit -> None {
 }
 
 impl JacAutoLintPass._is_file_excluded(file_path: str) -> bool {
-    import from jaclang.compiler.frontend.helpers { path_matches_exclude }
+    import from jaclang.project.source { path_matches_exclude }
     return path_matches_exclude(file_path, self._exclude_patterns, self._project_root);
 }
 
@@ -1357,7 +1358,7 @@ impl JacAutoLintPass._base_decl_archetypes(annex_path: str) -> list[uni.Archetyp
     self._base_decls_loaded = True;
     import from jaclang.compiler.driver.bccache { discover_base_file }
     import from jaclang.compiler.frontend.parser { parse as rd_parse }
-    import from jaclang.compiler.frontend.helpers { read_file_with_encoding }
+    import from jaclang.project.source { read_file_with_encoding }
     import from jaclang.compiler.driver.program { JacProgram }
     base_path = discover_base_file(annex_path);
     if base_path is None {
@@ -1882,6 +1883,14 @@ impl JacAutoLintPass._check_stale_has_read(ability_node: uni.Ability) -> None {
     if not writes or not reads {
         return;
     }
+    earliest_write: dict[str, tuple[int, int]] = {};
+    for write_entry in writes {
+        wname = write_entry[2];
+        wpos = (write_entry[0], write_entry[1]);
+        if wname not in earliest_write or wpos < earliest_write[wname] {
+            earliest_write[wname] = wpos;
+        }
+    }
     flagged: set[tuple[int, int, str]] = set();
     for read_entry in reads {
         rline = read_entry[0];
@@ -1892,15 +1901,10 @@ impl JacAutoLintPass._check_stale_has_read(ability_node: uni.Ability) -> None {
         if key in flagged {
             continue;
         }
-        for write_entry in writes {
-            wline = write_entry[0];
-            wcol = write_entry[1];
-            wname = write_entry[2];
-            if wname == rname and ((wline, wcol) < (rline, rcol)) {
-                self.emit(W3041, node_override=rnode, name=rname);
-                flagged.add(key);
-                break;
-            }
+        first_write = earliest_write.get(rname);
+        if first_write is not None and first_write < (rline, rcol) {
+            self.emit(W3041, node_override=rnode, name=rname);
+            flagged.add(key);
         }
     }
 }

@@ -62,6 +62,7 @@ def eq_bool_else_branch(v: bool | None) -> None {
     return None;
 }
 
+# `!=` does not narrow here yet, so the error names both literals.
 def keeps_sibling(v: Literal["a"] | Literal["b"]) -> None {
     if v != "a" {
         n: None = v;

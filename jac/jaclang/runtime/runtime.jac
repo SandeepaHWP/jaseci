@@ -9,8 +9,7 @@ import from collections { OrderedDict, deque }
 import from collections.abc { Callable, Coroutine, Iterable, Mapping, Sequence }
 import from concurrent.futures { Future, ThreadPoolExecutor }
 import from contextvars { ContextVar }
-import dataclasses;
-import from dataclasses { dataclass, field }
+import from jaclang.runtime.object_model { field, make_object }
 import from inspect { getfile }
 import from logging { getLogger }
 import from typing { TYPE_CHECKING, Literal, ParamSpec, Protocol, TypeAlias, TypeVar }
@@ -34,7 +33,7 @@ import from jaclang.runtime.archetype {
     light_hop,
     light_hop_answers
 }
-import from jaclang.compiler.frontend.constant { EdgeDir, colors }
+import from jaclang.runtime.constants { EdgeDir, colors }
 import from jaclang.runtime.graph_query { GraphQuery, QHop }
 import from jaclang.runtime.constructs {
     AccessLevel,
@@ -50,13 +49,13 @@ import from jaclang.runtime.constructs {
     WalkerAnchor,
     WalkerArchetype
 }
-import from jaclang.compiler.driver.modresolver {
+import from jaclang.project.modresolver {
     infer_language,
     find_jac_project_root,
     push_import_base,
     pop_import_base
 }
-import from jaclang.compiler.driver.mtp { Info }
+import from jaclang.runtime.semantic { Info }
 import type from jaclang.byllm.mtir { MTRuntime }
 import type from jaclang.cli.console { JacConsole as ConsoleImpl }
 import type from jaclang.compiler.driver.compiler { JacCompiler }
@@ -97,8 +96,8 @@ def _scale_provider -> any {
     }
     result: any = None;
     try {
-        import from jaclang.scale.plugin { JacScalePlugin }
-        result = JacScalePlugin;
+        import from jaclang.scale.runtime.provider { JacScaleRuntime }
+        result = JacScaleRuntime;
     } except ImportError as e {
         _scale_provider_error[0] = e;
     }
@@ -371,10 +370,6 @@ class JacWalker {
 
 class JacArchetype {
     static def make_archetype(cls: type[Archetype]) -> type[Archetype];
-    static def field(
-        factory: (Callable[([], T)] | None) = None, `init: bool = True
-    ) -> T;
-
     static def on_entry(func: Callable) -> Callable;
     static def on_exit(func: Callable) -> Callable;
     static def set_trigger(

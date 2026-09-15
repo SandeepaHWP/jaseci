@@ -47,7 +47,9 @@ impl JacScaleConfig.get_default_config(self: JacScaleConfig) -> dict[str, any] {
             'replay_tolerance_seconds': 300,
             'max_body_bytes': 1048576,
             'rate_limit_per_minute': 0,
-            'api_key_expiry_days': 365
+            'api_key_expiry_days': 365,
+            'github_secret': '',
+            'github_signature_header': 'X-Hub-Signature-256'
         },
         'monitoring': {
             'enabled': False,
@@ -215,7 +217,12 @@ impl JacScaleConfig.get_webhook_config(self: JacScaleConfig) -> dict[str, any] {
         ),
         'max_body_bytes': int(webhook_config.get('max_body_bytes', 1048576)),
         'rate_limit_per_minute': int(webhook_config.get('rate_limit_per_minute', 0)),
-        'api_key_expiry_days': int(webhook_config.get('api_key_expiry_days', 365))
+        'api_key_expiry_days': int(webhook_config.get('api_key_expiry_days', 365)),
+        'github_secret': str(webhook_config.get('github_secret', '') or ''),
+        'github_signature_header': str(
+            webhook_config.get('github_signature_header', 'X-Hub-Signature-256')
+                or 'X-Hub-Signature-256'
+        )
     };
 }
 
@@ -239,6 +246,24 @@ impl sanitize_prometheus_namespace(name: str) -> str {
     return sanitized or 'jaclang_scale';
 }
 
+impl _resolve_prometheus_namespace(configured: str | None, k8s_namespace: str) -> str {
+    configured = "" if configured is None else str(configured);
+    if not configured {
+        return sanitize_prometheus_namespace(k8s_namespace);
+    }
+    sanitized = sanitize_prometheus_namespace(configured);
+    if sanitized != configured and not _prometheus_namespace_warned {
+        _prometheus_namespace_warned = True;
+        import logging;
+        logging.getLogger(__name__).warning(
+            f"jac.toml [scale.monitoring] namespace '{configured}' is not a valid "
+            f"Prometheus prefix; metrics are exported under '{sanitized}' instead. "
+            "Update dashboards and alert rules that reference the old prefix."
+        );
+    }
+    return sanitized;
+}
+
 impl JacScaleConfig.get_monitoring_config(self: JacScaleConfig) -> dict[str, any] {
     config = self.load();
     monitoring_config = config.get('monitoring', {});
@@ -258,12 +283,10 @@ impl JacScaleConfig.get_monitoring_config(self: JacScaleConfig) -> dict[str, any
         10.0
     ];
 
-    namespace = monitoring_config.get('namespace');
-    if not namespace {
-        k8s_config = config.get('kubernetes', {});
-        k8s_namespace = k8s_config.get('namespace', 'default');
-        namespace = sanitize_prometheus_namespace(k8s_namespace);
-    }
+    k8s_config = config.get('kubernetes', {});
+    namespace = _resolve_prometheus_namespace(
+        monitoring_config.get('namespace'), k8s_config.get('namespace', 'default')
+    );
     return {
         'enabled': monitoring_config.get('enabled', False),
         'endpoint': monitoring_config.get('endpoint', '/metrics'),
@@ -377,6 +400,7 @@ impl peek_scale_config -> JacScaleConfig | None {
 
 impl reset_scale_config -> None {
     _scale_config_instance = None;
+    _prometheus_namespace_warned = False;
     _app_scale_cache.clear();
 }
 

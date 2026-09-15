@@ -1,6 +1,5 @@
 """`x == "literal"` narrows x, as it does for an int, float or bool literal.
-Every function here is sound narrowing, so this fixture reports no errors.
-"""
+Only the case marked below still reports an error."""
 
 # The reported repro: a plain string literal.
 
@@ -78,8 +77,8 @@ def eq_non_literal(v: str | None, w: str) -> str {
     return r;
 }
 
-# `!=` narrows only where the members are literals themselves, so that every
-# remaining alternative is spelled out.
+# Not narrowed yet: `!=` never narrows its true branch, even for an exact
+# literal union, so `return v` still reports. Kept to record the gap.
 
 def ne_literal_union_to_none(v: Literal["a"] | None) -> None {
     if v != "a" {

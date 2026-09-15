@@ -14,12 +14,15 @@ requires a Windows host (or WSL interop) and is not assumed here.
 """
 
 import os;
+import from jaclang.compiler.driver.compile_options {
+    push_native_target,
+    pop_native_target
+}
 import struct;
 import subprocess;
-import sys;
 import tempfile;
 import from pathlib { Path }
-import from tests.support { TESTS_DIR }
+import from tests.support { jac_command, TESTS_DIR }
 import jaclang;
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.driver.compile_options { CompileOptions }
@@ -78,8 +81,7 @@ def _inject_pe_entry(ir: str) -> str {
 
 """Compile a fixture to a relocatable COFF object the way nacompile does."""
 def emit_coff_object(fixture: str) -> bytes {
-    prev = os.environ.get("JAC_NATIVE_TARGET", None);
-    os.environ["JAC_NATIVE_TARGET"] = WIN_TRIPLE;
+    prev = push_native_target(WIN_TRIPLE);
     try {
         prog = JacProgram();
         ir = prog.compile(
@@ -110,11 +112,7 @@ def emit_coff_object(fixture: str) -> bytes {
         mpm.run(mod, pb);
         relobj = tm.emit_object(mod);
     } finally {
-        if prev is None {
-            os.environ.pop("JAC_NATIVE_TARGET", None);
-        } else {
-            os.environ["JAC_NATIVE_TARGET"] = prev;
-        }
+        pop_native_target(prev);
     }
     return relobj;
 }
@@ -336,17 +334,15 @@ test "linking is deterministic" {
 test "nacompile --target windows writes a valid PE via the CLI" {
     out = os.path.join(tempfile.mkdtemp(), "smoke.exe");
     proc = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "jaclang",
-            "nacompile",
+        jac_command(
+            "build",
+            "--native",
             "--target",
             "windows",
             os.path.join(FIXTURES, FIXTURE),
             "-o",
             out
-        ],
+        ),
         capture_output=True,
         text=True,
         timeout=300

@@ -58,13 +58,13 @@ test "desktop target dispatches on the configured engine" {
         proj = Path(d);
         reset_desktop_config();
         (proj / "jac.toml").write_text(
-            '[project]\nname = "t"\nversion = "1.0.0"\nentry-point = "main.jac"\n'
+            '[project]\nname = "t"\nversion = "1.0.0"\nentry-point = "main"\n'
             'kind = "desktop"\n'
         );
         assert target.engine(proj) == "native" , "engine defaults to the native webview";
         reset_desktop_config();
         (proj / "jac.toml").write_text(
-            '[project]\nname = "t"\nversion = "1.0.0"\nentry-point = "main.jac"\n'
+            '[project]\nname = "t"\nversion = "1.0.0"\nentry-point = "main"\n'
             'kind = "desktop"\n\n[desktop]\nengine = "cef"\n'
         );
         assert target.engine(proj) == "cef" , "[desktop] engine = cef selects CEF";
@@ -98,7 +98,7 @@ test "desktop target dispatches on the configured engine" {
             assert calls == ["cef_dev_unsupported"];
             reset_desktop_config();
             (proj / "jac.toml").write_text(
-                '[project]\nname = "t"\nversion = "1.0.0"\nentry-point = "main.jac"\n'
+                '[project]\nname = "t"\nversion = "1.0.0"\nentry-point = "main"\n'
                 'kind = "desktop"\n'
             );
             target.dev(proj / "main.jac", proj);
@@ -123,7 +123,7 @@ test "desktop window config loads from jac.toml" {
         reset_desktop_config();
         with open(Path(d) / "jac.toml", "w") as f {
             f.write(
-                '[project]\nname = "t"\nversion = "1.0.0"\nentry-point = "main.jac"\n'
+                '[project]\nname = "t"\nversion = "1.0.0"\nentry-point = "main"\n'
                 '[desktop.window]\ntitle = "Hi"\nwidth = 640\nheight = 480\n'
             );
         }
@@ -148,9 +148,7 @@ test "desktop engine config defaults to native" {
     with tempfile.TemporaryDirectory() as d {
         reset_desktop_config();
         with open(Path(d) / "jac.toml", "w") as f {
-            f.write(
-                '[project]\nname = "t"\nversion = "1.0.0"\nentry-point = "main.jac"\n'
-            );
+            f.write('[project]\nname = "t"\nversion = "1.0.0"\nentry-point = "main"\n');
         }
         cfg = get_desktop_config(project_dir=Path(d));
         engine = cfg.get_engine();
@@ -173,9 +171,7 @@ test "desktop dispatch config loads from jac.toml" {
         reset_desktop_config();
         # No [desktop.dispatch] -> documented defaults.
         with open(Path(d) / "jac.toml", "w") as f {
-            f.write(
-                '[project]\nname = "t"\nversion = "1.0.0"\nentry-point = "main.jac"\n'
-            );
+            f.write('[project]\nname = "t"\nversion = "1.0.0"\nentry-point = "main"\n');
         }
         cfg = get_desktop_config(project_dir=Path(d));
         d1 = cfg.get_dispatch_config();
@@ -187,7 +183,7 @@ test "desktop dispatch config loads from jac.toml" {
         # Explicit values override the defaults.
         with open(Path(d) / "jac.toml", "w") as f {
             f.write(
-                '[project]\nname = "t"\nversion = "1.0.0"\nentry-point = "main.jac"\n'
+                '[project]\nname = "t"\nversion = "1.0.0"\nentry-point = "main"\n'
                 '[desktop.dispatch]\ntimeout_s = 5.0\nmax_queue = 16\ndebug = true\n'
             );
         }
@@ -321,7 +317,7 @@ test "generated host calls shutdown after run_main_loop()" {
 The desktop host appends the CLI's `[payload][trailer]` (desktop_build.
 _bundle_runtime), so an app materializes the SAME fused runtime the CLI uses --
 which carries the LLVMPY shim the native backend ctypes-loads AND the na compiler
-pass. So any app on this runtime can `jac nacompile` / run `na` exactly like the
+pass. So any app on this runtime can `jac build --native` / run `na` exactly like the
 CLI. This test runs in that runtime (the test interpreter), so locating the shim
 + the na pass here verifies na is first-class on desktop by construction."""
 test "na/LLVM backend is first-class in the desktop fused runtime" {
@@ -335,7 +331,7 @@ test "na/LLVM backend is first-class in the desktop fused runtime" {
     shim = _find_shim();
     assert os.path.isfile(shim) , f"LLVMPY shim missing from the fused runtime: {shim}";
     assert shim.endswith(_shim_name()) , "resolved shim must be the platform LLVMPY shim";
-    # The native compiler pass is importable, so `nacompile` is available to any
+    # The native compiler pass is importable, so `jac build --native` is available to any
     # app running on this fused runtime (the one the desktop host bundles).
     spec = importlib.util.find_spec("jaclang.compiler.backends.native.na_compile_pass");
     assert spec is not None , "na compiler pass must be importable in the desktop runtime";

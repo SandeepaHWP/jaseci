@@ -235,7 +235,7 @@ impl JacLangServer.type_check_file(
         if cancel_token and cancel_token.is_set() {
             return False;
         }
-        import from jaclang.compiler.placement.workspace { workspace_for_path }
+        import from jaclang.project.workspace { workspace_for_path }
         ws = workspace_for_path(main_path);
         app = ws.app_for_path(main_path) if ws is not None else None;
         proj_root = ws.project_root if ws is not None else None;
@@ -260,6 +260,9 @@ impl JacLangServer.type_check_file(
                     cancel_token=cancel_token,
                     target_app=app_name,
                     app_kind=app_kind,
+                    entry_point=ws.apps[app_name].`entry
+                        if ws is not None and app_name in ws.apps
+                        else main_path,
                     project_root=proj_root
                 )
             );
@@ -657,11 +660,11 @@ impl JacLangServer._string_import_definition(
 
 impl JacLangServer._module_spec_target(mp: uni.ModulePath) -> Optional[str] {
     import os;
-    import from jaclang.compiler.driver.modresolver {
-        is_client_npm_import,
+    import from jaclang.project.modresolver {
         resolve_client_npm_declarations,
         resolve_client_npm_package
     }
+    import from jaclang.compiler.placement.placement_pins { is_client_npm_import }
     try {
         resolved = mp.resolve_relative_path();
         if os.path.isfile(resolved) {
@@ -691,11 +694,11 @@ impl JacLangServer._module_spec_target(mp: uni.ModulePath) -> Optional[str] {
 impl JacLangServer._npm_item_location(
     from_loc: uni.ModulePath, item_name: str
 ) -> Optional[lspt.Location] {
-    import from jaclang.compiler.driver.modresolver {
-        is_client_npm_import,
+    import from jaclang.project.modresolver {
         resolve_client_npm_declarations,
         resolve_client_npm_package
     }
+    import from jaclang.compiler.placement.placement_pins { is_client_npm_import }
     def at_file(path_: str, rng: Optional[lspt.Range]) -> Optional[lspt.Location] {
         path_uri = uris.from_fs_path(path_);
         if path_uri is None {
@@ -792,6 +795,37 @@ impl JacLangServer.get_node_info(sym_node: uni.AstSymbolNode) -> Optional[str] {
     return node_info.strip() if node_info else None;
 }
 
+impl JacLangServer.get_inlay_hints(
+    file_path: str, range: lspt.Range
+) -> list[lspt.InlayHint] {
+    import from jaclang.compiler.passes.ownership_hints { inferred_hints }
+    fs_path = _path_of(file_path);
+    mod = self.program.mod.hub.get(fs_path);
+    if mod is None {
+        return [];
+    }
+    out: list[lspt.InlayHint] = [];
+    for h in inferred_hints(mod) {
+        line = h.line - 1;
+        if line < range.start.line or line > range.end.line {
+            continue;
+        }
+        out.append(
+            lspt.InlayHint(
+                position=lspt.Position(line=line, character=h.col),
+                label=h.label,
+                kind=(
+                    lspt.InlayHintKind.Parameter
+                        if h.kind == "parameter"
+                        else lspt.InlayHintKind.Type
+                ),
+                padding_left=h.label.startswith("(") or h.label.startswith(" raises")
+            )
+        );
+    }
+    return out;
+}
+
 impl JacLangServer.get_hover_info(
     file_path: str, position: lspt.Position
 ) -> Optional[lspt.Hover] {
@@ -872,28 +906,7 @@ impl JacLangServer.rename_module(old_path: str, new_path: str) -> None {
 impl JacLangServer.get_completion_items_of(
     ty: TypeBase | uni.UniScopeNode
 ) -> lspt.CompletionList {
-    items: list[lspt.CompletionItem] = [];
-    for item in get_completion_items(ty) {
-        detail: lspt.CompletionItemLabelDetails | None = None;
-        if item.detail {
-            detail = lspt.CompletionItemLabelDetails(detail=item.detail);
-        }
-        documentation: lspt.MarkupContent | None = None;
-        if item.documentation {
-            documentation = lspt.MarkupContent(
-                kind=lspt.MarkupKind.PlainText, value=item.documentation
-            );
-        }
-        items.append(
-            lspt.CompletionItem(
-                label=item.label,
-                kind=lspt.CompletionItemKind(item.kind.value),
-                label_details=detail,
-                documentation=documentation,
-            )
-        );
-    }
-    return lspt.CompletionList(is_incomplete=False, items=items,);
+    return lspt.CompletionList(is_incomplete=False, items=get_completion_items(ty));
 }
 
 impl JacLangServer.get_scope_completion(

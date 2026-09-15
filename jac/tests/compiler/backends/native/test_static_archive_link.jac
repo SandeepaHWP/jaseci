@@ -16,7 +16,14 @@ unresolved libc import and the loader would abort, so a clean run proves the
 merge. Together the file covers the archive-merge path on both object formats.
 """
 
+import from tests.support { jac_command }
+import from jaclang.compiler.backends.native.entry_points { inject_main }
+
 import os;
+import from jaclang.compiler.driver.compile_options {
+    push_native_target,
+    pop_native_target
+}
 import struct;
 import subprocess;
 import sys;
@@ -27,11 +34,7 @@ import from jaclang.compiler.driver.compile_options { CompileOptions }
 import from jaclang.compiler.backends.native.macho_linker { MachOLinker }
 import from jaclang.compiler.backends.native.elf_linker { ElfLinker }
 import from jaclang.compiler.backends.native.linker_common { select_ar_members }
-import from jaclang.cli.commands.nacompile {
-    _inject_entry_elf_static,
-    _collect_musl_static,
-    _musl_lib_dir
-}
+import from jaclang.cli.commands.native_build { _collect_musl_static, _musl_lib_dir }
 import jaclang.compiler.backends.native.llvm.binding as llvm;
 
 glob FIXTURES = str(Path(__file__).resolve().parent / "fixtures");
@@ -40,8 +43,7 @@ glob FIXTURES = str(Path(__file__).resolve().parent / "fixtures");
 """Compile a fixture for `triple` and return its LLVM IR text (mirrors the
 nacompile CLI AOT path; see test_exec_link)."""
 def _compile_ir(fixture: str, triple: str) -> str {
-    prev = os.environ.get("JAC_NATIVE_TARGET", None);
-    os.environ["JAC_NATIVE_TARGET"] = triple;
+    prev = push_native_target(triple);
     try {
         prog = JacProgram();
         ir = prog.compile(
@@ -53,11 +55,7 @@ def _compile_ir(fixture: str, triple: str) -> str {
         ]}";
         ir_txt = str(ir.gen.llvm_ir);
     } finally {
-        if prev is None {
-            os.environ.pop("JAC_NATIVE_TARGET", None);
-        } else {
-            os.environ["JAC_NATIVE_TARGET"] = prev;
-        }
+        pop_native_target(prev);
     }
     return ir_txt;
 }
@@ -99,14 +97,15 @@ def _inject_macho(ir_txt: str) -> str {
 `main` and `exit`, unlike Mach-O where dyld provides the entry stub."""
 def _inject_elf(ir_txt: str) -> str {
     # Static musl entry (crt1.o supplies `_start`); see test_exec_link.
-    return _inject_entry_elf_static(ir_txt);
+    return inject_main(ir_txt);
 }
 
 
 """Locate a bundled archive by name from any pbs build, or None."""
 def _find_bundled(libname: str) -> (str | None) {
     jac_dir = Path(__file__).resolve().parents[4];
-    hits = list(jac_dir.`glob(f".pbs-build/*/python/build/lib/{libname}"));
+    hits = sorted(jac_dir.`glob(f".python-build/*/*/python/build/lib/{libname}"));
+    hits += sorted(jac_dir.`glob(f".python-build/*/python/build/lib/{libname}"));
     return str(hits[0]) if hits else None;
 }
 
@@ -202,7 +201,7 @@ test "nacompile CLI: `import from lzma` static-links the floor, no dylib dep (#6
     d = tempfile.mkdtemp();
     out = os.path.join(d, "crc32_cli");
     comp = subprocess.run(
-        [sys.executable, "-m", "jaclang", "nacompile", fixture, "-o", out],
+        jac_command("build", "--native", fixture, "-o", out),
         capture_output=True,
         text=True,
         timeout=180

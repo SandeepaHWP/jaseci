@@ -1,6 +1,6 @@
 ---
 name: jac-config
-description: The jac.toml control plane - every section ([project], [apps.<name>] workspace tables with per-app overlays, [dependencies], [serve], [run], [check.lint], [test], [scripts], [environments], capability tables ([byllm], [scale] incl. [scale.gateway], [client] incl. app_meta_data, [desktop]), [jac-shadcn], [npm], [jacpack]), ${VAR} interpolation, profiles via JAC_PROFILE, .jacignore, and the CLI verbs that manage it (jac config/install/remove/update/x). Load before editing jac.toml or wiring project settings, apps, dependencies, scripts, or environment profiles.
+description: Edit jac.toml project, app, dependency, build, and runtime settings. Use when selecting configuration keys or resolving configuration errors.
 ---
 
 `jac.toml` is the single config file (think `pyproject.toml` + `package.json`). Commands find it by walking up from cwd. Generate it with `jac create`, then edit sections directly or via `jac config set` / `jac install <pkg>` - hand-editing is normal and expected.
@@ -10,7 +10,7 @@ description: The jac.toml control plane - every section ([project], [apps.<name>
 | Section | Purpose |
 |---|---|
 | `[project]` | name (required), version, description, **`entry-point`** (default for `jac run`, defaults to `main.jac`), **`kind`** (project kind that makes a bare `jac run` execute / serve / build the project - empty = inferred from the entry-point codespace; see `jac-project-kinds`), **`default-app`** (workspaces: the app a bare `jac run`/`build`/`test`/`setup` targets), `jac-version` compiler pin; publishing fields (`license`, `readme`, `requires-python`, `classifiers`, `authors`) feed `jac build --as wheel` (see `jac-packaging`). `entry-point` and `kind` are single-app only - alongside `[apps]` they are a hard error |
-| `[apps.<name>]` | one table per app turns the project into a **workspace**: `kind` (required; decides the client too: `web-app`/`web-static`/`desktop` render React DOM, `mobile` is React Native through `@jac/mobui`), `path` (dir root) or `entry-point` (file-rooted), `platform`, `route` (default `/api/<name>`). Modules under no app root are shared. No `[apps]` = one implicit app. See `jac-sv-microservices` for service apps |
+| `[apps.<name>]` | one table per app turns the project into a **workspace**: `kind` (required; decides the client too: `web-app`/`web-static`/`desktop` render React DOM, `mobile` is React Native through `@jac/mobui`), `entry-point` (required, relative to the project root), `platform`, `route` (default `/api/<name>`). Ordinary imports inherit the selected app context. No `[apps]` = one implicit app. See `jac-sv-microservices` for service apps |
 | `[apps.<name>.<section>]` | per-app **overlay** of any section (`[apps.web.serve]`, `[apps.mobile.dependencies.npm]`, `[apps.svc.scale]`, `[apps.web.placement.pins]`), deep-merged over the base for that app only. Effective config = base → app overlays → profile → `jac.local.toml` |
 | `[dependencies]` | PyPI packages, pip-style specs (`requests = ">=2.28.0"`) |
 | `[dependencies.npm]` / `[dependencies.npm.dev]` | npm packages for client code (see `jac-npm-packages`); `[dependencies.npm.web]` / `.static` / `.desktop` / `.mobile` scope a table to one client kind, `[dependencies.npm.native]` feeds a mobile app's Expo project |
@@ -23,7 +23,9 @@ description: The jac.toml control plane - every section ([project], [apps.<name>
 | `[check.lint]` | lint rule selection: `select = ["default"]` / `["all"]`, `ignore = ["combine-has"]`, `exclude = ["legacy/*"]` |
 | `[test]` | `jac test` defaults: `directory`, `filter`, `verbose`, `fail_fast`, `max_failures` |
 | `[build]` | `dir` (artifact root, default `.jac/` - holds `cache/`, `venv/`, `client/`, `data/`) |
-| `[gc]` / `[gc.enforce]` | native memory management: `default = "cycles"/"rc"/"none"` (mode when `--gc` not passed); `enforce.modules`/`enforce.grandfathered` glob patterns opt modules into zero-RC nogc enforcement (see `jac-native-memory`) |
+| `[memory]` | the memory profile: `profile = "managed"/"rc"/"nogc"` (overridable per build with `--memory`); `enforce`/`exempt` glob patterns hold modules to the zero-RC contract under a managed profile (see `jac-native-memory`) |
+| `[native]` | native build knobs: `target`, `opt`, `debug`, `threads` |
+| `[placement]` | `default = "native"/"server"` for markerless modules, beside `[placement.pins]` |
 | `[scripts]` | named command shortcuts run via `jac x <name>` |
 | `[environments]` / `[environment]` | per-profile overrides (below) |
 | `[byllm]` / `[byllm.model]` / `[byllm.call_params]` | AI settings: model identity, API keys, call params (see `jac-by-llm`) |
