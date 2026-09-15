@@ -710,7 +710,7 @@ glob CHECKER_DIRS: dict[(str, str)] = {
              "literal_ne_does_not_over_narrow",
              "checker",
              "checker_literal_ne_no_over_narrow.jac",
-             9,
+             10,
              True,
              [
                  (0, "Cannot assign str | NoneType to NoneType"),
@@ -721,7 +721,8 @@ glob CHECKER_DIRS: dict[(str, str)] = {
                  (5, "Cannot assign int | NoneType to NoneType"),
                  (6, "Cannot assign float | NoneType to NoneType"),
                  (7, "Cannot assign bool | NoneType to NoneType"),
-                 (8, "Cannot assign Literal[\"a\"] | Literal[\"b\"] to NoneType")
+                 (8, "Cannot assign Literal[\"a\"] | Literal[\"b\"] to NoneType"),
+                 (9, "Cannot assign str | NoneType to Literal[\"node\"]")
              ]
          ),
          (

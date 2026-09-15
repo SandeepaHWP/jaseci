@@ -5864,11 +5864,7 @@ impl TypeEvaluator._extract_literal_operand_type(operand: Expr) -> TypeBase | No
         }
         return self.get_type_of_expression(operand);
     }
-    operand_type = self.get_type_of_expression(operand);
-    if isinstance(operand_type, ClassType) and operand_type.is_literal_type() {
-        return operand_type;
-    }
-    return None;
+    return self._literal_type_from_expr(operand);
 }
 
 impl TypeEvaluator._extract_hasattr_info(condition: Expr) -> tuple[str, str] | None {
