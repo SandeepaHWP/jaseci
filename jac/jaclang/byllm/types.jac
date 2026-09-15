@@ -82,18 +82,24 @@ obj ToolCall {
 }
 
 obj MockToolCall {
-    has tool: Callable,
-        args: dict[str, any];
+    has tool: Callable | str,
+        args: dict[str, any] | str = {},
+        call_id: str = "";
 
     def to_tool_call -> ToolCall;
 }
 
 obj MockRawResponse {
-    has content: str;
+    has content: str = "",
+        tool_calls: list[MockToolCall] = [],
+        usage: dict[str, any] | None = None,
+        finish_reason: str = "";
 }
 
 obj MockError {
-    has error: Exception;
+    has error: Exception,
+        content: str = "",
+        after: int = 0;
 }
 
 obj CompletionResult {

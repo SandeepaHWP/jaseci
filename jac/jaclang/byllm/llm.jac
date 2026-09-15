@@ -69,6 +69,7 @@ with entry {
     if _litellm_config['local_cost_map'] {
         os.environ["LITELLM_LOCAL_MODEL_COST_MAP"] = "True";
     }
+    litellm.suppress_debug_info = not _litellm_config.get("debug", False);
 }
 
 glob _TOOL_DELTA_MIN_CHARS = 48,
@@ -191,13 +192,23 @@ obj BaseLLM {
 }
 
 obj MockLLM(BaseLLM) {
-    has seen_prompts: list[any] = [];
+    has model_name: str = MODEL_MOCK,
+        outputs: list[any] = [],
+        seen_prompts: list[str] = [],
+        seen: list[dict[str, any]] = [],
+        chunk_size: int = 12,
+        _queue: list[any] | None = None;
 
     def postinit -> None;
-    override def dispatch_no_streaming(mt_run: MTRuntime) -> CompletionResult;
-    override async def adispatch_no_streaming(mt_run: MTRuntime) -> CompletionResult;
-    override def dispatch_streaming(mt_run: MTRuntime) -> Generator[str, None, None];
-    override async def adispatch_streaming(mt_run: MTRuntime) -> AsyncIterator[str];
+    override def model_call_no_stream(params: dict[str, any]) -> object;
+    override def model_call_with_stream(
+        params: dict[str, any]
+    ) -> Generator[object, None, None];
+
+    def sent(key: str) -> list[any];
+    def exhausted -> bool;
+    def _next_reply(params: dict[str, any]) -> MockRawResponse | MockError;
+    def _current_queue -> list[any];
 }
 
 obj LocalLLM(BaseLLM) {

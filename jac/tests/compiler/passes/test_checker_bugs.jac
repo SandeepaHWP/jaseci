@@ -1992,6 +1992,42 @@ test "bug_tvarmeth1_method_type_param_shadows_class_param" {
     );
 }
 
+# Bug #LITEQ-1: `x == 0` dropped `int` from `int | None` in the other branch;
+# a literal comparison now narrows only the branch that confirms it.
+test "bug_liteq_1_int_literal_comparison_keeps_int_arm" {
+    program = compile_and_check("checker_literal_eq_keeps_base.jac");
+
+    by_line = {
+        e.loc.first_line: str(e)
+        for e in program.errors_had
+        if e.loc
+    };
+
+    assert len(program.errors_had) == 4 , (
+        "Bug #LITEQ-1: only the two optional returns and the two None-binding "
+        f"reports may fire. Got: {[str(e) for e in program.errors_had]}"
+    );
+
+    # Both read plain "NoneType" before the fix.
+    for line in [7, 12] {
+        assert "int | NoneType" in by_line.get(line, "") , (
+            "Bug #LITEQ-1: an int-literal comparison must leave the int arm "
+            f"standing. Line {line} reported: {by_line.get(line)}"
+        );
+    }
+
+    # The collapse was unsound, not just mislabelled: before the fix the else
+    # branch bound a live `int` to a `None` name and reported nothing.
+    for (line, expected) in [
+        (31, "Cannot assign int | NoneType to NoneType"),
+        (32, "Cannot return int | NoneType, expected NoneType")
+    ] {
+        assert expected in by_line.get(line, "") , (
+            "Bug #LITEQ-1: the else branch of an int-literal comparison must "
+            f"not admit the int arm. Line {line} reported: {by_line.get(line)}"
+        );
+    }
+}
 
 test "bug_selfovl1_receiver_selects_the_self_typed_overload" {
     program = compile_and_check("checker_self_typed_overload.jac");

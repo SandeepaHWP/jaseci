@@ -195,8 +195,12 @@ walker EndpointEffectPass(UniPass) {
     def _call_target_symbol(call: FuncCall) -> (Symbol | None) {
         if isinstance(call.target, Name) {
             sym = call.target.sym;
-            if not sym and call.target.sym_tab {
-                sym = call.target.sym_tab.lookup(call.target.sym_name, deep=True);
+            if not sym {
+                try {
+                    sym = call.target.sym_tab.lookup(call.target.sym_name, deep=True);
+                } except ValueError {
+                    return None;
+                }
             }
             return sym;
         }
