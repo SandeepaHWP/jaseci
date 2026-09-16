@@ -658,7 +658,7 @@ impl NaIRGenPass._adapter_callee(
         lv = self._codegen_lambda(fn_expr);
         if self._pending_lambda_captures is not None {
             self._pending_lambda_captures = None;
-            self.emit(
+            self.ctx.emit(
                 E5092,
                 node_override=fn_expr,
                 kind="expression",
@@ -1019,7 +1019,7 @@ impl NaIRGenPass._resolve_method_owner(
     arch_name: str, method_name: str
 ) -> (str | None) {
     import from jaclang.compiler.passes.layout_pass { get_layout_registry }
-    owner = get_layout_registry(self.ir_in, self.prog).resolve_method_owner(
+    owner = get_layout_registry(self.module, self.prog).resolve_method_owner(
         arch_name, method_name
     );
     if owner is not None {
@@ -1028,7 +1028,7 @@ impl NaIRGenPass._resolve_method_owner(
     _arch = self.arch_ast_map.get(arch_name);
     if isinstance(_arch, uni.Archetype) {
         _mod = _arch.find_parent_of_type(uni.Module);
-        if _mod is not None and _mod is not self.ir_in {
+        if _mod is not None and _mod is not self.module {
             return get_layout_registry(_mod, self.prog).resolve_method_owner(
                 arch_name, method_name
             );
@@ -1041,7 +1041,7 @@ impl NaIRGenPass._resolve_method(
     arch_name: str, method_name: str
 ) -> (ir.Function | None) {
     import from jaclang.compiler.passes.layout_pass { get_layout_registry }
-    _reg = get_layout_registry(self.ir_in, self.prog);
+    _reg = get_layout_registry(self.module, self.prog);
     cur: (str | None) = arch_name;
     _guard = 0;
     while cur is not None and _guard < 64 {
@@ -1297,7 +1297,7 @@ impl NaIRGenPass._try_iter_protocol_for(nd: uni.InForStmt) -> bool {
     func = self.builder.function;
     cond_bb = func.append_basic_block(name="iterf.cond");
     body_bb = func.append_basic_block(name="iterf.body");
-    end_bb = func.append_basic_block(name="iterf.end");
+    (else_bb, end_bb) = self._loop_exit_blocks(func, nd, "iterf");
     self.builder.branch(cond_bb);
     self.builder.position_at_end(cond_bb);
     if _gen_it_spill is not None {
@@ -1305,7 +1305,7 @@ impl NaIRGenPass._try_iter_protocol_for(nd: uni.InForStmt) -> bool {
     }
     out_i8 = self.builder.bitcast(elem_slot, i8p, name="iterf.out");
     got = self._emit_iter_advance(self.builder, iter_val, out_i8);
-    self.builder.cbranch(got, body_bb, end_bb);
+    self.builder.cbranch(got, body_bb, else_bb if else_bb is not None else end_bb);
     self.loop_stack.append((cond_bb, end_bb));
     self.builder.position_at_end(body_bb);
     yielded = self.builder.load(elem_slot, name="iterf.value");
@@ -1341,8 +1341,8 @@ impl NaIRGenPass._try_iter_protocol_for(nd: uni.InForStmt) -> bool {
         );
         self.builder.branch(cond_bb);
     }
+    self._emit_loop_else(nd, else_bb, end_bb);
     self.loop_stack.pop();
-    self.builder.position_at_end(end_bb);
 
     if _gen_it_spill is not None {
         iter_val = self.builder.load(_gen_it_spill, name="iterf.it.end");

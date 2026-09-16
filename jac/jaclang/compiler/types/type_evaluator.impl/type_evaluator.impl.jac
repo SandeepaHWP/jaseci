@@ -570,14 +570,16 @@ impl TypeEvaluator._get_type_of_expression_core(
                 }
 
                 if seeded_param {
-                    seed_body_expr: Expr | None = None;
+                    seed_body_node: UniNode | None = None;
                     if isinstance(expr.body, Expr) {
-                        seed_body_expr = expr.body;
+                        seed_body_node = expr.body;
+                    } elif isinstance(expr.body, list) and len(expr.body) == 1 {
+                        seed_body_node = expr.body[0];
                     } else {
-                        seed_body_expr = expr.tail_return_expr();
+                        seed_body_node = expr.tail_return_expr();
                     }
-                    if seed_body_expr is not None {
-                        self._invalidate_expr_type_cache(seed_body_expr);
+                    if seed_body_node is not None {
+                        self._invalidate_expr_type_cache(seed_body_node);
                     }
                 }
             }
@@ -596,6 +598,21 @@ impl TypeEvaluator._get_type_of_expression_core(
                 }
             } elif isinstance(return_type, UnknownType) {
                 return_type = self._infer_lambda_block_return_type(expr.body);
+            } elif (tail_expr := expr.tail_return_expr()) is not None {
+                tail_type = self.get_type_of_expression(
+                    tail_expr, expected_type=return_type
+                );
+                verdict = self.assign_expr(
+                    tail_expr, tail_type, return_type, strict=self._is_strict_site(expr)
+                );
+                if not verdict.ok and not verdict.diagnosed {
+                    self.emit_diag(
+                        E1002,
+                        tail_expr,
+                        actual=str(tail_type),
+                        expected=str(return_type)
+                    );
+                }
             }
             return FunctionType(
                 func_name="<lambda>", return_type=return_type, parameters=parameters,
@@ -2291,7 +2308,6 @@ impl TypeEvaluator._bind_filter_compare(cmp: Expr, filter_type: ClassType) -> No
     self._bind_filter_member(left, filter_type);
 }
 
-
 impl TypeEvaluator._filter_order_name(expr: Expr) -> (Name | None) {
     inner = expr;
     if isinstance(inner, UnaryExpr) {
@@ -2303,7 +2319,6 @@ impl TypeEvaluator._filter_order_name(expr: Expr) -> (Name | None) {
     return inner if isinstance(inner, Name) else None;
 }
 
-
 impl TypeEvaluator._bind_filter_member(target: Name, filter_type: ClassType) -> None {
     if sym := filter_type.lookup_member_symbol(target.value) {
         self._set_symbol_to_expr(target, sym);
@@ -2311,7 +2326,6 @@ impl TypeEvaluator._bind_filter_member(target: Name, filter_type: ClassType) -> 
     }
     self.emit_diag(E1033, target, member=target.value, type=str(filter_type));
 }
-
 
 impl TypeEvaluator._widen_literal_for_declaration(ty: TypeBase) -> TypeBase {
     if isinstance(ty, ClassType) {
@@ -2971,7 +2985,6 @@ impl TypeEvaluator._is_protocol_class(cls_type: ClassType) -> bool {
     return False;
 }
 
-
 impl TypeEvaluator._solve_protocol_type_args(
     src_type: ClassType, proto_type: ClassType, bindings: dict[str, TypeBase]
 ) -> bool {
@@ -3014,7 +3027,6 @@ impl TypeEvaluator._solve_protocol_type_args(
     }
     return solved;
 }
-
 
 impl TypeEvaluator.is_sub_class(super_cls: ClassType, sub_cls: ClassType) -> bool {
     import from jaclang.compiler.types.type_utils { ensure_mro_fresh }
@@ -3292,7 +3304,7 @@ impl TypeEvaluator._in_native_context -> bool {
     if self._pass is None {
         return False;
     }
-    cur = self._pass?.cur_node;
+    cur = self._pass?.current_node;
     if cur is None or not isinstance(cur, UniNode) {
         return False;
     }
@@ -4834,7 +4846,6 @@ impl TypeEvaluator._classify_edge(pred: IfStmt, succ: UniCFGNode) -> str {
     return "unconditional";
 }
 
-
 impl TypeEvaluator.create_key_for_reference(expr: Expr) -> str | None {
     if isinstance(expr, AtomUnit) and isinstance(expr.value, Expr) {
         return self.create_key_for_reference(expr.value);
@@ -4969,7 +4980,6 @@ impl TypeEvaluator.classify_condition(condition: Expr) -> ConditionInfo | None {
     }
     return None;
 }
-
 
 impl TypeEvaluator._find_predicate_for(
     target: NarrowingTarget, condition: Expr

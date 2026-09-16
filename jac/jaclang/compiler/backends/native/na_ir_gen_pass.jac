@@ -1,3 +1,4 @@
+import from jaclang.compiler.passes.context { CompileContext }
 import jaclang.compiler.frontend.unitree as uni;
 import os;
 import sys;
@@ -14,7 +15,7 @@ import from jaclang.compiler.backends.native.lowering {
     NativeLoweringKind
 }
 import from jaclang.runtime.scalars { ScalarShape }
-import from jaclang.compiler.passes.transform { Transform }
+
 import from jaclang.compiler.frontend.codeinfo {
     HDR_ALLOC_ID_OFF,
     HDR_DTOR_OFF,
@@ -155,10 +156,12 @@ obj NativeFunctionState {
             list[tuple[ir.Function, tuple[ir.Value, ir.Value, ir.Value]]];
 }
 
-walker NaIRGenPass(Transform) {
-    has prog: JacProgram;
+walker NaIRGenPass {
+    has ctx: CompileContext,
+        prog: JacProgram;
+
     static has HOST_PASS: bool = True;
-    has ir_in: uni.Module,
+    has module: uni.Module,
         _llvm_module: (ir.Module | None) = None,
         _type_map: (dict[str, ir.Type] | None) = None,
         _complex_struct_type: (ir.IdentifiedStructType | None) = None,
@@ -930,7 +933,6 @@ walker NaIRGenPass(Transform) {
     ) -> None;
 
     def postinit -> None;
-    def transform(ir_in: uni.Module) -> uni.Module;
     def _run_impl(ir_in: uni.Module) -> uni.Module;
     can run_walk with uni.Module entry;
     def _register_imported_struct_types -> None;
@@ -1042,7 +1044,7 @@ walker NaIRGenPass(Transform) {
     def _na_debug_on -> bool;
     def _attach_di_subprogram(func: ir.Function, name: str, line: int) -> None;
     def _finalize_di_locations(func: ir.Function, fallback_line: int) -> None;
-    def post_transform -> None;
+    can finish with exit;
     def _peer_dict_key -> (str | None);
     def _hash_key_spec(key_type: ir.Type) -> tuple[str, int];
     def _dict_val_spec(val_type: ir.Type) -> str;
@@ -1966,6 +1968,18 @@ walker NaIRGenPass(Transform) {
     ) -> tuple[(ir.Value, ir.Value)];
 
     def _codegen_body(stmts: Sequence[uni.UniNode]) -> None;
+    def _loop_exit_blocks(
+        func: ir.Function,
+        nd: (uni.WhileStmt | uni.InForStmt | uni.IterForStmt),
+        prefix: str
+    ) -> tuple[(ir.Block | None), ir.Block];
+
+    def _emit_loop_else(
+        nd: (uni.WhileStmt | uni.InForStmt | uni.IterForStmt),
+        else_bb: (ir.Block | None),
+        end_bb: ir.Block
+    ) -> None;
+
     def _codegen_stmt(nd: uni.UniNode) -> None;
     def _codegen_return(nd: uni.ReturnStmt) -> None;
     def _codegen_delete(nd: uni.DeleteStmt) -> None;
@@ -2245,11 +2259,39 @@ walker NaIRGenPass(Transform) {
     ) -> (ir.Value | None);
 
     def _emit_comparison(
-        op: str, left: ir.Value, right: ir.Value, is_float: bool, unsigned: bool = False
+        op: str,
+        left: ir.Value,
+        right: ir.Value,
+        is_float: bool,
+        unsigned: bool = False,
+        key_ret: (TypeBase | None) = None
     ) -> (ir.Value | None);
+
+    def _int_lt_gt_pair(
+        left: ir.Value, right: ir.Value, unsigned: bool, name: str
+    ) -> tuple[(ir.Value, ir.Value)];
+
+    def _emit_order_pair(
+        left: ir.Value,
+        right: ir.Value,
+        is_float: bool,
+        unsigned: bool,
+        name: str,
+        key_ret: (TypeBase | None) = None
+    ) -> (tuple[(ir.Value, ir.Value)] | None);
 
     def _is_jacval_ty(t: ir.Type) -> bool;
     def _is_jacval_boxable(t: ir.Type) -> bool;
+    def _sort_key_supported(ty: ir.Type) -> bool;
+    def _sort_key_supported_d(ty: ir.Type, depth: int) -> bool;
+    def _sort_key_return_type(nd: (uni.UniNode | None)) -> (TypeBase | None);
+    def _sort_key_orderable(ty: (TypeBase | None)) -> (bool | None);
+    def _sort_key_unsigned(nd: (uni.UniNode | None)) -> bool;
+    def _agg_key_args(
+        key_ret: (TypeBase | None), agg_name: str
+    ) -> (list[TypeBase] | None);
+
+    def _key_elem_unsigned(et: (TypeBase | None)) -> bool;
     def _emit_jacval_ordering(
         op: str, jv: ir.Value, peer: ir.Value, jv_on_left: bool
     ) -> (ir.Value | None);
