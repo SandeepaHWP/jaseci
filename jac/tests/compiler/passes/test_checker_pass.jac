@@ -2042,42 +2042,59 @@ test "lambda_param_inferred_from_expected_callable" {
 }
 
 test "overload_rejection_help" {
-    # Each E1054 must name why the overload was rejected; the arity failure stays bare.
+    # Each E1054 must name why the overload was rejected, keyed by assigned name.
     path = os.path.join(CHECKER_FIXTURES, "checker_overload_rejection_help.jac");
     program = JacProgram();
     program.compile(path);
 
-    helps = [
-        (e.help_text or "")
+    with open(path) as fixture {
+        line_of = {
+            row.strip().split(" = ")[0]: no
+            for (no, row) in enumerate(fixture.read().splitlines(), start=1)
+            if " = " in row
+        };
+    }
+    by_line = {
+        e.loc.first_line: (e.help_text or "")
         for e in program.errors_had
         if e.code and e.code.code == "E1054"
-    ];
-    assert len(helps) == 7 , f"Expected 7 E1054s, got {len(helps)}";
+    };
+    assert len(by_line) == 13 , f"Expected 13 E1054s, got {len(by_line)}:\n{by_line}";
+    helps = {name: by_line.get(line, "") for (name, line) in line_of.items()};
 
-    def mentions(needle: str) -> bool {
-        return any(needle in h for h in helps);
+    expected = {
+        "a": ["returns 'dict[str, int]', but must return"],
+        "b": ["takes 2 parameter(s), but a callable taking 1 is expected"],
+        "g": ["returns 'dict[str, int]', but must return"],
+        "h": ["accepts 'int' for parameter 'n', but will be called with 'str'"],
+        "i": ["lambda parameter 'd' has no annotation", "`lambda (d: <type>) { ... }`"],
+        "c": ["Every overload expects 'Callable[[int]"],
+        "d": ["Every overload expects 'SupportsIndex'"],
+        "e": ["parameter 'iterable'"],
+        "j": ["overloads 2, 3, 4, 5: cannot assign", "more"],
+        "k": ["The candidates expect:", " | ...'", "more"],
+        "m": ["parameter 'reverse'", "Every overload expects 'bool'"],
+        "n": ["Every overload expects an object with '__round__'"]
+    };
+    for (name, needles) in expected.items() {
+        for needle in needles {
+            assert needle in helps[name] , f"{name} help lacks {needle!r}:\n{helps[
+                name
+            ]}";
+        }
     }
-
-    assert mentions("returns 'dict'") and mentions("must return") , f"Missing return-type reason:\n{helps}";
-    assert mentions("takes 2 parameter(s)") , f"Missing arity reason:\n{helps}";
-
-    # An extra optional param is arity-compatible, so it must not be blamed on arity.
-    arity = [
-        h
-        for h in helps
-        if "parameter(s), but a callable taking" in h
-    ];
-    assert len(arity) == 1 , f"Expected exactly one arity reason, got {len(arity)}:\n{helps}";
-    assert mentions("The candidates expect:") and mentions("overload 2:") , f"Missing candidate list:\n{helps}";
-    assert mentions("Every overload expects 'SupportsIndex'") , f"Missing collapsed expectation:\n{helps}";
-    assert mentions("parameter 'iterable'") , f"Missing per-argument reason:\n{helps}";
-
-    bare = [
-        h
-        for h in helps
-        if "overload" not in h
-    ];
-    assert len(bare) == 1 , f"Expected exactly one bare E1054, got {len(bare)}:\n{helps}";
+    # Arity-compatible callbacks with optional params are blamed on the return type.
+    assert "parameter(s)" not in helps["g"] , helps["g"];
+    assert "NoneType" not in helps["c"] + helps["m"] , f"{helps['c']}\n{helps['m']}";
+    assert "_SupportsRound" not in helps["n"] , helps["n"];
+    assert helps["f"] == "" and line_of["f"] in by_line , f"Unknown keyword should stay bare:\n{helps[
+        'f'
+    ]}";
+    for text in helps.values() {
+        for row in text.splitlines() {
+            assert len(row) <= 240 , f"Help line too long ({len(row)}):\n{row}";
+        }
+    }
 }
 
 test "lambda_param_unresolved_requires_annotation" {

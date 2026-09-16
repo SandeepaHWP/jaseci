@@ -303,13 +303,16 @@ obj MatchArgsToParamsResult {
         argument_errors: bool = False;
 }
 
-glob MAX_LISTED_OVERLOADS: int = 4;
+glob MAX_LISTED_OVERLOADS: int = 4,
+     MAX_TYPE_TEXT: int = 80;
 
 obj ArgTypeMismatch {
     has param_name: str,
         actual: str,
         expected: str,
-        callable_reason: str | None = None;
+        expects_none: bool = False,
+        callable_reason: str | None = None,
+        lambda_param: str | None = None;
 }
 
 obj NarrowingTarget {
@@ -700,7 +703,6 @@ walker TypeEvaluator {
     def validate_call_args(expr: FuncCall) -> TypeBase;
     def _validate_call_type(expr: FuncCall, caller_type: TypeBase) -> TypeBase;
     def _container_value_type(value_type: TypeBase, at: Expr) -> TypeBase;
-    def _unannotated_lambda_arg_name(expr: FuncCall) -> str | None;
     def _make_coroutine_type(inner: TypeBase) -> TypeBase;
     def _is_awaitable_type(t: TypeBase) -> bool;
     def _unwrap_awaitable_type(t: TypeBase, node_: UniNode) -> TypeBase;
@@ -713,6 +715,7 @@ walker TypeEvaluator {
     ) -> bool;
 
     def _callable_reason(arg_type: TypeBase, expected: TypeBase) -> str | None;
+    def _expected_text(expected: TypeBase) -> str;
     def _describe_overload_rejections(
         rejections: list[tuple[int, ArgTypeMismatch]]
     ) -> str | None;
