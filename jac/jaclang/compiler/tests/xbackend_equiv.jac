@@ -15,6 +15,8 @@ compare_results uses intersection semantics: only keys present in both dicts
 are checked, so a backend that returns {} (unimplemented) is silently skipped.
 """
 
+import from jaclang.compiler.passes.execution { run_walker }
+
 import ctypes;
 import importlib;
 import json;
@@ -108,8 +110,8 @@ def compile_fixture_to_js(fixture_name: str) -> str {
     assert not fatal , (
         f"Compilation errors in {fixture_name}: {[str(e) for e in fatal]}"
     );
-    es_pass = EsastGenPass(ir_in=ir, prog=prog);
-    es_ir = es_pass.ir_out;
+    es_pass = run_walker(EsastGenPass, module=ir, prog=prog);
+    es_ir = es_pass.module;
     assert isinstance(es_ir.gen.es_ast, EsNode) , "es_ast should be an EsNode";
     return es_to_js(es_ir.gen.es_ast);
 }
@@ -205,6 +207,17 @@ def compile_native(fixture: str, *, no_ir_cache: bool = False) -> tuple[any, ...
     eng = ir.gen.native_engine;
     assert eng is not None , f"No native engine produced for {fixture}";
     return (eng, ir);
+}
+
+def compile_native_errors(fixture: str) -> list[str] {
+    # compile_native for fixtures whose native lane is EXPECTED to emit
+    # diagnostics; returns the rendered errors for assertion.
+    prog = JacProgram();
+    prog.compile(
+        file_path=str(os.path.join(_fixture_shadow_dir(), fixture)),
+        options=CompileOptions()
+    );
+    return [str(e) for e in prog.errors_had] if prog.errors_had else [];
 }
 
 def get_func(eng: object, name: str, restype: type, *argtypes: type) -> object {
