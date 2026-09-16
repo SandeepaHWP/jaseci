@@ -174,44 +174,33 @@ impl TypeEvaluator._callable_reason(
     arg_type: TypeBase, expected: TypeBase
 ) -> str | None {
     if not isinstance(arg_type, FunctionType)
-        or not isinstance(expected, FunctionType)
-        or expected.is_gradual_callable_form() {
+        or not isinstance(expected, FunctionType) {
         return None;
     }
+    mismatch = self._callable_mismatch(arg_type, expected);
+    if mismatch is None {
+        return None;
+    }
+    match mismatch.kind {
+        case CallableMismatchKind.PARAMETER:
+            return f"accepts {_q(mismatch.src_param.param_type)} for parameter {_q(
+                mismatch.src_param.name
+            )}, but will be called with {_q(mismatch.dest_param.param_type)}";
 
-    (src_params, dest_params) = (_visible_params(arg_type), _visible_params(expected));
-    for (src, dest) in zip(src_params, dest_params) {
-        if src.param_type is None
-            or dest.param_type is None
-            or isinstance(src.param_type, UnknownType) {
-            continue;
-        }
-        if not self.assign_type(dest.param_type, src.param_type) {
-            return f"accepts {_q(src.param_type)} for parameter {_q(
-                src.name
-            )}, but will be called with {_q(dest.param_type)}";
-        }
-    }
+        case CallableMismatchKind.ARITY:
+            return f"takes {mismatch.src_count} parameter(s), but a callable taking {mismatch.dest_count} is expected";
 
-    want = len(dest_params);
-    if any(not p.is_optional for p in src_params[want:]) {
-        return f"takes {len(src_params)} parameter(s), but a callable taking {want} is expected";
-    }
-    if any(_has_unknown(p.param_type) for p in src_params) {
-        return None;
-    }
+        case CallableMismatchKind.RETURN:
+            if _has_unknown(mismatch.src_return)
+                or any(_has_unknown(p.param_type) for p in _visible_params(arg_type)) {
+                return None;
+            }
+            return f"returns {_q(mismatch.src_return)}, but must return {_q(
+                mismatch.dest_return
+            )}";
 
-    src_ret = arg_type.return_type;
-    dest_ret = expected.return_type;
-    if src_ret is None or dest_ret is None or _has_unknown(src_ret) {
-        return None;
     }
-    got_ret = self._convert_to_instance(src_ret);
-    want_ret = self._convert_to_instance(dest_ret);
-    if self.is_none_type(want_ret) or self.assign_type(got_ret, want_ret) {
-        return None;
-    }
-    return f"returns {_q(got_ret)}, but must return {_q(want_ret)}";
+    return None;
 }
 
 impl TypeEvaluator._describe_overload_rejections(

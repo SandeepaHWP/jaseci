@@ -306,6 +306,23 @@ obj MatchArgsToParamsResult {
 glob MAX_LISTED_OVERLOADS: int = 4,
      MAX_TYPE_TEXT: int = 80;
 
+enum CallableMismatchKind {
+    GRADUAL_SOURCE = "gradual_source",
+    PARAMETER = "parameter",
+    ARITY = "arity",
+    RETURN = "return"
+}
+
+obj CallableMismatch {
+    has kind: CallableMismatchKind,
+        src_param: Parameter | None = None,
+        dest_param: Parameter | None = None,
+        src_count: int = 0,
+        dest_count: int = 0,
+        src_return: TypeBase | None = None,
+        dest_return: TypeBase | None = None;
+}
+
 obj ArgTypeMismatch {
     has param_name: str,
         value: Expr,
@@ -573,6 +590,10 @@ walker TypeEvaluator {
     def _assign_callable(
         src_func: FunctionType, dest_func: FunctionType, strict: bool = False
     ) -> bool;
+
+    def _callable_mismatch(
+        src_func: FunctionType, dest_func: FunctionType, strict: bool = False
+    ) -> CallableMismatch | None;
 
     def _is_ability_classmethod(node_: Ability) -> bool;
     def _is_ability_staticmethod(node_: Ability) -> bool;
