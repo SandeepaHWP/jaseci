@@ -917,7 +917,10 @@ impl TypeEvaluator.assign_type_to_type_var(
                     if isinstance(value, UnionType)
                     else [value];
                 for alternative in value_alternatives {
-                    solutions.setdefault(name, {})[alternative.mangle()] = alternative;
+                    if name not in solutions {
+                        solutions[name] = {};
+                    }
+                    solutions[name][alternative.mangle()] = alternative;
                 }
             }
         }
@@ -971,8 +974,8 @@ impl TypeEvaluator.assign_type_to_type_var(
     }
 
     if isinstance(param_type, FunctionType) and isinstance(arg_type, FunctionType) {
-        param_params = param_type.parameters or [];
-        arg_params = arg_type.parameters or [];
+        param_params: list[Parameter] = param_type.parameters or [];
+        arg_params: list[Parameter] = arg_type.parameters or [];
         for (i, pp) in enumerate(param_params) {
             if i < len(arg_params)
                 and pp.param_type is not None
@@ -1012,7 +1015,7 @@ impl TypeEvaluator.assign_type_to_type_var(
         if _unresolved and param_type_args and self._is_protocol_class(param_type) {
             proto_bindings: dict[str, TypeBase] = {};
             if self._solve_protocol_type_args(arg_type, param_type, proto_bindings) {
-                type_params = param_type.shared.type_params or [];
+                type_params: list[TypeVarType] = param_type.shared.type_params or [];
                 solved_args: list[TypeBase] = [];
                 for i in range(len(param_type_args)) {
                     solved = proto_bindings.get(type_params[i].name)
