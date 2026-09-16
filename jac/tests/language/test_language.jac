@@ -12,7 +12,7 @@ import json;
 import from pathlib { Path }
 import from tests.support { JAC_ROOT }
 import jaclang;
-import from jaclang.jac0core.runtime { JacRuntime }
+import from jaclang.runtime.runtime { JacRuntime }
 
 glob FIXTURES = os.path.join(JAC_ROOT, "tests", "language", "fixtures"),
      EXAMPLES = os.path.join(JAC_ROOT, "examples"),
@@ -163,10 +163,7 @@ test "deep imports mods" {
 test "deep outer imports one" {
     output = run_module("deep.deeper.deep_outer_import", FIXTURES);
     assert "one level deeperslHello World!" in output;
-    assert (
-        "module 'pyfunc' from " in output
-        or "module 'jaclang.tests.fixtures.pyfunc' from " in output
-    );
+    assert "module 'pyfunc' from " in output;
 }
 
 test "has lambda goodness" {
@@ -736,6 +733,18 @@ test "while else" {
     assert "Completed" in lines[2];
 }
 
+test "for else" {
+    output = run_jac(os.path.join(FIXTURES, "for_else.jac"));
+    lines = output.split("\n");
+    assert "Sum:  1006" in lines[0];
+    assert "Done" in lines[1];
+}
+
+test "break in loop else stays in its owning loop" {
+    output = run_jac(os.path.join(FIXTURES, "loop_else_break.jac"));
+    assert output.strip() == "1444";
+}
+
 test "forever loop" {
     output = run_jac(os.path.join(FIXTURES, "forever_loop.jac"));
     lines = output.split("\n");
@@ -930,7 +939,7 @@ test "typed filter compr" {
 # ── Tests using compiler fixture paths ───────────────────────────────────────
 test "fstring multiple quotation" {
     output = run_module(
-        "compiler/passes/main/fixtures/fstrings", os.path.join(JAC_ROOT, "tests")
+        "compiler/passes/fixtures/fstrings", os.path.join(JAC_ROOT, "tests")
     );
     lines = output.split("\n");
     assert lines[0] == "11 13 12 12 11 12 12";
@@ -941,7 +950,7 @@ test "fstring multiple quotation" {
 
 test "fstring escape sequences" {
     output = run_module(
-        "compiler/passes/main/fixtures/fstring_escape_sequences",
+        "compiler/passes/fixtures/fstring_escape_sequences",
         os.path.join(JAC_ROOT, "tests")
     );
     lines = output.strip().split("\n");
@@ -1064,4 +1073,10 @@ test "as cast binds tighter than comparison" {
 test "deep walker chain does not hit recursion limit" {
     output = run_jac(os.path.join(FIXTURES, "deep_walker_chain.jac"));
     assert "1500" in output , f"Walker should visit all 1500 nodes: {output}";
+}
+
+
+test "plain walkers execute async abilities in sync and async callers" {
+    output = run_jac(os.path.join(FIXTURES, "inferred_async_walker.jac"));
+    assert "async abilities completed" in output;
 }

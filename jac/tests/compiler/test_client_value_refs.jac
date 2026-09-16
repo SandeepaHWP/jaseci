@@ -15,9 +15,9 @@ unbound identifier.
 
 import os;
 import from tests.support { JAC_ROOT }
-import jaclang.jac0core.unitree as uni;
-import from jaclang.jac0core.compile_options { CompileOptions }
-import from jaclang.jac0core.program { JacProgram }
+import jaclang.compiler.frontend.unitree as uni;
+import from jaclang.compiler.driver.compile_options { CompileOptions }
+import from jaclang.compiler.driver.program { JacProgram }
 
 glob FIXTURE_DIR = os.path.join(
          JAC_ROOT, "tests", "compiler", "fixtures", "codespace"
@@ -77,7 +77,7 @@ test "calls to the same endpoint still bridge over RPC" {
     (prog, mod) = build_fixture("infer_value_ref_call.jac");
     assert not prog.errors_had , f"{[str(e) for e in prog.errors_had]}";
     js = mod.gen.js or "";
-    assert '__jacCallFunction("push_tag", {"tag": "x"})' in js , (
+    assert '__jacCallFunction("push_tag", {"tag": "x"},' in js , (
         f"the call-site rewrite still carries Jac's calling convention; got:\n{js}"
     );
 }

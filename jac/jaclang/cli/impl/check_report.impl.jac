@@ -1,11 +1,10 @@
-def print_guide_hint(alert: any) -> None {
+def print_guide_hint(code: (str | None), category: (str | None)) -> None {
     import from jaclang.cli.console { console }
     import from jaclang.cli.guide_store { guide_for_diagnostic }
-    info = alert.code;
-    if info is None {
+    if not code or not category {
         return;
     }
-    name = guide_for_diagnostic(info.code, info.category.value);
+    name = guide_for_diagnostic(code, category);
     if name is not None {
         console.print(f"  → run 'jac guide {name}' for guidance", style="muted");
     }
@@ -25,27 +24,37 @@ impl print_file_progress(file_path: str, success: bool, idx: int, total: int) ->
     console.print(f"{file_path} {status} [{percentage}%]");
 }
 
-impl print_failures(failed_results: list, nowarn: bool = False) -> None {
+impl print_failures(
+    failed_results: list[dict[str, any]], nowarn: bool = False
+) -> None {
     import from jaclang.cli.console { console }
     console.print("");
     console.print(separator("FAILURES"));
     for r in failed_results {
         console.print(separator(r['path'], char='_'));
         for e in r['errors'] {
-            console.error(e.pretty_print());
-            print_guide_hint(e);
+            if isinstance(e, dict) {
+                console.error(str(e.get('pretty') or e.get('text') or ''));
+                print_guide_hint(e.get('code'), e.get('category'));
+            } else {
+                console.error(str(e));
+            }
         }
         if not nowarn and r['warnings'] {
             for w in r['warnings'] {
-                console.warning(w.pretty_print());
-                print_guide_hint(w);
+                if isinstance(w, dict) {
+                    console.warning(str(w.get('pretty') or w.get('text') or ''));
+                    print_guide_hint(w.get('code'), w.get('category'));
+                } else {
+                    console.warning(str(w));
+                }
             }
         }
         console.print("");
     }
 }
 
-impl print_failed_summary(failed_results: list) -> None {
+impl print_failed_summary(failed_results: list[dict[str, any]]) -> None {
     import from jaclang.cli.console { console }
     console.print(separator("failed files"));
     for r in failed_results {
@@ -79,7 +88,7 @@ def _coverage_relpath(path: str) -> str {
 
 impl print_native_coverage(coverage: dict[str, dict[str, any]]) -> None {
     import from jaclang.cli.console { console }
-    import from jaclang.jac0core.codeinfo { effective_default_codespace }
+    import from jaclang.compiler.frontend.codeinfo { effective_default_codespace }
     console.print("");
     console.print(separator("native coverage"));
     console.print(f"default codespace: {effective_default_codespace()}");
@@ -129,7 +138,13 @@ impl print_native_coverage(coverage: dict[str, dict[str, any]]) -> None {
         for (p, rec) in demoted {
             by_code.setdefault(rec['code'] or '<uncoded>', []).append((p, rec));
         }
-        ranked = sorted(by_code.items(), key=lambda (x: tuple) { (-len(x[1]), x[0]); });
+        ranked = sorted(
+            by_code.items(),
+            key=lambda (x: tuple[str, list[tuple[str, dict[str, any]]]]) { (
+                -len(x[1]),
+                x[0]
+            ); }
+        );
         for (code, entries) in ranked {
             console.print(f"  {code}  ({len(entries)})");
             for (p, rec) in sorted(entries) {
@@ -150,7 +165,8 @@ impl print_native_coverage(coverage: dict[str, dict[str, any]]) -> None {
             by_reason.setdefault(rec['detail'] or '<unknown>', []).append(p);
         }
         ranked_r = sorted(
-            by_reason.items(), key=lambda (x: tuple) { (-len(x[1]), x[0]); }
+            by_reason.items(),
+            key=lambda (x: tuple[str, list[str]]) { (-len(x[1]), x[0]); }
         );
         for (reason, paths) in ranked_r {
             console.print(f"  {reason}  ({len(paths)})");
@@ -227,35 +243,5 @@ impl print_placement_report(rows_by_module: dict[str, dict[str, any]]) -> None {
                 console.print("      - " + note);
             }
         }
-    }
-}
-
-impl print_compile_stats -> None {
-    import from jaclang.cli.console { console }
-    import from jaclang.jac0core.prefix_flip {
-        prefix_clause_help,
-        prefix_fallbacks_by_clause,
-        prefix_report_lines,
-        prefix_stats_lines
-    }
-    console.print("");
-    console.print(separator("compile stats"));
-    for line in prefix_stats_lines() {
-        console.print(line);
-    }
-    by_clause = prefix_fallbacks_by_clause();
-    if not by_clause {
-        return;
-    }
-    console.print("");
-    console.print("staged fallbacks (ranked by clause):");
-    ranked = sorted(by_clause.items(), key=lambda (x: tuple) { (-x[1], x[0]); });
-    for (clause, count) in ranked {
-        console.print(f"  {clause}  ({count})  -- {prefix_clause_help(clause)}");
-    }
-    console.print("");
-    console.print("per module:");
-    for line in prefix_report_lines() {
-        console.print(line);
     }
 }

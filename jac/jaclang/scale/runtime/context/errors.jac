@@ -1,4 +1,4 @@
-import from jaclang.runtimelib.serving.datatypes { JSONResponse }
+import from jaclang.server.serving.datatypes { JSONResponse }
 
 def error_response(
     code: str,
@@ -9,7 +9,7 @@ def error_response(
 ) -> JSONResponse {
     import from jaclang.scale.runtime.context.trace_ctx { get_current_trace }
 
-    err: dict = {"code": code, "message": message};
+    err: dict[str, any] = {"code": code, "message": message};
     if service {
         err["service"] = service;
     }
@@ -18,7 +18,7 @@ def error_response(
         err["trace_id"] = trace;
     }
 
-    body: dict = {"ok": False, "error": err, "meta": {"http_status": status}};
+    body: dict[str, any] = {"ok": False, "error": err, "meta": {"http_status": status}};
 
     headers: dict[str, str] = {};
     if retry_after_seconds is not None {
@@ -37,6 +37,15 @@ def service_unavailable(service: str, reason: str) -> JSONResponse {
         retry_after_seconds=2
     );
 }
+
+def identity_unresolvable(detail: str) -> JSONResponse {
+    return error_response(
+        code="IDENTITY_UNRESOLVABLE",
+        message=f"The caller's identity could not be resolved: {detail}",
+        status=401
+    );
+}
+
 
 def gateway_timeout(service: str) -> JSONResponse {
     return error_response(

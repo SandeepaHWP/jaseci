@@ -1,6 +1,6 @@
 """Contract parity across the `@jac/runtime` implementations.
 
-One public API, three runtimes (React, Solid, react-native) plus two cores, so a
+One public API, three runtimes (React, Solid, native/React Native) plus two cores, so a
 name taking different parameters per target is a silent portability bug. Asserting
 each function merely *exists* (`test_solid_backend.jac`) stayed green right through
 #8023, while React's `AuthGuard(redirect)` and Solid's `AuthGuard(redirect,
@@ -16,38 +16,39 @@ revives #8023. The last test reads the compiled body instead.
 import re;
 import jaclang;
 import from pathlib { Path }
-import jaclang.jac0core.unitree as uni;
-import from jaclang.jac0core.program { JacProgram }
-import from jaclang.jac0core.compile_options { CompileOptions }
-import from jaclang.jac0core.compiler { run_pass }
-import from jaclang.compiler.passes.ecmascript { EsastGenPass }
-import from jaclang.compiler.passes.ecmascript.es_unparse { es_to_js }
-import from jaclang.compiler.passes.ecmascript.backends.react { ReactBackend }
-import from jaclang.compiler.passes.ecmascript.backends.solid { SolidBackend }
-import from jaclang.compiler.passes.main.type_checker_pass { TypeCheckPass }
+import jaclang.compiler.frontend.unitree as uni;
+import from jaclang.compiler.driver.program { JacProgram }
+import from jaclang.compiler.driver.compile_options { CompileOptions }
+import from jaclang.compiler.driver.pass_driver { run_pass }
+import from jaclang.compiler.backends.es { EsastGenPass }
+import from jaclang.compiler.backends.es.es_unparse { es_to_js }
+import from jaclang.compiler.backends.es.backends.react { ReactBackend }
+import from jaclang.compiler.backends.es.backends.solid { SolidBackend }
+import from jaclang.compiler.passes.type_checker_pass { TypeCheckPass }
 
 def _as_any(v: any) -> any {
     return v;
 }
 
-glob _RT = Path(jaclang.__file__).parent / "runtimelib",
+glob _RT = Path(jaclang.__file__).parent / "client",
      # The three router/component runtimes: one public surface, three targets.
      _ROUTER_RUNTIMES: dict[str, Path] = {
          "react": _RT / "client_runtime.jac",
          "solid": _RT / "solid_runtime.jac",
-         "react-native": _RT / "client" / "client_runtime_native.jac"
+         "native": _RT / "client_runtime_native.jac"
      },
      # The two cores underneath them (auth, walker calls, form plumbing).
      _RUNTIME_CORES: dict[str, Path] = {
          "web": _RT / "client_runtime_core.jac",
-         "native": _RT / "client" / "client_runtime_core.jac"
+         "native": _RT / "client_react_core.jac"
      },
      # `target -> (backend, no-children fallback)` for the compiled-body test.
-     # react-native rides the React backend. Solid's fallback is None: its entry
-     # always passes `props.children`, so it has no `<Outlet/>` branch to keep.
+     # The native (React Native) runtime rides the React backend. Solid's
+     # fallback is None: its entry always passes `props.children`, so it has
+     # no `<Outlet/>` branch to keep.
      _AUTHGUARD_TARGETS: dict[str, tuple[any, (str | None)]] = {
          "react": (ReactBackend, "ReactRouterOutlet"),
-         "react-native": (ReactBackend, "__nativeOutlet"),
+         "native": (ReactBackend, "__nativeOutlet"),
          "solid": (SolidBackend, None)
      };
 
@@ -78,21 +79,22 @@ Non-public helpers are excluded on purpose: parsing pulls in the `impl/` annex,
 and targets may name internal arguments after whatever library they wrap
 (react-form's `field` vs solid-form's `fieldApi`). Parity covers the public
 surface, not private plumbing."""
-def _signatures(path: Path) -> dict[str, list] {
+def _signatures(path: Path) -> dict[str, list[any]] {
     src = path.read_text(encoding="utf-8");
     prog = JacProgram();
     mod = prog.parse_str(src, str(path));
     assert not prog.errors_had , (
         f"{path.name} failed to parse: {[str(e) for e in prog.errors_had]}"
     );
-    out: dict[str, list] = {};
+    out: dict[str, list[any]] = {};
     for abl in mod.get_all_sub_nodes(uni.Ability) {
         name = abl.name_ref?.value;
         if not name or not _is_public(abl) {
             continue;
         }
-        params = [];
-        for prm in (_as_any(abl.signature).params or []) {
+        params: list[any] = [];
+        sig_params: any = _as_any(abl.signature).params or [];
+        for prm in sig_params {
             type_node = prm.type_tag.tag if prm.type_tag else None;
             params.append(
                 (prm.name.value, _node_text(src, type_node), _node_text(src, prm.value))
@@ -117,7 +119,7 @@ def _compiled_body(path: Path, backend: any, name: str) -> str {
         if not issubclass(e.from_pass, TypeCheckPass)
     ];
     assert not fatal , f"{path.name} failed to compile: {[str(e) for e in fatal]}";
-    js = es_to_js(run_pass(EsastGenPass, ir, prog, backend=backend).ir_out.gen.es_ast);
+    js = es_to_js(run_pass(EsastGenPass, ir, prog, backend=backend).module.gen.es_ast);
     start = js.find(f"function {name}(");
     assert start >= 0 , f"{path.name} emitted no `function {name}(`";
     body = [];
@@ -135,7 +137,7 @@ def _compiled_body(path: Path, backend: any, name: str) -> str {
 }
 
 """Render one signature for a failure message."""
-def _render(name: str, params: list) -> str {
+def _render(name: str, params: list[any]) -> str {
     parts = [];
     for (pname, ptype, pdefault) in params {
         text = pname;
@@ -153,7 +155,7 @@ def _render(name: str, params: list) -> str {
 """Names declared by two or more `runtimes` must have identical parameter lists.
 Returns the compared names, so callers can assert the run was not vacuous."""
 def _assert_parity(runtimes: dict[str, Path], label: str) -> set {
-    tables = {};
+    tables: dict[str, dict[str, list[any]]] = {};
     for (target, path) in runtimes.items() {
         tables[target] = _signatures(path);
     }
@@ -221,7 +223,7 @@ test "runtime cores declare one signature per shared symbol" {
 test "AuthGuard takes redirect and children on every target" {
     # The specific contract #8023 turned on, pinned by name so a regression
     # reports itself rather than arriving as an anonymous parity diff. React and
-    # react-native once declared `redirect` alone and discarded any wrapped page.
+    # the native runtime once declared `redirect` alone and discarded any wrapped page.
     for (target, path) in _ROUTER_RUNTIMES.items() {
         params = _signatures(path).get("AuthGuard");
         assert params is not None , f"{target} does not declare AuthGuard";

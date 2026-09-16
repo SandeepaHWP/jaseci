@@ -1,0 +1,165 @@
+"""Unit gate for the floor locator's two shipping shapes (#6978 Phase 0.2).
+
+`nacompile` static-links a bundled C floor from a `.a` it resolves at compile
+time. `resolve_floor_dir` (in `compiler.backends.native.floor`) and
+`_resolve_ca_bundle` map the jaclang package root + a
+target triple to that archive dir (and the CA bundle) under either the dev
+`.python-build` tree or the installed `python/floor` payload layout (staged into the
+runtime cache by `mkpayload`). These build each layout synthetically in a temp
+dir so the resolution is covered without a real pbs build or a relocated jaclang
+-- the production lookups (`floor_lib_dir` / `_floor_ca_bundle`) just feed the real
+`jaclang.__file__`-derived root into these resolvers.
+"""
+
+import os;
+import tempfile;
+import from jaclang.compiler.backends.native.floor { resolve_floor_dir, floor_lib_dir }
+import from jaclang.cli.commands.native_build { _resolve_ca_bundle, _floor_ca_bundle }
+
+
+"""mkdir -p `path`, returning it."""
+def _mk(path: str) -> str {
+    os.makedirs(path, exist_ok=True);
+    return path;
+}
+
+
+test "installed payload: python/floor/<osarch> resolves by arch (#6978 0.2)" {
+    rt = tempfile.mkdtemp();
+    pkg_root = _mk(os.path.join(rt, "site"));  # jaclang pkg root == <rt>/site
+    floor = _mk(os.path.join(rt, "python", "floor", "linux-x86_64"));
+    got = resolve_floor_dir(pkg_root, "x86_64-unknown-linux-gnu");
+    assert got == floor , f"expected {floor}, got {got}";
+}
+
+
+test "installed payload: cross-arch target does not match host floor (#6978 0.2)" {
+    rt = tempfile.mkdtemp();
+    pkg_root = _mk(os.path.join(rt, "site"));
+    _mk(os.path.join(rt, "python", "floor", "linux-x86_64"));
+    # Only an x86_64 floor is staged; an arm64 target must NOT grab it -- linking
+    # host-arch archives into a cross-arch binary is broken, so this stays None.
+    got = resolve_floor_dir(pkg_root, "aarch64-unknown-linux-gnu");
+    assert got is None , f"expected None for cross-arch, got {got}";
+}
+
+
+test "dev tree: .python-build/<osarch>/python/build/lib resolves (#6978 0.2)" {
+    base = tempfile.mkdtemp();
+    libdir = _mk(
+        os.path.join(base, ".python-build", "linux-x86_64", "python", "build", "lib")
+    );
+    got = resolve_floor_dir(base, "x86_64-unknown-linux-gnu");
+    assert got == libdir , f"expected {libdir}, got {got}";
+}
+
+test "JacPython resolves its development archives and CA bundle" {
+    with tempfile.TemporaryDirectory() as base {
+        build = _mk(
+            os.path.join(
+                base, ".python-build", "jacpython", "linux-x86_64", "python", "build"
+            )
+        );
+        libdir = _mk(os.path.join(build, "lib"));
+        ca = os.path.join(build, "cacert.pem");
+        with open(ca, "w") as f {
+            f.write("# test CA bundle\n");
+        }
+        assert resolve_floor_dir(base, "x86_64-unknown-linux-gnu") == libdir;
+        assert _resolve_ca_bundle(base) == ca;
+    }
+}
+
+test "CPython resolves its release archives and CA bundle on macOS and Linux" {
+    for (osarch, triple) in [
+        ("macos-aarch64", "arm64-apple-darwin"),
+        ("linux-x86_64", "x86_64-unknown-linux-gnu"),
+        ("linux-aarch64", "aarch64-unknown-linux-gnu")
+    ] {
+        with tempfile.TemporaryDirectory() as base {
+            build = _mk(
+                os.path.join(
+                    base, ".python-build", "cpython", osarch, "python", "build"
+                )
+            );
+            libdir = _mk(os.path.join(build, "lib"));
+            ca = os.path.join(build, "cacert.pem");
+            with open(ca, "w") as f {
+                f.write("# test CA bundle\n");
+            }
+            assert resolve_floor_dir(base, triple) == libdir;
+            assert _resolve_ca_bundle(base) == ca;
+            # A second variant in a warm checkout must not hide the default build.
+            _mk(
+                os.path.join(
+                    base, ".python-build", "jacpython", osarch, "python", "build", "lib"
+                )
+            );
+            assert resolve_floor_dir(base, triple) == libdir;
+        }
+    }
+}
+
+test "no floor anywhere resolves to None (#6978 0.2)" {
+    base = tempfile.mkdtemp();
+    got = resolve_floor_dir(base, "x86_64-unknown-linux-gnu");
+    assert got is None , f"expected None, got {got}";
+}
+
+
+test "JAC_NATIVE_FLOOR_DIR overrides resolution (#6978 0.2)" {
+    `override = tempfile.mkdtemp();
+    prev = os.environ.get("JAC_NATIVE_FLOOR_DIR", None);
+    os.environ["JAC_NATIVE_FLOOR_DIR"] = `override;
+    try {
+        got = floor_lib_dir("x86_64-unknown-linux-gnu");
+        assert got == `override , f"env override ignored: {got}";
+    } finally {
+        if prev is None {
+            os.environ.pop("JAC_NATIVE_FLOOR_DIR", None);
+        } else {
+            os.environ["JAC_NATIVE_FLOOR_DIR"] = prev;
+        }
+    }
+}
+
+
+test "CA bundle resolves from installed python/floor/cacert.pem (#6978 0.2)" {
+    rt = tempfile.mkdtemp();
+    pkg_root = _mk(os.path.join(rt, "site"));
+    _mk(os.path.join(rt, "python", "floor"));
+    ca = os.path.join(rt, "python", "floor", "cacert.pem");
+    with open(ca, "w") as f {
+        f.write("# test bundle\n");
+    }
+    got = _resolve_ca_bundle(pkg_root);
+    assert got == ca , f"expected {ca}, got {got}";
+}
+
+
+test "CA bundle is None when neither installed nor dev bundle exists (#6978 0.2)" {
+    pkg_root = _mk(os.path.join(tempfile.mkdtemp(), "site"));
+    got = _resolve_ca_bundle(pkg_root);
+    assert got is None , f"expected None, got {got}";
+}
+
+
+test "JAC_NATIVE_CA_BUNDLE overrides CA resolution (#6978 0.2)" {
+    d = tempfile.mkdtemp();
+    `override = os.path.join(d, "my-ca.pem");
+    with open(`override, "w") as f {
+        f.write("# override\n");
+    }
+    prev = os.environ.get("JAC_NATIVE_CA_BUNDLE", None);
+    os.environ["JAC_NATIVE_CA_BUNDLE"] = `override;
+    try {
+        got = _floor_ca_bundle();
+        assert got == `override , f"env override ignored: {got}";
+    } finally {
+        if prev is None {
+            os.environ.pop("JAC_NATIVE_CA_BUNDLE", None);
+        } else {
+            os.environ["JAC_NATIVE_CA_BUNDLE"] = prev;
+        }
+    }
+}

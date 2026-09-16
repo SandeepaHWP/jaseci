@@ -10,6 +10,7 @@ import tempfile;
 import time;
 import tomllib;
 import from pathlib { Path }
+import from jaclang.scale.runtime.fleet { FleetSpec }
 
 glob logger = logging.getLogger(__name__);
 
@@ -47,7 +48,7 @@ glob _EXCLUDE_FILES: set[str] = {
          "id_ecdsa",
          "id_ed25519"
      };
-glob _EXCLUDE_SUFFIXES: tuple = (
+glob _EXCLUDE_SUFFIXES: tuple[str, ...] = (
          ".pem",
          ".key",
          ".crt",
@@ -62,7 +63,8 @@ glob _EXCLUDE_ENV: set[str] = {
          "PYTHONHOME",
          "JAC_LLVM_SHIM",
          "JAC_DEV_SOURCE",
-         "JAC_NO_PRECOMPILE"
+         "JAC_NO_PRECOMPILE",
+         "JAC_EXECUTABLE"
      };
 
 
@@ -88,16 +90,18 @@ obj BundleSourceFilter {
     has ignore_patterns: list[str];
 
     def parks(rel: Path) -> bool {
-        import from jaclang.jac0core.helpers { path_matches_exclude }
+        import from jaclang.project.source { path_matches_exclude }
 
         return path_matches_exclude(rel.as_posix(), self.ignore_patterns);
     }
 
+    def is_build_tree(rel: Path) -> bool {
+        return _exclude_dir_root(rel) is not None;
+    }
+
     def excludes_tree(rel: Path) -> bool {
-        for part in rel.parts {
-            if part in _EXCLUDE_DIRS {
-                return True;
-            }
+        if self.is_build_tree(rel) {
+            return True;
         }
         return self.parks(rel);
     }
@@ -118,42 +122,124 @@ obj BundleSourceFilter {
         }
         return name.endswith(_EXCLUDE_SUFFIXES);
     }
+
+    def matching_ignore_pattern(rel: Path) -> str {
+        import from jaclang.project.source { path_matches_exclude }
+
+        for pattern in self.ignore_patterns {
+            if path_matches_exclude(rel.as_posix(), [pattern]) {
+                return pattern;
+            }
+        }
+        return "";
+    }
+
+    def exclusion_reason(rel: Path) -> str {
+        for part in rel.parts {
+            if part in _EXCLUDE_DIRS {
+                return f"'{part}/' is a build or cache tree the deploy never ships";
+            }
+        }
+        pattern = self.matching_ignore_pattern(rel);
+        if pattern {
+            return f"parked by the .jacignore pattern '{pattern}'";
+        }
+        name = rel.name;
+        if name == "jac.toml" {
+            return (
+                "the deploy ships a sanitized jac.toml with [scale.secrets] "
+                "and [dev] stripped"
+            );
+        }
+        if name == ".env" or name.startswith(".env.") {
+            return (
+                "'.env' files never ship; move deploy values to "
+                "[scale.secrets] or pod env"
+            );
+        }
+        if name in _EXCLUDE_FILES or name.endswith(_EXCLUDE_SUFFIXES) {
+            return f"'{name}' is key material the deploy never ships";
+        }
+        return "excluded from the bundle";
+    }
 }
 
 
 def source_filter_for(base: Path) -> BundleSourceFilter {
-    import from jaclang.jac0core.helpers { read_jacignore_patterns }
+    import from jaclang.project.source { read_jacignore_patterns }
 
     return BundleSourceFilter(ignore_patterns=read_jacignore_patterns(str(base)));
 }
 
 
-def entry_module_rel(project_dir: str) -> (Path | None) {
+def _project_config(project_dir: str) -> any {
     import from jaclang.project.config { get_config_for_path }
 
     try {
-        config = get_config_for_path(Path(project_dir));
+        return get_config_for_path(Path(project_dir));
     } except Exception as exc {
-        logger.warning(f"entry-point check skipped, jac.toml unparseable: {exc}");
+        raise ValueError(
+            f"jac.toml under '{project_dir}' cannot be parsed ({exc}), so the "
+            "deploy cannot resolve the entry module or the service modules, "
+            "and every pod would fail on the same file at boot. Fix jac.toml "
+            "and re-deploy."
+        ) from exc;
+    }
+}
+
+
+def _entry_module_spec(project_dir: str) -> (tuple[Path, Path] | None) {
+    config = _project_config(project_dir);
+    if config is None {
         return None;
     }
-    if config is None or not config.project.entry_point {
+    proj_root: Path = config.project_root or Path(project_dir);
+    if config.apps {
+        try {
+            app = config.resolve_app("");
+        } except ValueError {
+            return None;
+        }
+        return (proj_root.resolve(), Path(app.entry_path(str(proj_root))));
+    }
+    if not config.project.entry_point {
         return None;
     }
-    return Path(config.project.entry_point);
+    import from jaclang.project.apps { resolve_entry_path }
+    return (
+        proj_root.resolve(),
+        Path(resolve_entry_path(config.project.entry_point, str(proj_root)))
+    );
+}
+
+
+def entry_module_rel(project_dir: str) -> (Path | None) {
+    spec = _entry_module_spec(project_dir);
+    if spec is None {
+        return None;
+    }
+    (proj_root, entry_path) = spec;
+    try {
+        return (proj_root / entry_path).resolve().relative_to(
+            Path(project_dir).resolve()
+        );
+    } except ValueError {
+        return None;
+    }
 }
 
 
 def assert_entry_module_ships(base: Path, excluded: BundleSourceFilter) {
     rel = entry_module_rel(str(base));
-    if rel is None or not (base / rel).is_file() or not excluded.parks(rel) {
+    if rel is None or not (base / rel).is_file() or not excluded.excludes(rel) {
         return;
     }
     raise ValueError(
-        f"The project entry module '{rel.as_posix()}' is parked by .jacignore, "
-        f"so the bundle would ship without an entry point and every pod would "
-        f"crash-loop on boot. Drop the .jacignore pattern that matches it, or "
-        f"point [project] entry-point at a module the bundle ships."
+        f"The project entry module '{rel.as_posix()}' is excluded from the "
+        f"bundle ({excluded.exclusion_reason(rel)}), so the bundle would ship "
+        "without an entry point and every pod would crash-loop on boot. Ship "
+        "the module (for .jacignore, drop the pattern that matches it), or "
+        "point [project] entry-point at a module the bundle ships."
     );
 }
 
@@ -227,6 +313,82 @@ def bundle_source_files(base: Path) -> list[Path] {
 }
 
 
+def resolve_fleet_entries(project_dir: str, fleet: any) -> dict[str, str] {
+    base = Path(project_dir).resolve();
+    excluded = source_filter_for(base);
+    members = [path.relative_to(base).as_posix() for path in bundle_source_files(base)];
+    return check_fleet_entries(base, members, excluded, fleet);
+}
+
+
+def _fleet_entry_rel(base: Path, app: str, file: str) -> str {
+    raw = Path(file);
+    if raw.is_absolute() {
+        try {
+            return raw.resolve().relative_to(base.resolve()).as_posix();
+        } except ValueError {
+            raise ValueError(
+                f"App '{app}' boots '{file}', which resolves outside the deployed "
+                f"tree '{base}', so the bundle cannot ship it and every '{app}' "
+                "pod would crash-loop on boot. Deploy from the project root."
+            );
+        }
+    }
+    rel = Path(raw.as_posix()).as_posix();
+    if rel.startswith("./") {
+        rel = rel[2:];
+    }
+    if ".." in Path(rel).parts {
+        raise ValueError(
+            f"App '{app}' boots '{file}', which reaches outside the deployed "
+            f"tree, so the bundle cannot ship it."
+        );
+    }
+    return rel;
+}
+
+
+def check_fleet_entries(
+    base: Path,
+    members: list[str],
+    excluded: BundleSourceFilter,
+    fleet: (FleetSpec | None)
+) -> dict[str, str] {
+    if fleet is None or fleet.is_empty() {
+        return {};
+    }
+    member_set: set[str] = set(members);
+    resolved: dict[str, str] = {};
+    for (app, member) in fleet.members.items() {
+        if not member.file {
+            raise ValueError(
+                f"App '{app}' has no entry file, so every '{app}' pod would "
+                "crash-loop on boot. Set [apps.{app}] entry-point."
+            );
+        }
+        rel = _fleet_entry_rel(base, app, member.file);
+        if rel in member_set {
+            resolved[app] = rel;
+            continue;
+        }
+        if not (base / rel).is_file() {
+            raise ValueError(
+                f"App '{app}' boots '{rel}', but no such file exists in the "
+                f"project, so every '{app}' pod would crash-loop on boot. Add "
+                f"the module or fix [apps.{app}] entry-point."
+            );
+        }
+        raise ValueError(
+            f"App '{app}' boots '{rel}', but the bundle does not ship it "
+            f"({excluded.exclusion_reason(Path(rel))}), so every '{app}' pod "
+            "would crash-loop on boot. Ship the file, or point the app at a "
+            "module the bundle ships."
+        );
+    }
+    return resolved;
+}
+
+
 def _is_secret_path(name: str) -> bool {
     return name == "plugins.scale.secrets"
         or name.startswith("plugins.scale.secrets.")
@@ -286,6 +448,31 @@ def sanitized_jac_toml(base: Path) -> (str | None) {
 }
 
 
+def unresolved_toml_references(text: str, environ: dict[str, str]) -> list[str] {
+    import from jaclang.project.config { interpolate_env_vars }
+    found: list[str] = [];
+    def collect(item: any, path: str) {
+        if isinstance(item, dict) {
+            for (key, value) in item.items() {
+                collect(value, f"{path}.{key}" if path else str(key));
+            }
+        } elif isinstance(item, list) {
+            for (i, element) in enumerate(item) {
+                collect(element, f"{path}[{i}]");
+            }
+        } elif isinstance(item, str) {
+            try {
+                interpolate_env_vars(item, environ);
+            } except ValueError as e {
+                found.append(f"{path}: {e}");
+            }
+        }
+    }
+    collect(tomllib.loads(text), "");
+    return found;
+}
+
+
 def det_tar_member(info: tarfile.TarInfo) -> tarfile.TarInfo {
     info.mtime = 0;
     info.uid = 0;
@@ -302,8 +489,10 @@ def open_det_tar(buf: io.BytesIO) -> tuple[tarfile.TarFile, any] {
 }
 
 
-def add_source_members(tar: tarfile.TarFile, base: Path) {
-    for path in bundle_source_files(base) {
+def add_source_members(
+    tar: tarfile.TarFile, base: Path, sources: (list[Path] | None) = None
+) {
+    for path in (sources if sources is not None else bundle_source_files(base)) {
         tar.add(str(path), arcname=str(path.relative_to(base)), filter=det_tar_member);
     }
 }
@@ -420,7 +609,7 @@ def _remove_stage_roots {
 
 
 def seal_step_env -> dict[str, str] {
-    import from jaclang.runtimelib.session { SCRATCH_ENV }
+    import from jaclang.server.session { SCRATCH_ENV }
     env = release_binary_env();
     env[SCRATCH_ENV] = "1";
     return env;
@@ -474,6 +663,62 @@ def release_binary_env -> dict[str, str] {
 }
 
 
+def _child_tree_script(
+    jac_path: Path,
+    work_dir: Path,
+    timeout_s: int,
+    rel_candidates: tuple[str, ...],
+    fallback: Path
+) -> Path {
+    probe = work_dir / "_seal_probe.jac";
+    try {
+        probe.write_text('import jaclang;\nwith entry { print(jaclang.__file__); }\n');
+        result = subprocess.run(
+            [str(jac_path), "run", str(probe)],
+            capture_output=True,
+            text=True,
+            timeout=timeout_s,
+            env=seal_step_env(),
+            cwd=str(work_dir)
+        );
+    } except Exception {
+        return fallback;
+    } finally {
+        probe.unlink(missing_ok=True);
+    }
+    if result.returncode != 0 {
+        return fallback;
+    }
+    for line in reversed((result.stdout or "").splitlines()) {
+        candidate = line.strip();
+        if not candidate.endswith("__init__.py") {
+            continue;
+        }
+        pkg_dir = Path(candidate).parent;
+        for rel in rel_candidates {
+            script = pkg_dir / rel;
+            if script.is_file() {
+                return script;
+            }
+        }
+    }
+    return fallback;
+}
+
+
+def _legacy_sealer_script_for(
+    jac_path: Path, stage_root: Path, timeout_s: int
+) -> Path {
+    return _child_tree_script(
+        jac_path,
+        stage_root,
+        timeout_s,
+        ("dist/precompile_bytecode.jac", "utils/precompile_bytecode.jac"),
+        Path(str(__file__)).parent.parent.parent / "dist" / "precompile_bytecode.jac"
+    );
+}
+
+
 def _precompile_app(
     base: Path, seal_binary: bytes, sanitized_toml: (str | None), timeout_s: int
 ) -> Path {
@@ -483,23 +728,73 @@ def _precompile_app(
         jac_path = stage_root / ".seal-jac";
         jac_path.write_bytes(seal_binary);
         jac_path.chmod(0o755);
-        script = Path(str(__file__)).parent.parent.parent
-            / "utils"
-            / "precompile_bytecode.jac";
 
-        result = subprocess.run(
-            [str(jac_path), "run", str(script), str(stage_root), "--seal"],
+        manifest_script = stage_root / "_serve_payloads.jac";
+        manifest_script.write_text(
+            "import from pathlib { Path }\n"
+                + "import from jaclang.project.config { get_config_for_path }\n"
+                + "import from jaclang.dist.seal { bake_serve_payloads }\n"
+                + "with entry {\n"
+                + "    project = Path('app').resolve();\n"
+                + "    config = get_config_for_path(project);\n"
+                + "    if not bake_serve_payloads(config, project, bake_client=False) {\n"
+                + "        raise RuntimeError('Serving metadata preparation failed');\n"
+                + "    }\n}\n"
+        );
+        prepared = subprocess.run(
+            [str(jac_path), "run", str(manifest_script)],
             capture_output=True,
             text=True,
             timeout=timeout_s,
             env=seal_step_env(),
             cwd=str(stage_root)
         );
+        manifest_script.unlink();
+        if prepared.returncode != 0 {
+            raise RuntimeError(
+                "App serving metadata preparation failed: "
+                    + (prepared.stderr or prepared.stdout).strip()[-4000:]
+            );
+        }
+
+        result = subprocess.run(
+            [str(jac_path), "precompile", str(stage_root), "--seal"],
+            capture_output=True,
+            text=True,
+            timeout=timeout_s,
+            env=seal_step_env(),
+            cwd=str(stage_root)
+        );
+        if (
+            result.returncode != 0
+            and "invalid choice: 'precompile'" in (result.stderr or "")
+        ) {
+            logger.warning(
+                "Seal binary predates 'jac precompile'; falling back to its "
+                "legacy sealer script."
+            );
+            script = _legacy_sealer_script_for(jac_path, stage_root, timeout_s);
+            result = subprocess.run(
+                [str(jac_path), "run", str(script), str(stage_root), "--seal"],
+                capture_output=True,
+                text=True,
+                timeout=timeout_s,
+                env=seal_step_env(),
+                cwd=str(stage_root)
+            );
+        }
         jac_path.unlink();
         if (
             result.returncode != 0
             or not (stage / "_precompiled" / "MANIFEST.json").is_file()
         ) {
+            for stream_line in (
+                (result.stderr or "") + "\n" + (result.stdout or "")
+            ).splitlines() {
+                if stream_line.strip() {
+                    logger.error(f"seal stderr: {stream_line.rstrip()}");
+                }
+            }
             raise RuntimeError(
                 f"App seal did not complete, so the deploy cannot produce a "
                 f".jab: {(result.stderr or result.stdout).strip()[-2000:]}"
@@ -582,7 +877,13 @@ def _vendor_stage(stage: Path, seal_binary: bytes, platform_tag: str = "") {
     jac_path = stage.parent / ".seal-jac";
     jac_path.write_bytes(seal_binary);
     jac_path.chmod(0o755);
-    script = Path(str(__file__)).parent.parent / "utils" / "vendor_wheels.jac";
+    script = _child_tree_script(
+        jac_path,
+        stage.parent,
+        900,
+        ("scale/utils/vendor_wheels.jac", ),
+        Path(str(__file__)).parent.parent / "utils" / "vendor_wheels.jac"
+    );
     cmd = [str(jac_path), "run", str(script), str(stage)];
     if platform_tag {
         cmd.append(platform_tag);
@@ -614,7 +915,115 @@ def _vendor_stage(stage: Path, seal_binary: bytes, platform_tag: str = "") {
 }
 
 
-def pack_jab(project_dir: str, seal_binary: bytes, pod_arch: str = "") -> bytes {
+def _resolved_python_specs(stage: Path) -> list[str] {
+    import from jaclang.project.config { JacConfig }
+    import from jaclang.project.providers { get_python_provider, resolve_plan }
+    config = JacConfig.load(stage / "jac.toml");
+    deps = resolve_plan(config).for_ecosystem("python");
+    return get_python_provider().specs_for(deps);
+}
+
+
+def _strip_external_record_lines(site: Path) {
+    for record in sorted(site.`glob("*.dist-info/RECORD")) {
+        lines = record.read_text(encoding="utf-8").splitlines(keepends=True);
+        kept = [
+            line
+            for line in lines
+            if not line.startswith("../")
+        ];
+        if len(kept) != len(lines) {
+            record.write_text("".join(kept), encoding="utf-8");
+        }
+    }
+}
+
+
+def staged_venv_files(stage: Path) -> list[Path] {
+    import from jaclang.project.providers { VENV_DEPS_MARKER }
+    import from jaclang.project.pyvenv { get_venv_site_packages }
+    venv = stage / ".jac" / "venv";
+    marker = venv / VENV_DEPS_MARKER;
+    if not marker.is_file() {
+        return [];
+    }
+    site = get_venv_site_packages(venv);
+    if not site.is_dir() {
+        return [];
+    }
+    files = [marker];
+    for path in sorted(site.rglob("*")) {
+        if (
+            path.is_file() and path.suffix != ".pyc" and "__pycache__" not in path.parts
+        ) {
+            files.append(path);
+        }
+    }
+    return files;
+}
+
+
+def _prune_seed_pip(site: Path, specs: list[str]) {
+    import re;
+    for spec in specs {
+        if re.split(r"[<>=!~\[ ;@]", spec.strip())[0].lower() == "pip" {
+            return;
+        }
+    }
+    for item in sorted(site.iterdir()) {
+        if item.name == "pip"
+            or (item.name.startswith("pip-") and item.name.endswith(".dist-info")) {
+            shutil.rmtree(str(item), ignore_errors=True);
+        }
+    }
+}
+
+
+def _venv_stage(stage: Path, seal_binary: bytes, timeout_s: int) {
+    jac_path = stage.parent / ".seal-jac";
+    jac_path.write_bytes(seal_binary);
+    jac_path.chmod(0o755);
+    env = seal_step_env();
+
+    env["PIP_NO_INDEX"] = "1";
+    env["PIP_FIND_LINKS"] = str(stage / "_vendor" / "wheels");
+    env["JAC_CLIENT_SKIP_NPM_INSTALL"] = "1";
+    try {
+        result = subprocess.run(
+            [str(jac_path), "install"],
+            capture_output=True,
+            text=True,
+            timeout=timeout_s,
+            env=env,
+            cwd=str(stage)
+        );
+    } finally {
+        jac_path.unlink(missing_ok=True);
+    }
+    if result.returncode != 0 {
+        raise RuntimeError(
+            f"seal-time venv build failed (host cannot install the "
+            f"pod-platform wheels?): "
+            f"{(result.stderr or result.stdout).strip()[-300:]}"
+        );
+    }
+    venv = stage / ".jac" / "venv";
+    import from jaclang.project.pyvenv { get_venv_site_packages }
+    site = get_venv_site_packages(venv);
+    if not site.is_dir() {
+        raise RuntimeError(f"seal-time venv build left no site-packages under {venv}");
+    }
+    specs = _resolved_python_specs(stage);
+    _prune_seed_pip(site, specs);
+    _strip_external_record_lines(site);
+    import from jaclang.project.providers { write_venv_deps_marker }
+    write_venv_deps_marker(venv, specs);
+}
+
+
+def pack_jab(
+    project_dir: str, seal_binary: bytes, pod_arch: str = "", fleet: any = None
+) -> bytes {
     if not seal_binary {
         raise ValueError(
             "pack_jab requires a host-runnable jac binary to seal the app "
@@ -630,6 +1039,10 @@ def pack_jab(project_dir: str, seal_binary: bytes, pod_arch: str = "") -> bytes 
     }
     excluded = source_filter_for(base);
     assert_entry_module_ships(base, excluded);
+    sources = bundle_source_files(base);
+    check_fleet_entries(
+        base, [path.relative_to(base).as_posix() for path in sources], excluded, fleet
+    );
     if excluded.ignore_patterns {
         logger.info(
             f"Honoring {len(excluded.ignore_patterns)} .jacignore pattern(s) "
@@ -659,11 +1072,25 @@ def pack_jab(project_dir: str, seal_binary: bytes, pod_arch: str = "") -> bytes 
                 );
             }
         }
+        if (
+            not os.environ.get("JAC_SEAL_SKIP_VENV")
+            and (staged / "_vendor" / "wheels").is_dir()
+        ) {
+            try {
+                _venv_stage(staged, seal_binary, seal_timeout_setting(project_dir));
+            } except Exception as exc {
+                shutil.rmtree(str(staged / ".jac" / "venv"), ignore_errors=True);
+                logger.warning(
+                    f"Seal-time venv staging failed; pods will build the venv "
+                    f"at boot instead. {exc}"
+                );
+            }
+        }
         buf = io.BytesIO();
         (tar, gz) = open_det_tar(buf);
         try {
             with tar {
-                add_source_members(tar, base);
+                add_source_members(tar, base, sources=sources);
                 pre = staged / "_precompiled";
                 count = 0;
                 for path in sorted(pre.rglob("*")) {
@@ -676,6 +1103,15 @@ def pack_jab(project_dir: str, seal_binary: bytes, pod_arch: str = "") -> bytes 
                 logger.info(
                     f"Sealed {count} precompiled app-module artifacts into the .jab."
                 );
+                import from jaclang.server.sealed_serve { SERVE_MANIFEST_REL }
+                serve_manifest = staged / SERVE_MANIFEST_REL;
+                if serve_manifest.is_file() {
+                    tar.add(
+                        str(serve_manifest),
+                        arcname=SERVE_MANIFEST_REL,
+                        filter=det_tar_member
+                    );
+                }
                 ven = staged / "_vendor";
                 if ven.is_dir() {
                     wheel_count = 0;
@@ -691,6 +1127,18 @@ def pack_jab(project_dir: str, seal_binary: bytes, pod_arch: str = "") -> bytes 
                     logger.info(
                         f"Fat bundle: vendored {wheel_count} wheel(s) into the "
                         f".jab; pods install python deps offline."
+                    );
+                }
+                venv_files = staged_venv_files(staged);
+                for path in venv_files {
+                    rel = path.relative_to(staged);
+                    tar.add(str(path), arcname=str(rel), filter=det_tar_member);
+                }
+                if venv_files {
+                    logger.info(
+                        f"Sealed a prebuilt venv ({len(venv_files)} files) "
+                        f"into the .jab; pods skip the boot-time dependency "
+                        f"install."
                     );
                 }
                 if sanitized is not None {

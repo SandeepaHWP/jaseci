@@ -1,6 +1,6 @@
 ---
 name: jac-types
-description: The Jac type system - annotations, unions, optionals, inference, `as` casts, any-boundary fixes, import type, ambient typing names, generics, and common type errors. Load before writing any non-trivial typed function or when debugging a type-check failure.
+description: Resolve Jac type annotations, inference, any boundaries, generics, and narrowing. Use for type errors or unfamiliar typing constructs.
 ---
 
 Jac is statically typed at **annotation boundaries** and inferred inside function bodies. Every `def` parameter and every `has` field needs an explicit type; a `def` that returns a value needs an explicit return type (a `def` with no `return` infers `None` - don't write `-> None`, it warns W3037). Local variables get their type from the right-hand side. Types are unified across client and server code.
@@ -74,7 +74,11 @@ The 3-step playbook for an untyped boundary (PyPI call, `json.loads`, walker rep
 
 ## `import type` - the circular-import breaker
 
-`import type from billing { Invoice }` registers `Invoice` for annotations only - it compiles to a `typing.TYPE_CHECKING`-guarded Python import, so it never runs at module load. That breaks circular imports between modules whose types reference each other. **Caveat:** the name does not exist at runtime - do NOT use `import type` for names you construct (`Invoice(...)`), `isinstance`-check, or use in `has` field types (archetypes are dataclass-derived and resolve annotations at runtime). Those need a regular `import`.
+`import type from billing { Invoice }` registers `Invoice` for annotations only - it compiles to a `typing.TYPE_CHECKING`-guarded Python import and to nothing at all in the client bundle, so it never runs at module load. That breaks circular imports between modules whose types reference each other.
+
+Every import binding carries a kind and the checker enforces it, asking whether the backend that lowers *this* module leaves a runtime binding for the imported name. A TypeScript `interface` or `type` alias in a `.d.ts` (npm or sibling declaration file) has no runtime export in any codespace, so a plain `import from` of one is always `E1131`; give it its own `import type` statement beside the value imports (`import from mermaid { default as mermaid }` + `import type from mermaid { Mermaid }`). A jac `type` alias is `E1131` **only in client code**: on the server it lowers to a real runtime binding (`type UserId := int;` becomes `UserId = int`, which is what makes `UserId(raw)` a brand constructor), so a plain import of an alias from a server module is correct - do not "fix" it. A `declare class`, a `declare enum`, and every jac archetype have a runtime binding on both backends, so a plain import of those stays correct.
+
+Going the other way, an `import type` binding is legal only in type position - annotations, `has` field types, return types, generic arguments, `as` casts, `type` alias right-hand sides. Constructing it (`Invoice(...)`), `isinstance`-checking it, reading an attribute off it, decorating with it or inheriting from it is `E1132`, on the server as much as in the client (the `TYPE_CHECKING` guard means the name is not there at run time); those need a regular `import`. **Caveat that is not diagnosed:** an archetype `has` field type still has to exist at runtime on the Python lane, because archetypes are dataclass-derived and resolve annotations through `typing.get_type_hints`. Keep those names on a regular `import`.
 
 ## Type aliases, named constructors, `Self`
 
@@ -126,7 +130,7 @@ The width is a compile-time fact, not a runtime wrapper: a sized value is a plai
 - **Do NOT fall back to `any` to silence a type error.** It defers the error to the next typed boundary: `len(any)` → E1053, `any + any` → E1055, assigning/returning into a concrete type → E1001/E1002. Fix the actual type (typed field, `T | None` + `is None` guard, or `as` cast at the boundary).
 - **Every `def` parameter needs a type** (E0052); a value-returning `def` needs a return type (E1003); `has name;` without a type is a parse error.
 - **Don't annotate `-> None`** on a no-return `def` - W3037. Write `def save(x: int) { ... }`.
-- `list`, `dict`, `set` (and ambient `Iterable` etc.) without type args default to `[any]` (W1036) - add element types.
+- `list`, `dict`, `set` (and ambient `Iterable` etc.) without type args are an error (E1036) - add element types. For genuinely heterogeneous values say so explicitly, e.g. `dict[str, any]`.
 - Use **`T | None`**, not `Optional[T]`. Always check `is None` before dereferencing.
 - **Lowercase `any` is the gradual type** - Jac-native, no import. `import from typing { Any }` triggers W1104; bare `Any` warns W2001. Note: even legitimate explicit `any` annotations draw W1037 ("disables type checking here") - a nudge, not a failure.
 - **Event-handler params take the event type, not `any`** (`e: ChangeEvent`, `e: MouseEvent`) - see `jac-cl-components`.
@@ -137,4 +141,4 @@ The width is a compile-time fact, not a runtime wrapper: a sized value is a plai
 
 ## See also
 
-`jac-has-fields` (field rules) · `jac-core-cheatsheet` (`import type` syntax, reserved words) · `jac-python-interop` (typing the Python boundary) · `jac-walker-patterns` (typed reports)
+`jac-has-fields` (field rules) · `jac-core-cheatsheet` (`import type` syntax, reserved words) · `jac-python-interop` (typing the Python boundary) · `jac-walker-patterns` (typed reports) · `jac-comptime` (`comptime` parameters, archetype value params, compile-time reflection)

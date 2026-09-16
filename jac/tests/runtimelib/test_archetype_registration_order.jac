@@ -17,9 +17,9 @@ import sys;
 import from tempfile { mkdtemp }
 import from types { ModuleType }
 import from uuid { uuid4 }
-import from jaclang.jac0core.archetype { Archetype, NodeAnchor, Root }
-import from jaclang.runtimelib { serializer as serializer_mod }
-import from jaclang.runtimelib.serializer { Serializer }
+import from jaclang.runtime.archetype { Archetype, NodeAnchor, Root }
+import from jaclang.data { serializer as serializer_mod }
+import from jaclang.data.serializer { Serializer }
 
 glob ATTEMPTS = "JAC_8117_IMPORT_ATTEMPTS",
      FAIL = "JAC_8117_FAIL_IMPORT";
@@ -69,11 +69,11 @@ def _restore_home_module(previous: (object | None)) {
 }
 
 
-def _anchor_blob(arch: object) -> dict {
+def _anchor_blob(arch: object) -> dict[str, any] {
     raw = Serializer.serialize(arch, include_type=True);
     return {
         '__type__': 'NodeAnchor',
-        '__module__': 'jaclang.jac0core.archetype',
+        '__module__': 'jaclang.runtime.archetype',
         'id': str(uuid4()),
         'root': None,
         'persistent': False,
@@ -87,7 +87,7 @@ def _anchor_blob(arch: object) -> dict {
 
 # --- Back-fill on hook install ---------------------------------------------
 test "installing a hook back-fills archetype classes that already exist" {
-    seen: list = [];
+    seen: list[any] = [];
 
     def recorder(cls: type) {
         seen.append(_key(cls));
@@ -109,7 +109,7 @@ test "installing a hook back-fills archetype classes that already exist" {
 
 
 test "installing the same hook twice neither duplicates it nor re-runs it" {
-    calls: list = [];
+    calls: list[type] = [];
 
     def recorder(cls: type) {
         calls.append(cls);
@@ -131,7 +131,7 @@ test "installing the same hook twice neither duplicates it nor re-runs it" {
 
 
 test "an installed hook still fires for classes created afterwards" {
-    seen: list = [];
+    seen: list[str] = [];
 
     def recorder(cls: type) {
         seen.append(cls.__name__);
@@ -155,7 +155,7 @@ test "a raw append cannot install a hook that skips the back-fill" {
     # who reaches for `.append` silently reintroduces #8049: their hook only
     # ever sees classes created after it, so everything defined earlier goes
     # unregistered and every read of those anchors is refused and dropped.
-    seen: list = [];
+    seen: list[type] = [];
 
     def recorder(cls: type) {
         seen.append(cls);
@@ -165,11 +165,11 @@ test "a raw append cannot install a hook that skips the back-fill" {
     try {
         hooks.append(recorder);
         installed = True;
-    } except AttributeError { } finally {
+    } except AttributeError {} finally {
         if installed {
             try {
                 hooks.remove(recorder);
-            } except Exception { }
+            } except Exception {}
         }
     }
     assert not installed , (
@@ -181,7 +181,7 @@ test "a raw append cannot install a hook that skips the back-fill" {
 
 
 test "uninstall_subclass_hook removes a hook and is safe to repeat" {
-    calls: list = [];
+    calls: list[type] = [];
 
     def recorder(cls: type) {
         calls.append(cls);
@@ -270,13 +270,10 @@ test "resolution refuses names that are not archetype classes" {
         # `jaclang.*` (except `jaclang.scale.*`) and resolution honors the same
         # line: a runtime-internal class resolves only if it was registered
         # explicitly, exactly as before this fallback existed.
-        assert not Serializer.is_auto_registered_module(
-            "jaclang.runtimelib.serializer"
-        );
+        assert not Serializer.is_auto_registered_module("jaclang.data.serializer");
         assert Serializer.is_auto_registered_module("jaclang.scale.something");
         assert Serializer.is_auto_registered_module("myapp.nodes");
-        assert Serializer._get_class("jaclang.runtimelib.serializer", "Serializer")
-            is None , "runtime-internal archetypes must not resolve implicitly";
+        assert Serializer._get_class("jaclang.data.serializer", "Serializer") is None , "runtime-internal archetypes must not resolve implicitly";
         assert Serializer._get_class("os", "does_not_exist") is None;
         assert Serializer._get_class("definitely.not", "Present") is None;
     } finally {

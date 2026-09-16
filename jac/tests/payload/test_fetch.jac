@@ -11,19 +11,18 @@ import shutil;
 import tempfile;
 import zipfile;
 
-import from jaclang.payload.fetch {
+import from jaclang.dist.payload.fetch {
     BUN_VERSION,
     HttpSource,
     bun_asset_name,
     fetch_llvm_slice,
     parse_central_directory,
     parse_eocd,
-    pbs_platform,
     slice_wanted,
     unzip_member_by_suffix
 }
-import from jaclang.payload.fsutil { PayloadDie, find_sum_line }
-import from jaclang.payload.pins {
+import from jaclang.dist.payload.fsutil { PayloadDie, find_sum_line }
+import from jaclang.dist.payload.pins {
     LlvmSlice,
     llvm_release,
     load_pins,
@@ -31,9 +30,7 @@ import from jaclang.payload.pins {
     py_minor,
     py_ver
 }
-import from jaclang.runtimelib.client.bun_installer {
-    BUN_VERSION as INSTALLER_BUN_VERSION
-}
+import from jaclang.client.bun_installer { BUN_VERSION as INSTALLER_BUN_VERSION }
 
 # zipfile's method constants are typed `Final` in typeshed, which the checker
 # cannot assign from; spell them as the ints they are and pin them below.
@@ -268,11 +265,6 @@ test "find_sum_line reads `<hex>  <filename>` lines" {
 }
 
 test "platform tables match the Zig tool" {
-    assert pbs_platform("macos-aarch64") == "aarch64-apple-darwin";
-    assert pbs_platform("macos-x86_64") == "x86_64-apple-darwin";
-    assert pbs_platform("linux-x86_64") == "x86_64-unknown-linux-gnu";
-    assert pbs_platform("linux-aarch64") == "aarch64-unknown-linux-gnu";
-    assert pbs_platform("windows-x86_64") is None;
     assert bun_asset_name("macos-aarch64") == "bun-darwin-aarch64";
     assert bun_asset_name("macos-x86_64") == "bun-darwin-x64";
     assert bun_asset_name("linux-x86_64") == "bun-linux-x64";
@@ -281,20 +273,16 @@ test "platform tables match the Zig tool" {
     assert bun_asset_name("freebsd-x86_64") is None;
 }
 
-test "pins.json carries the pbs + llvm pins and bun stays in lockstep" {
+test "source and LLVM pins agree with the payload" {
     p = pins();
-    assert load_pins().pbs.tag == p.pbs.tag;
-    assert p.pbs.tag == "20260610";
-    assert p.pbs.python == "3.14.6";
-    assert p.pbs.flavor == "pgo+lto-full";
-    assert p.pbs.base
-        == "https://github.com/astral-sh/python-build-standalone/releases/download";
+    assert load_pins().python == p.python;
+    assert p.python == "3.14.6";
     assert py_ver() == "3.14";
     assert py_minor("3.14.6") == "3.14";
     try {
         py_minor("3.14");
         assert False , "expected a die";
-    } except PayloadDie { }
+    } except PayloadDie {}
 
     assert p.llvm.version == "22.1.8";
     assert p.llvm.slice_base
