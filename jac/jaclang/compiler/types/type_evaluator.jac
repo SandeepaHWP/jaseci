@@ -308,10 +308,10 @@ glob MAX_LISTED_OVERLOADS: int = 4,
 
 obj ArgTypeMismatch {
     has param_name: str,
-        actual: str,
-        expected: str,
-        callable_reason: str | None = None,
-        lambda_param: str | None = None;
+        value: Expr,
+        actual: TypeBase,
+        param_type: TypeBase,
+        bindings: dict[str, TypeBase];
 }
 
 obj NarrowingTarget {
@@ -715,9 +715,10 @@ walker TypeEvaluator {
 
     def _callable_reason(arg_type: TypeBase, expected: TypeBase) -> str | None;
     def _describe_overload_rejections(
-        rejections: list[tuple[int, ArgTypeMismatch]]
+        rejections: list[tuple[int, ArgTypeMismatch]], overload_count: int
     ) -> str | None;
 
+    def _shown_expected(mismatch: ArgTypeMismatch) -> TypeBase;
     def _merge_catalog_field_params(
         tab: CatScope, param_map: dict[str, Parameter], skip_deferred: bool
     ) -> None;

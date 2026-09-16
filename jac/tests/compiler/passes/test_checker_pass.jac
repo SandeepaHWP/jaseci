@@ -2059,7 +2059,7 @@ test "overload_rejection_help" {
         for e in program.errors_had
         if e.code and e.code.code == "E1054"
     };
-    assert len(by_line) == 13 , f"Expected 13 E1054s, got {len(by_line)}:\n{by_line}";
+    assert len(by_line) == 14 , f"Expected 14 E1054s, got {len(by_line)}:\n{by_line}";
     helps = {name: by_line.get(line, "") for (name, line) in line_of.items()};
 
     expected = {
@@ -2072,11 +2072,16 @@ test "overload_rejection_help" {
         "d": ["Every overload expects 'SupportsIndex'"],
         "e": ["parameter 'iterable'"],
         "j": ["parameter 'base'"],
-        "k": ["The candidates expect:", " | ...'", "overloads 3, 6:", "and 1 more"],
-        "m": ["parameter 'reverse'", "Every overload expects 'bool'"],
+        "k": [
+            "The closest candidates expect:",
+            " | ...'",
+            "overloads 3, 6:",
+            "and 1 more"
+        ],
+        "m": ["parameter 'reverse'", "The closest match, overload 2, expects 'bool'"],
         "n": [
             "parameter 'repl'",
-            "Every overload expects 'str | Callable[[Match[str]], str]'"
+            "The closest match, overload 1, expects 'str | Callable[[Match[str]], str]'"
         ]
     };
     for (name, needles) in expected.items() {
@@ -2088,6 +2093,11 @@ test "overload_rejection_help" {
     }
     # Arity-compatible callbacks with optional params are blamed on the return type.
     assert "parameter(s)" not in helps["g"] , helps["g"];
+    # Filtered overloads must not be described as every overload.
+    assert "Every overload" not in helps["m"] + helps["n"] , f"{helps['m']}\n{helps[
+        'n'
+    ]}";
+    assert "expects 'str'" in helps["p"] and "Literal" not in helps["p"] , helps["p"];
     assert helps["f"] == "" and line_of["f"] in by_line , f"Unknown keyword should stay bare:\n{helps[
         'f'
     ]}";

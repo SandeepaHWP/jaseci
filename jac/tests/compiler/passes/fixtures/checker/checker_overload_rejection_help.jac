@@ -51,7 +51,9 @@ with entry {
 
     n = re.sub("a", to_int, "abc");
 
+    p = max("a", 5, key=to_int);
+
     f = sorted([3, 1, 2], nosuch=5);
 
-    print(a, b, c, d, e, f, g, h, i, j, k, m, n);
+    print(a, b, c, d, e, f, g, h, i, j, k, m, n, p);
 }

@@ -7,18 +7,6 @@ impl TypeEvaluator.validate_arg_types(
     has_errors: bool = False;
     binding_failures: set[Expr | KWPair] = set();
 
-    def rejection(
-        name: str, value: Expr, arg_type: TypeBase, expected: TypeBase
-    ) -> ArgTypeMismatch {
-        return ArgTypeMismatch(
-            param_name=name,
-            actual=str(arg_type),
-            expected=str(expected),
-            callable_reason=self._callable_reason(arg_type, expected),
-            lambda_param=_unresolved_lambda_param(value, arg_type)
-        );
-    }
-
     bindings: dict[str, TypeBase] = solved_type_vars
         if solved_type_vars is not None
         else {};
@@ -50,7 +38,15 @@ impl TypeEvaluator.validate_arg_types(
         arg_type = self.get_type_of_expression(value, expected_type=expected);
         if arg in binding_failures {
             if mismatches is not None {
-                mismatches.append(rejection(param.name, value, arg_type, expected));
+                mismatches.append(
+                    ArgTypeMismatch(
+                        param_name=param.name,
+                        value=value,
+                        actual=arg_type,
+                        param_type=param.param_type,
+                        bindings=bindings
+                    )
+                );
             }
             if not checking_overload {
                 self.emit_diag(
@@ -86,7 +82,15 @@ impl TypeEvaluator.validate_arg_types(
         if not verdict.ok {
             has_errors = True;
             if mismatches is not None {
-                mismatches.append(rejection(param.name, value, arg_type, expected));
+                mismatches.append(
+                    ArgTypeMismatch(
+                        param_name=param.name,
+                        value=value,
+                        actual=arg_type,
+                        param_type=param.param_type,
+                        bindings=bindings
+                    )
+                );
             }
             if not checking_overload and not verdict.diagnosed {
                 self.emit_diag(
@@ -211,38 +215,46 @@ impl TypeEvaluator._callable_reason(
 }
 
 impl TypeEvaluator._describe_overload_rejections(
-    rejections: list[tuple[int, ArgTypeMismatch]]
+    rejections: list[tuple[int, ArgTypeMismatch]], overload_count: int
 ) -> str | None {
     if not rejections {
         return None;
     }
+    all_listed = len(rejections) == overload_count;
+
     if len({m.param_name for (_, m) in rejections}) > 1 {
         entries = [
             (
                 no,
                 f"cannot assign {_q(m.actual)} to parameter {_q(m.param_name)} of type {_q(
-                    m.expected
+                    self._shown_expected(m)
                 )}"
             ) for (no, m) in rejections
         ];
-        return "\n".join(
-            ["no overload accepts these arguments:"] + _grouped_lines(entries)
-        );
+        header = "no overload accepts these arguments:"
+            if all_listed
+            else "no overload accepts these arguments; the closest ones reject:";
+        return "\n".join([header] + _grouped_lines(entries));
     }
 
     for (no, m) in rejections {
-        if m.callable_reason {
-            return f"the callable passed for parameter {_q(m.param_name)} {m.callable_reason} (overload {no}). Annotate the callable so it matches.";
+        expected = apply_solved_type_vars(m.param_type, m.bindings)
+            if m.bindings
+            else m.param_type;
+        reason = self._callable_reason(m.actual, expected);
+        if reason {
+            return f"the callable passed for parameter {_q(m.param_name)} {reason} (overload {no}). Annotate the callable so it matches.";
         }
     }
 
     for (_, m) in rejections {
-        if m.lambda_param {
+        lambda_param = _unresolved_lambda_param(m.value, m.actual);
+        if lambda_param {
             return f"lambda parameter {_q(
-                m.lambda_param
+                lambda_param
             )} has no annotation, so the lambda passed for {_q(
                 m.param_name
-            )} could not be typed and matches no overload. Annotate it, e.g. `lambda ({m.lambda_param}: <type>) {{ ... }}`, or pass a typed `def`.";
+            )} could not be typed and matches no overload. Annotate it, e.g. `lambda ({lambda_param}: <type>) {{ ... }}`, or pass a typed `def`.";
         }
     }
 
@@ -250,11 +262,32 @@ impl TypeEvaluator._describe_overload_rejections(
     head = f"the argument for parameter {_q(first.param_name)} has type {_q(
         first.actual
     )}, which no overload accepts.";
-    entries = [(no, _q(m.expected)) for (no, m) in rejections];
+    entries = [(no, _q(self._shown_expected(m))) for (no, m) in rejections];
     if len({text for (_, text) in entries}) == 1 {
-        return f"{head} Every overload expects {entries[0][1]}.";
+        if all_listed {
+            return f"{head} Every overload expects {entries[0][1]}.";
+        }
+        label = _overload_label([no for (no, _) in entries]);
+        verb = "expects" if len(entries) == 1 else "expect";
+        return f"{head} The closest match, {label}, {verb} {entries[0][1]}.";
     }
-    return "\n".join([f"{head} The candidates expect:"] + _grouped_lines(entries));
+    header = "The candidates expect:"
+        if all_listed
+        else "The closest candidates expect:";
+    return "\n".join([f"{head} {header}"] + _grouped_lines(entries));
+}
+
+impl TypeEvaluator._shown_expected(mismatch: ArgTypeMismatch) -> TypeBase {
+    if not mismatch.bindings {
+        return mismatch.param_type;
+    }
+    return apply_solved_type_vars(
+        mismatch.param_type,
+        {
+            name: self._widen_literal_for_declaration(solved)
+            for (name, solved) in mismatch.bindings.items()
+        }
+    );
 }
 
 impl TypeEvaluator.validate_call_args(expr: FuncCall) -> TypeBase {
@@ -522,7 +555,8 @@ impl TypeEvaluator._validate_call_type(
                 (no, ms[0])
                 for (no, ms) in rejections
                 if len(ms) == fewest
-            ]
+            ],
+            len(caller_type.overloads)
         );
         if help_text is not None {
             self.emit_diag(E1054, expr, help_text=help_text);
