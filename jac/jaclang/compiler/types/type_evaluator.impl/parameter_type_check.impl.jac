@@ -181,24 +181,20 @@ impl TypeEvaluator._callable_reason(
     if mismatch is None {
         return None;
     }
-    match mismatch.kind {
-        case CallableMismatchKind.PARAMETER:
-            return f"accepts {_q(mismatch.src_param.param_type)} for parameter {_q(
-                mismatch.src_param.name
-            )}, but will be called with {_q(mismatch.dest_param.param_type)}";
-
-        case CallableMismatchKind.ARITY:
-            return f"takes {mismatch.src_count} parameter(s), but a callable taking {mismatch.dest_count} is expected";
-
-        case CallableMismatchKind.RETURN:
-            if _has_unknown(mismatch.src_return)
-                or any(_has_unknown(p.param_type) for p in _visible_params(arg_type)) {
-                return None;
-            }
-            return f"returns {_q(mismatch.src_return)}, but must return {_q(
-                mismatch.dest_return
-            )}";
-
+    if isinstance(mismatch, ParameterMismatch) {
+        return f"accepts {_q(mismatch.src_param.param_type)} for parameter {_q(
+            mismatch.src_param.name
+        )}, but will be called with {_q(mismatch.dest_param.param_type)}";
+    }
+    if isinstance(mismatch, ArityMismatch) {
+        return f"takes {mismatch.src_count} parameter(s), but a callable taking {mismatch.dest_count} is expected";
+    }
+    if isinstance(mismatch, ReturnMismatch)
+        and not _has_unknown(mismatch.src_return)
+        and not any(_has_unknown(p.param_type) for p in _visible_params(arg_type)) {
+        return f"returns {_q(mismatch.src_return)}, but must return {_q(
+            mismatch.dest_return
+        )}";
     }
     return None;
 }

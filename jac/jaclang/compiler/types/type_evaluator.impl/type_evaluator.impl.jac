@@ -2772,17 +2772,15 @@ impl TypeEvaluator._callable_mismatch(
             and not self.assign_type(
                 src_func.return_type, dest_func.return_type, strict
             ) {
-            return CallableMismatch(
-                kind=CallableMismatchKind.RETURN,
-                src_return=src_func.return_type,
-                dest_return=dest_func.return_type
+            return ReturnMismatch(
+                src_return=src_func.return_type, dest_return=dest_func.return_type
             );
         }
         return None;
     }
 
     if src_func.is_gradual_callable_form() {
-        return CallableMismatch(kind=CallableMismatchKind.GRADUAL_SOURCE);
+        return GradualSourceMismatch();
     }
 
     src_params = [
@@ -2806,11 +2804,7 @@ impl TypeEvaluator._callable_mismatch(
         }
 
         if not self.assign_type(dest_param.param_type, src_param.param_type, strict) {
-            return CallableMismatch(
-                kind=CallableMismatchKind.PARAMETER,
-                src_param=src_param,
-                dest_param=dest_param
-            );
+            return ParameterMismatch(src_param=src_param, dest_param=dest_param);
         }
     }
 
@@ -2818,10 +2812,8 @@ impl TypeEvaluator._callable_mismatch(
         for i in range(len(dest_params), len(src_params)) {
             src_param = src_params[i];
             if not src_param.is_optional {
-                return CallableMismatch(
-                    kind=CallableMismatchKind.ARITY,
-                    src_count=len(src_params),
-                    dest_count=len(dest_params)
+                return ArityMismatch(
+                    src_count=len(src_params), dest_count=len(dest_params)
                 );
             }
         }
@@ -2835,11 +2827,7 @@ impl TypeEvaluator._callable_mismatch(
         }
         src_ret = self._convert_to_instance(src_func.return_type);
         if not self.assign_type(src_ret, dest_ret, strict) {
-            return CallableMismatch(
-                kind=CallableMismatchKind.RETURN,
-                src_return=src_ret,
-                dest_return=dest_ret
-            );
+            return ReturnMismatch(src_return=src_ret, dest_return=dest_ret);
         }
     }
     return None;

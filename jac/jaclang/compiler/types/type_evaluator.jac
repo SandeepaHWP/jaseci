@@ -306,21 +306,23 @@ obj MatchArgsToParamsResult {
 glob MAX_LISTED_OVERLOADS: int = 4,
      MAX_TYPE_TEXT: int = 80;
 
-enum CallableMismatchKind {
-    GRADUAL_SOURCE = "gradual_source",
-    PARAMETER = "parameter",
-    ARITY = "arity",
-    RETURN = "return"
+obj CallableMismatch {}
+
+obj GradualSourceMismatch(CallableMismatch) {}
+
+obj ParameterMismatch(CallableMismatch) {
+    has src_param: Parameter,
+        dest_param: Parameter;
 }
 
-obj CallableMismatch {
-    has kind: CallableMismatchKind,
-        src_param: Parameter | None = None,
-        dest_param: Parameter | None = None,
-        src_count: int = 0,
-        dest_count: int = 0,
-        src_return: TypeBase | None = None,
-        dest_return: TypeBase | None = None;
+obj ArityMismatch(CallableMismatch) {
+    has src_count: int,
+        dest_count: int;
+}
+
+obj ReturnMismatch(CallableMismatch) {
+    has src_return: TypeBase,
+        dest_return: TypeBase;
 }
 
 obj ArgTypeMismatch {
