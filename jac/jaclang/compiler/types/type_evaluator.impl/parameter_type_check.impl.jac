@@ -7,6 +7,18 @@ impl TypeEvaluator.validate_arg_types(
     has_errors: bool = False;
     binding_failures: set[Expr | KWPair] = set();
 
+    def rejection(
+        name: str, value: Expr, arg_type: TypeBase, expected: TypeBase
+    ) -> ArgTypeMismatch {
+        return ArgTypeMismatch(
+            param_name=name,
+            actual=str(arg_type),
+            expected=str(expected),
+            callable_reason=self._callable_reason(arg_type, expected),
+            lambda_param=_unresolved_lambda_param(value, arg_type)
+        );
+    }
+
     bindings: dict[str, TypeBase] = solved_type_vars
         if solved_type_vars is not None
         else {};
@@ -37,6 +49,9 @@ impl TypeEvaluator.validate_arg_types(
         value = arg.value if isinstance(arg, KWPair) else arg;
         arg_type = self.get_type_of_expression(value, expected_type=expected);
         if arg in binding_failures {
+            if mismatches is not None {
+                mismatches.append(rejection(param.name, value, arg_type, expected));
+            }
             if not checking_overload {
                 self.emit_diag(
                     E1053,
@@ -71,16 +86,7 @@ impl TypeEvaluator.validate_arg_types(
         if not verdict.ok {
             has_errors = True;
             if mismatches is not None {
-                mismatches.append(
-                    ArgTypeMismatch(
-                        param_name=param.name,
-                        actual=str(arg_type),
-                        expected=self._expected_text(expected),
-                        expects_none=self.is_none_type(expected),
-                        callable_reason=self._callable_reason(arg_type, expected),
-                        lambda_param=_unresolved_lambda_param(value, arg_type)
-                    )
-                );
+                mismatches.append(rejection(param.name, value, arg_type, expected));
             }
             if not checking_overload and not verdict.diagnosed {
                 self.emit_diag(
@@ -204,44 +210,19 @@ impl TypeEvaluator._callable_reason(
     return f"returns {_q(got_ret)}, but must return {_q(want_ret)}";
 }
 
-impl TypeEvaluator._expected_text(expected: TypeBase) -> str {
-    if not isinstance(expected, ClassType)
-        or not expected.shared.class_name.startswith("_")
-        or not self._is_protocol_class(expected) {
-        return _q(expected);
-    }
-    symtab = expected.shared.symbol_table;
-    members = [
-        name
-        for name in (symtab.names_in_scope if isinstance(symtab, UniScopeNode) else {})
-        if not name.startswith("_") or name.endswith("__")
-    ];
-    if not members {
-        return _q(expected);
-    }
-    return "an object with " + ", ".join(_q(m) for m in sorted(members));
-}
-
 impl TypeEvaluator._describe_overload_rejections(
     rejections: list[tuple[int, ArgTypeMismatch]]
 ) -> str | None {
     if not rejections {
         return None;
     }
-    informative = [
-        r
-        for r in rejections
-        if not r[1].expects_none
-    ];
-    if informative {
-        rejections = informative;
-    }
-
     if len({m.param_name for (_, m) in rejections}) > 1 {
         entries = [
             (
                 no,
-                f"cannot assign {_q(m.actual)} to parameter {_q(m.param_name)} of type {m.expected}"
+                f"cannot assign {_q(m.actual)} to parameter {_q(m.param_name)} of type {_q(
+                    m.expected
+                )}"
             ) for (no, m) in rejections
         ];
         return "\n".join(
@@ -269,7 +250,7 @@ impl TypeEvaluator._describe_overload_rejections(
     head = f"the argument for parameter {_q(first.param_name)} has type {_q(
         first.actual
     )}, which no overload accepts.";
-    entries = [(no, m.expected) for (no, m) in rejections];
+    entries = [(no, _q(m.expected)) for (no, m) in rejections];
     if len({text for (_, text) in entries}) == 1 {
         return f"{head} Every overload expects {entries[0][1]}.";
     }
@@ -484,7 +465,7 @@ impl TypeEvaluator._validate_call_type(
             return False;
         }
 
-        rejections: list[tuple[int, ArgTypeMismatch]] = [];
+        rejections: list[tuple[int, list[ArgTypeMismatch]]] = [];
         overload_no = 0;
 
         for overload in caller_type.overloads {
@@ -527,7 +508,7 @@ impl TypeEvaluator._validate_call_type(
                         _fallback_result = ret_type;
                     }
                 } elif mismatches {
-                    rejections.append((overload_no, mismatches[0]));
+                    rejections.append((overload_no, mismatches));
                 }
             }
         }
@@ -535,7 +516,14 @@ impl TypeEvaluator._validate_call_type(
             return _fallback_result;
         }
 
-        help_text = self._describe_overload_rejections(rejections);
+        fewest = min([len(ms) for (_, ms) in rejections] or [0]);
+        help_text = self._describe_overload_rejections(
+            [
+                (no, ms[0])
+                for (no, ms) in rejections
+                if len(ms) == fewest
+            ]
+        );
         if help_text is not None {
             self.emit_diag(E1054, expr, help_text=help_text);
         } else {

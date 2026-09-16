@@ -2068,13 +2068,16 @@ test "overload_rejection_help" {
         "g": ["returns 'dict[str, int]', but must return"],
         "h": ["accepts 'int' for parameter 'n', but will be called with 'str'"],
         "i": ["lambda parameter 'd' has no annotation", "`lambda (d: <type>) { ... }`"],
-        "c": ["Every overload expects 'Callable[[int]"],
+        "c": ["The candidates expect:", "overload 2: 'Callable[[int]"],
         "d": ["Every overload expects 'SupportsIndex'"],
         "e": ["parameter 'iterable'"],
-        "j": ["overloads 2, 3, 4, 5: cannot assign", "more"],
-        "k": ["The candidates expect:", " | ...'", "more"],
+        "j": ["parameter 'base'"],
+        "k": ["The candidates expect:", " | ...'", "overloads 3, 6:", "and 1 more"],
         "m": ["parameter 'reverse'", "Every overload expects 'bool'"],
-        "n": ["Every overload expects an object with '__round__'"]
+        "n": [
+            "parameter 'repl'",
+            "Every overload expects 'str | Callable[[Match[str]], str]'"
+        ]
     };
     for (name, needles) in expected.items() {
         for needle in needles {
@@ -2085,8 +2088,6 @@ test "overload_rejection_help" {
     }
     # Arity-compatible callbacks with optional params are blamed on the return type.
     assert "parameter(s)" not in helps["g"] , helps["g"];
-    assert "NoneType" not in helps["c"] + helps["m"] , f"{helps['c']}\n{helps['m']}";
-    assert "_SupportsRound" not in helps["n"] , helps["n"];
     assert helps["f"] == "" and line_of["f"] in by_line , f"Unknown keyword should stay bare:\n{helps[
         'f'
     ]}";

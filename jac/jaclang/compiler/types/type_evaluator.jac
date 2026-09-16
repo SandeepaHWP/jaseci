@@ -310,7 +310,6 @@ obj ArgTypeMismatch {
     has param_name: str,
         actual: str,
         expected: str,
-        expects_none: bool = False,
         callable_reason: str | None = None,
         lambda_param: str | None = None;
 }
@@ -715,7 +714,6 @@ walker TypeEvaluator {
     ) -> bool;
 
     def _callable_reason(arg_type: TypeBase, expected: TypeBase) -> str | None;
-    def _expected_text(expected: TypeBase) -> str;
     def _describe_overload_rejections(
         rejections: list[tuple[int, ArgTypeMismatch]]
     ) -> str | None;

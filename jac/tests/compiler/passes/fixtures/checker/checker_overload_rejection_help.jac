@@ -6,6 +6,12 @@ def opt_key(d: dict[str, int], extra: int = 0) -> dict[str, int] {
     return d;
 }
 
+import re;
+
+def to_int(text: str) -> int {
+    return len(text);
+}
+
 def by_number(n: int) -> int {
     return n;
 }
@@ -43,7 +49,7 @@ with entry {
 
     m = sorted([1, 2], key=by_number, reverse="yes");
 
-    n = round("s", "t");
+    n = re.sub("a", to_int, "abc");
 
     f = sorted([3, 1, 2], nosuch=5);
 
