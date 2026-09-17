@@ -473,7 +473,7 @@ impl TypeCheckPass._write_leaves(target: (Expr | None)) -> list[Expr] {
 }
 
 impl TypeCheckPass._check_immutable_write(
-    target: (Expr | None), rebind_scope: (UniScopeNode | None) = None
+    target: (Expr | None), rebind_scope: (UniNode | None) = None
 ) -> None {
     for leaf in self._write_leaves(target) {
         if isinstance(leaf, AtomTrailer)
@@ -484,7 +484,7 @@ impl TypeCheckPass._check_immutable_write(
             sym = name.sym;
         } elif isinstance(leaf, Name) {
             name = leaf;
-            sym = lookup_enclosing_binding(rebind_scope, leaf.value)
+            sym = self._rebound_enclosing_symbol(rebind_scope, leaf)
                 if rebind_scope is not None
                 else leaf.sym;
         } else {
@@ -512,6 +512,16 @@ impl TypeCheckPass._check_immutable_write(
     }
 }
 
+impl TypeCheckPass._rebound_enclosing_symbol(
+    scope: UniNode, leaf: Name
+) -> (Symbol | None) {
+    # A `for`/`with as`/`except as`/`match` target binds in its own scope but the
+    # emitted code writes the enclosing binding -- only within the same function,
+    # so a nested rebind of an outer Final leaves that Final untouched.
+    py_scope = find_python_scope_node_of(scope);
+    return py_scope.names_in_scope.get(leaf.value) if py_scope is not None else None;
+}
+
 impl TypeCheckPass._is_initializer_write(target: Expr, decl_sym: Symbol) -> bool {
     field = decl_sym.decl.name_of;
     if not (
@@ -519,16 +529,30 @@ impl TypeCheckPass._is_initializer_write(target: Expr, decl_sym: Symbol) -> bool
         and field.value is None
         and isinstance(target, AtomTrailer)
         and isinstance(target.target, Name)
-        and target.target.value == "self"
     ) {
         return False;
     }
     method = self.evaluator._get_enclosing_function(target);
     return method is not None
         and method.is_method
-        and method.sym_name in ("init", "postinit")
-        and method.find_parent_of_type(Archetype)
-            is field.find_parent_of_type(Archetype);
+        and not method.is_static
+        and method.sym_name in ("init", "__init__", "postinit", "__post_init__")
+        and method.method_owner is field.find_parent_of_type(Archetype)
+        and self._is_self_ref(target.target, method);
+}
+
+impl TypeCheckPass._is_self_ref(base: Name, method: Ability) -> bool {
+    if base.value == "self" {
+        return True;
+    }
+    sig = method.signature;
+    params = sig.params if isinstance(sig, FuncSignature) else None;
+    return (
+        params is not None
+        and len(params) > 0
+        and base.sym is not None
+        and base.sym is params[0].name.sym
+    );
 }
 
 impl TypeCheckPass.exit_assignment with Assignment exit {
@@ -1983,6 +2007,10 @@ impl TypeCheckPass.exit_with_stmt with WithStmt exit {
 }
 
 impl TypeCheckPass.exit_except with Except exit {
+    self._check_immutable_write(here.name, rebind_scope=here);
+}
+
+impl TypeCheckPass.exit_match_as with MatchAs exit {
     self._check_immutable_write(here.name, rebind_scope=here);
 }
 

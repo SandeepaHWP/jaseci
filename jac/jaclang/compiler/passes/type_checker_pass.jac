@@ -38,6 +38,7 @@ import from jaclang.compiler.frontend.unitree {
     LambdaExpr,
     ListVal,
     Literal,
+    MatchAs,
     ModuleCode,
     ModuleItem,
     ModulePath,
@@ -56,7 +57,6 @@ import from jaclang.compiler.frontend.unitree {
     UnaryExpr,
     TupleVal,
     TypeAlias,
-    UniScopeNode,
     VisitStmt,
     in_type_position,
     type_only_import_of,
@@ -65,7 +65,7 @@ import from jaclang.compiler.frontend.unitree {
     WhileStmt,
     WithStmt,
     YieldExpr,
-    lookup_enclosing_binding
+    find_python_scope_node_of
 }
 import from jaclang.compiler.passes.context { CompileContext }
 
@@ -208,6 +208,7 @@ walker TypeCheckPass(TreeWalker) {
     can exit_in_for_stmt with InForStmt exit;
     can exit_raise_stmt with RaiseStmt exit;
     can exit_except with Except exit;
+    can exit_match_as with MatchAs exit;
     can enter_with_stmt with WithStmt entry;
     can exit_with_stmt with WithStmt exit;
     can enter_if_stmt with IfStmt entry;
@@ -229,10 +230,12 @@ walker TypeCheckPass(TreeWalker) {
     def _eval_unpacking_names(container: Expr) -> None;
     def _write_leaves(target: (Expr | None)) -> list[Expr];
     def _check_immutable_write(
-        target: (Expr | None), rebind_scope: (UniScopeNode | None) = None
+        target: (Expr | None), rebind_scope: (UniNode | None) = None
     ) -> None;
 
+    def _rebound_enclosing_symbol(scope: UniNode, leaf: Name) -> (Symbol | None);
     def _is_initializer_write(target: Expr, decl_sym: Symbol) -> bool;
+    def _is_self_ref(base: Name, method: Ability) -> bool;
     def _body_always_returns(body: list[CodeBlockStmt]) -> bool;
     def _check_bare_generic(
         ann_node: UniNode,
