@@ -7,9 +7,9 @@ unrepresentable rather than merely fixed."""
 import from pathlib { Path }
 import from tempfile { TemporaryDirectory }
 import from uuid { UUID }
-import from jaclang.jac0core.archetype { EdgeAnchor, NodeAnchor, Root }
-import from jaclang.jac0core.runtime { JacRuntime }
-import from jaclang.runtimelib.context { ExecutionContext }
+import from jaclang.runtime.archetype { EdgeAnchor, NodeAnchor, Root }
+import from jaclang.runtime.runtime { JacRuntime }
+import from jaclang.runtime.context { ExecutionContext }
 
 def _as_any(v: any) -> any {
     return v;
@@ -39,7 +39,7 @@ def _seed(ctx: ExecutionContext) -> UUID {
     ranch = Root().__jac__;
     ranch.persistent = True;
     ctx.mem.put(ranch);
-    das: list = [];
+    das: list[any] = [];
     payloads = [(DA(val=1), 1), (DA(val=2), 5), (DA(val=3), 7), (DB(tag="x"), 9)];
     for (arch, w) in payloads {
         nanch = arch.__jac__;
@@ -64,11 +64,11 @@ def _seed(ctx: ExecutionContext) -> UUID {
     leaf.edges.append(e2);
     ctx.mem.put(leaf);
     ctx.mem.put(e2);
-    return ranch.id;
+    return ranch.ensure_id();
 }
 
 
-def _vals(nodes: list) -> list {
+def _vals(nodes: list[any]) -> list[any] {
     return [n.val for n in nodes];
 }
 

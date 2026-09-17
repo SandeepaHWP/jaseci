@@ -10,7 +10,7 @@ sockets so the classification is exercised end to end.
 import socket;
 import struct;
 import threading;
-import from jaclang.runtimelib.serving.client {
+import from jaclang.server.serving.client {
     ClientConnectionError,
     ClientRequestNotSent,
     ClientRequestSent,
@@ -29,13 +29,13 @@ def _closed_port -> int {
 }
 
 
-def _start_server(handler: any) -> tuple {
+def _start_server(handler: any) -> tuple[any, ...] {
     srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM);
     srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1);
     srv.bind(("127.0.0.1", 0));
     srv.listen(4);
     port = srv.getsockname()[1];
-    held: list = [];
+    held: list[any] = [];
 
     def serve {
         while True {
@@ -47,9 +47,7 @@ def _start_server(handler: any) -> tuple {
             held.append(conn);
             try {
                 handler(conn);
-            } except OSError {
-                ;
-            }
+            } except OSError {}
         }
     }
     t = threading.Thread(target=serve, daemon=True);
@@ -58,18 +56,14 @@ def _start_server(handler: any) -> tuple {
 }
 
 
-def _stop_server(srv: any, held: list) {
+def _stop_server(srv: any, held: list[any]) {
     try {
         srv.close();
-    } except OSError {
-        ;
-    }
+    } except OSError {}
     for conn in held {
         try {
             conn.close();
-        } except OSError {
-            ;
-        }
+        } except OSError {}
     }
 }
 
@@ -239,7 +233,7 @@ test "mid-stream connection loss raises from the consumer's iterator" {
         );
         assert kind == 'sse';
         it = iter(gen);
-        got: list = [next(it)];
+        got: list[any] = [next(it)];
         _sse_reset_gate.set();
         raised: any = None;
         try {

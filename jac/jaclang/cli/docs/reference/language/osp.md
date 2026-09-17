@@ -759,6 +759,96 @@ with entry {
 }
 ```
 
+### Construction Expressions
+
+Use `graph { ... }` to build and capture a structure. Ordinary `++>` expressions
+keep their existing result semantics. Inside construction, a nested child
+attaches by its roots and a following connection continues from every tip.
+
+`graph` is a reserved keyword. To use that spelling as an identifier, prefix
+it with a backtick: `` `graph ``. Construction expressions can appear directly
+in block heads, for example `if graph { a; }.root { ... }`.
+
+```jac
+node Part { has name: str; }
+edge Next { has weight: int = 0; }
+
+with entry {
+    a = Part("a");
+    b = Part("b");
+    c = Part("c");
+    d = Part("d");
+    f = graph { a ++> [b, c] +>:Next(weight=1):+> d; };
+    assert f.root is a;
+    assert len(f.nodes) == 4;
+    assert len(f.edges) == 4;
+    assert f.tips == [d];
+}
+```
+
+This creates `a -> b`, `a -> c`, `b -> d`, and `c -> d`. Nesting instead
+expresses a child structure: `graph { a ++> [b ++> c]; }` creates `a -> b`
+and `b -> c`.
+
+The result is a `GraphFragment[T]`, where `T` describes its root nodes.
+Interior nodes may have different node types.
+
+| Property | Meaning |
+| --- | --- |
+| `roots: list[T]` | Entry nodes, in construction order |
+| `root: T` | The sole entry node; raises `ValueError` for zero or multiple roots |
+| `tips: list[Node]` | Nodes from which a subsequent connection continues |
+| `nodes: list[Node]` | Participating nodes, deduplicated by identity |
+| `edges: list[Edge]` | Captured edge instances, including adopted fragment edges |
+
+Helpers can return fragments for composition. Import the result type when
+annotating a helper:
+
+```jac
+import from jaclang.runtime.graph_fragment { GraphFragment }
+
+node Part { has name: str; }
+
+def child -> GraphFragment[Part] {
+    return graph { Part("child") ++> Part("grandchild"); };
+}
+
+with entry {
+    tree = graph { Part("parent") ++> [child(), Part("sibling")]; };
+    assert tree.root.name == "parent";
+    assert len(tree.nodes) == 4;
+}
+```
+
+Construction is synchronous and evaluates immediately, once, in source order.
+Await values or consume asynchronous iterables before entering the expression.
+Each connection creates its edges after evaluating its operands. A fan-out creates edges in
+source-major, then target order, with a fresh edge constructor evaluation for
+each endpoint pair. Nested construction therefore creates inner edges before
+its enclosing connections. Fragments adopt their existing node and edge
+identities; they never clone or replay a helper's construction.
+
+Lists and list comprehensions can describe fan-outs. Repeated references in a
+fan-out contribute one root and one tip per identity. Separate connection
+expressions can still create parallel edges. Multiple semicolon-separated
+expressions form a forest; `graph {}` produces an empty fragment.
+Conditional expressions preserve the selected branch's roots and tips and
+evaluate only that branch. Other expressions contribute their returned values;
+a helper that builds a subgraph should return a fragment to preserve its ports.
+
+Fragment membership is a construction record, not a live traversal or an
+ownership boundary. Subsequent graph edits do not change the record. Deleting
+an edge captured in `edges` uses ordinary `del` semantics. Construction does
+not add a transaction: a later failure does not roll back earlier mutations.
+The construction body has a local scope; pass a fragment's `.root` explicitly
+to an API that expects a node.
+An immediate `(graph { ... }).root` projection skips membership collection
+while preserving node construction and connection effects.
+
+Outward directed arrows (`++>` and `+>:Edge:+>`) are supported inside
+construction expressions. Incoming and undirected connects remain available
+as ordinary graph mutations. Graph fragments do not provide pattern matching.
+
 ### 4 Deleting Nodes and Edges
 
 ```jac
@@ -774,10 +864,8 @@ with entry {
     alice del --> bob;
 
     # Delete a specific TYPED edge: pin it by both endpoints with an
-    # [edge ...] reference, then del the edge objects
-    for e in [edge alice ->:Friend:-> bob] {
-        del e;
-    }
+    # [edge ...] reference and del the query itself
+    del [edge alice ->:Friend:-> bob];
 
     # Delete node
     del bob;
@@ -794,6 +882,52 @@ walker Cleanup {
     }
 }
 ```
+
+#### What `del` Means
+
+One rule: `del` destroys every graph object its target holds, then, when the
+target is a location, releases that location exactly as Python would. The
+shape of the target decides only whether there is something to release; what
+dies is decided by what the target holds.
+
+| Target | Destroys | Then releases |
+| --- | --- | --- |
+| a name, `del n` | what `n` holds | unbinds the name |
+| an attribute, `del o.x` | what `o.x` holds | `__delattr__` |
+| a subscript, `del d["k"]`, `del L[i]`, `del L[i:j]` | what the entry or slice holds | `__delitem__` |
+| a target list, `del (a, b)`, `del [a, b]`, `del a, b` | each target in turn | each target in turn |
+| any other expression: a call, an `[edge ...]` query, a traversal, a comprehension, a set literal | every graph object it yields | nothing, there is no location |
+
+A node held in a name, a slot, a dict entry or a list slice meets the same
+fate at each, and binding a query to a local does not change what `del` means:
+
+```jac
+with entry {
+    index = {"alice": alice};
+    del index["alice"];             # destroys alice, then removes the key
+    del [edge a ->:Friend:-> b];    # destroys those edges
+    del [a -->];                    # destroys every successor node
+    es = [edge a ->:Friend:->];
+    del es;                         # destroys the same edges, then unbinds es
+    del stale_edges(a);             # destroys whatever the call returned
+}
+```
+
+To drop a reference without destroying what it points at, rebind it:
+`index = {}` or `holder.slot = None`. **Rebind to drop, `del` to destroy.**
+
+On every target Python accepts, Jac does what Python does, in Python's order,
+with Python's exceptions. Jac adds three things: graph objects are destroyed;
+the forms Python rejects ("cannot delete function call") are accepted as
+destroy requests, and they are strict, so a value target that yields anything
+other than graph objects raises `TypeError` before destroying anything; and a
+location is read once before it is released, which only a side-effecting
+`__getitem__` or property could notice.
+
+A destroyed object is dead, not gone. Its fields still read, but it has no
+edges, it is not in the store, and it does not come back: connecting to it,
+spawning on it, or visiting it raises, and a walker whose queue already holds
+it skips it. `del root` is rejected.
 
 #### Cascade Deletion Pattern
 
@@ -822,8 +956,8 @@ walker:priv DeleteWithChildren {
 |----------|-------------|
 | `jid(node)` | Get unique Jac ID of object |
 | `jobj(node)` | Get Jac object wrapper |
-| `grant(node, level=AccessLevel.READ)` | Open a node to every other user at a level of the ambient `AccessLevel` enum - `NO_ACCESS` / `READ` / `CONNECT` / `WRITE` (no import) |
-| `revoke(node)` | Remove a `grant` |
+| `grant(node, level=AccessLevel.READ)` | Open a node to every other user at a level of the ambient `AccessLevel` enum - `NO_ACCESS` / `READ` / `CONNECT` / `WRITE` (no import). Changing a node's grants is a write on the node: only a caller holding `WRITE` on it (its owner, the system root, or a root granted `WRITE`) may do so; anyone else gets a permission-denied diagnostic (a `PermissionError` under `JAC_STRICT_PERMISSIONS`) and nothing changes |
+| `revoke(node)` | Remove a `grant` (same `WRITE` requirement) |
 | `allroots()` | Get all root references |
 | `save(node)` | Persist node to storage |
 | `commit()` | Commit pending changes |

@@ -28,13 +28,13 @@ must stay silent, because there is no honest answer to give.
 
 import os;
 import from tests.support { TESTS_DIR }
-import from jaclang.jac0core.program { JacProgram }
-import from jaclang.jac0core.compile_options { CompileOptions }
+import from jaclang.compiler.driver.program { JacProgram }
+import from jaclang.compiler.driver.compile_options { CompileOptions }
 
 glob FIXTURES = os.path.join(TESTS_DIR, "compiler", "fixtures");
 
 """Type-check a fixture and return its errors."""
-def check_errors(fixture: str) -> list {
+def check_errors(fixture: str) -> list[any] {
     prog = JacProgram();
     prog.compile(
         file_path=str(os.path.join(FIXTURES, fixture)),

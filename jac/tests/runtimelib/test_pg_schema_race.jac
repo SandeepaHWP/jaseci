@@ -26,17 +26,17 @@ directly so the process-local gate is out of the picture.
 import threading;
 import from pathlib { Path }
 import from tempfile { TemporaryDirectory }
-import from jaclang.runtimelib.pgembed { PgRuntime }
-import from jaclang.runtimelib.session { shared_pg_data_dir, project_db_name }
-import from jaclang.runtimelib.store { PgStore }
-import from jaclang.runtimelib.pgwire { PgWireError }
+import from jaclang.data.pgembed { PgRuntime }
+import from jaclang.server.session { shared_pg_data_dir, project_db_name }
+import from jaclang.data.store { PgStore }
+import from jaclang.data.pgwire { PgWireError }
 
 glob _RACERS = 8,
      _ROUNDS = 3,
      _CONCURRENT_CREATE_STATES = ['23505', '42P07', '42710'];
 
 
-def _fresh_db(td: str) -> tuple {
+def _fresh_db(td: str) -> tuple[any, ...] {
     # One database per temp dir: every round races against a virgin schema,
     # which is the only state in which the bug can fire.
     target = str(Path(td) / 'app.jac');
@@ -112,10 +112,10 @@ def _race_round(td: str, racers: int) -> list[Exception] {
             if s._schema_stamp() {
                 stamped += 1;
             }
-        } except Exception { }
+        } except Exception {}
         try {
             s.close();
-        } except Exception { }
+        } except Exception {}
     }
     if not failures {
         assert stamped == racers , (

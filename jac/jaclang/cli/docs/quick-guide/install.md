@@ -1,6 +1,6 @@
 # Installation and First Run
 
-Get Jac installed and ready to use in under 2 minutes.
+Install Jac, verify the version, and run a first program. Download and setup time depend on your platform and connection.
 
 ---
 
@@ -24,6 +24,16 @@ Pass flags after `--` to customize the install:
 curl -fsSL https://raw.githubusercontent.com/jaseci-labs/jaseci/main/scripts/install.sh | bash -s -- --version 0.34.1
 ```
 
+**Experimental JacPython compiler:**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jaseci-labs/jaseci/main/scripts/install.sh | bash -s -- --jacpython
+```
+
+Releases with both variants default to stock CPython. `--jacpython` selects the
+binary containing the native JacPython compiler and can be combined with
+`--version`. The selected release must carry a `-jacpython` asset for your platform.
+
 **Uninstall:**
 
 ```bash
@@ -33,11 +43,12 @@ curl -fsSL https://raw.githubusercontent.com/jaseci-labs/jaseci/main/scripts/ins
 | Flag | Description |
 |------|-------------|
 | `--version V` | Install a specific release version |
+| `--jacpython` | Select the experimental JacPython binary |
 | `--uninstall` | Remove Jac |
 
 ### Upgrading
 
-Re-run the install command to upgrade to the latest version. The installer replaces the binary in place.
+Re-run the install command to upgrade to the latest version. The installer replaces the binary in place. Include `--jacpython` on each install to keep that variant; omit it to return to the default binary.
 
 ---
 
@@ -93,7 +104,7 @@ The MCP server for AI-assisted Jac development is built into the binary -- run `
 `jac install` resolves packages from PyPI into your project environment; jaclang itself is provided by the binary, so it is never reinstalled. See [One Binary, Build Anything](one-binary.md) for the full picture of what the binary bundles, and the [CLI reference](../reference/cli/index.md#jac-install) for all options.
 
 !!! note "Deployment & scaling is built in"
-    Production serving and Kubernetes deployment (`jac run`, `jac scale deploy`) ship inside the `jac` binary as the built-in `scale` subsystem -- there is no separate `jac-scale` package to install. Scale's optional heavier dependencies (MongoDB, Redis, Kubernetes, Prometheus, ...) are pulled into your project on demand: declare the matching `[scale.*]` config in `jac.toml`, then run `jac install` to resolve them into `.jac/venv`.
+    Production serving and Kubernetes deployment (`jac run`, `jac scale deploy`) ship inside the `jac` binary as the built-in `scale` subsystem -- there is no separate `jac-scale` package to install. Scale's optional heavier dependencies (Kubernetes, Prometheus, OpenTelemetry, ...) are pulled into your project on demand: declare the matching `[scale.*]` config in `jac.toml`, then run `jac install` to resolve them into `.jac/venv`.
 
 ---
 

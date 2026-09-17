@@ -251,7 +251,7 @@ impl serve_sse(engine: McpEngine, host: str, port: int) -> None {
     _serve_forever(httpd);
 }
 
-def _error_response(msg_id: any, code: int, message: str) -> dict {
+def _error_response(msg_id: any, code: int, message: str) -> dict[str, any] {
     return {
         "jsonrpc": "2.0",
         "id": msg_id,
@@ -320,7 +320,7 @@ def _make_http_server(
 def _serve_forever(httpd: _McpHttpServer) {
     try {
         httpd.serve_forever();
-    } except KeyboardInterrupt { } finally {
+    } except KeyboardInterrupt {} finally {
         httpd.server_close();
     }
 }
@@ -434,7 +434,7 @@ class _SseHandler(BaseHTTPRequestHandler) {
                 }
                 self._send_event("message", item);
             }
-        } except Exception { } finally {
+        } except Exception {} finally {
             with srv.lock {
                 srv.sessions.pop(session_id, None);
             }

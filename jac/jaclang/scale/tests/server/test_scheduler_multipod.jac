@@ -11,9 +11,9 @@ on every pod without a restart.
 
 import time;
 import from tempfile { mkdtemp }
-import from jaclang.runtimelib.pgembed { PgRuntime }
-import from jaclang.runtimelib.store { PgStore }
-import from jaclang.scale._optdeps.apscheduler { HAS_APSCHEDULER }
+import from jaclang.data.pgembed { PgRuntime }
+import from jaclang.data.store { PgStore }
+import from jaclang.testing.requires { require_module }
 import from jaclang.scale.scheduler.scheduler {
     JOBS_CHANGED_CHANNEL,
     JacScaleScheduler,
@@ -21,12 +21,7 @@ import from jaclang.scale.scheduler.scheduler {
     TriggerSpec
 }
 
-glob _holder: dict = {},
-     _DOCS_DDL = (
-         'CREATE TABLE IF NOT EXISTS jac_docs ('
-         'collection text NOT NULL, id text NOT NULL, doc jsonb NOT NULL, '
-         'PRIMARY KEY (collection, id))'
-     );
+glob _holder: dict[str, any] = {};
 
 
 def _store -> (PgStore | None) {
@@ -36,7 +31,6 @@ def _store -> (PgStore | None) {
         }
         store = PgStore(conninfo=_holder['rt'].ensure());
         store.ensure_schema({});
-        store.rows(_DOCS_DDL, {});
         return store;
     } except Exception as e {
         print(f"[skip] embedded postgres unavailable: {e}");
@@ -52,7 +46,7 @@ def _pod(store: PgStore, collection: str) -> JacScaleScheduler {
 }
 
 
-def _job(job_id: str, interval: float) -> dict {
+def _job(job_id: str, interval: float) -> dict[str, any] {
     return {
         'job_id': job_id,
         'name': 'tick',
@@ -144,9 +138,7 @@ test "jobs-changed NOTIFY from one pod reaches the other pod's listener" {
 
 
 test "two live pods fire a due job exactly once and DELETE stops both" {
-    if not HAS_APSCHEDULER {
-        testskip('apscheduler not installed; covered in CI');
-    }
+    require_module("apscheduler");
     import datetime as _dt;
     import from apscheduler.schedulers.background { BackgroundScheduler }
     sa = _store();
@@ -207,7 +199,9 @@ test "two live pods fire a due job exactly once and DELETE stops both" {
 
 
 test "events url scheme is validated with a clean error" {
-    import from jaclang.scale.server.serve { _validate_events_url }
+    import from jaclang.scale.server.extensions {
+        validate_events_url as _validate_events_url
+    }
     _validate_events_url(None);
     _validate_events_url('postgresql://u:p@h:5432/db');
     _validate_events_url('postgres://u:p@h:5432/db');

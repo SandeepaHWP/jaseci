@@ -22,10 +22,10 @@ import atexit;
 import shutil;
 import time;
 import from tempfile { mkdtemp }
-import from jaclang.runtimelib.pgembed { PgRuntime }
-import from jaclang.runtimelib.store { PgStore }
+import from jaclang.data.pgembed { PgRuntime }
+import from jaclang.data.store { PgStore }
 
-glob _holder: dict = {},
+glob _holder: dict[str, any] = {},
      _LONG_STEM = 'cache:' + ('x' * 70) + ':';
 
 
@@ -37,7 +37,7 @@ def _discard_runtime {
     if rt is not None {
         try {
             rt.stop();
-        } except Exception { }
+        } except Exception {}
     }
     if home is not None {
         shutil.rmtree(home, ignore_errors=True);
@@ -56,7 +56,7 @@ def _runtime -> any {
 }
 
 
-def _pair -> tuple {
+def _pair -> tuple[any, ...] {
     # Publisher and subscriber on separate connections: the same path a
     # second pod takes, and it makes delivery push-driven rather than
     # waiting out the listen loop's idle poll.
@@ -76,7 +76,7 @@ def _settle {
 }
 
 
-def _wait_for(box: list, want: int, seconds: float = 10.0) {
+def _wait_for(box: list[any], want: int, seconds: float = 10.0) {
     deadline = time.monotonic() + seconds;
     while len(box) < want and time.monotonic() < deadline {
         time.sleep(0.05);

@@ -9,9 +9,9 @@ test_persistence_migration.jac (fingerprints).
 """
 
 import os;
-import from jaclang.jac0core.archetype { NodeAnchor, Root }
-import from jaclang.runtimelib.serializer { Serializer }
-import from jaclang.runtimelib.schema_rules {
+import from jaclang.runtime.archetype { NodeAnchor, Root }
+import from jaclang.data.serializer { Serializer }
+import from jaclang.data.schema_rules {
     SchemaRules,
     merged_rules_for,
     schema_alias as direct_schema_alias,
@@ -20,7 +20,7 @@ import from jaclang.runtimelib.schema_rules {
 
 
 """Upgrade callback: legacy comma-string tags become list[str]."""
-def _split_tags(doc: dict) -> dict {
+def _split_tags(doc: dict[str, any]) -> dict[str, any] {
     doc['tags'] = [
         t.strip()
         for t in doc['tags'].split(',')
@@ -43,7 +43,8 @@ impl _DriftUser.__jac_schema__ -> None {
     schema_alias("name", stored="username");
     schema_drop("legacy_bio");
     schema_upgrade(
-        _split_tags, when=(lambda (doc: dict) { isinstance(doc.get('tags'), str); })
+        _split_tags,
+        when=(lambda (doc: dict[str, any]) { isinstance(doc.get('tags'), str); })
     );
 }
 
@@ -66,7 +67,7 @@ obj _FactoryDefaults(Root) {
 
 
 """Build a raw stored dict shaped like a pre-rename _DriftUser document."""
-def _old_user_raw -> dict {
+def _old_user_raw -> dict[str, any] {
     return {
         '__type__': '_DriftUser',
         '__module__': getattr(_DriftUser, '__module__'),

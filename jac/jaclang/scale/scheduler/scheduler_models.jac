@@ -1,10 +1,11 @@
-import from jaclang.runtimelib.serving.model { ApiModel, require_str }
+import from jaclang.comptime { fields }
+import from jaclang.server.serving.model { ApiModel, require_str }
 
 
 glob TRIGGER_KINDS: set[str] = {'interval', 'cron', 'date'};
 
 
-def _validate_trigger_fields(data: dict, allowed: set[str]) {
+def _validate_trigger_fields(data: dict[str, any], allowed: set[str]) {
     extra = [
         k
         for k in data.keys()
@@ -44,9 +45,9 @@ obj CreateJobRequest(ApiModel) {
         if not isinstance(data, dict) {
             raise ValueError('request body must be an object');
         }
-        _validate_trigger_fields(
-            data, {'walker_or_function', 'trigger', 'interval', 'cron', 'date'}
-        );
+
+        comptime allowed: set[str] = {f.name for f in fields(CreateJobRequest)};
+        _validate_trigger_fields(data, allowed);
         return CreateJobRequest(
             walker_or_function=require_str(data, 'walker_or_function'),
             trigger=str(data.get('trigger')),
@@ -69,7 +70,9 @@ obj UpdateJobRequest(ApiModel) {
         if not isinstance(data, dict) {
             raise ValueError('request body must be an object');
         }
-        _validate_trigger_fields(data, {'trigger', 'interval', 'cron', 'date'});
+
+        comptime allowed: set[str] = {f.name for f in fields(UpdateJobRequest)};
+        _validate_trigger_fields(data, allowed);
         return UpdateJobRequest(
             trigger=str(data.get('trigger')),
             interval=float(data['interval'])

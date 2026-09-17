@@ -4,37 +4,32 @@
 //! Both halves are produced by Jac:
 //!
 //!   * the launcher stub is `launcher/launcher.jac` over the fused-runtime
-//!     library (`jaclang/runtimelib/fused`), compiled by the in-checkout
+//!     library (`jaclang/dist/fused`), compiled by the in-checkout
 //!     compiler with `jac build --as native` (the Jac-native linkers; no
 //!     external toolchain) -- it links only libc/libdl and dlopens the bundled
 //!     CPython at runtime;
-//!   * the payload tool is `jaclang.payload`, Python-tier Jac that fetches the
+//!   * the payload tool is `jaclang.dist.payload`, Python-tier Jac that fetches the
 //!     vendored inputs, stages the runtime tree, packs it, and appends it to the
 //!     stub with the trailer.
 //!
-//! Both run on the pbs CPython the build fetches first (through JACBOOT_SRC
-//! below) -- so the only thing that must exist before any Python does is
-//! `bootstrap/fetch_pbs.zig`, the one Zig tool. Zig is otherwise the C/C++ cross-compiler: the LLVMPY_* shim
-//! (`zig c++`), the static-musl harvest, and the wasm32 libc bitcode.
+//! The build first compiles the pinned CPython and native libraries from
+//! bootstrap/python/sources.json using Zig's C toolchain. The seed verifies
+//! sources before running the retained upstream configure/make recipes.
+//! Build hosts need Zig 0.16.0, make, Perl, a POSIX shell, and a network
+//! connection. No installed Python or Jac is required. Each release target
+//! builds on its matching runner; the resulting Python tree is relocatable.
 //!
-//!   zig build test                 # bootstrap unit tests
-//!   zig build stub                 # just the launcher stub (no payload)
-//!   zig build                      # the full jac binary -> zig-out/bin/jac
-//!   zig build -Ddev                # FAST dev binary: don't bundle the compiler,
-//!                                  #   link it live from the build root instead
-//!   zig build -Djaclang-dir=PATH   # like -Ddev but link an explicit compiler dir
-//!   zig build -Dpayload=PATH       # pack a prebuilt payload (skip fetch+mkpayload)
-//!   zig build -Dpayload-progress   # stream the payload build live (no caching)
-//!   zig build -Dtarget=aarch64-macos
+//!   zig build build-python        # just Python and its native dependencies
+//!   zig build test                # offline bootstrap tests
+//!   zig build stub                # just the launcher
+//!   zig build                     # complete binary -> zig-out/bin/jac
+//!   JACPYTHON=1 zig build         # opt in to the native Python compiler
+//!   zig build -Ddev               # link compiler sources from this checkout
+//!   zig build -Djaclang-dir=PATH   # link another compiler source tree
+//!   zig build -Dpayload=PATH       # pack an existing payload
 //!
-//! Build-time host tools: just `zig` and a network connection. The payload tool
-//! shells out only to the freshly-fetched pbs python (pip + JIR precompile),
-//! which provides its own pip, and -- best-effort, optional -- to `strip` to
-//! shrink the unstripped pbs libpython; without `strip` the build still works,
-//! the binary is just larger. The shipped binary needs none of these.
-
 const std = @import("std");
-// Pinned toolchain inputs (pbs, LLVM slices), read from bootstrap/pins.json --
+// Pinned toolchain inputs (Python, LLVM slices), read from bootstrap/pins.json --
 // the single source of truth shared with the Jac payload tool.
 const pins = @import("bootstrap/pins.zig");
 
@@ -55,14 +50,14 @@ fn llvmCacheDir(b: *std.Build, target: std.Build.ResolvedTarget) ?[]const u8 {
 // link path can both feed it through the same mkpayload/place plumbing.
 const Shim = struct { bin: std.Build.LazyPath, place: *std.Build.Step };
 
-/// The Python that boots the in-checkout compiler on the pbs CPython. `zig
-/// build` fetches python-build-standalone first (bootstrap/fetch_pbs.zig, the
-/// one step that runs before any Python exists) and then drives every other
+/// The Python that boots the in-checkout compiler on the source-built CPython. `zig
+/// build` builds CPython from pinned sources first (bootstrap/build_python.zig, the
+/// first step that runs before any Python exists) and then drives every other
 /// build step through this program, so the build tooling is Jac
-/// (`jaclang.payload`) and needs no prior jac binary:
+/// (`jaclang.dist.payload`) and needs no prior jac binary:
 ///
-///     <pbs-python> -I -c JACBOOT <root> payload <subcommand> [args...]   # jaclang.payload.cli
-///     <pbs-python> -I -c JACBOOT <root> jac <jac-cli-args...>             # the jac CLI itself
+///     <built-python> -I -c JACBOOT <root> payload <subcommand> [args...]   # jaclang.dist.payload.cli
+///     <built-python> -I -c JACBOOT <root> jac <jac-cli-args...>             # the jac CLI itself
 ///
 /// `-I` keeps the interpreter isolated from the ambient environment; the
 /// checkout root is put on sys.path explicitly and the lazy `.jac` finder
@@ -75,28 +70,37 @@ const JACBOOT_SRC =
     "root, mode, argv = sys.argv[1], sys.argv[2], sys.argv[3:]\n" ++
     "sys.path.insert(0, root)\n" ++
     "os.environ['JAC_NO_DEV_SOURCE'] = '1'\n" ++
+    "os.environ['JAC_STUBCAT_BUILDING'] = '1'\n" ++
     "import _jac_finder\n" ++
     "_jac_finder.install()\n" ++
     "if mode == 'payload':\n" ++
-    "    from jaclang.payload.cli import main\n" ++
+    "    from jaclang.dist.payload.cli import main\n" ++
     "    sys.exit(int(main(argv) or 0))\n" ++
     "sys.argv = ['jac'] + argv\n" ++
-    "from jaclang.jac0core.cli_boot import start_cli\n" ++
+    "from jaclang.cli.cli_boot import start_cli\n" ++
     "start_cli()\n";
 
-/// The Jac build tooling, as a runnable. Every run depends on the host pbs
-/// fetch; the callee imports the compiler from this checkout, so callers that
-/// cache on inputs must also declare the jaclang tree (addTreeInputs).
+/// The Jac build tooling, as a runnable. Every run depends on BOTH seed
+/// fetches, which is what keeps the bootstrap acyclic: the callee imports the
+/// compiler from this checkout and compiling anything at all needs the source-built
+/// CPython to run on and the vendored typeshed to type-check against, so a Jac
+/// tool run can never be the thing that puts either of them in place (#8785).
+/// Callers that cache on inputs must also declare the jaclang tree
+/// (addTreeInputs).
 const JacTool = struct {
     b: *std.Build,
     python: []const u8,
     root: []const u8,
-    fetch: *std.Build.Step,
+    build_python: *std.Build.Step,
+    fetch_typeshed: *std.Build.Step,
 
     fn run(self: JacTool, mode: []const u8, args: []const []const u8) *std.Build.Step.Run {
         const cmd = self.b.addSystemCommand(&.{ self.python, "-I", "-c", JACBOOT_SRC, self.root, mode });
+        const python_dir = std.fs.path.dirname(std.fs.path.dirname(std.fs.path.dirname(self.python).?).?).?;
+        cmd.setEnvironmentVariable("SSL_CERT_FILE", self.b.fmt("{s}/build/cacert.pem", .{python_dir}));
         cmd.addArgs(args);
-        cmd.step.dependOn(self.fetch);
+        cmd.step.dependOn(self.build_python);
+        cmd.step.dependOn(self.fetch_typeshed);
         return cmd;
     }
 };
@@ -113,6 +117,9 @@ pub fn build(b: *std.Build) void {
     else
         b.resolveTargetQuery(.{ .cpu_model = .baseline });
     const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseSmall });
+    // Opt in at build time; each binary bundles exactly one Python runtime.
+    const jacpython = std.mem.eql(u8, b.graph.environ_map.get("JACPYTHON") orelse "0", "1");
+    const python_variant = if (jacpython) "jacpython" else "cpython";
 
     // --- LLVMPY_* shim: compile jac/native/*.cpp + statically link host LLVM ---
     // Replaces the bundled libllvmlite.so (llvmlite wheel). Gated on -Dllvm-dir
@@ -123,61 +130,95 @@ pub fn build(b: *std.Build) void {
     // --- unit tests (the Zig bootstrap seed) -------------------------------
     addTests(b, target, optimize);
 
-    // --- Stage 0: the pbs CPython for the build HOST (runs the Jac tooling) --
-    // The one step that runs before any Python exists. Idempotent: a no-op
-    // when the tree is already there, so a cache hit costs a file probe.
+    // --- Stage 0: the two inputs that must exist before any Jac compiles -----
+    // The source-built CPython the Jac tooling runs ON, and the typeshed stdlib stubs it
+    // type-checks AGAINST. Type inference is on the critical path of every
+    // compilation, so both are hard prerequisites of compiling even the build
+    // tooling itself -- which is why both are fetched by Zig seeds and not by
+    // the Jac payload tool (#8785). Both validate their input fingerprints before reusing an installed tree.
     const host_osarch = osArchString(b.graph.host.result) orelse {
         // Unsupported build host: only the shim/test steps are available.
         return;
     };
     const seed_mod = b.createModule(.{
-        .root_source_file = b.path("bootstrap/fetch_pbs.zig"),
+        .root_source_file = b.path("bootstrap/build_python.zig"),
         .target = b.graph.host,
         .optimize = .ReleaseSafe,
         .link_libc = true,
     });
-    const seed = b.addExecutable(.{ .name = "fetch_pbs", .root_module = seed_mod });
+    const seed = b.addExecutable(.{ .name = "build_python", .root_module = seed_mod });
     const pins_path = b.pathFromRoot(pins.PINS_PATH);
-    const host_pbs_dir = b.pathFromRoot(b.fmt(".pbs-build/{s}", .{host_osarch}));
+    const host_python_dir = b.pathFromRoot(b.fmt(".python-build/{s}/{s}", .{ python_variant, host_osarch }));
     const fetch_host = b.addRunArtifact(seed);
-    fetch_host.addArgs(&.{ host_osarch, host_pbs_dir, pins_path });
+    fetch_host.addArgs(&.{ host_osarch, host_python_dir, b.pathFromRoot("."), b.graph.zig_exe });
+    if (!jacpython) fetch_host.addArg("--host");
     fetch_host.has_side_effects = true;
+    b.step("build-python", "Build the source-pinned Python runtime and native libraries").dependOn(&fetch_host.step);
     const root = b.pathFromRoot(".");
+
+    // The typeshed seed reads its pin (PIN + TARBALL_SHA256) out of the vendor
+    // dir it fills, the same two files the payload tool's own fetch-typeshed
+    // reads, so the two fetchers can never disagree.
+    const ts_seed_mod = b.createModule(.{
+        .root_source_file = b.path("bootstrap/fetch_typeshed.zig"),
+        .target = b.graph.host,
+        .optimize = .ReleaseSafe,
+        .link_libc = true,
+    });
+    const ts_seed = b.addExecutable(.{ .name = "fetch_typeshed", .root_module = ts_seed_mod });
+    const fetch_ts = b.addRunArtifact(ts_seed);
+    fetch_host.step.dependOn(&fetch_ts.step);
+    if (jacllvm) |shim| fetch_host.step.dependOn(shim.place);
+    fetch_ts.addArg(b.pathFromRoot("jaclang/vendor/typeshed"));
+    // has_side_effects: the output lands in the source tree, not the cache, so
+    // the step must run even when its (unchanging) argv would otherwise cache
+    // it away -- a clean checkout has to materialize the stubs.
+    fetch_ts.has_side_effects = true;
+    fetch_ts.addFileInput(b.path("jaclang/vendor/typeshed/PIN"));
+    fetch_ts.addFileInput(b.path("jaclang/vendor/typeshed/TARBALL_SHA256"));
+
     const tool = JacTool{
         .b = b,
-        .python = b.fmt("{s}/python/install/bin/python{s}", .{ host_pbs_dir, pins.pyMinor(b) }),
+        .python = b.fmt("{s}/python/install/bin/python{s}", .{ host_python_dir, pins.pyMinor(b) }),
         .root = root,
-        .fetch = &fetch_host.step,
+        .build_python = &fetch_host.step,
+        .fetch_typeshed = &fetch_ts.step,
     };
 
     // Standalone step: materialize the gitignored typeshed stdlib stubs at the
     // pinned commit, without building a binary. Used by CI (test-binary) and
-    // local dev to enable from-source `jac check` / the test suite.
-    {
-        const fetch_ts_only = tool.run("payload", &.{ "fetch-typeshed", root });
-        fetch_ts_only.has_side_effects = true;
-        b.step("fetch-typeshed", "Fetch the pinned typeshed stdlib stubs into the checkout")
-            .dependOn(&fetch_ts_only.step);
-    }
+    // local dev to enable from-source `jac check` / the test suite. Pure Zig, so
+    // it works on a checkout where nothing can compile yet -- which is exactly
+    // the state the error messages that point here describe.
+    b.step("fetch-typeshed", "Fetch the pinned typeshed stdlib stubs into the checkout")
+        .dependOn(&fetch_ts.step);
 
     // Standalone: fetch the pinned LLVM subset the jacllvm shim needs into
     // .llvm-build/ (one-time, ~84 MB range-fetched from the llvm-slice zip). After
     // this, a plain `zig build` picks it up via llvmCacheDir and ships the
-    // wheel-free binary.
+    // wheel-free binary. Pure-Zig bootstrap (no source-built CPython needed).
     {
-        const fetch_llvm = tool.run("payload", &.{ "fetch-llvm", b.pathFromRoot(LLVM_CACHE_BASE) });
-        fetch_llvm.has_side_effects = true;
+        const llvm_seed_mod = b.createModule(.{
+            .root_source_file = b.path("bootstrap/fetch_llvm.zig"),
+            .target = b.graph.host,
+            .optimize = .ReleaseSafe,
+            .link_libc = true,
+        });
+        const llvm_seed = b.addExecutable(.{ .name = "fetch_llvm", .root_module = llvm_seed_mod });
+        const fetch_llvm_run = b.addRunArtifact(llvm_seed);
+        fetch_llvm_run.addArgs(&.{ host_osarch, b.pathFromRoot(LLVM_CACHE_BASE), pins_path });
+        fetch_llvm_run.has_side_effects = true;
         b.step("fetch-llvm", "Range-fetch the pinned LLVM subset for the wheel-free jacllvm shim")
-            .dependOn(&fetch_llvm.step);
+            .dependOn(&fetch_llvm_run.step);
     }
 
     // Standalone: place the pinned, contained bun runtime into the source tree at
-    // jaclang/runtimelib/client/_bun/ for the HOST. Editable/source checkouts,
+    // jaclang/client/_bun/ for the HOST. Editable/source checkouts,
     // the test suite, and -Ddev linked binaries resolve it there via get_bun()'s
     // __file__-relative lookup. (Normal/release builds instead bundle a
     // target-matched bun into the payload; see the payload block below.)
     {
-        const fetch_bun = tool.run("payload", &.{ "fetch-bun", host_osarch, b.pathFromRoot("jaclang/runtimelib/client/_bun") });
+        const fetch_bun = tool.run("payload", &.{ "fetch-bun", host_osarch, b.pathFromRoot("jaclang/client/_bun") });
         fetch_bun.has_side_effects = true;
         b.step("fetch-bun", "Place the pinned bun into the source tree (editable/dev + tests)")
             .dependOn(&fetch_bun.step);
@@ -185,7 +226,7 @@ pub fn build(b: *std.Build) void {
 
     // Standalone: harvest a static-musl runtime (libc.a + libzigc.a + compiler-rt
     // + crt) from the bundled Zig toolchain into .pbs-build/<osarch>/musl/lib, so
-    // `jac nacompile` can fully static-link Linux executables against musl with
+    // `jac build --native` can fully static-link Linux executables against musl with
     // NO external toolchain at compile time. Idempotent; Linux only.
     if (std.mem.startsWith(u8, host_osarch, "linux-")) {
         const vendor_musl = tool.run("payload", &.{ "build-musl", host_osarch, b.pathFromRoot(b.fmt(".pbs-build/{s}/musl/lib", .{host_osarch})), b.graph.zig_exe });
@@ -195,7 +236,7 @@ pub fn build(b: *std.Build) void {
     }
 
     // Arch-parameterized variants: `zig cc -target <arch>-linux-musl` cross-
-    // compiles musl from any host, so a cross `jac nacompile` and the aarch64 CI
+    // compiles musl from any host, so a cross `jac build --native` and the aarch64 CI
     // lane can static-link without target hardware (#7626 C1).
     inline for ([_][]const u8{ "linux-x86_64", "linux-aarch64" }) |cross_osarch| {
         const vendor_musl_cross = tool.run("payload", &.{ "build-musl", cross_osarch, b.pathFromRoot(b.fmt(".pbs-build/{s}/musl/lib", .{cross_osarch})), b.graph.zig_exe });
@@ -211,7 +252,7 @@ pub fn build(b: *std.Build) void {
     {
         const vendor_wasm_libc = tool.run("payload", &.{
             "build-wasm-libc",
-            b.pathFromRoot("jaclang/compiler/passes/native/wasm_rt"),
+            b.pathFromRoot("jaclang/compiler/backends/native/wasm_rt"),
             b.pathFromRoot(".pbs-build/wasm32/libc"),
             b.graph.zig_exe,
         });
@@ -225,25 +266,29 @@ pub fn build(b: *std.Build) void {
         return;
     };
 
-    // The TARGET's pbs tree: the payload input, and the C floor archives
+    // The TARGET's source-built Python tree: the payload input, and the C floor archives
     // (libzstd.a, libcrypto.a, ...) the stub static-links. Same tree as the
     // host's whenever host == target, which is every CI lane.
-    const pbs_dir = b.pathFromRoot(b.fmt(".pbs-build/{s}", .{osarch}));
-    const pbs_python = b.fmt("{s}/python", .{pbs_dir});
+    const python_dir = b.pathFromRoot(b.fmt(".python-build/{s}/{s}", .{ python_variant, osarch }));
+    const python_tree = b.fmt("{s}/python", .{python_dir});
     const fetch_target: *std.Build.Step = if (std.mem.eql(u8, osarch, host_osarch)) &fetch_host.step else blk: {
         const fetch = b.addRunArtifact(seed);
-        fetch.addArgs(&.{ osarch, pbs_dir, pins_path });
+        fetch.addArgs(&.{ osarch, python_dir, root, b.graph.zig_exe });
+        if (!jacpython) fetch.addArg("--host");
         fetch.has_side_effects = true;
         break :blk &fetch.step;
     };
 
     // --- launcher stub: the in-checkout compiler compiles launcher/ natively --
-    // `--strict` makes any native-seam demotion in the stub's closure a hard
-    // error: a function demoted to Python-only cannot run before CPython
+    // A native build treats any native-seam demotion in the stub's closure as
+    // a hard error: a function demoted to Python-only cannot run before CPython
     // exists. (The whole-program type-check gate is not used here: it cannot
     // see the bundled per-OS native floors the launcher imports.) Needs the
     // LLVMPY_* shim placed in-tree and the target's C floor archives.
-    const build_stub = tool.run("jac", &.{ "nacompile", "--strict" });
+    const build_stub = tool.run("jac", &.{ "build", "--native" });
+    // Pin the selected runtime's libraries and certificates when both variants are cached.
+    build_stub.setEnvironmentVariable("JAC_NATIVE_FLOOR_DIR", b.fmt("{s}/build/lib", .{python_tree}));
+    build_stub.setEnvironmentVariable("JAC_NATIVE_CA_BUNDLE", b.fmt("{s}/build/cacert.pem", .{python_tree}));
     build_stub.addFileArg(b.path("launcher/launcher.jac"));
     build_stub.addArg("-o");
     const stub = build_stub.addOutputFileArg("jac-stub");
@@ -256,28 +301,29 @@ pub fn build(b: *std.Build) void {
         .dependOn(&b.addInstallBinFile(stub, "jac").step);
 
     // --- runtime payload: -Dpayload override, else mkpayload ---------------
+    // The stub catalog (pre-resolved typeshed types) is a second mkpayload
+    // output that `pack` places as its own page-aligned region of the binary;
+    // a prebuilt -Dpayload carries the same catalog as a file inside it.
+    var stubcat_region: ?std.Build.LazyPath = null;
     const payload: std.Build.LazyPath = if (b.option([]const u8, "payload", "Path to a prebuilt runtime payload .tar.zst")) |p|
         .{ .cwd_relative = p }
     else payload: {
-        // Materialize the gitignored typeshed stdlib stubs at the pinned
-        // commit. Idempotent; has_side_effects so a clean checkout always
-        // materializes them (it is otherwise cached away as a no-arg command).
-        const fetch_ts = tool.run("payload", &.{ "fetch-typeshed", root });
-        fetch_ts.has_side_effects = true;
-
         // Assemble the payload. Cacheable (output-file arg), so Zig CAPTURES
         // its stdio and prints it only on failure -- the "==>" logs stay hidden.
         // `-Dpayload-progress` flips stdio to .inherit so the build streams live;
         // the tradeoff is .inherit marks the step as having side-effects, so it
         // ALWAYS repacks (no caching) while the flag is on.
-        const mk = tool.run("payload", &.{ "mkpayload", pbs_python, root });
+        const mk = tool.run("payload", &.{ "mkpayload", python_tree, root });
         if (b.option(bool, "payload-progress", "Stream the payload build (mkpayload) live; disables its caching") orelse false) {
             mk.stdio = .inherit;
         }
         mk.step.dependOn(fetch_target);
-        mk.step.dependOn(&fetch_ts.step);
         const out = mk.addOutputFileArg("payload.tar.zst");
-        // Optional trailing flags (parsed after the positional pbs/root/out):
+        stubcat_region = mk.addPrefixedOutputFileArg("--stubcat-out=", "stubcat.bin");
+        if (b.option(bool, "skip-stubcat", "mkpayload: skip the stub catalog build (the type checker builds it on first use)") orelse false) {
+            mk.addArg("--skip-stubcat");
+        }
+        // Optional trailing flags (parsed after the positional python/root/out):
         // --shim ships the Zig-built LLVMPY_* shim; --skip-precompile drops the
         // JIR precompile (fast link validation; first run compiles on demand).
         if (jacllvm) |shim| {
@@ -312,12 +358,12 @@ pub fn build(b: *std.Build) void {
         // before the precompile and is refreshed after, so only changed modules
         // recompile. Content-keyed per module, so a stale dir can never change
         // the payload -- only how fast it builds. NOT a tracked input.
-        mk.addArg(b.fmt("--precompiled-cache={s}", .{b.pathFromRoot(".precompiled-build")}));
+        mk.addArg(b.fmt("--precompiled-cache={s}", .{b.pathFromRoot(b.fmt(".precompiled-build/{s}", .{python_variant}))}));
         // Persistent compressed-frame cache for the payload's deps layer: the
         // level-19 zstd frame over the rarely-changing deps tree is reused when
         // its content is unchanged. Verified by decompress + compare on reuse,
         // so it can never change the payload either.
-        mk.addArg(b.fmt("--layer-cache={s}", .{b.pathFromRoot(".payload-layers")}));
+        mk.addArg(b.fmt("--layer-cache={s}", .{b.pathFromRoot(b.fmt(".payload-layers/{s}", .{python_variant}))}));
 
         // Seal the runtime (issue #7135): a bundled release payload boots from
         // the JIR image + frozen jac0core bootstrap. This is the ONLY bundled
@@ -340,14 +386,14 @@ pub fn build(b: *std.Build) void {
             mk.step.dependOn(&fetch_bun.step);
             mk.addArg(b.fmt("--bun={s}/bun", .{bun_dir}));
         } else {
-            const fetch_bun = tool.run("payload", &.{ "fetch-bun", host_osarch, b.fmt("{s}/jaclang/runtimelib/client/_bun", .{link_dir.?}) });
+            const fetch_bun = tool.run("payload", &.{ "fetch-bun", host_osarch, b.fmt("{s}/jaclang/client/_bun", .{link_dir.?}) });
             fetch_bun.has_side_effects = true;
             mk.step.dependOn(&fetch_bun.step);
         }
 
         // Linux: harvest a static-musl runtime for the target and bundle it so
         // the shipped binary can fully static-link Linux executables against
-        // musl at nacompile time -- no glibc/loader dep.
+        // musl at native build time -- no glibc/loader dep.
         if (link_dir == null and std.mem.startsWith(u8, osarch, "linux-")) {
             const musl_lib = b.pathFromRoot(b.fmt(".pbs-build/{s}/musl/lib", .{osarch}));
             const vendor_musl = tool.run("payload", &.{ "build-musl", osarch, musl_lib, b.graph.zig_exe });
@@ -363,7 +409,7 @@ pub fn build(b: *std.Build) void {
             const wasm_libc = b.pathFromRoot(".pbs-build/wasm32/libc");
             const vendor_wasm = tool.run("payload", &.{
                 "build-wasm-libc",
-                b.pathFromRoot("jaclang/compiler/passes/native/wasm_rt"),
+                b.pathFromRoot("jaclang/compiler/backends/native/wasm_rt"),
                 wasm_libc,
                 b.graph.zig_exe,
             });
@@ -371,7 +417,7 @@ pub fn build(b: *std.Build) void {
             // must run even when inputs are unchanged (a deleted .pbs-build has
             // to repopulate). The tool itself skips up-to-date per-file work.
             vendor_wasm.has_side_effects = true;
-            addTreeInputs(b, vendor_wasm, "jaclang/compiler/passes/native/wasm_rt");
+            addTreeInputs(b, vendor_wasm, "jaclang/compiler/backends/native/wasm_rt");
             mk.step.dependOn(&vendor_wasm.step);
             if (link_dir == null) {
                 mk.addArg(b.fmt("--wasm-libc={s}", .{wasm_libc}));
@@ -394,8 +440,12 @@ pub fn build(b: *std.Build) void {
         // The project manifest (version stamped into dist-info) lives at the
         // repo root, one level above this build root.
         mk.addFileInput(.{ .cwd_relative = b.pathFromRoot("../jac.toml") });
-        // The pins (pbs/bun/LLVM) and the tool itself; a bump must repack.
+        // The pins (Python/bun/LLVM) and the tool itself; a bump must repack.
         mk.addFileInput(b.path(pins.PINS_PATH));
+        mk.addFileInput(b.path("bootstrap/python/sources.json"));
+        mk.addFileInput(b.path("bootstrap/python/cpython-sources.txt"));
+        // Repack when any runtime source or recipe changes, even in dev mode.
+        mk.addFileInput(.{ .cwd_relative = b.fmt("{s}/build-key", .{python_dir}) });
         break :payload out;
     };
 
@@ -404,6 +454,9 @@ pub fn build(b: *std.Build) void {
     pack.addFileArg(stub);
     pack.addFileArg(payload);
     const jac = pack.addOutputFileArg("jac");
+    if (stubcat_region) |region| {
+        pack.addFileArg(region);
+    }
     b.getInstallStep().dependOn(&b.addInstallBinFile(jac, "jac").step);
 }
 
@@ -430,18 +483,35 @@ fn addTreeInputs(b: *std.Build, run: *std.Build.Step.Run, sub_path: []const u8) 
 }
 
 fn addTests(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
-    const test_step = b.step("test", "Run the bootstrap unit tests (no network/pbs needed)");
+    const test_step = b.step("test", "Run the bootstrap unit tests (no network or Python needed)");
     const seed_mod = b.createModule(.{
-        .root_source_file = b.path("bootstrap/fetch_pbs.zig"),
+        .root_source_file = b.path("bootstrap/build_python.zig"),
         .target = target,
         .optimize = optimize,
         .link_libc = true,
     });
-    const seed_tests = b.addTest(.{ .name = "fetch-pbs-tests", .root_module = seed_mod });
+    const seed_tests = b.addTest(.{ .name = "build-python-tests", .root_module = seed_mod });
     test_step.dependOn(&b.addRunArtifact(seed_tests).step);
+    const llvm_mod = b.createModule(.{
+        .root_source_file = b.path("bootstrap/fetch_llvm.zig"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
+
+    const ts_mod = b.createModule(.{
+        .root_source_file = b.path("bootstrap/fetch_typeshed.zig"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
+    const llvm_tests = b.addTest(.{ .name = "fetch-llvm-tests", .root_module = llvm_mod });
+    test_step.dependOn(&b.addRunArtifact(llvm_tests).step);
+    const ts_tests = b.addTest(.{ .name = "fetch-typeshed-tests", .root_module = ts_mod });
+    test_step.dependOn(&b.addRunArtifact(ts_tests).step);
 }
 
-/// Map a target to the os-arch token the fetch-pbs subcommand understands,
+/// Map a target to the os-arch token the build-python subcommand understands,
 /// or null for targets we don't ship a binary for yet.
 fn osArchString(t: std.Target) ?[]const u8 {
     return switch (t.os.tag) {
@@ -476,7 +546,7 @@ fn addLlvmShim(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.bu
     if (b.option([]const u8, "shim-bin", "Prebuilt LLVMPY_* shim to bundle (skips the LLVM fetch + link)")) |p| {
         const bin: std.Build.LazyPath = .{ .cwd_relative = p };
         const place = b.addUpdateSourceFiles();
-        place.addCopyFileToSource(bin, b.fmt("jaclang/compiler/passes/native/llvm/{s}", .{shim_file}));
+        place.addCopyFileToSource(bin, b.fmt("jaclang/compiler/backends/native/llvm/{s}", .{shim_file}));
         const jacllvm_step = b.step("jacllvm", "Build the LLVMPY_* shim (jac/native), static-link LLVM, place it in-tree");
         jacllvm_step.dependOn(&b.addInstallLibFile(bin, shim_file).step);
         jacllvm_step.dependOn(&place.step);
@@ -527,7 +597,7 @@ fn addLlvmShim(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.bu
     // fetch-typeshed materializes gitignored stubs into the tree. mkpayload's
     // jaclang copy skips this file (it ships the shim via --shim instead).
     const place = b.addUpdateSourceFiles();
-    place.addCopyFileToSource(bin, b.fmt("jaclang/compiler/passes/native/llvm/{s}", .{shim_file}));
+    place.addCopyFileToSource(bin, b.fmt("jaclang/compiler/backends/native/llvm/{s}", .{shim_file}));
 
     const jacllvm_step = b.step("jacllvm", "Build the LLVMPY_* shim (jac/native), static-link LLVM, place it in-tree");
     jacllvm_step.dependOn(&b.addInstallLibFile(bin, shim_file).step);

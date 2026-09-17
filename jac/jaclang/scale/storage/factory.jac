@@ -1,5 +1,5 @@
 import os;
-import from jaclang.runtimelib.storage { Storage }
+import from jaclang.data.storage { Storage }
 import from jaclang.project.config { get_config }
 import from jaclang.scale.config.firebase_env {
     JAC_STORAGE_FIREBASE_PROJECT_ID_ENV,
@@ -38,15 +38,15 @@ class StorageFactory {
         }
 
         if storage_type == StorageType.LOCAL {
-            import from jaclang.runtimelib.storage { LocalStorage }
-            cfg = config or {};
+            import from jaclang.data.storage { LocalStorage }
+            cfg: dict[str, any] = config or {};
             return LocalStorage(
                 base_path=cfg.get("base_path", "./storage"),
                 create_dirs=cfg.get("create_dirs", True)
             );
         } elif storage_type == StorageType.S3 {
             import from jaclang.scale.storage.s3_storage { S3Storage }
-            cfg = config or {};
+            cfg: dict[str, any] = config or {};
             if not cfg.get("bucket") {
                 raise ValueError("S3 storage requires a 'bucket' configuration.");
             }
@@ -59,7 +59,7 @@ class StorageFactory {
             );
         } elif storage_type in [StorageType.GCS, StorageType.FIREBASE] {
             import from jaclang.scale.storage.gcs_storage { GcsStorage }
-            cfg = config or {};
+            cfg: dict[str, any] = config or {};
             if not cfg.get("bucket") {
                 raise ValueError(
                     "GCS/Firebase storage requires a 'bucket' configuration."

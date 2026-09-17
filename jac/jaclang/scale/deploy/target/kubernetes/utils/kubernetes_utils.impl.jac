@@ -271,7 +271,17 @@ impl cluster_type -> str {
             }
         }
         return 'local';
-    } except Exception {
+    } except ApiException as exc {
+        console.print(
+            f"[warn] could not read cluster nodes to detect the provider "
+            f"(HTTP {exc.status} {exc.reason}). {_LOCAL_FALLBACK_NOTE}"
+        );
+        return 'local';
+    } except Exception as exc {
+        console.print(
+            f"[warn] provider detection failed "
+            f"({type(exc).__name__}: {exc}). {_LOCAL_FALLBACK_NOTE}"
+        );
         return 'local';
     }
 }
@@ -372,7 +382,7 @@ impl privileged_pss_labels(existing: dict[str, str]) -> dict[str, str] | None {
 }
 
 
-impl ensure_namespace_exists(namespace: str) -> None {
+impl ensure_namespace_exists(namespace: str, owner: str) -> None {
     if (namespace == 'default') {
         return;
     }
@@ -381,8 +391,10 @@ impl ensure_namespace_exists(namespace: str) -> None {
         existing_ns = core_v1.read_namespace(name=namespace);
         console.print(f"Namespace '{namespace}' already exists.");
 
-        existing_labels: dict = dict(getattr(existing_ns.metadata, "labels", {}) or {});
-        patch_labels: dict = {};
+        existing_labels: dict[str, any] = dict(
+            getattr(existing_ns.metadata, "labels", {}) or {}
+        );
+        patch_labels: dict[str, any] = {};
         for (label, value) in default_pss_labels().items() {
             if not existing_labels.get(label) {
                 patch_labels[label] = value;
@@ -405,11 +417,15 @@ impl ensure_namespace_exists(namespace: str) -> None {
     } except ApiException as e {
         if (e.status == 404) {
             console.print(f"Namespace '{namespace}' not found. Creating it...");
+            create_labels: dict[str, any] = dict(default_pss_labels());
+            if owner {
+                create_labels[NAMESPACE_OWNER_LABEL] = owner;
+            }
             core_v1.create_namespace(
                 body={
                     'apiVersion': 'v1',
                     'kind': 'Namespace',
-                    'metadata': {'name': namespace, 'labels': default_pss_labels()}
+                    'metadata': {'name': namespace, 'labels': create_labels}
                 }
             );
             console.print(f"Namespace '{namespace}' created successfully.");
@@ -419,15 +435,30 @@ impl ensure_namespace_exists(namespace: str) -> None {
     }
 }
 
+impl namespace_is_owned(core_v1: client.CoreV1Api, namespace: str, owner: str) -> bool {
+    if (namespace == 'default') or not owner {
+        return False;
+    }
+    try {
+        ns = core_v1.read_namespace(name=namespace);
+    } except ApiException as e {
+        if (e.status == 404) {
+            return False;
+        }
+        raise;
+    }
+    labels: dict[str, any] = dict(getattr(ns.metadata, "labels", {}) or {});
+    return labels.get(NAMESPACE_OWNER_LABEL) == owner;
+}
+
+
 impl delete_if_exists(
     delete_func: Callable, name: str, namespace: str, kind: str
 ) -> None {
     try {
         delete_func(name, namespace);
     } except ApiException as e {
-        if (e.status == 404) {
-            ;
-        } else {
+        if (e.status == 404) {} else {
             raise;
         }
     }
