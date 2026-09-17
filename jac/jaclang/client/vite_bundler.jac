@@ -16,7 +16,22 @@ glob logger = logging.getLogger(__name__),
      VITE_READY_PATTERNS = ['ready in', 'local:'],
      VITE_URL_PATTERNS = ['localhost', 'Local:', 'Network:'],
      CONFIG_META_KEYS = frozenset({'extension'}),
-     CLIENT_EVENT_PREFIX = '@@jac-client-event ';
+     CLIENT_EVENT_PREFIX = '@@jac-client-event ',
+     DEV_PROXY_PREFIXES: list[str] = [
+         '/api',
+         '/walker',
+         '/function',
+         '/user',
+         '/introspect',
+         '/static',
+         '/docs',
+         '/openapi.json',
+         '/healthz',
+         '/admin',
+         '/graph',
+         '/redoc',
+         '/assets'
+     ];
 
 def client_deps_stale(build_dir: Path) -> bool;
 
@@ -30,7 +45,8 @@ def _forward_vite_output(
 
 class ViteBundler {
     has dev_server_port: int = 0,
-        on_client_event: any = None;
+        on_client_event: any = None,
+        build_dir: Path | None = None;
 
     def _dispatch_client_event(self: ViteBundler, line: str) -> None;
     def init(
@@ -38,10 +54,12 @@ class ViteBundler {
         project_dir: Path,
         output_dir: Optional[Path] = None,
         minify: bool = False,
-        config_path: Optional[Path] = None
+        config_path: Optional[Path] = None,
+        entry_path: str = ""
     );
 
     def _get_client_dir(self: ViteBundler) -> Path;
+    def _client_app_dir(self: ViteBundler) -> Path;
     def build(self: ViteBundler, entry_file: Optional[Path] = None) -> None;
     def find_bundle(self: ViteBundler) -> Optional[Path];
     def find_css(self: ViteBundler) -> Optional[Path];
@@ -56,16 +74,18 @@ class ViteBundler {
         api_base_url_override: str = "",
         is_dev: bool = False,
         api_port: int = 8000,
-        for_mobile_dev: bool = False,
-        mobile_hmr_host: str = "",
-        mobile_hmr_port: int = 0,
         for_desktop_dev: bool = False,
-        desktop_broker_port: int = 0
+        desktop_broker_port: int = 0,
+        api_paths: (list[str] | None) = None,
+        client_paths: (list[str] | None) = None
     ) -> Path;
 
-    def _format_config_object(self: ViteBundler, config: dict, indent: int = 0) -> str;
+    def _format_config_object(
+        self: ViteBundler, config: dict[str, any], indent: int = 0
+    ) -> str;
+
     def _format_define_entries(
-        self: ViteBundler, api_base_url: str, custom_defines: dict
+        self: ViteBundler, api_base_url: str, custom_defines: dict[str, any]
     ) -> str;
 
     def install_packages(
@@ -90,11 +110,10 @@ class ViteBundler {
         api_base_url: str,
         base_path: str,
         api_port: int = 8000,
-        for_mobile_dev: bool = False,
-        mobile_hmr_host: str = "",
-        mobile_hmr_port: int = 0,
         for_desktop_dev: bool = False,
-        desktop_broker_port: int = 0
+        desktop_broker_port: int = 0,
+        api_paths: (list[str] | None) = None,
+        client_paths: (list[str] | None) = None
     ) -> str;
 
     def create_package_json(

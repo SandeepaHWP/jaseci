@@ -16,7 +16,7 @@ glob RESET: str = "\033[0m",
      BRIGHT_WHITE: str = "\033[97m",
      BRIGHT_BLUE: str = "\033[94m";
 
-glob _ANSI_ROLES: dict = {
+glob _ANSI_ROLES: dict[str, str] = {
          'success': GREEN,
          'error': RED,
          'warning': YELLOW,
@@ -28,7 +28,7 @@ glob _ANSI_ROLES: dict = {
          'bright_white': BRIGHT_WHITE
      };
 
-glob _ANSI_STYLE_TOKENS: dict = {
+glob _ANSI_STYLE_TOKENS: dict[str, str] = {
          'bold': BOLD,
          'dim': DIM,
          'underline': UNDERLINE,
@@ -156,6 +156,7 @@ impl ConsoleRenderer.clear_status -> None {
 }
 
 impl ConsoleRenderer.emit(spans: list[Span], stream: any = None) -> None {
+    self.clear_status();
     out = stream if stream is not None else sys.stdout;
 
     can_style = self.use_color and _stream_is_tty(out);
@@ -178,8 +179,9 @@ impl ConsoleRenderer.emit(spans: list[Span], stream: any = None) -> None {
 }
 
 impl ConsoleRenderer.emit_raw(
-    args: list, stream: any, style: str | None, kwargs: dict
+    args: list[object], stream: any, style: str | None, kwargs: dict[str, any]
 ) -> None {
+    self.clear_status();
     out = stream if stream is not None else sys.stdout;
 
     can_style = self.use_color and _stream_is_tty(out);
@@ -187,7 +189,7 @@ impl ConsoleRenderer.emit_raw(
 
     if sys.platform == 'win32' and not os.environ.get('WT_SESSION') {
         encoding: str = str(out?.encoding or 'cp1252');
-        processed_args: list = [];
+        processed_args: list[object] = [];
         for arg in args {
             if isinstance(arg, str) {
                 try {
@@ -267,7 +269,7 @@ impl ConsoleRenderer.header(title: str, version: str | None = None) -> None {
     }
 }
 
-impl ConsoleRenderer.urls(items: list, symbol: str = '') -> None {
+impl ConsoleRenderer.urls(items: list[tuple[str, str]], symbol: str = '') -> None {
     sym = symbol or ('➜' if self.use_emoji else '>');
     for (label, url) in items {
         padded_label = f"{label}:".ljust(10);
@@ -380,7 +382,7 @@ impl ConsoleRenderer.table(
 }
 
 @contextmanager
-impl ConsoleRenderer.status_ctx(args: list, kwargs: dict) -> object {
+impl ConsoleRenderer.status_ctx(args: list[object], kwargs: dict[str, any]) -> object {
     text = "";
     if args {
         text = args[0] if isinstance(args[0], str) else str(args[0]);
@@ -459,7 +461,7 @@ impl JacConsole.print(*args: any, **kwargs: any) -> None {
     file = kwargs.pop('file', None);
     kwargs.pop('markup', None);
     kwargs.pop('highlight', None);
-    processed: list = [(a.text if isinstance(a, Content) else a) for a in args];
+    processed: list[object] = [(a.text if isinstance(a, Content) else a) for a in args];
     self._renderer.emit_raw(processed, self._resolve_stream(file), style, kwargs);
 }
 
@@ -475,7 +477,6 @@ impl JacConsole.success(message: str, emoji: bool = True) -> None {
 impl JacConsole.error(
     message: str, hint: str | None = None, emoji: bool = True
 ) -> None {
-    self._renderer.clear_status();
     prefix = '✖' if emoji and self.use_emoji else '[ERROR]';
 
     if message.startswith("Error: ") {
@@ -505,7 +506,8 @@ impl JacConsole.print_header(title: str, version: str | None = None) -> None {
 }
 
 impl JacConsole.print_urls(urls: any, symbol: str = '') -> None {
-    items = list(urls.items()) if isinstance(urls, dict) else list(urls);
+    pairs = urls.items() if isinstance(urls, dict) else urls;
+    items: list[tuple[str, str]] = [(str(k), str(v)) for (k, v) in pairs];
     self._renderer.urls(items, symbol);
 }
 
@@ -583,7 +585,7 @@ impl _get_console -> JacConsole {
     return _console_instance;
 }
 
-impl use_line_buffered_output(streams: (list[any] | None) = None) -> int {
+impl use_line_buffered_output(streams: (list[TextIO] | None) = None) -> int {
     targets = streams if streams is not None else [sys.stdout, sys.stderr];
     switched = 0;
     for stream in targets {

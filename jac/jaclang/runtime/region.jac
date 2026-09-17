@@ -1,8 +1,9 @@
 import threading;
+import weakref;
 
 glob _region_tls: any = threading.local();
 
-def _stack -> list {
+def _stack -> list[JacRegion] {
     s = _region_tls?.stack;
     if s is None {
         s = [];
@@ -21,7 +22,7 @@ obj JacRegion {
             c._parent = self;
             return c;
         }
-        out: list = [];
+        out: list[JacRegion] = [];
         for _i in range(n) {
             c = JacRegion();
             c._parent = self;
@@ -61,7 +62,7 @@ obj JacRegion {
         }
         for o in reversed(_pending) {
             try {
-                o.drop();
+                run_drop(o);
             } except Exception {
                 continue;
             }
@@ -89,7 +90,13 @@ def register_drop(item: any) {
     s = _stack();
     if s {
         s[-1]._jac_register(item);
+        item._jac_region = weakref.ref(s[-1]);
     }
+}
+
+def region_of(item: any) -> any {
+    ref = item?._jac_region;
+    return ref() if ref is not None else None;
 }
 
 def instrument_drops(cls: any) {
@@ -99,4 +106,27 @@ def instrument_drops(cls: any) {
         register_drop(inst);
     }
     setattr(cls, "__init__", _region_init);
+    _orig_del: any = cls?.__del__;
+    def _drop_on_release(inst: any) {
+        try {
+            run_drop(inst);
+        } finally {
+            if _orig_del is not None {
+                _orig_del(inst);
+            }
+        }
+    }
+    setattr(cls, "__del__", _drop_on_release);
+}
+
+def run_drop(item: any) {
+    if getattr(item, "_jac_drop_done", False) {
+        return;
+    }
+    drop = item?.drop;
+    if not callable(drop) {
+        return;
+    }
+    item._jac_drop_done = True;
+    drop();
 }

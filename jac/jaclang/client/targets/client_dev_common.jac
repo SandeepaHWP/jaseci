@@ -8,6 +8,8 @@ import from jaclang.cli.console { console }
 import from jaclang.client.targets.build_common { SUBPROCESS_TIMEOUT_SHORT }
 import from jaclang.server.sv_client { headless_start_args }
 import from jaclang.server.watcher { FileChangeEvent }
+import type from jaclang.client.vite_bundler { ViteBundler }
+import type from jaclang.client.compiler { ViteCompiler }
 
 def port_bind_error(port: int) -> Optional[str] {
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM);
@@ -128,7 +130,9 @@ def start_backend_server_common(entry_file: Path, project_dir: Path, port: int) 
     );
 }
 
-def prepare_vite_dev_compilation(project_dir: Path, entry_file: Path) -> tuple {
+def prepare_vite_dev_compilation(
+    project_dir: Path, entry_file: Path
+) -> tuple[ViteBundler, ViteCompiler] {
     import from jaclang.client.vite_bundler { ViteBundler }
     import from jaclang.client.vite_client_bundle { make_client_bundle_builder }
 
@@ -148,11 +152,7 @@ def prepare_vite_dev_compilation(project_dir: Path, entry_file: Path) -> tuple {
         raise RuntimeError("Client compiled directory could not be resolved");
     }
     compiled_dir.mkdir(parents=True, exist_ok=True);
-    (_, mod, _) = compiler.jac_compiler.compile_module(entry_file);
-    if not mod {
-        raise RuntimeError(f"Failed to compile client entry module: {entry_file}");
-    }
-    compiler.compile(mod, entry_file);
+    compiler.compile(None, entry_file);
     console.print("  ✔ Client modules compiled for dev mode", style="success");
     return (bundler, compiler);
 }
@@ -174,20 +174,41 @@ obj _ClientHmrHandler {
                 return;
             }
             invalidate_runtime_module_cache([pth, str(self.entry_file)]);
-            compile_out = cast(
-                any, self.compiler.jac_compiler.compile_module(self.entry_file)
-            );
-            mod2 = compile_out[1];
-            if not mod2 {
-                return;
-            }
-            self.compiler.compile(mod2, self.entry_file);
+            self.compiler.compile(None, self.entry_file);
             console.print("  ✔ Client recompiled after save", style="success");
         } except Exception as e {
             console.error(f"  HMR recompile failed: {e}");
         }
     }
 }
+
+def dev_proxy_paths(
+    project_dir: Path, entry_file: Path
+) -> tuple[list[str], list[str]] {
+    import from jaclang.client.vite_bundler { DEV_PROXY_PREFIXES }
+    import from jaclang.jac0core.ext_registry { base_stem }
+    try {
+        import from jaclang.runtime.prepared { prepared_manifest }
+        if prepared_manifest(str(entry_file)) is None {
+            import from jaclang.compiler.driver.application { prepare_application }
+            import from jaclang.runtime.runtime { JacRuntime as Jac }
+            prepare_application(str(entry_file), Jac.get_program(), str(project_dir));
+        }
+        import from jaclang.server.server { ModuleIntrospector }
+        introspector = ModuleIntrospector(
+            module_name=base_stem(entry_file.name), base_path=str(project_dir)
+        );
+        introspector.load();
+        return (
+            introspector.declared_api_paths(),
+            introspector.client_claimed_paths(DEV_PROXY_PREFIXES)
+        );
+    } except Exception as e {
+        console.warning(f"Could not resolve dev proxy paths: {e}");
+        return ([], []);
+    }
+}
+
 
 def invalidate_runtime_module_cache(paths: list[str]) -> None {
     try {
@@ -234,7 +255,8 @@ def stop_dev_watcher(watcher: any) {
 }
 
 def terminate_dev_processes(
-    processes: list[any], timeout: int = SUBPROCESS_TIMEOUT_SHORT
+    processes: list[subprocess.Popen[bytes] | None],
+    timeout: int = SUBPROCESS_TIMEOUT_SHORT
 ) {
     for p in processes {
         if not p {

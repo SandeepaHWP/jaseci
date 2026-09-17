@@ -3,6 +3,7 @@ import from jaclang.comptime { module_of }
 
 comptime import from jaclang.cli.commands.analysis {
     SPEC_CHECK,
+    SPEC_EXPLAIN,
     SPEC_FORMAT,
     SPEC_GEN_PARSER,
     SPEC_PRECOMMIT,
@@ -10,6 +11,7 @@ comptime import from jaclang.cli.commands.analysis {
 }
 comptime import from jaclang.cli.commands.browse { SPEC_BROWSE }
 comptime import from jaclang.cli.commands.build { SPEC_BUILD }
+comptime import from jaclang.cli.commands.cache { SPEC_CACHE }
 comptime import from jaclang.cli.commands.code { SPEC_CODE }
 comptime import from jaclang.cli.commands.config { SPEC_CONFIG }
 comptime import from jaclang.cli.commands.db { SPEC_DB }
@@ -17,7 +19,6 @@ comptime import from jaclang.cli.commands.execution { SPEC_RUN, SPEC_X }
 comptime import from jaclang.cli.commands.fix { SPEC_FIX }
 comptime import from jaclang.cli.commands.guide { SPEC_GUIDE }
 comptime import from jaclang.cli.commands.mcp { SPEC_MCP_CMD }
-comptime import from jaclang.cli.commands.nacompile { SPEC_NACOMPILE }
 comptime import from jaclang.cli.commands.precompile { SPEC_PRECOMPILE }
 comptime import from jaclang.cli.commands.project {
     SPEC_CLEAN,
@@ -51,11 +52,13 @@ comptime VERB_BUDGET: int = 26,
          "dev": "jac run --dev",
          "bundle": "jac build [--as jab|sealed|binary|wheel|npm]",
          "eject": "jac build --as source",
+         "nacompile": "jac build <file.jac> --native [--memory managed|rc|nogc] [--lib]",
          "js": "jac tool jac2js <file>",
          "jac2py": "jac tool jac2py <file>",
          "py2jac": "jac tool py2jac <file>",
          "jac2js": "jac tool jac2js <file>",
          "grammar": "jac tool grammar",
+         "purge": "jac cache purge",
          "destroy": "jac scale destroy <file.jac>",
          "status": "jac scale status <file.jac>"
      },
@@ -68,7 +71,7 @@ comptime VERB_BUDGET: int = 26,
          "config": "Configuration",
          "build": "Build",
          "db": "Database",
-         "microservices": "Microservices",
+         "fleet": "Microservices",
          "general": "General"
      },
      GROUP_ORDER: list[str] = [
@@ -80,7 +83,7 @@ comptime VERB_BUDGET: int = 26,
          "config",
          "build",
          "db",
-         "microservices",
+         "fleet",
          "general"
      ],
      TIER_SECTIONS: dict[str, str] = {
@@ -97,6 +100,7 @@ comptime def _route(spec: CommandSpec) -> CommandSpec {
 comptime ROUTES: list[CommandSpec] = [
          _route(SPEC_BROWSE),
          _route(SPEC_BUILD),
+         _route(SPEC_CACHE),
          _route(SPEC_CHECK),
          _route(SPEC_CLEAN),
          _route(SPEC_CODE),
@@ -105,6 +109,7 @@ comptime ROUTES: list[CommandSpec] = [
          _route(SPEC_CREATE),
          _route(SPEC_DB),
          _route(SPEC_DOT),
+         _route(SPEC_EXPLAIN),
          _route(SPEC_FIX),
          _route(SPEC_FORMAT),
          _route(SPEC_GEN_PARSER),
@@ -113,7 +118,6 @@ comptime ROUTES: list[CommandSpec] = [
          _route(SPEC_LSP),
          _route(SPEC_MCP_CMD),
          _route(SPEC_MODEL),
-         _route(SPEC_NACOMPILE),
          _route(SPEC_PRECOMMIT),
          _route(SPEC_PRECOMPILE),
          _route(SPEC_REMOVE),
@@ -151,6 +155,11 @@ with entry {
     ) , "a command names a tier that TIER_SECTIONS does not know";
     comptime assert all([r.group in GROUP_DISPLAY for r in ROUTES]) , "a command names a group that GROUP_DISPLAY does not know";
     comptime assert all([r.handler_module and r.handler_name for r in ROUTES]) , "a command spec has no handler";
+    comptime assert not [
+        r.name
+        for r in ROUTES
+        if len({a.dest or a.name for a in r.args}) != len(r.args)
+    ] , "a command declares two arguments that bind the same name.";
 }
 
 def get_command_meta(name: str) -> CommandSpec | None;

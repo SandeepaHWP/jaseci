@@ -353,18 +353,10 @@ impl DocIRGenPass.exit_name with uni.Name exit {
         return;
     }
     name_text = f"`{here.value}" if here.is_kwesc else here.value;
-    by_kids = [
-        k
-        for k in here.kid
-        if (isinstance(k, uni.Token) and (k.name == Tok.KW_BY))
-    ];
+    by_kids = [here->:Kid:->[?:uni.Token, name==Tok.KW_BY]];
     by_kid = by_kids[0] if by_kids else None;
     if by_kid is not None {
-        semi_kids = [
-            k
-            for k in here.kid
-            if isinstance(k, uni.Semi)
-        ];
+        semi_kids = [here->:Kid:->[?:uni.Semi]];
         semi_kid = semi_kids[0] if semi_kids else None;
         parts: list[doc.DocType] = [
             by_kid.gen.doc_ir,
@@ -833,6 +825,9 @@ impl DocIRGenPass.exit_filter_compr with uni.FilterCompr exit {
     for i in here.kid {
         if isinstance(i, uni.Token) and i.name == Tok.COMMA {
             parts.append(doc.Text(", "));
+        } elif isinstance(i, uni.CompareExpr)
+            and any(op.value in ("in", "not in", "is", "is not") for op in i.ops) {
+            parts.append(i.gen.doc_ir);
         } else {
             parts.append(self.remove_all_spaces(i.gen.doc_ir));
         }
@@ -905,8 +900,14 @@ impl DocIRGenPass.exit_connect_op with uni.ConnectOp exit {
 
 impl DocIRGenPass.exit_visit_stmt with uni.VisitStmt exit {
     parts: list[doc.DocType] = [];
-    for i in here.kid {
-        if (isinstance(i, uni.Token) and (i.name == Tok.SEMI)) {
+    for (idx, i) in enumerate(here.kid) {
+        if (isinstance(i, uni.Token) and (i.name == Tok.COLON)) {
+            parts.pop();
+            parts.append(i.gen.doc_ir);
+            if idx != 1 {
+                parts.append(self.space());
+            }
+        } elif (isinstance(i, uni.Token) and (i.name == Tok.SEMI)) {
             parts.pop();
             parts.append(i.gen.doc_ir);
             parts.append(self.space());
@@ -1396,6 +1397,10 @@ impl DocIRGenPass.exit_try_stmt with uni.TryStmt exit {
     here.gen.doc_ir = self.format_simple_stmt_with_body(here, here.body);
 }
 
+impl DocIRGenPass.exit_awaiting_clause with uni.AwaitingClause exit {
+    here.gen.doc_ir = self.format_simple_stmt_with_body(here, here.body);
+}
+
 impl DocIRGenPass.exit_iter_for_stmt with uni.IterForStmt exit {
     here.gen.doc_ir = self.format_simple_stmt_with_body(here, here.body);
 }
@@ -1585,6 +1590,35 @@ impl DocIRGenPass.exit_dict_val with uni.DictVal exit {
 
 impl DocIRGenPass.exit_list_val with uni.ListVal exit {
     here.gen.doc_ir = self.format_comma_collection(here);
+}
+
+impl DocIRGenPass.exit_graph_expr with uni.GraphExpr exit {
+    parts: list[doc.DocType] = [];
+    for (index, child) in enumerate(here.kid[2:-1]) {
+        if isinstance(child, uni.Expr) {
+            parts.extend([self.line(), child.gen.doc_ir]);
+            following = here.kid[index + 3];
+            if not (isinstance(following, uni.Token) and following.name == Tok.SEMI) {
+                parts.append(self.text(";"));
+            }
+        } else {
+            parts.append(child.gen.doc_ir);
+        }
+    }
+    here.gen.doc_ir = self.group(
+        self.concat(
+            [
+                here.kid[0].gen.doc_ir,
+                self.space(),
+                here.kid[1].gen.doc_ir,
+                self.indent(self.concat(parts), ast_node=here),
+                self.line(),
+                here.kid[-1].gen.doc_ir
+            ],
+            ast_node=here
+        ),
+        ast_node=here
+    );
 }
 
 impl DocIRGenPass.exit_atom_trailer with uni.AtomTrailer exit {
@@ -2463,7 +2497,7 @@ impl DocIRGenPass._assign_space_group(nd: uni.UniNode) -> None {
 }
 
 impl DocIRGenPass._assign_operator_chain(
-    nd: uni.UniNode, operands: list, ops: list
+    nd: uni.UniNode, operands: list[uni.UniNode], ops: list[uni.UniNode]
 ) -> None {
     rest: list[doc.DocType] = [];
     for i in range(len(ops)) {
@@ -2665,6 +2699,12 @@ impl DocIRGenPass.break_parent -> doc.BreakParent {
     return doc.BreakParent();
 }
 
+impl DocIRGenPass.doc_ir_default_exit with uni.UniNode exit {
+    if (here.gen._doc_ir is None) and here.kid {
+        self._assign_space_group(here);
+    }
+}
+
 impl DocIRGenPass.finish_doc_comments with uni.UniNode exit {
     if here.gen.doc_comments is not None {
         self._wrap_doc_comments(here);
@@ -2673,7 +2713,7 @@ impl DocIRGenPass.finish_doc_comments with uni.UniNode exit {
 
 impl DocIRGenPass._comment_is_live(c: uni.CommentToken) -> bool {
     if self._live_comment_ids is None {
-        src = self.ir_in.source if isinstance(self.ir_in, uni.Module) else None;
+        src = self.module.source if isinstance(self.module, uni.Module) else None;
         self._live_comment_ids = {id(lc) for lc in (src.comments if src else [])};
     }
     return id(c) in self._live_comment_ids;

@@ -8,7 +8,6 @@ import from jaclang.scale.deploy.target.kubernetes.kubernetes_config {
 import from jaclang.scale.deploy.target.kubernetes.utils.kubernetes_utils {
     COMPANION_DEFS,
     create_k8s_secret,
-    ensure_namespace_exists,
     get_cluster_provider,
     resize_pvc_if_needed
 }
@@ -22,14 +21,14 @@ import from jaclang.scale.config.config_loader { get_scale_config }
 import from jaclang.scale.deploy.database.kubernetes_postgres {
     KubernetesPostgresProvider
 }
-import from jaclang.scale.deploy.target.kubernetes.monitoring { MonitoringDeployer }
 import from jaclang.scale.deploy.target.kubernetes.ingress { IngressDeployer }
+import from jaclang.scale.models.deploy_context { DATABASE_URL_ENV }
 
 obj KubernetesTargetBase(DeploymentTarget) {
     has config: KubernetesConfig,
         logger: (Logger | None) = None,
         k8s_config: KubernetesConfig postinit,
-        env_list: list = [],
+        env_list: list[any] = [],
         secrets: dict[str, str] = {},
         env: dict[str, str] = {},
         events: EventSink = NoopSink(),
@@ -55,7 +54,8 @@ obj KubernetesTargetBase(DeploymentTarget) {
 
     def _owner_labels -> dict[str, str] {
         return {
-            str(k): str(v) for (k, v) in dict(self.k8s_config.labels or {}).items()
+            str(k): str(v)
+            for (k, v) in dict[str, any](self.k8s_config.labels or {}).items()
         };
     }
 
@@ -131,7 +131,7 @@ obj KubernetesTargetBase(DeploymentTarget) {
             );
             self.env_list.append(
                 {
-                    'name': 'JAC_DB_URL',
+                    'name': DATABASE_URL_ENV,
                     'valueFrom': {
                         'secretKeyRef': {
                             'name': external_secret_name,
@@ -147,7 +147,7 @@ obj KubernetesTargetBase(DeploymentTarget) {
         );
         self.env_list.append(
             {
-                'name': 'JAC_DB_URL',
+                'name': DATABASE_URL_ENV,
                 'valueFrom': {
                     'secretKeyRef': {
                         'name': pg_result['secret']['metadata']['name'],
@@ -471,7 +471,7 @@ obj KubernetesTargetBase(DeploymentTarget) {
         }
     }
 
-    def get_full_status(app_name: str) -> dict {
+    def get_full_status(app_name: str) -> dict[str, any] {
         try {
             self._load_cluster_config();
             apps_v1 = client.AppsV1Api();
@@ -546,7 +546,7 @@ obj KubernetesTargetBase(DeploymentTarget) {
             }
         }
 
-        component_defs = [
+        component_defs: list[dict[str, any]] = [
             {'k8s_name': app_name + d[0], 'display': d[1], 'is_sts': d[2]}
             for d in COMPANION_DEFS
         ];

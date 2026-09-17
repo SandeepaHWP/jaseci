@@ -1,27 +1,25 @@
-import sys;
+import from jaclang.compiler.driver.pipeline_types { AnalysisFact }
+import type from jaclang.compiler.types.stubcat.reader { StubCatalog }
 import types;
 import from threading { Event }
 import jaclang.compiler.frontend.unitree as uni;
 import from jaclang.compiler.frontend.relations { ScopeChild }
 import from jaclang.compiler.driver.compile_options { CompileOptions }
-import from jaclang.compiler.passes.transform { Alert }
+import from jaclang.compiler.passes.context { Alert }
 import from jaclang.compiler.driver.progstate {
     AnalysisCaches,
     BuildScratch,
     DepGraph,
     DiagLedger,
-    ModuleHub
+    ModuleHub,
+    unit_collect_budget
 }
+import type from jaclang.compiler.frontend.codeinfo { ClientArtifact }
 import type from jaclang.compiler.types.type_evaluator { TypeEvaluator }
 import type from jaclang.compiler.driver.compiler { JacCompiler }
-import type from jaclang.compiler.driver.mtp { Info }
-import type from jaclang.compiler.passes.transform { Transform }
+import type from jaclang.runtime.semantic { Info }
 
-with entry {
-    if sys.getrecursionlimit() < 12000 {
-        sys.setrecursionlimit(12000);
-    }
-}
+import type from jaclang.compiler.driver.compilation_context { SourceStore }
 
 class JacProgram {
     has hub: ModuleHub,
@@ -36,18 +34,26 @@ class JacProgram {
         mtir_map: dict[(str, Info)],
         type_evaluator: TypeEvaluator | None,
         _compiler: JacCompiler | None,
-        _iface: any;
+        _iface: any,
+        source_store: SourceStore,
+        context_root: JacProgram | None,
+        context_key: str,
+        contexts: dict[str, JacProgram];
 
     def init(self: JacProgram, main_mod: (uni.ProgramModule | None) = None) -> None;
     def _get_compiler(self: JacProgram) -> JacCompiler;
     def iface_registry(self: JacProgram) -> any;
     def get_type_evaluator(self: JacProgram) -> TypeEvaluator;
-    def stub_catalog(self: JacProgram) -> any;
+    def stub_catalog(self: JacProgram) -> StubCatalog | None;
     def clear_type_system(self: JacProgram, clear_hub: bool = False) -> None;
-    def release_compile_closure(self: JacProgram, collect: bool = True) -> None;
+    def release_compile_closure(
+        self: JacProgram, collect: bool = True, retain_stubs: bool = True
+    ) -> None;
+
     def release_native_dep_units(self: JacProgram) -> None;
     def release_check_caches(self: JacProgram) -> None;
     def hub_cache_stamp(self: JacProgram, resolved_path: str) -> None;
+    def install_module(self: JacProgram, resolved_path: str, mod: uni.Module) -> None;
     def is_hub_entry_fresh(self: JacProgram, resolved_path: str) -> bool;
     def record_dependency(
         self: JacProgram, importer_path: str, target_path: str
@@ -71,6 +77,10 @@ class JacProgram {
     def _search_hubs(self: JacProgram) -> list[dict[(str, uni.Module)]];
     def find_module(self: JacProgram, path: str) -> (uni.Module | None);
     def get_bytecode(self: JacProgram, full_target: str) -> (types.CodeType | None);
+    def get_client_artifact(
+        self: JacProgram, full_target: str
+    ) -> (ClientArtifact | None);
+
     def parse_str(
         self: JacProgram,
         source_str: str,
@@ -95,7 +105,7 @@ class JacProgram {
     def run_schedule(
         self: JacProgram,
         mod: uni.Module,
-        passes: list[type[Transform]],
+        passes: list[type],
         cancel_token: (Event | None) = None
     ) -> None;
 
