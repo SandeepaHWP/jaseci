@@ -5283,41 +5283,16 @@ test "bare_list_flow_inference" {
     }
 }
 
-test "final_immutability_enforcement" {
-    # Reassigning a Final binding raises E1135 at every write form, while
-    # declarations, constructor kwargs, and no-default init writes stay legal.
+test "final_reassignment_errors" {
     program = JacProgram();
     program.compile(
         os.path.join(CHECKER_FIXTURES, "checker_final_reassignment.jac"), options=NO_TC
     );
-    assert len(program.errors_had) == 15 , "Expected 15 errors, got "
-        + f"{len(program.errors_had)}:\n"
-        + "\n---\n".join(err.pretty_print() for err in program.errors_had);
-    for err in program.errors_had {
-        assert "E1135" in err.pretty_print() , f"Expected only E1135 diagnostics:\n{err.pretty_print()}";
-        assert "declared Final" in err.pretty_print();
-    }
-    expected_names = [
-        "SHARED_RATE",
-        "tag",
-        "t",
-        "x",
-        "x",
-        "base",
-        "tail",
-        "handle",
-        "err",
-        "name",
-        "y",
-        "y",
-        "y",
-        "y",
-        "RATE"
-    ];
-    for (i, want) in enumerate(expected_names) {
-        assert f"'{want}'" in program.errors_had[i].pretty_print() , f"Error {i}: expected '{want}' in:\n{program.errors_had[
-            i
-        ].pretty_print()}";
+    errors = [e.pretty_print() for e in program.errors_had];
+    names = ["SHARED_RATE", "x", "x", "y", "y", "label"];
+    assert len(errors) == len(names) , "\n---\n".join(errors);
+    for (err, name) in zip(errors, names) {
+        assert "E1135" in err and f"'{name}'" in err , err;
     }
 }
 

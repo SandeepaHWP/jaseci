@@ -386,9 +386,11 @@ impl TypeEvaluator._ts_synth_class_types(
                     );
                 }
             }
-            is_readonly = all(m.readonly and not m.is_method for m in group);
+            immutability = ImmutabilityKind.READONLY
+                if all(m.readonly and not m.is_method for m in group)
+                else ImmutabilityKind.NONE;
             self._install_synth_member(
-                scope, synth_src, mname, member_type, readonly=is_readonly
+                scope, synth_src, mname, member_type, immutability
             );
         }
         if decl.call_sig is not None {
@@ -428,7 +430,7 @@ impl TypeEvaluator._install_synth_member(
     synth_src: Source,
     mname: str,
     member_type: TypeBase,
-    readonly: bool = False
+    immutability: ImmutabilityKind = ImmutabilityKind.NONE
 ) -> None {
     field_node = Name(
         orig_src=synth_src,
@@ -443,9 +445,7 @@ impl TypeEvaluator._install_synth_member(
     );
     field_node.type = member_type;
     _field_sym = Symbol(defn=field_node, access=SymbolAccess.PUBLIC, parent_tab=scope);
-    _field_sym.immutability = (
-        ImmutabilityKind.READONLY if readonly else ImmutabilityKind.NONE
-    );
+    _field_sym.immutability = immutability;
     scope.adopt_primary(_field_sym, mname);
 }
 

@@ -227,14 +227,12 @@ walker TypeCheckPass(TreeWalker) {
     can exit_impl_def with ImplDef exit;
     can exit_sub_tag with SubTag exit;
     def _eval_unpacking_names(container: Expr) -> None;
-    def _check_immutable_write(target: Expr) -> None;
-    def _emit_immutable_write(sym: Symbol, site: UniNode, name: str) -> None;
-    def _in_owner_initializer(target: AtomTrailer, decl_node: UniNode) -> bool;
-    def _check_immutable_rebind(
-        scope_node: UniScopeNode, target: (Expr | None)
+    def _write_leaves(target: (Expr | None)) -> list[Expr];
+    def _check_immutable_write(
+        target: (Expr | None), rebind_scope: (UniScopeNode | None) = None
     ) -> None;
 
-    def _immutable_origin(sym: Symbol) -> Symbol;
+    def _is_initializer_write(target: Expr, decl_sym: Symbol) -> bool;
     def _body_always_returns(body: list[CodeBlockStmt]) -> bool;
     def _check_bare_generic(
         ann_node: UniNode,

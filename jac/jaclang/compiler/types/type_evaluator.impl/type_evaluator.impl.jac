@@ -2346,24 +2346,30 @@ impl TypeEvaluator._widen_literal_for_declaration(ty: TypeBase) -> TypeBase {
     return ty;
 }
 
-impl TypeEvaluator._apply_final_qualifier(
-    annotation_type: TypeBase, symbol: (Symbol | None)
-) -> (TypeBase | None) {
-    if (
-        self.prefetch is None
+impl TypeEvaluator._as_final_form(ty: TypeBase) -> (ClassType | None) {
+    if self.prefetch is None
         or self.prefetch.final_class is None
-        or not isinstance(annotation_type, ClassType)
-        or not annotation_type.shared.same_class(self.prefetch.final_class.shared)
-    ) {
-        return annotation_type;
+        or not isinstance(ty, ClassType)
+        or not ty.shared.same_class(self.prefetch.final_class.shared) {
+        return None;
+    }
+    return ty;
+}
+
+impl TypeEvaluator._final_declared_type(
+    annotation_type: TypeBase, symbol: (Symbol | None), value: (Expr | None)
+) -> (TypeBase | None) {
+    final_form = self._as_final_form(annotation_type);
+    if final_form is None {
+        return None;
     }
     if symbol is not None {
         symbol.immutability = ImmutabilityKind.FINAL;
     }
-    if annotation_type.private.type_args {
-        return annotation_type.private.type_args[0];
+    if value is not None and not final_form.private.type_args {
+        return self.get_type_of_expression(value);
     }
-    return None;
+    return self._convert_to_instance(final_form);
 }
 
 impl TypeEvaluator._get_type_of_symbol(symbol: Symbol) -> TypeBase {
@@ -2598,14 +2604,12 @@ impl TypeEvaluator._get_type_of_symbol_decl(
                         node_.parent.type_tag.tag
                     );
 
-                    stripped = self._apply_final_qualifier(annotation_type, symbol);
-                    if stripped is None {
-                        if node_.parent.value is not None {
-                            return self.get_type_of_expression(node_.parent.value);
-                        }
-                        return UnknownType();
+                    if final_type
+                        := self._final_declared_type(
+                            annotation_type, symbol, node_.parent.value
+                        ) {
+                        return final_type;
                     }
-                    annotation_type = stripped;
 
                     if (
                         self._is_type_alias_annotation(
@@ -2654,16 +2658,13 @@ impl TypeEvaluator._get_type_of_symbol_decl(
                     annotation_type = self.get_type_of_expression(
                         node_.parent.parent.type_tag.tag
                     );
-                    stripped = self._apply_final_qualifier(annotation_type, symbol);
-                    if stripped is None {
-                        if node_.parent.parent.value is not None {
-                            return self.get_type_of_expression(
-                                node_.parent.parent.value
-                            );
-                        }
-                        return UnknownType();
+                    if final_type
+                        := self._final_declared_type(
+                            annotation_type, symbol, node_.parent.parent.value
+                        ) {
+                        return final_type;
                     }
-                    return self._convert_to_instance(stripped);
+                    return self._convert_to_instance(annotation_type);
                 } else {
                     if node_.parent.parent.value is not None {
                         return self._widen_literal_for_declaration(
@@ -2739,14 +2740,13 @@ impl TypeEvaluator._get_type_of_symbol_decl(
         case HasVar():
             if node_.type_tag is not None {
                 annotation_type = self.get_type_of_expression(node_.type_tag.tag);
-                stripped = self._apply_final_qualifier(annotation_type, symbol);
-                if stripped is None {
-                    if node_.value is not None {
-                        return self.get_type_of_expression(node_.value);
-                    }
-                    return UnknownType();
+                if final_type
+                    := self._final_declared_type(
+                        annotation_type, symbol, node_.value
+                    ) {
+                    return final_type;
                 }
-                return self._convert_to_instance(stripped);
+                return self._convert_to_instance(annotation_type);
             } else {
                 if node_.value is not None {
                     return self.get_type_of_expression(node_.value);

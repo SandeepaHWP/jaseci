@@ -130,18 +130,10 @@ impl TypeEvaluator._build_field_params(
             if has_var.type_tag {
                 var_type_expr = has_var.type_tag.tag;
                 type_cls = self.get_type_of_expression(var_type_expr);
-                stripped = self._apply_final_qualifier(type_cls, has_var.name.sym);
-                if stripped is None {
-                    if has_var.value is not None {
-                        param_type = self._convert_to_instance(
-                            self.get_type_of_expression(has_var.value)
-                        );
-                    } else {
-                        param_type = AnyType();
-                    }
-                } else {
-                    param_type = self._convert_to_instance(stripped);
-                }
+                param_type = self._final_declared_type(
+                    type_cls, has_var.name.sym, has_var.value
+                )
+                    or self._convert_to_instance(type_cls);
             }
             initialization = field_initialization(has_var);
             if skip_deferred and not initialization.participates_in_init {
@@ -655,16 +647,9 @@ impl TypeEvaluator._synthesize_enum_metaclass_attr(
 }
 
 impl TypeEvaluator._convert_to_instance(jtype: TypeBase) -> TypeBase {
-    if (
-        self.prefetch is not None
-        and self.prefetch.final_class is not None
-        and isinstance(jtype, ClassType)
-        and jtype.shared.same_class(self.prefetch.final_class.shared)
-    ) {
-        if jtype.private.type_args {
-            return self._convert_to_instance(jtype.private.type_args[0]);
-        }
-        return UnknownType();
+    if final_form := self._as_final_form(jtype) {
+        type_args = final_form.private.type_args;
+        return self._convert_to_instance(type_args[0]) if type_args else UnknownType();
     }
     return convert_to_instance(jtype);
 }

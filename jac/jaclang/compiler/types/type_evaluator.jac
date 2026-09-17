@@ -476,7 +476,7 @@ walker TypeEvaluator {
         synth_src: Source,
         mname: str,
         member_type: TypeBase,
-        readonly: bool = False
+        immutability: ImmutabilityKind = ImmutabilityKind.NONE
     ) -> None;
 
     def _ts_synth_class_types(
@@ -586,8 +586,9 @@ walker TypeEvaluator {
 
     def _get_type_of_symbol(symbol: Symbol) -> TypeBase;
     def _get_type_of_symbol_decl(symbol: Symbol, decl: NameAtom) -> TypeBase;
-    def _apply_final_qualifier(
-        annotation_type: TypeBase, symbol: (Symbol | None)
+    def _as_final_form(ty: TypeBase) -> (ClassType | None);
+    def _final_declared_type(
+        annotation_type: TypeBase, symbol: (Symbol | None), value: (Expr | None)
     ) -> (TypeBase | None);
 
     def _get_enum_member_type_for_decl(node_: Name) -> (EnumMemberType | None);
