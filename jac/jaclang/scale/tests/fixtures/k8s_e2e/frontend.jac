@@ -14,9 +14,9 @@ def:pub app -> any {
         authPassword: str = "",
         error: str = "",
         loading: bool = False,
-        products: list = [],
-        cart: dict = {},
-        orders: list = [],
+        products: list[any] = [],
+        cart: any = {},
+        orders: list[any] = [],
         currentView: str = "products";
 
     can with entry {
@@ -35,7 +35,7 @@ def:pub app -> any {
         }
     }
 
-    async def apiCall(service: str, endpoint: str, body: dict = {}) -> any;
+    async def apiCall(service: str, endpoint: str, body: dict[str, any] = {}) -> any;
     async def fetchProducts -> None;
     async def addToCart(productId: str, name: str, price: float) -> None;
     async def fetchCart -> None;
@@ -258,7 +258,7 @@ def:pub app -> any {
                                 </button>
                             </div>
                         )
-                            if cart.items and cart.items.length > 0
+                            if cart.items and len(cart.items) > 0
                             else <p style={{"color": "#888", "textAlign": "center"}}>
                                 Cart is empty
                             </p>}
@@ -291,7 +291,7 @@ def:pub app -> any {
                                 No orders yet
                             </p>
                         )
-                            if orders.length == 0
+                            if len(orders) == 0
                             else None}
                     </div>
                 )

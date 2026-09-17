@@ -1,17 +1,83 @@
 import ctypes;
-import from jaclang.runtimelib.test { parametrize }
+import from jaclang.testing.test { parametrize }
 import from jaclang.compiler.tests.xbackend_equiv {
     run_with_both,
     run_py_fixture,
     compile_fixture_to_js,
     run_js_function,
     compile_native,
+    compile_native_errors,
     get_func,
     compare_results
 }
+import from jaclang.compiler.backends.native.lowering { native_lowering_issues }
 
 # (case, fixture, py fn, cl fn, na fn, [backends that must run])
-glob EQUIV_CASES: list[tuple] = [
+"""Rows `prim_str`'s native lane does not produce yet.
+
+Declared here rather than absorbed silently: `run_with_both` compares the
+intersection of the two lanes' keys, so a lane that returns fewer rows used to
+narrow the comparison without saying so. Every name below is a string method
+the native lane has no lowering for; deleting one from this list is how the
+suite starts covering it, and the harness fails if a name here is one the
+lane now produces.
+"""
+glob STR_NA_GAPS: list[any] = [
+         "casefold",
+         "enc1",
+         "enc2",
+         "endswith_f",
+         "endswith_t",
+         "eq_f",
+         "eq_t",
+         "et1",
+         "et2",
+         "et3",
+         "fm1",
+         "fm2",
+         "fmt_pos_args",
+         "fmt_repeat",
+         "fmt_single",
+         "ge",
+         "gt",
+         "isalnum_t",
+         "isalpha_f",
+         "isalpha_t",
+         "isascii_t",
+         "isdecimal_f",
+         "isdecimal_t",
+         "isdigit_f",
+         "isdigit_t",
+         "isidentifier_f",
+         "isidentifier_t",
+         "islower_f",
+         "islower_t",
+         "isnumeric_empty",
+         "isnumeric_f",
+         "isnumeric_t",
+         "isprintable_t",
+         "isspace_f",
+         "isspace_t",
+         "isupper_f",
+         "isupper_t",
+         "join",
+         "le",
+         "ljust",
+         "lstrip",
+         "lt",
+         "mod1",
+         "mod2",
+         "ne_t",
+         "replace",
+         "rfind",
+         "rjust",
+         "rstrip",
+         "split",
+         "startswith_f",
+         "startswith_t",
+         "tr1"
+     ],
+     EQUIV_CASES: list[tuple[any, ...]] = [
          ("int", "prim_int.jac", "int_py", "int_cl", "int_na"),
          (
              "dict ctor",
@@ -46,7 +112,7 @@ glob EQUIV_CASES: list[tuple] = [
              "complex_ops_cl",
              "complex_ops_na"
          ),
-         ("str", "prim_str.jac", "str_py", "str_cl", "str_na", ["na"]),
+         ("str", "prim_str.jac", "str_py", "str_cl", "str_na", ["na"], STR_NA_GAPS),
          (
              "string escapes",
              "cl_string_escapes.jac",
@@ -570,17 +636,31 @@ glob EQUIV_CASES: list[tuple] = [
              "hetero_na",
              ["na"]
          ),
+         (
+             "sort key str comparator",
+             "prim_sort_key.jac",
+             "sort_key_py",
+             "sort_key_cl",
+             "sort_key_na",
+             ["na"]
+         ),
 
      ];
 
-def _equiv_case(row: tuple) {
+def _equiv_case(row: tuple[any, ...]) {
     require = row[5] if len(row) > 5 else [];
-    run_with_both(row[1], row[2], row[3], row[4], require=require);
+    waived = row[6] if len(row) > 6 else None;
+    run_with_both(
+        row[1], row[2], row[3], row[4], require=require, allow_missing=waived
+    );
 }
 
 with entry {
     parametrize(
-        "prim equivalence", EQUIV_CASES, _equiv_case, id_fn=lambda (c: tuple) { c[0]; }
+        "prim equivalence",
+        EQUIV_CASES,
+        _equiv_case,
+        id_fn=lambda (c: tuple[any, ...]) { c[0]; }
     );
 }
 
@@ -611,6 +691,56 @@ test "bundled shutil" {
     );
 }
 
+test "native sort never silently orders object-returning keys" {
+    # Node values lower to bare i8*, the same LLVM type as raw string
+    # data. The checker's call overloads reject a non-comparable key
+    # type, and the native sort gate (semantic return type -> E5092)
+    # independently refuses one before emitting comparisons (#9144).
+    errors = compile_native_errors("prim_sort_key_object.jac");
+    assert len(errors) > 0 , "object-returning sort key compiled silently";
+    assert any("No matching overload" in e or "E5092" in e for e in errors) , (
+        f"object-returning sort key must be rejected: {errors}"
+    );
+}
+
+test "native gradual object keys demote, never pointer-sort (#9158)" {
+    # A `-> any` key slips the checker's overloads, so only the native
+    # gate sees the danger: the erased i8* is indistinguishable from
+    # string data, and object pointers must never reach strcmp. The
+    # function demotes to its Python implementation instead, while a
+    # semantic `-> str` key in the same module stays natively lowered.
+    (eng, na_ir) = compile_native("prim_sort_key_gradual.jac");
+    llvm_txt = str(na_ir.gen.llvm_ir);
+    issues = native_lowering_issues(llvm_txt);
+    demoted = [
+        i
+        for i in issues
+        if "grad_obj_na" in i.symbol
+    ];
+    assert len(demoted) == 1 , (
+        f"gradual object key function should demote exactly once: {issues}"
+    );
+    assert "orderable key values" in demoted[0].detail , demoted[0].detail;
+    kept = [
+        i
+        for i in issues
+        if "grad_str_na" in i.symbol
+    ];
+    assert len(kept) == 0 , f"semantic str key must lower natively: {kept}";
+    assert "__jac_str_cmp" in llvm_txt , "str-key control should use the semantic string comparator";
+    assert "strcmp" not in llvm_txt , "no raw pointer may reach libc strcmp (#9158)";
+}
+
+test "annotated block lambda tails are type-checked (#9158)" {
+    # The checker skipped the tails of block-bodied lambdas entirely, so a
+    # tail violating the declared return type went undiagnosed and the
+    # native sort backend saw no semantic key type at all.
+    errors = compile_native_errors("prim_lambda_bad_tail.jac");
+    assert any(
+        "Cannot return tuple[str, int], expected tuple[int, int]" in e for e in errors
+    ) , (f"mismatching lambda tail must be diagnosed: {errors}");
+}
+
 test "native call resolves bundled stdlib signature, not typeshed (#7037)" {
     (eng, _) = compile_native("bundled_stdlib_sig.jac");
     pos = get_func(eng, "dumps_pos_len", ctypes.c_int64);
@@ -621,6 +751,21 @@ test "native call resolves bundled stdlib signature, not typeshed (#7037)" {
     assert kw_len == 4 , f"keyword dumps len {kw_len}";
 }
 
+test "native call fills omitted defaults from the bundled stdlib signature" {
+    (eng, _) = compile_native("bundled_stdlib_defaults.jac");
+    adler = get_func(eng, "adler32_default_seed", ctypes.c_int64);
+    hex_len = get_func(eng, "token_hex_default_len", ctypes.c_int64);
+    adler_val = adler();
+    hex_val = hex_len();
+    assert adler_val == 103547413 , (
+        f"adler32(b'hello') with the default seed: na={adler_val}, CPython=103547413 "
+        f"(a zero-filled seed gives 103219732)"
+    );
+    assert hex_val == 64 , (
+        f"token_hex() with the default nbytes=32: na={hex_val} chars, CPython=64"
+    );
+}
+
 test "exception hierarchy" {
     py_result = run_py_fixture("prim_exceptions", "exceptions_py");
     try {
@@ -628,7 +773,7 @@ test "exception hierarchy" {
         compare_results(
             py_result, run_js_function(js_code, "exceptions_cl"), "exceptions [ES]"
         );
-    } except Exception { }
+    } except Exception {}
 }
 
 test "runtime error hierarchy" {
@@ -640,7 +785,7 @@ test "runtime error hierarchy" {
             run_js_function(js_code, "runtime_errors_cl"),
             "runtime_errors [ES]"
         );
-    } except Exception { }
+    } except Exception {}
 }
 
 """exception basic catch"""

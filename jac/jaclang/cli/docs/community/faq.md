@@ -6,18 +6,20 @@ Answers to common questions about Jac, organized by topic. Click a category to e
 
 ??? "Getting Started & Setup"
 
-    ??? question "I updated to the latest Jac toolchain and my project won't `jac start` properly."
-        Run `jac purge` to clear the global bytecode cache. This is the recommended approach after upgrading packages:
+    ??? question "I updated to the latest Jac toolchain and my project won't `jac run` properly."
+        Clear the project cache, then the global per-user cache. This is the recommended approach after upgrading packages:
         ```bash
-        jac purge
+        jac clean --cache
         ```
 
-        This command works even when the cache is corrupted. If `jac purge` is not available (older versions), manually clear the cache:
+        If the problem persists, clear the machine-wide cache with `jac cache`. `jac cache status` shows every bucket (compiled modules, fused runtimes, app images, toolchains, and so on) with its size; `jac cache purge --bucket jir-modules` clears just the compiled modules, and `jac cache purge` clears every managed bucket:
+        ```bash
+        jac cache status
+        jac cache purge --bucket jir-modules
+        jac cache purge
         ```
-        Linux:   rm -rf ~/.cache/jac/bytecode/
-        macOS:   rm -rf ~/Library/Caches/jac/bytecode/
-        Windows: rmdir /s /q %LOCALAPPDATA%\jac\cache\bytecode
-        ```
+
+        The cache lives at `~/.cache/jac` on Linux, `~/Library/Caches/jac` on macOS and `%LOCALAPPDATA%\jac\cache` on Windows (`JAC_CACHE_HOME` or `XDG_CACHE_HOME` relocate it). It is also collected on its own: every bucket has a retention policy, and `jac cache gc` runs them on demand.
 
     ??? question "What do I need to install to get started with Jac?"
         See the [Installation Guide](../quick-guide/install.md)
@@ -97,7 +99,7 @@ Answers to common questions about Jac, organized by topic. Click a category to e
 ??? "Production & Deployment"
 
     ??? question "How do I deploy a Jac app to production?"
-        - [Local Deployment](../tutorials/production/local.md): `jac start` creates an HTTP API server.
+        - [Local Deployment](../tutorials/production/local.md): `jac run` creates an HTTP API server.
         - [Kubernetes Deployment](../tutorials/production/kubernetes.md): Deploy with a single command.
 
     ??? question "Do I need Docker/Kubernetes knowledge to deploy with scale?"
@@ -115,10 +117,10 @@ Answers to common questions about Jac, organized by topic. Click a category to e
         The one-line installer downloads the self-contained native `jac` binary -- it does not install anything into a Python environment, so `pip show` and `pip list` have nothing to find. Use `jac --version` to confirm the installed version.
 
     ??? question "`jac clean --all` says 'No jac.toml found'."
-        `jac clean --all` (and the project-level cleanup flags it implies) needs a Jac project -- a directory with a `jac.toml`. Plain `jac clean` (no flags) only clears the local `.jac/data/` directory, but `--all`, `--cache`, and `--packages` operate on project artifacts and require the project root. If you're running standalone `.jac` scripts outside a project, delete the data directory manually: `rm -rf .jac/`. To create a project, run `jac create <name>`.
+        `jac clean --all` (and the project-level cleanup flags it implies) needs a Jac project -- a directory with a `jac.toml`. Plain `jac clean` (no flags) only clears the local `.jac/data/` directory, but `--all`, `--cache`, and `--packages` operate on project artifacts and require the project root. These commands remove project directories; they do not reset an external or embedded Postgres database. For an invalid reference, inspect the selected store with `jac db status` and follow `jac guide jac-debugging` before deleting data. To create a project, run `jac create <name>`.
 
-    ??? question "I see 'Address already in use' when running `jac start`."
-        Another process is using the port (default 8000). Either stop the other process or use a different port: `jac start --port 3000`.
+    ??? question "I see 'Address already in use' when running `jac run`."
+        Another process is using the port (default 8000). Either stop the other process or use a different port: `jac run --port 3000`.
 
     ??? question "My frontend shows data but fields are empty or undefined."
         When returning node objects directly from `def:pub` endpoints, use `jid(node)` to access the node's unique identity. For reliable client-side access, return explicit dictionaries from your endpoints:

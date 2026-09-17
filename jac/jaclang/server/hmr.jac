@@ -1,0 +1,65 @@
+import threading;
+import type from jaclang.compiler.passes.context { Alert }
+import type from jaclang.client.client_diagnostics { ClientDiagnostic }
+import from pathlib { Path }
+import type from jaclang.server.watcher { JacFileWatcher, FileChangeEvent, ChangeType }
+
+import from jaclang.server.build_status { BuildStatus, BuildMonitor }
+
+obj HotReloader {
+    has base_path: str,
+        module_name: str,
+        watcher: any,
+        entry_path: str = "",
+        client_compiler: any = None,
+        _client_output_dir: str = ".jac/client/compiled",
+        _running: bool = False,
+        _build_status: BuildStatus = BuildStatus.OK,
+        _diagnostics: list[ClientDiagnostic] = [],
+        _vite_diagnostics: list[ClientDiagnostic] = [],
+        _client_diagnostics: list[ClientDiagnostic] = [],
+        _runtime_diagnostics: list[ClientDiagnostic] = [],
+        _reload_nonce: int = 0;
+
+    static has _build_lock: threading.Lock = threading.Lock();
+
+    def start -> None;
+    def stop -> None;
+    def on_file_change(event: any) -> None;
+    def build_status -> dict[str, any];
+    def diagnostics -> list[ClientDiagnostic];
+    def attach_client_bundler(bundler: any) -> None;
+    def record_client_event(slot: str, payload: (dict[str, any] | None)) -> None;
+    def record_ok -> None;
+    def record_error(
+        file_path: str,
+        message: str,
+        alerts: (list[Alert] | None) = None,
+        line: int = 0,
+        column: int = 0
+    ) -> None;
+
+    def _process_change(file_path: str, is_directory: bool = False) -> None;
+    def _dispatch_change(file_path: str, is_directory: bool = False) -> None;
+    def _reload_server_module(file_path: str) -> None;
+    def _recompile_client_code(
+        file_path: str, visited: set | None = None, force: bool = True
+    ) -> None;
+
+    def _recompile_client_unified(file_path: str) -> None;
+    def _client_js_path(file_path: str) -> (Path | None);
+    def _extract_js_exports(js_path: Path) -> set[str];
+    def _signal_full_reload -> None;
+    def _remove_compiled_output(file_path: str) -> None;
+    def _remove_compiled_dir(file_path: str) -> None;
+    def _refresh_routing(file_path: str) -> None;
+    def _tracked_wasm_module(file_path: str) -> bool;
+    def _reemit_native_wasm(file_path: str) -> None;
+    def _entry_module_path -> Path;
+    def _status_file_path -> Path;
+    def _sync_status_file -> None;
+    def _classify_declarations(file_path: str) -> tuple[bool, bool, bool];
+    def _path_to_module(file_path: str) -> str;
+    def _get_js_filename(file_path: str) -> str;
+    def _copy_frontend_files(file_path: str) -> None;
+}

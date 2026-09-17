@@ -141,7 +141,7 @@ glob smart_model   = Model(model_name="gpt-4o");
 glob summarizer    = Model(model_name="claude-sonnet-4-6");
 
 def quick_label(text: str) -> str by fast_model();
-def deep_analyze(text: str) -> dict by smart_model();
+def deep_analyze(text: str) -> dict[str, any] by smart_model();
 def tldr(article: str) -> str by summarizer();
 ```
 
@@ -165,7 +165,7 @@ def tldr(article: str) -> str by summarizer();
 | `ca_bundle` | str/bool | SSL certificate path, `True` for default, `False` to skip verification |
 | `api_key` | str | API key (alternative to constructor parameter) |
 | `verbose` | bool | Enable verbose/debug logging |
-| `outputs` | list | Mock responses for `MockLLM` testing |
+| `outputs` | list | Replies for `Model(model_name="mockllm")`, see [Testing with MockLLM](#testing-with-mockllm) |
 
 **Example with config:**
 
@@ -494,6 +494,7 @@ max_output_retries = 3            # Retries for structured output (0 = disabled)
 local_cost_map = true             # Use local cost map
 drop_params = true                # Drop unsupported params per provider
 debug = false                     # Enable verbose LiteLLM logging
+include_cost_in_streaming_usage = true  # Let LiteLLM compute cost on streaming usage chunks
 
 [byllm.fallback]
 strategy = "fallback"             # Default ModelPool routing strategy
@@ -539,6 +540,7 @@ compaction_model       = ""       # Empty = copy of the active model; set to use
 | `local_cost_map` | bool | `true` | Use local cost map instead of fetching from remote |
 | `drop_params` | bool | `true` | Silently drop parameters unsupported by the chosen provider |
 | `debug` | bool | `false` | Enable verbose LiteLLM logging (HTTP requests, retries, headers). When `false`, LiteLLM's internal loggers are silenced. Exceptions are always logged via byLLM's own logger regardless of this setting |
+| `include_cost_in_streaming_usage` | bool | `true` | Let LiteLLM compute `cost` on a streamed usage chunk itself, from its own full response context, instead of byLLM recomputing it afterward from a bare `{model, usage}` shape. Has no effect below litellm 1.75.2, where the underlying flag doesn't exist |
 
 **`[byllm.parallel]` options:**
 
@@ -919,7 +921,7 @@ sem analyze_code.code = "The source code to analyze";
 sem analyze_code.language = "Programming language (python, javascript, etc.)";
 sem analyze_code.return = "A structured analysis with issues and suggestions";
 
-def analyze_code(code: str, language: str) -> dict by llm;
+def analyze_code(code: str, language: str) -> dict[str, any] by llm;
 ```
 
 ### Complex Semantic Types
@@ -1019,6 +1021,10 @@ def my_hook(ctx: IterationContext) -> IterationAction {
     if ctx.total_tokens > 10000 {
         return IterationAction.ABORT_WITH_SUMMARY;
     }
+    # Or gate on real cost directly, e.g. against a per-user credit balance
+    if ctx.total_cost > 0.50 {
+        return IterationAction.ABORT_WITH_SUMMARY;
+    }
     return IterationAction.CONTINUE;
 }
 
@@ -1036,6 +1042,7 @@ def agent_task(question: str) -> str by llm(
 | `last_tool` | str | Name of the last tool executed |
 | `last_result` | str | Truncated result of last tool (500 chars) |
 | `total_tokens` | int | Cumulative token usage across all iterations |
+| `total_cost` | float | Cumulative real cost (USD) across all iterations, summed from the same per-call cost `usage`/`usage_step` report |
 | `messages` | list | Full message history |
 
 **`IterationAction`** values:
@@ -1301,7 +1308,7 @@ glob llm = Model(model_name="gpt-4o", ctx_window=128000);
 Replace the built-in summarisation with your own logic by passing `on_compaction`. The hook receives the full serialised message list and `keep_recent`, and must return the compacted list:
 
 ```jac
-def my_compactor(messages: list, keep_recent: int) -> list {
+def my_compactor(messages: list[any], keep_recent: int) -> list[any] {
     # messages[0] = system, messages[1] = original user task - always preserve
     # messages[2:] = tool-call history to summarise
     summary = my_domain_summariser(messages[2:]);
@@ -1486,7 +1493,8 @@ delta from a stream that replaced an abandoned one.
 | `thought` | LLM produced reasoning text before a tool call | `content` (str), `iteration` (int) |
 | `steps_done` | ReAct loop finished, final answer next | `iterations` (int), `reason` (str): `"max_iterations"`, `"aborted"`, or `"aborted_with_summary"` |
 | `chunk` | One token of the final streamed answer | `content` (str) |
-| `usage` | All LLM calls complete (always the last event) | `total` (dict), `per_call` (list[dict]) |
+| `usage_step` | A single LLM call finished (tool-calling invocations only; see [Per-Call Usage](#per-call-usage)) | Same shape as `usage`, scoped to that one call |
+| `usage` | All LLM calls complete (always the last event) | `total` (dict), `by_kind` (dict), `per_call` (list[dict]), `requests` (int) |
 
 **Importing `StreamEvent`:**
 
@@ -1521,25 +1529,54 @@ with entry {
 }
 ```
 
+`usage` fires exactly once per invocation, even with no measurable tokens (`total`/`per_call` are then empty). A single invocation with tools can make several calls, not just the ones you asked for - each `per_call` entry carries a `call_kind` to tell them apart, and `event.data["by_kind"]` gives the same totals pre-grouped:
+
+| `call_kind` | When it happens |
+|---|---|
+| `react_iteration` | A normal turn of the ReAct loop - the calls you actually asked for |
+| `final_answer_restream` | byLLM re-asking the model to reproduce its already-known answer as a stream, once tool calls are done |
+| `recovery` | byLLM re-prompting after the model skipped `finish_tool` on a structured/typed call |
+| `compaction` | The summarisation call that shrinks message history when auto-compaction fires |
+
+```jac
+with entry {
+    if event.event_type == "usage" {
+        print(event.data["requests"]);        # total LLM calls this invocation made
+        print(event.data["by_kind"]);         # e.g. {"react_iteration": {...}, "final_answer_restream": {...}}
+    }
+}
+```
+
+### Per-Call Usage
+
+`usage_step` fires once per individual LLM call instead of waiting for the whole invocation - same shape as `usage`, so the same parsing code handles both. Useful for tracking spend while a multi-call tool-using turn is still running:
+
+```jac
+with entry {
+    running_total = 0;
+    for event in my_agent("...") {
+        if event.event_type == "usage_step" {
+            running_total += event.data["total"].get("total_tokens", 0);
+            if running_total > budget {
+                break;
+            }
+        }
+    }
+}
+```
+
+Only fires for tool-calling invocations. A single-call invocation still emits one `usage_step` carrying the same numbers as the final `usage` event - don't sum both. See also `IterationContext.total_cost` (in [Interrupting the ReAct Loop](#interrupting-the-react-loop)) to gate the *next* call instead of reacting to a stream event.
+
 #### Cache tokens
 
-When [prompt caching](#project-configuration) is active (automatic for Claude models), each `per_call` dict also carries the provider's cache counters. Read them to measure your cache hit rate:
+`cache_read_input_tokens` and `cache_creation_input_tokens` are always present on every `per_call` entry, normalized to the same field names across providers - `0` when [prompt caching](#project-configuration) isn't active or unsupported, the real count otherwise:
 
 ```jac
 with entry {
     for event in my_agent("...") {
         if event.event_type == "usage" {
             input_tokens = int(event.data["total"].get("prompt_tokens", 0));
-            cached = 0;
-            for call in event.data["per_call"] {
-                # Anthropic reports `cache_read_input_tokens`; OpenAI nests the
-                # count under `prompt_tokens_details.cached_tokens`.
-                cached += int(
-                    call.get("cache_read_input_tokens", 0)
-                    or (call.get("prompt_tokens_details") or {}).get("cached_tokens", 0)
-                    or 0
-                );
-            }
+            cached = int(event.data["total"].get("cache_read_input_tokens", 0));
             if input_tokens > 0 {
                 print(f"Cache hit rate: {round(cached / input_tokens * 100, 1)}%");
             }
@@ -2025,69 +2062,65 @@ def get_product(prompt: str) -> Product by llm(stream=True);
 
 ## Testing with MockLLM
 
-Use `MockLLM` for deterministic testing without API calls. Mock responses are returned sequentially from the `outputs` list:
+`MockLLM` stands in for the model provider, so tests run without API keys. It replaces only the network call: byLLM still builds the real request and parses the reply, so a test catches a broken prompt, schema or parser as well as a changed answer.
 
 ```jac
 import from jaclang.byllm.lib { MockLLM }
 
-glob llm = MockLLM(
-    model_name="mockllm",
-    config={
-        "outputs": ["Mocked response 1", "Mocked response 2"]
-    }
-);
+enum Priority { LOW = "low", HIGH = "high" }
+
+glob llm = MockLLM(outputs=["Bonjour", Priority.HIGH]);
 
 def translate(text: str) -> str by llm();
-def summarize(text: str) -> str by llm();
+def triage(ticket: str) -> Priority by llm();
 
-test "translate returns first mock" {
-    result = translate("Hello");
-    assert result == "Mocked response 1";
-}
-
-test "summarize returns second mock" {
-    result = summarize("Long text...");
-    assert result == "Mocked response 2";
+test "outputs come back typed, and the request is recorded" {
+    assert translate("Hello") == "Bonjour";
+    assert triage("Login is down") == Priority.HIGH;
+    assert "Hello" in str(llm.sent("messages")[0]);
+    assert llm.exhausted();
 }
 ```
 
-`MockLLM` is useful for:
+Outputs are consumed in order, one per model call, so a tool loop takes one per step. `llm.seen` holds every request, `llm.sent(key)` one field across them (`"messages"`, `"tools"`, `"response_format"`), and `llm.seen_prompts` the prompt text of each call. `model_name` defaults to `mockllm`, and `config={"outputs": [...]}` still works in place of `outputs=`.
 
-- Unit testing LLM-powered functions without API costs
-- Deterministic assertions on function behavior
-- CI/CD pipelines where API keys aren't available
+#### What each output becomes
 
-#### Injecting usage metadata (for compaction tests)
+| Entry in `outputs` | What the model sends |
+|---|---|
+| a string | that text; for a non-`str` return it is the answer when the return type allows a string (a union with `str`, an optional `str`, a string enum), otherwise it is parsed like real model text |
+| any other value: a number, an enum member, an object, a list | that value as the typed answer, encoded the way a model sends it (enums by value) |
+| `MockToolCall(tool=fn, args={...})` | a tool call; `tool` is the function or its name, resolved against the tools the call offers, as for a real model |
+| a list of `MockToolCall` | several tool calls in one turn |
+| `MockRawResponse(content=..., tool_calls=[...], usage=..., finish_reason=...)` | one full turn as the provider sends it; `content` alone is delivered verbatim |
+| `MockError(error=..., content="", after=0)` | the provider raising `error`; on a stream, `content` arrives first and the error fires after `after` chunks |
+| `(entry, usage_dict)` | the entry, with token usage attached |
 
-Each entry in `outputs` may be a `(payload, usage_dict)` tuple to inject token-usage metadata. This lets you test threshold-based auto-compaction without a real model:
+#### Token usage (for compaction tests)
+
+A `(entry, usage)` tuple attaches token usage to any entry, which is enough to drive threshold-based compaction:
 
 ```jac
 import from jaclang.byllm.lib { MockLLM, MockToolCall }
 
 def step_a -> str { return "a"; }
-def finish_tool(final_output: str) -> str { return final_output; }
 
 glob llm = MockLLM(
-    model_name="mockllm",
     ctx_window=1000,
-    config={"outputs": [
+    outputs=[
         # (tool_call, usage) - triggers compaction at 85 % of 1000 tokens
         (MockToolCall(tool=step_a, args={}), {"prompt_tokens": 850, "total_tokens": 950}),
-        # plain entry - no usage injection, loop exits via finish_tool
-        MockToolCall(tool=finish_tool, args={"final_output": "done"})
-    ]}
+        # plain entry - the loop exits through byLLM's finish tool
+        MockToolCall(tool="finish_tool", args={"final_output": "done"})
+    ]
 );
+
+def task(goal: str) -> str by llm(tools=[step_a]);
 ```
 
-Non-tuple entries behave exactly as before - usage defaults to `{}`.
+#### Malformed output and errors
 
-#### Simulating raw model text and errors
-
-A plain string or a pre-built typed instance in `outputs` is returned verbatim, which is fine for happy-path tests but skips byLLM's parsing. To exercise the real parse and retry path (for example to test [typed-output retry](#typed-output-retry)), use these wrappers:
-
-- **`MockRawResponse(content=...)`** routes the text through `parse_response` exactly like a real model: valid JSON parses to the typed object, malformed JSON raises `OutputConversionError` (triggering a retry), and an empty string is returned as-is.
-- **`MockError(error=...)`** raises the wrapped exception when dispatched, to verify that errors which are not `OutputConversionError` propagate without retry.
-- **`MockLLM.seen_prompts`** records the prompt (joined message contents) seen on each dispatch, so a test can assert how many attempts ran and inspect the corrective feedback between them.
+`MockRawResponse` sends text verbatim, so malformed JSON goes through [typed-output retry](#typed-output-retry) exactly as a real model's reply would. `MockError` raises from the provider: timeouts, connection errors and 5xx responses are retried as in production, and anything else propagates.
 
 ```jac
 import from jaclang.byllm.lib { MockLLM, MockRawResponse }
@@ -2099,11 +2132,10 @@ obj Person {
 
 # First response is malformed JSON (triggers a retry); the second parses cleanly.
 glob llm = MockLLM(
-    model_name="mockllm",
-    config={"outputs": [
+    outputs=[
         MockRawResponse(content="{\"name\": \"Ada\", \"age\":"),
         MockRawResponse(content="{\"name\": \"Ada\", \"age\": 36}")
-    ]}
+    ]
 );
 
 def get_person -> Person by llm();
@@ -2116,7 +2148,7 @@ test "malformed output is retried and recovered" {
 }
 ```
 
-To cap or disable retries in a test, pass `max_output_retries` on the by-expression, e.g. `by llm(max_output_retries=1)` (a bare `by llm()` resets call params, so set it there rather than on the constructor).
+In a test, set the retry count on the call, `by llm(max_output_retries=1)`: a bare `by llm()` resets call params, so a value set on the constructor does not survive.
 
 ---
 
@@ -2218,10 +2250,11 @@ Each callback receives a dict with these fields:
 | `latency_ms` | `float` | Wall-clock time for the invocation in milliseconds |
 | `status` | `str` | `"success"` or `"error"` |
 | `error` | `str \| None` | Error message if status is `"error"` (truncated to 1000 chars) |
+| `tokens` | `dict` | Same shape as the `usage` `StreamEvent` (see [Usage Tracking](#usage-tracking)); covers every invocation shape, streaming or not |
 
 ### Combining with LiteLLM Per-Call Logging
 
-For full observability (tokens, cost, per-call breakdowns), combine the byLLM agent callback with a [litellm CustomLogger](https://docs.litellm.ai/docs/observability/custom_callback#custom-callback-class). The agent callback fires once per `by llm()` invocation, while the litellm callback fires for each underlying LLM API call (including tool-use round-trips).
+The `tokens` field above covers per-invocation totals with no extra wiring. For raw per-underlying-API-call records instead, combine the byLLM agent callback with a [litellm CustomLogger](https://docs.litellm.ai/docs/observability/custom_callback#custom-callback-class): the agent callback fires once per `by llm()` invocation, the litellm callback fires for each underlying API call.
 
 ```jac
 import litellm;
@@ -2368,7 +2401,7 @@ For virtual key generation, see [LiteLLM Virtual Keys](https://docs.litellm.ai/d
 
 ### Enabling Telemetry in LiteLLM Proxy Server
 
-When serving with the built-in scale subsystem (`jac start`), LLM telemetry is automatically enabled. The server registers both a **litellm CustomLogger** (for per-call token/cost tracking) and a **byLLM agent callback** (for per-invocation metadata), then exposes REST endpoints for querying the collected data.
+When serving with the built-in scale subsystem (`jac run`), LLM telemetry is automatically enabled. The server registers both a **litellm CustomLogger** (for per-call token/cost tracking) and a **byLLM agent callback** (for per-invocation metadata), then exposes REST endpoints for querying the collected data.
 
 The telemetry endpoints are:
 

@@ -1,6 +1,6 @@
 # Installation and First Run
 
-Get Jac installed and ready to use in under 2 minutes.
+Install Jac, verify the version, and run a first program. Download and setup time depend on your platform and connection.
 
 ---
 
@@ -24,6 +24,16 @@ Pass flags after `--` to customize the install:
 curl -fsSL https://raw.githubusercontent.com/jaseci-labs/jaseci/main/scripts/install.sh | bash -s -- --version 0.34.1
 ```
 
+**Experimental JacPython compiler:**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jaseci-labs/jaseci/main/scripts/install.sh | bash -s -- --jacpython
+```
+
+Releases with both variants default to stock CPython. `--jacpython` selects the
+binary containing the native JacPython compiler and can be combined with
+`--version`. The selected release must carry a `-jacpython` asset for your platform.
+
 **Uninstall:**
 
 ```bash
@@ -33,11 +43,12 @@ curl -fsSL https://raw.githubusercontent.com/jaseci-labs/jaseci/main/scripts/ins
 | Flag | Description |
 |------|-------------|
 | `--version V` | Install a specific release version |
+| `--jacpython` | Select the experimental JacPython binary |
 | `--uninstall` | Remove Jac |
 
 ### Upgrading
 
-Re-run the install command to upgrade to the latest version. The installer replaces the binary in place.
+Re-run the install command to upgrade to the latest version. The installer replaces the binary in place. Include `--jacpython` on each install to keep that variant; omit it to return to the default binary.
 
 ---
 
@@ -84,8 +95,8 @@ The `jac` binary bundles every capability -- the AI (byLLM), MCP, full-stack cli
 jac install byllm
 
 # The MCP server and the production deployment & scaling subsystem ship built
-# into the jac binary (no install): run `jac mcp`, and use `jac start` /
-# `jac start --scale`. Scale's optional deps install per-project via jac.toml.
+# into the jac binary (no install): run `jac mcp`, and use `jac run` /
+# `jac scale deploy`. Scale's optional deps install per-project via jac.toml.
 ```
 
 The MCP server for AI-assisted Jac development is built into the binary -- run `jac mcp` directly, no install needed (see [Agent Skills and MCP](../reference/agent-skills-and-mcp.md)).
@@ -93,7 +104,7 @@ The MCP server for AI-assisted Jac development is built into the binary -- run `
 `jac install` resolves packages from PyPI into your project environment; jaclang itself is provided by the binary, so it is never reinstalled. See [One Binary, Build Anything](one-binary.md) for the full picture of what the binary bundles, and the [CLI reference](../reference/cli/index.md#jac-install) for all options.
 
 !!! note "Deployment & scaling is built in"
-    Production serving and Kubernetes deployment (`jac start`, `jac start --scale`) ship inside the `jac` binary as the built-in `scale` subsystem -- there is no separate `jac-scale` package to install. Scale's optional heavier dependencies (MongoDB, Redis, Kubernetes, Prometheus, ...) are pulled into your project on demand: declare the matching `[scale.*]` config in `jac.toml`, then run `jac install` to resolve them into `.jac/venv`.
+    Production serving and Kubernetes deployment (`jac run`, `jac scale deploy`) ship inside the `jac` binary as the built-in `scale` subsystem -- there is no separate `jac-scale` package to install. Scale's optional heavier dependencies (Kubernetes, Prometheus, OpenTelemetry, ...) are pulled into your project on demand: declare the matching `[scale.*]` config in `jac.toml`, then run `jac install` to resolve them into `.jac/venv`.
 
 ---
 
@@ -190,11 +201,11 @@ The full-stack client framework ships with `jaclang` core, so you can scaffold a
 jac create example --kind web-app
 cd example
 jac install
-jac start
+jac run
 ```
 
 !!! note
-    `main.jac` is the default entry point. All `jac start` commands in this guide omit the filename. If your entry point has a different name (e.g., `app.jac`), pass it explicitly: `jac start app.jac`.
+    `main.jac` is the default entry point. All `jac run` commands in this guide omit the filename. If your entry point has a different name (e.g., `app.jac`), pass it explicitly: `jac run app.jac`.
 
 This creates a project with a Jac backend and a React frontend, ready to go at `http://localhost:8000`.
 
@@ -208,7 +219,7 @@ This creates a project with a Jac backend and a React frontend, ready to go at `
 jac create my-todo --use https://raw.githubusercontent.com/jaseci-labs/jacpacks/main/multi-user-todo-app/multi-user-todo-app.jacpack
 cd my-todo
 jac install
-jac start
+jac run
 ```
 
 Want to try one with AI built in? The `multi-user-todo-meals-app` uses Jac's AI integration features to generate smart shopping lists with costs and nutritional info. It works out of the box with an Anthropic API key:
@@ -218,7 +229,7 @@ export ANTHROPIC_API_KEY="your-key-here"
 jac create meals-app --use https://raw.githubusercontent.com/jaseci-labs/jacpacks/main/multi-user-todo-meals-app/multi-user-todo-meals-app.jacpack
 cd meals-app
 jac install
-jac start
+jac run
 ```
 
 To use any of the other jacpacks, just swap the URL:
@@ -255,7 +266,7 @@ jac create my-app --kind web-static
 
 # Start the development server
 cd my-app
-jac start
+jac run
 ```
 
 The `web-static` kind sets up a complete project with:

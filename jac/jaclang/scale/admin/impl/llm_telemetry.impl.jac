@@ -3,10 +3,11 @@ import threading;
 import time;
 import uuid;
 import from collections { OrderedDict }
-import from jaclang.runtimelib.serving.datatypes { Request }
-import from jaclang.runtimelib.serving.datatypes { JSONResponse }
-import from jaclang.runtimelib.transport { TransportResponse, Meta }
-import from jaclang.runtimelib.serving.endpoint {
+import from jaclang.server.serving.datatypes { Request }
+import from jaclang.server.serving.datatypes { JSONResponse }
+import from jaclang.server.transport { TransportResponse, Meta }
+import from jaclang.server.server { JsonValue }
+import from jaclang.server.serving.endpoint {
     HTTPMethod,
     JEndPoint,
     APIParameter,
@@ -67,23 +68,23 @@ obj Trace {
     has invocation_id: str = "",
         parent_invocation_id: str | None = None,
         caller_name: str = "unknown",
-        caller_args: dict = {},
+        caller_args: dict[str, JsonValue] = {},
         model: str = "unknown",
         user_prompt: str = "",
         agent_response: str = "",
-        conversation_history: list = [],
+        conversation_history: list[JsonValue] = [],
         total_latency_ms: float = 0,
         total_tokens: int = 0,
         total_cost: float = 0.0,
         llm_call_count: int = 0,
-        llm_calls: list = [],
+        llm_calls: list[LLMCallRecord] = [],
         status: str = "in_progress",
         error: str | None = None,
         completed: bool = False,
         timestamp: float = 0;
 
-    def to_dict(include_detail: bool = False) -> dict[str, any] {
-        result = {
+    def to_dict(include_detail: bool = False) -> dict[str, JsonValue] {
+        result: dict[str, JsonValue] = {
             "invocation_id": self.invocation_id,
             "parent_invocation_id": self.parent_invocation_id,
             "caller_name": self.caller_name,
@@ -105,7 +106,7 @@ obj Trace {
             "timestamp": self.timestamp
         };
         if include_detail {
-            safe_history: (list | str) = self.conversation_history;
+            safe_history: (list[JsonValue] | str) = self.conversation_history;
             try {
                 json_module.dumps(safe_history);
             } except (TypeError, ValueError) {
@@ -301,7 +302,7 @@ obj TelemetryStore {
         status: str | None = None,
         caller: str | None = None,
         root_only: bool = False
-    ) -> dict {
+    ) -> dict[str, any] {
         with self._lock {
             all_traces: list[Trace] = list(reversed(self._traces.values()));
             for t in all_traces {
@@ -388,7 +389,7 @@ obj TelemetryStore {
                 }
 
                 child_traces = children_lookup.get(invocation_id, []);
-                enriched_children: list = [];
+                enriched_children: list[dict[str, any]] = [];
                 for ct in child_traces {
                     self._backfill_streaming_response(ct);
                     cd = ct.to_dict(include_detail=True);
@@ -423,7 +424,7 @@ obj TelemetryStore {
         }
     }
 
-    def get_summary -> dict {
+    def get_summary -> dict[str, any] {
         with self._lock {
             traces_list = list(self._traces.values());
             if not traces_list {
@@ -505,7 +506,7 @@ obj TelemetryStore {
         }
     }
 
-    def get_available_filters -> dict {
+    def get_available_filters -> dict[str, any] {
         with self._lock {
             models = list(
                 set(
@@ -559,13 +560,14 @@ impl JacAPIServerLLMTelemetry.register_llm_telemetry_endpoints -> None {
 
             def log_success_event(
                 self: JacLLMLogger,
-                kwargs: dict,
+                kwargs: dict[str, any],
                 response_obj: any,
                 start_time: any,
                 end_time: any
             ) {
                 try {
-                    slp = kwargs.get("standard_logging_object", {}) or {};
+                    slp: dict[str, any] = kwargs.get("standard_logging_object", {})
+                        or {};
                     metadata = kwargs.get("litellm_params", {}).get("metadata", {})
                         or {};
                     self.store.record_llm_event(
@@ -594,13 +596,14 @@ impl JacAPIServerLLMTelemetry.register_llm_telemetry_endpoints -> None {
 
             def log_failure_event(
                 self: JacLLMLogger,
-                kwargs: dict,
+                kwargs: dict[str, any],
                 response_obj: any,
                 start_time: any,
                 end_time: any
             ) {
                 try {
-                    slp = kwargs.get("standard_logging_object", {}) or {};
+                    slp: dict[str, any] = kwargs.get("standard_logging_object", {})
+                        or {};
                     metadata = kwargs.get("litellm_params", {}).get("metadata", {})
                         or {};
                     self.store.record_llm_event(

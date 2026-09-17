@@ -4,7 +4,7 @@ Full-stack app in one markerless file (the walkers stay server, the JSX
 component infers client) runnable as a native desktop binary:
 
     cd jac/examples/todo_app
-    jac start --client desktop
+    jac run --client desktop
 """
 
 node Todo {
@@ -39,7 +39,7 @@ walker:pub read_todos {
 }
 
 def:pub app -> JsxElement {
-    has todos: list = [],
+    has todos: list[any] = [],
         inputValue: str = "",
         filter: str = "all";
 
@@ -58,13 +58,13 @@ def:pub app -> JsxElement {
         inputValue = "";
     }
 
-    async def toggleTodo(id: any) {
+    async def toggleTodo(id: str) {
         result = id spawn toggle_todo();
         updated = result.reports[0][0];
         todos = [updated if todo._jac_id == id else todo for todo in todos];
     }
 
-    def deleteTodo(id: any) {
+    def deleteTodo(id: str) {
         todos = [
             todo
             for todo in todos
@@ -80,7 +80,7 @@ def:pub app -> JsxElement {
         ];
     }
 
-    def getFilteredTodos -> list {
+    def getFilteredTodos -> list[any] {
         if filter == "active" {
             return [
                 todo

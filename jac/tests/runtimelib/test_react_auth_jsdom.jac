@@ -23,8 +23,8 @@ import os;
 import from pathlib { Path }
 import from tempfile { TemporaryDirectory }
 
-import from jaclang.compiler.passes.ecmascript.backends.react { ReactBackend }
-import from jaclang.runtimelib.client.bun_installer { get_bun }
+import from jaclang.compiler.backends.es.backends.react { ReactBackend }
+import from jaclang.client.bun_installer { get_bun }
 import from .react_jsdom_harness {
     bun_install,
     compile_page,
@@ -140,7 +140,7 @@ finish();
 
 """One fresh process per scenario, so each starts at its own URL and auth state
 with a clean module graph."""
-def _run_scenarios(bun: str, work: Path, scenarios: list, label: str) {
+def _run_scenarios(bun: str, work: Path, scenarios: list[any], label: str) {
     for sc in scenarios {
         run_harness(bun, work, [sc[0], sc[1]], f"{label} {sc}");
     }

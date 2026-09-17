@@ -1,6 +1,6 @@
 ---
 name: jac-cl-organization
-description: Structuring a multi-component client app - the stateful-shell architecture (one component owns state, prop-drilled sections, handler bodies in .impl.jac), file layout, component reuse, hook pattern, createContext, domain-meaningful naming. Load before adding a new component, when a page file is growing, or when several components share state/fetching logic. Pair with `jac-cl-components` (what goes inside each file).
+description: Organize client state, components, hooks, and implementation annexes. Use when splitting a page or sharing state across components.
 ---
 
 **First-choice architecture for small/medium apps: the stateful shell.** One page-level component owns ALL of that page's reactive `has` fields and async handlers, and prop-drills data + `Callable` callbacks into stateless section components. Handler bodies live in the paired `.impl.jac` annex (see `jac-impl-files`). Real Jac apps with a dozen sections run entirely on this - zero hooks, zero contexts. Escalate only when it stops fitting: a **hook** when the same fetch+state unit must be reused by several components, a **context** when distant components must see the same live values.
@@ -102,7 +102,7 @@ utils_path = "shared/utils.jac" # where cn() lives
 ### Import forms - two rules, neither stylistic
 
 - **Within a feature, use the sibling form.** A client shell reaches its own server module with `import from .store { Recipe, list_recipes }` - a plain import; the compiler sees the target is server-placed and generates the RPC stub (`jac-codespaces`). The entire cross-codespace call is one dot, because both halves live together. This is the layout's main payoff.
-- **Across packages, server modules use the no-dot absolute form:** `import from shared.github { fetch }`, never `..shared.github`. A `..` that climbs out of a feature folder resolves under `jac start` but fails `jac test <file>` with `attempted relative import beyond top-level package`, because the test runner roots the package at the target file's own directory. Client modules keep the dotted form (`..shared.utils`) - that is what the bundler resolves.
+- **Across packages, server modules use the no-dot absolute form:** `import from shared.github { fetch }`, never `..shared.github`. A `..` that climbs out of a feature folder resolves under `jac run` but fails `jac test <file>` with `attempted relative import beyond top-level package`, because the test runner roots the package at the target file's own directory. Client modules keep the dotted form (`..shared.utils`) - that is what the bundler resolves.
 
 ⚠ **A file move is a schema migration.** Archetype identity includes the module path, so moving a module that declares `node`/`edge` types orphans every persisted instance: the nodes stay in the store under the old path and graph queries in the moved module quietly match nothing. No error, no warning. Reorganize before a graph has data in it, or plan a re-ingest.
 
@@ -115,7 +115,7 @@ node Item {
     has name: str = "";
 }
 
-def:pub useItems() -> dict {
+def:pub useItems() -> dict[str, any] {
     has items: list[Item] = [];
     has loading: bool = True;
 

@@ -2,7 +2,7 @@ import json;
 import os;
 import sys;
 import from jaclang.cli.console { console }
-import from jaclang.compiler.code_intel { CodeIntelligence }
+import from jaclang.compiler.tools.code_intel { CodeIntelligence }
 import from jaclang.project.config { find_project_root }
 
 glob _SCHEMA_VERSION = 1,
@@ -14,8 +14,8 @@ def _emit(text: str) {
 }
 
 
-def _emit_json(command: str, payload: dict) {
-    body: dict = {"schema_version": _SCHEMA_VERSION, "command": command};
+def _emit_json(command: str, payload: dict[str, any]) {
+    body: dict[str, any] = {"schema_version": _SCHEMA_VERSION, "command": command};
     body.update(payload);
     _emit(json.dumps(body, indent=2));
 }

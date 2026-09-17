@@ -268,7 +268,7 @@ Hello, Carol!
 ```
 
 !!! info "`visit` is a promise, not a jump"
-    `visit` does **not** move the walker. It *enqueues* destinations: when the current ability finishes, the walker proceeds to the next node in its queue. That's why the default traversal is breadth-first (each node appends its neighbors to the back of the queue), why `visit` at the top of an ability doesn't run other nodes "in the middle of" your code, and why a walker's schedule is fully deterministic -- given the same graph, the same walker visits the same nodes in the same order, every run. You can also steer the queue: `visit : 0 : [-->];` inserts at the *front*, turning the traversal depth-first (see [traversal control](../../reference/language/osp.md#object-spatial-queries) in the reference).
+    `visit` does **not** move the walker. It *enqueues* destinations: when the current ability finishes, the walker proceeds to the next node in its queue. That's why the default traversal is breadth-first (each node appends its neighbors to the back of the queue), why `visit` at the top of an ability doesn't run other nodes "in the middle of" your code, and how the queue determines traversal order. Reproducible traversal also requires stable neighbor ordering, inputs, and ability behavior; concurrent graph changes or external calls can change the result. You can also steer the queue: `visit : 0 : [-->];` inserts at the *front*, turning the traversal depth-first (see [traversal control](../../reference/language/osp.md#object-spatial-queries) in the reference).
 
 ---
 
@@ -567,11 +567,11 @@ walker add_todo {
 Every public walker becomes an endpoint: its `has` properties become the request body and its `report` values become the response. See [Walkers as REST APIs](../../reference/language/osp.md#walkers-as-rest-apis) for the full treatment.
 
 !!! note
-    `main.jac` is the default entry point. If your file has a different name (e.g., `app.jac`), pass it explicitly: `jac start app.jac`.
+    `main.jac` is the default entry point. If your file has a different name (e.g., `app.jac`), pass it explicitly: `jac run app.jac`.
 
 ```bash
 # Run as API server
-jac start
+jac run
 
 # Call via HTTP
 curl -X POST http://localhost:8000/walker/add_todo \

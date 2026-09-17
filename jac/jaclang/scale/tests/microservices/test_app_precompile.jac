@@ -6,6 +6,7 @@ import sys;
 import tarfile;
 import tempfile;
 import from pathlib { Path }
+import from jaclang.scale.tests.support { require_pod_binary }
 import from jaclang.scale.injector.bundle {
     DEFAULT_SEAL_TIMEOUT_S,
     _stage_app,
@@ -60,7 +61,7 @@ test "staging writes sanitized root and nested jac.toml before the seal runs" {
 test "placement pins are readable from inside the seal stage (issue 7866)" {
     base = Path(_pinned_app());
     stage_root = _stage_app(base, sanitized_jac_toml(base));
-    import from jaclang.jac0core.placement_pins { config_module_pin }
+    import from jaclang.compiler.placement.placement_pins { config_module_pin }
     staged_page = stage_root / "app" / "ui" / "page.jac";
     assert config_module_pin(str(staged_page)) == "client";
 }
@@ -88,12 +89,12 @@ test "the seal skips pinned and inferred client modules and nested projects" {
     );
     stage_root = _stage_app(base, sanitized_jac_toml(base));
     stage = stage_root / "app";
-    import from jaclang.utils.precompile_bytecode { sealable_sources }
+    import from jaclang.dist.precompile_bytecode { sealable_sources }
     rels = {
         Path(p).relative_to(stage).as_posix() for p in sealable_sources(str(stage))
     };
     assert rels == {"__init__.jac", "svc.jac"} , rels;
-    import from jaclang.utils.precompile_bytecode { placement_facts_map }
+    import from jaclang.dist.precompile_bytecode { placement_facts_map }
     placement = placement_facts_map(str(stage));
     assert placement["svc.jac"] == ["server"];
     assert placement["ui/page.jac"] == ["client"];
@@ -111,7 +112,7 @@ test "any discovery error voids client skips so failures surface per-file" {
     );
     stage_root = _stage_app(base, sanitized_jac_toml(base));
     stage = stage_root / "app";
-    import from jaclang.utils.precompile_bytecode { sealable_sources }
+    import from jaclang.dist.precompile_bytecode { sealable_sources }
     rels = {
         Path(p).relative_to(stage).as_posix() for p in sealable_sources(str(stage))
     };
@@ -131,7 +132,7 @@ test "a project without jac.toml stages the minimal placeholder for the seal" {
 
 
 test "sealing an app tree without jac.toml fails loudly before compiling" {
-    import from jaclang.utils.precompile_bytecode { main as seal_main }
+    import from jaclang.dist.precompile_bytecode { main as seal_main }
     d = tempfile.mkdtemp(prefix="jac-app-");
     app = Path(d, "app");
     app.mkdir();
@@ -194,7 +195,7 @@ test "an unrunnable pod binary fails the seal instead of shipping unsealed" {
 
 test "the seal and vendor subprocesses run without persistent storage (issue 8094)" {
     import from jaclang.scale.injector.bundle { seal_step_env }
-    import from jaclang.runtimelib.session { SCRATCH_ENV }
+    import from jaclang.server.session { SCRATCH_ENV }
     env = seal_step_env();
     assert env.get(SCRATCH_ENV) == "1" , (
         "the seal/vendor children stage the app under a fresh temp path, so a "
@@ -260,16 +261,32 @@ test "staging a project cleans up after itself" {
 }
 
 
-test "a real pod binary seals the app into a .jab (source + _precompiled + manifest)" {
+test "a real pod binary seals and serves an entry named app" {
     # The checkout's own binary stands in for the downloaded pod binary; the
     # mechanism (stage -> precompile_bytecode.jac --seal -> pack _precompiled/**)
     # is identical for release binaries.
-    jac_bin = Path(__file__).parents[4] / "zig-out" / "bin" / "jac";
-    if not jac_bin.is_file() {
-        return;
-    }
-    names = _names(pack_jab(_mini_app(), jac_bin.read_bytes()));
+    jac_bin = require_pod_binary();
+    import json;
+    base = Path(_mini_app());
+    (base / "jac.toml").write_text(
+        '[project]\nname="mini"\nkind="service"\nentry-point="app"\n'
+    );
+    (base / "app.jac").write_text(
+        'import from svc { ping }\n'
+            + 'walker:pub echo { can run with Root entry { report "hello"; } }\n'
+    );
+    raw = pack_jab(str(base), jac_bin.read_bytes());
+    names = _names(raw);
     assert "svc.jac" in names;
+    assert ".jac/serve_manifest.json" in names;
+    with tarfile.open(fileobj=io.BytesIO(raw), mode="r:gz") as archive {
+        serving = archive.extractfile(".jac/serve_manifest.json");
+        assert serving is not None;
+        assert json.loads(serving.read())["func_access"]["ping"] is False;
+        manifest = archive.extractfile("_precompiled/MANIFEST.json");
+        assert manifest is not None;
+        assert ".jac/serve_manifest.json" in json.loads(manifest.read())["payloads"];
+    }
     # The sealed manifest sits at the tar root, which is what makes this a .jab.
     assert "_precompiled/MANIFEST.json" in names;
     pre = [
@@ -278,4 +295,114 @@ test "a real pod binary seals the app into a .jab (source + _precompiled + manif
         if n.startswith("_precompiled/")
     ];
     assert any([n.endswith("svc.jir") for n in pre]) , pre;
+    with tempfile.TemporaryDirectory(prefix="jac-sealed-entry-") as tmp {
+        with tarfile.open(fileobj=io.BytesIO(raw), mode="r:gz") as archive {
+            archive.extractall(tmp, filter="data");
+        }
+        env = dict(os.environ);
+        env["JAC_NO_DEV_SOURCE"] = "1";
+        result = subprocess.run(
+            [str(jac_bin), "run", "--serve", "--faux", "app.jac"],
+            cwd=tmp,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=90
+        );
+        assert result.returncode == 0 , result.stdout + result.stderr;
+        assert "/walker/echo" in result.stdout , result.stdout;
+        assert "Preparing dynamically imported module" not in result.stdout;
+    }
+}
+
+test "sealing includes bytecode imports and serving exports despite client placement" {
+    import json;
+    import from unittest.mock { patch }
+    import jaclang.dist.precompile_bytecode as precompiler;
+    with tempfile.TemporaryDirectory(prefix="jac-seal-closure-") as tmp {
+        base = Path(tmp) / "app";
+        base.mkdir();
+        (base / "jac.toml").write_text(
+            '[project]\nname="closure"\nkind="service"\nentry-point="main"\n'
+        );
+        main = base / "main.jac";
+        shared = base / "shared.jac";
+        exported = base / "exported.jac";
+        unused = base / "unused.jac";
+        shared.write_text('def:pub value -> str { return "shared"; }\n');
+        exported.write_text('def:pub exposed -> str { return "exported"; }\n');
+        unused.write_text('def:pub page -> JsxElement { return <div>unused</div>; }\n');
+        main.write_text(
+            'import from shared { value }\ndef:pub ping -> str { return value(); }\n'
+        );
+        artifact = precompiler.precompile_unit(str(main), str(base));
+        assert artifact is not None;
+        out = base / "_precompiled" / "units";
+        out.mkdir(parents=True);
+        (out / "main.jir").write_bytes(artifact);
+        (base / ".jac").mkdir(exist_ok=True);
+        (base / ".jac" / "serve_manifest.json").write_text(
+            json.dumps(
+                {
+                    "cross_bindings": [
+                        {
+                            "src": "exported.jac",
+                            "name": "exposed",
+                            "kind": "def",
+                            "auth": False
+                        }
+                    ]
+                }
+            )
+        );
+        with patch.object(
+            precompiler, "_sealable_cache", {(str(base), ""): [str(main)]}
+        ), patch.object(
+            precompiler,
+            "_placement_cache",
+            {
+                (str(base), ""): {
+                    str(main): {"server"},
+                    str(shared): {"client"},
+                    str(exported): {"client"},
+                    str(unused): {"client"}
+                }
+            }
+        ) {
+            assert precompiler.seal_runtime_closure(base, out, False);
+            assert (out / "shared.jir").is_file();
+            assert (out / "exported.jir").is_file();
+            assert not (out / "unused.jir").exists();
+            assert precompiler._placement_cache[(str(base), "")][str(shared)]
+                == {"client", "server"};
+        }
+    }
+}
+
+
+test "an explicit app seal follows its entry and excludes unrelated apps" {
+    import from jaclang.dist.precompile_bytecode { sealable_sources }
+    with tempfile.TemporaryDirectory() as td {
+        base = Path(td);
+        (base / 'jac.toml').write_text(
+            '[project]\nname = "selected"\ndefault-app = "web"\n'
+                + '[apps.web]\nkind = "service"\nentry-point = "web"\n'
+                + '[apps.scoring]\nkind = "service"\nentry-point = "scoring"\n'
+                + '[apps.cli]\nkind = "cli"\nentry-point = "cli"\n'
+                + '[apps.desktop]\nkind = "desktop"\nentry-point = "desktop"\n'
+        );
+        (base / 'web.jac').write_text(
+            'import from helper { value }\ndef:pub read -> int { return value(); }\n'
+        );
+        (base / 'helper.jac').write_text('def:pub value -> int { return 7; }\n');
+        (base / 'scoring.jac').write_text('def:pub score -> int { return 42; }\n');
+        (base / 'desktop.jac').write_text('def:pub app -> int { return 1; }\n');
+        (base / 'cli.jac').write_text('this is deliberately invalid Jac');
+        sources = {Path(p).name for p in sealable_sources(td)};
+        assert sources == {'web.jac', 'helper.jac', 'scoring.jac'} , sources;
+        (base / 'cli.jac').write_text('def:pub main -> int { return 3; }\n');
+        assert {Path(p).name for p in sealable_sources(td, 'cli')} == {'cli.jac'};
+        assert {Path(p).name for p in sealable_sources(td, 'desktop')}
+            == {'desktop.jac'};
+    }
 }

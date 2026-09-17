@@ -30,7 +30,10 @@ def capture_get(captured: io.StringIO) -> str {
 
 """Test different access validation."""
 def trigger_access_validation_test(
-    roots: list, nodes: list, give_access_to_full_graph: bool, via_all: bool = False
+    roots: list[any],
+    nodes: list[any],
+    give_access_to_full_graph: bool,
+    via_all: bool = False
 ) {
     captured = capture_start();
 
@@ -40,62 +43,62 @@ def trigger_access_validation_test(
     node_1 = "" if give_access_to_full_graph else nodes[0];
     node_2 = "" if give_access_to_full_graph else nodes[1];
 
-    execution.enter(
-        filename=os.path.join(FIXTURES, "other_root_access.jac"),
-        entrypoint="allow_other_root_access",
+    execution.run(
+        target=os.path.join(FIXTURES, "other_root_access.jac"),
+        entry_name="allow_other_root_access",
         args=_as_any([roots[1], 0, via_all]),
-        **{"root": roots[0]},
+        root_id=roots[0],
         nd=node_1
     );
-    execution.enter(
-        filename=os.path.join(FIXTURES, "other_root_access.jac"),
-        entrypoint="allow_other_root_access",
+    execution.run(
+        target=os.path.join(FIXTURES, "other_root_access.jac"),
+        entry_name="allow_other_root_access",
         args=_as_any([roots[0], 0, via_all]),
-        **{"root": roots[1]},
+        root_id=roots[1],
         nd=node_2
     );
 
-    execution.enter(
-        filename=os.path.join(FIXTURES, "other_root_access.jac"),
-        entrypoint="update_node",
+    execution.run(
+        target=os.path.join(FIXTURES, "other_root_access.jac"),
+        entry_name="update_node",
         args=_as_any([20]),
-        **{"root": roots[0]},
+        root_id=roots[0],
         nd=nodes[1]
     );
-    execution.enter(
-        filename=os.path.join(FIXTURES, "other_root_access.jac"),
-        entrypoint="update_node",
+    execution.run(
+        target=os.path.join(FIXTURES, "other_root_access.jac"),
+        entry_name="update_node",
         args=_as_any([10]),
-        **{"root": roots[1]},
+        root_id=roots[1],
         nd=nodes[0]
     );
 
-    execution.enter(
-        filename=os.path.join(FIXTURES, "other_root_access.jac"),
-        entrypoint="update_target_node",
+    execution.run(
+        target=os.path.join(FIXTURES, "other_root_access.jac"),
+        entry_name="update_target_node",
         args=_as_any([20, nodes[1]]),
-        **{"root": roots[0]}
+        root_id=roots[0]
     );
 
-    execution.enter(
-        filename=os.path.join(FIXTURES, "other_root_access.jac"),
-        entrypoint="update_target_node",
+    execution.run(
+        target=os.path.join(FIXTURES, "other_root_access.jac"),
+        entry_name="update_target_node",
         args=_as_any([10, nodes[0]]),
-        **{"root": roots[1]}
+        root_id=roots[1]
     );
 
-    execution.enter(
-        filename=os.path.join(FIXTURES, "other_root_access.jac"),
-        entrypoint="check_node",
+    execution.run(
+        target=os.path.join(FIXTURES, "other_root_access.jac"),
+        entry_name="check_node",
         args=[],
-        **{"root": roots[0]},
+        root_id=roots[0],
         nd=nodes[1]
     );
-    execution.enter(
-        filename=os.path.join(FIXTURES, "other_root_access.jac"),
-        entrypoint="check_node",
+    execution.run(
+        target=os.path.join(FIXTURES, "other_root_access.jac"),
+        entry_name="check_node",
         args=[],
-        **{"root": roots[1]},
+        root_id=roots[1],
         nd=nodes[0]
     );
     archs = capture_get(captured).strip().split("\n");
@@ -107,33 +110,33 @@ def trigger_access_validation_test(
 
     # ---------- DISALLOW READ ACCESS ---------- #
     captured = capture_start();
-    execution.enter(
-        filename=os.path.join(FIXTURES, "other_root_access.jac"),
-        entrypoint="disallow_other_root_access",
+    execution.run(
+        target=os.path.join(FIXTURES, "other_root_access.jac"),
+        entry_name="disallow_other_root_access",
         args=_as_any([roots[1], via_all]),
-        **{"root": roots[0]},
+        root_id=roots[0],
         nd=node_1
     );
-    execution.enter(
-        filename=os.path.join(FIXTURES, "other_root_access.jac"),
-        entrypoint="disallow_other_root_access",
+    execution.run(
+        target=os.path.join(FIXTURES, "other_root_access.jac"),
+        entry_name="disallow_other_root_access",
         args=_as_any([roots[0], via_all]),
-        **{"root": roots[1]},
+        root_id=roots[1],
         nd=node_2
     );
 
-    execution.enter(
-        filename=os.path.join(FIXTURES, "other_root_access.jac"),
-        entrypoint="check_node",
+    execution.run(
+        target=os.path.join(FIXTURES, "other_root_access.jac"),
+        entry_name="check_node",
         args=[],
-        **{"root": roots[0]},
+        root_id=roots[0],
         nd=nodes[1]
     );
-    execution.enter(
-        filename=os.path.join(FIXTURES, "other_root_access.jac"),
-        entrypoint="check_node",
+    execution.run(
+        target=os.path.join(FIXTURES, "other_root_access.jac"),
+        entry_name="check_node",
         args=[],
-        **{"root": roots[1]},
+        root_id=roots[1],
         nd=nodes[0]
     );
     assert not capture_get(captured).strip();
@@ -142,48 +145,48 @@ def trigger_access_validation_test(
     #             ALLOW WRITE ACCESS             #
     ##############################################
     captured = capture_start();
-    execution.enter(
-        filename=os.path.join(FIXTURES, "other_root_access.jac"),
-        entrypoint="allow_other_root_access",
+    execution.run(
+        target=os.path.join(FIXTURES, "other_root_access.jac"),
+        entry_name="allow_other_root_access",
         args=_as_any([roots[1], "WRITE", via_all]),
-        **{"root": roots[0]},
+        root_id=roots[0],
         nd=node_1
     );
-    execution.enter(
-        filename=os.path.join(FIXTURES, "other_root_access.jac"),
-        entrypoint="allow_other_root_access",
+    execution.run(
+        target=os.path.join(FIXTURES, "other_root_access.jac"),
+        entry_name="allow_other_root_access",
         args=_as_any([roots[0], "WRITE", via_all]),
-        **{"root": roots[1]},
+        root_id=roots[1],
         nd=node_2
     );
 
-    execution.enter(
-        filename=os.path.join(FIXTURES, "other_root_access.jac"),
-        entrypoint="update_node",
+    execution.run(
+        target=os.path.join(FIXTURES, "other_root_access.jac"),
+        entry_name="update_node",
         args=_as_any([200]),
-        **{"root": roots[0]},
+        root_id=roots[0],
         nd=nodes[1]
     );
-    execution.enter(
-        filename=os.path.join(FIXTURES, "other_root_access.jac"),
-        entrypoint="update_node",
+    execution.run(
+        target=os.path.join(FIXTURES, "other_root_access.jac"),
+        entry_name="update_node",
         args=_as_any([100]),
-        **{"root": roots[1]},
+        root_id=roots[1],
         nd=nodes[0]
     );
 
-    execution.enter(
-        filename=os.path.join(FIXTURES, "other_root_access.jac"),
-        entrypoint="check_node",
+    execution.run(
+        target=os.path.join(FIXTURES, "other_root_access.jac"),
+        entry_name="check_node",
         args=[],
-        **{"root": roots[0]},
+        root_id=roots[0],
         nd=nodes[1]
     );
-    execution.enter(
-        filename=os.path.join(FIXTURES, "other_root_access.jac"),
-        entrypoint="check_node",
+    execution.run(
+        target=os.path.join(FIXTURES, "other_root_access.jac"),
+        entry_name="check_node",
         args=[],
-        **{"root": roots[1]},
+        root_id=roots[1],
         nd=nodes[0]
     );
     archs = capture_get(captured).strip().split("\n");
@@ -195,33 +198,33 @@ def trigger_access_validation_test(
 
     # ---------- DISALLOW WRITE ACCESS --------- #
     captured = capture_start();
-    execution.enter(
-        filename=os.path.join(FIXTURES, "other_root_access.jac"),
-        entrypoint="disallow_other_root_access",
+    execution.run(
+        target=os.path.join(FIXTURES, "other_root_access.jac"),
+        entry_name="disallow_other_root_access",
         args=_as_any([roots[1], via_all]),
-        **{"root": roots[0]},
+        root_id=roots[0],
         nd=node_1
     );
-    execution.enter(
-        filename=os.path.join(FIXTURES, "other_root_access.jac"),
-        entrypoint="disallow_other_root_access",
+    execution.run(
+        target=os.path.join(FIXTURES, "other_root_access.jac"),
+        entry_name="disallow_other_root_access",
         args=_as_any([roots[0], via_all]),
-        **{"root": roots[1]},
+        root_id=roots[1],
         nd=node_2
     );
 
-    execution.enter(
-        filename=os.path.join(FIXTURES, "other_root_access.jac"),
-        entrypoint="check_node",
+    execution.run(
+        target=os.path.join(FIXTURES, "other_root_access.jac"),
+        entry_name="check_node",
         args=[],
-        **{"root": roots[0]},
+        root_id=roots[0],
         nd=nodes[1]
     );
-    execution.enter(
-        filename=os.path.join(FIXTURES, "other_root_access.jac"),
-        entrypoint="check_node",
+    execution.run(
+        target=os.path.join(FIXTURES, "other_root_access.jac"),
+        entry_name="check_node",
         args=[],
-        **{"root": roots[1]},
+        root_id=roots[1],
         nd=nodes[0]
     );
     assert not capture_get(captured).strip();
@@ -229,18 +232,18 @@ def trigger_access_validation_test(
     # ---------- ROOTS RESET OWN NODE ---------- #
     captured = capture_start();
 
-    execution.enter(
-        filename=os.path.join(FIXTURES, "other_root_access.jac"),
-        entrypoint="update_node",
+    execution.run(
+        target=os.path.join(FIXTURES, "other_root_access.jac"),
+        entry_name="update_node",
         args=_as_any([1]),
-        **{"root": roots[0]},
+        root_id=roots[0],
         nd=nodes[0]
     );
-    execution.enter(
-        filename=os.path.join(FIXTURES, "other_root_access.jac"),
-        entrypoint="update_node",
+    execution.run(
+        target=os.path.join(FIXTURES, "other_root_access.jac"),
+        entry_name="update_node",
         args=_as_any([2]),
-        **{"root": roots[1]},
+        root_id=roots[1],
         nd=nodes[1]
     );
     capture_get(captured);
@@ -252,14 +255,14 @@ test "walker simple persistent" {
     Jac.set_base_path(_tmpdir);
     try {
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "simple_persistent.jac"),
-            entrypoint="create",
+        execution.run(
+            target=os.path.join(FIXTURES, "simple_persistent.jac"),
+            entry_name="create",
             args=[]
         );
-        execution.enter(
-            filename=os.path.join(FIXTURES, "simple_persistent.jac"),
-            entrypoint="traverse",
+        execution.run(
+            target=os.path.join(FIXTURES, "simple_persistent.jac"),
+            entry_name="traverse",
             args=[]
         );
         output = capture_get(captured).strip();
@@ -275,18 +278,18 @@ test "entrypoint root" {
     _orig_base = Jac.get_base_path_dir();
     Jac.set_base_path(_tmpdir);
     try {
-        execution.enter(
-            filename=os.path.join(FIXTURES, "simple_persistent.jac"),
-            entrypoint="create",
+        execution.run(
+            target=os.path.join(FIXTURES, "simple_persistent.jac"),
+            entry_name="create",
             args=[]
         );
         root_obj = get_object(
             filename=os.path.join(FIXTURES, "simple_persistent.jac"), id="root"
         );
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "simple_persistent.jac"),
-            entrypoint="traverse",
+        execution.run(
+            target=os.path.join(FIXTURES, "simple_persistent.jac"),
+            entry_name="traverse",
             args=[],
             nd=str(root_obj["id"])
         );
@@ -303,9 +306,9 @@ test "entrypoint non root" {
     _orig_base = Jac.get_base_path_dir();
     Jac.set_base_path(_tmpdir);
     try {
-        execution.enter(
-            filename=os.path.join(FIXTURES, "simple_persistent.jac"),
-            entrypoint="create",
+        execution.run(
+            target=os.path.join(FIXTURES, "simple_persistent.jac"),
+            entry_name="create",
             args=[]
         );
         root_obj = get_object(
@@ -320,9 +323,9 @@ test "entrypoint non root" {
             id=edge_obj["target"].id.hex
         );
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "simple_persistent.jac"),
-            entrypoint="traverse",
+        execution.run(
+            target=os.path.join(FIXTURES, "simple_persistent.jac"),
+            entry_name="traverse",
             nd=str(a_obj["id"]),
             args=[]
         );
@@ -339,7 +342,7 @@ test "get edge" {
     _orig_base = Jac.get_base_path_dir();
     Jac.set_base_path(_tmpdir);
     try {
-        execution.run(filename=os.path.join(FIXTURES, "simple_node_connection.jac"));
+        execution.run(target=os.path.join(FIXTURES, "simple_node_connection.jac"));
         root_obj = get_object(
             filename=os.path.join(FIXTURES, "simple_node_connection.jac"), id="root"
         );
@@ -370,11 +373,11 @@ test "filter on edge get edge" {
     _orig_base = Jac.get_base_path_dir();
     Jac.set_base_path(_tmpdir);
     try {
-        execution.run(filename=os.path.join(FIXTURES, "simple_node_connection.jac"));
+        execution.run(target=os.path.join(FIXTURES, "simple_node_connection.jac"));
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "simple_node_connection.jac"),
-            entrypoint="filter_on_edge_get_edge",
+        execution.run(
+            target=os.path.join(FIXTURES, "simple_node_connection.jac"),
+            entry_name="filter_on_edge_get_edge",
             args=[]
         );
         assert capture_get(captured).strip() == "[simple_edge(index=1)]";
@@ -389,11 +392,11 @@ test "filter on edge get node" {
     _orig_base = Jac.get_base_path_dir();
     Jac.set_base_path(_tmpdir);
     try {
-        execution.run(filename=os.path.join(FIXTURES, "simple_node_connection.jac"));
+        execution.run(target=os.path.join(FIXTURES, "simple_node_connection.jac"));
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "simple_node_connection.jac"),
-            entrypoint="filter_on_edge_get_node",
+        execution.run(
+            target=os.path.join(FIXTURES, "simple_node_connection.jac"),
+            entry_name="filter_on_edge_get_node",
             args=[]
         );
         assert capture_get(captured).strip() == "[simple(tag='second')]";
@@ -408,11 +411,11 @@ test "filter on node get node" {
     _orig_base = Jac.get_base_path_dir();
     Jac.set_base_path(_tmpdir);
     try {
-        execution.run(filename=os.path.join(FIXTURES, "simple_node_connection.jac"));
+        execution.run(target=os.path.join(FIXTURES, "simple_node_connection.jac"));
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "simple_node_connection.jac"),
-            entrypoint="filter_on_node_get_node",
+        execution.run(
+            target=os.path.join(FIXTURES, "simple_node_connection.jac"),
+            entry_name="filter_on_node_get_node",
             args=[]
         );
         assert capture_get(captured).strip() == "[simple(tag='second')]";
@@ -427,11 +430,11 @@ test "filter on edge visit" {
     _orig_base = Jac.get_base_path_dir();
     Jac.set_base_path(_tmpdir);
     try {
-        execution.run(filename=os.path.join(FIXTURES, "simple_node_connection.jac"));
+        execution.run(target=os.path.join(FIXTURES, "simple_node_connection.jac"));
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "simple_node_connection.jac"),
-            entrypoint="filter_on_edge_visit",
+        execution.run(
+            target=os.path.join(FIXTURES, "simple_node_connection.jac"),
+            entry_name="filter_on_edge_visit",
             args=[]
         );
         assert capture_get(captured).strip() == "simple(tag='first')";
@@ -446,11 +449,11 @@ test "filter on node visit" {
     _orig_base = Jac.get_base_path_dir();
     Jac.set_base_path(_tmpdir);
     try {
-        execution.run(filename=os.path.join(FIXTURES, "simple_node_connection.jac"));
+        execution.run(target=os.path.join(FIXTURES, "simple_node_connection.jac"));
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "simple_node_connection.jac"),
-            entrypoint="filter_on_node_visit",
+        execution.run(
+            target=os.path.join(FIXTURES, "simple_node_connection.jac"),
+            entry_name="filter_on_node_visit",
             args=[]
         );
         assert capture_get(captured).strip() == "simple(tag='first')";
@@ -465,15 +468,15 @@ test "indirect reference node" {
     _orig_base = Jac.get_base_path_dir();
     Jac.set_base_path(_tmpdir);
     try {
-        execution.enter(
-            filename=os.path.join(FIXTURES, "simple_persistent.jac"),
-            entrypoint="create",
+        execution.run(
+            target=os.path.join(FIXTURES, "simple_persistent.jac"),
+            entry_name="create",
             args=[]
         );
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "simple_persistent.jac"),
-            entrypoint="indirect_ref",
+        execution.run(
+            target=os.path.join(FIXTURES, "simple_persistent.jac"),
+            entry_name="indirect_ref",
             args=[]
         );
         capture_get(captured);
@@ -491,24 +494,24 @@ test "walker purger" {
     Jac.set_base_path(_tmpdir);
     try {
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "graph_purger.jac"),
-            entrypoint="populate",
+        execution.run(
+            target=os.path.join(FIXTURES, "graph_purger.jac"),
+            entry_name="populate",
             args=[]
         );
-        execution.enter(
-            filename=os.path.join(FIXTURES, "graph_purger.jac"),
-            entrypoint="traverse",
+        execution.run(
+            target=os.path.join(FIXTURES, "graph_purger.jac"),
+            entry_name="traverse",
             args=[]
         );
-        execution.enter(
-            filename=os.path.join(FIXTURES, "graph_purger.jac"),
-            entrypoint="check",
+        execution.run(
+            target=os.path.join(FIXTURES, "graph_purger.jac"),
+            entry_name="check",
             args=[]
         );
-        execution.enter(
-            filename=os.path.join(FIXTURES, "graph_purger.jac"),
-            entrypoint="purge",
+        execution.run(
+            target=os.path.join(FIXTURES, "graph_purger.jac"),
+            entry_name="purge",
             args=[]
         );
         output = capture_get(captured).strip();
@@ -527,19 +530,19 @@ test "walker purger" {
                 "125\n124"
             ) , f"got: {output!r}";
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "graph_purger.jac"),
-            entrypoint="traverse",
+        execution.run(
+            target=os.path.join(FIXTURES, "graph_purger.jac"),
+            entry_name="traverse",
             args=[]
         );
-        execution.enter(
-            filename=os.path.join(FIXTURES, "graph_purger.jac"),
-            entrypoint="check",
+        execution.run(
+            target=os.path.join(FIXTURES, "graph_purger.jac"),
+            entry_name="check",
             args=[]
         );
-        execution.enter(
-            filename=os.path.join(FIXTURES, "graph_purger.jac"),
-            entrypoint="purge",
+        execution.run(
+            target=os.path.join(FIXTURES, "graph_purger.jac"),
+            entry_name="purge",
             args=[]
         );
         output = capture_get(captured).strip();
@@ -559,17 +562,17 @@ test "other root access" {
         #                CREATE ROOTS                #
         ##############################################
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "other_root_access.jac"),
-            entrypoint="create_other_root",
+        execution.run(
+            target=os.path.join(FIXTURES, "other_root_access.jac"),
+            entry_name="create_other_root",
             args=[]
         );
         root1 = capture_get(captured).strip();
 
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "other_root_access.jac"),
-            entrypoint="create_other_root",
+        execution.run(
+            target=os.path.join(FIXTURES, "other_root_access.jac"),
+            entry_name="create_other_root",
             args=[]
         );
         root2 = capture_get(captured).strip();
@@ -578,17 +581,17 @@ test "other root access" {
         #           CREATE RESPECTIVE NODES          #
         ##############################################
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "other_root_access.jac"),
-            entrypoint="create_node",
+        execution.run(
+            target=os.path.join(FIXTURES, "other_root_access.jac"),
+            entry_name="create_node",
             args=_as_any([1]),
-            **{"root": root1}
+            root_id=root1
         );
-        execution.enter(
-            filename=os.path.join(FIXTURES, "other_root_access.jac"),
-            entrypoint="create_node",
+        execution.run(
+            target=os.path.join(FIXTURES, "other_root_access.jac"),
+            entry_name="create_node",
             args=_as_any([2]),
-            **{"root": root2}
+            root_id=root2
         );
         nodes = capture_get(captured).strip().split("\n");
         assert len(nodes) == 2;
@@ -597,17 +600,17 @@ test "other root access" {
         #           VISIT RESPECTIVE NODES           #
         ##############################################
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "other_root_access.jac"),
-            entrypoint="check_node",
+        execution.run(
+            target=os.path.join(FIXTURES, "other_root_access.jac"),
+            entry_name="check_node",
             args=[],
-            **{"root": root1}
+            root_id=root1
         );
-        execution.enter(
-            filename=os.path.join(FIXTURES, "other_root_access.jac"),
-            entrypoint="check_node",
+        execution.run(
+            target=os.path.join(FIXTURES, "other_root_access.jac"),
+            entry_name="check_node",
             args=[],
-            **{"root": root2}
+            root_id=root2
         );
         archs = capture_get(captured).strip().split("\n");
         assert len(archs) == 2;
@@ -619,18 +622,18 @@ test "other root access" {
         #                  NO ACCESS                 #
         ##############################################
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "other_root_access.jac"),
-            entrypoint="check_node",
+        execution.run(
+            target=os.path.join(FIXTURES, "other_root_access.jac"),
+            entry_name="check_node",
             args=[],
-            **{"root": root1},
+            root_id=root1,
             nd=nodes[1]
         );
-        execution.enter(
-            filename=os.path.join(FIXTURES, "other_root_access.jac"),
-            entrypoint="check_node",
+        execution.run(
+            target=os.path.join(FIXTURES, "other_root_access.jac"),
+            entry_name="check_node",
             args=[],
-            **{"root": root2},
+            root_id=root2,
             nd=nodes[0]
         );
         assert not capture_get(captured).strip();
@@ -661,81 +664,81 @@ test "get object read access" {
     Jac.set_base_path(_tmpdir);
     try {
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "other_root_access.jac"),
-            entrypoint="create_other_root",
+        execution.run(
+            target=os.path.join(FIXTURES, "other_root_access.jac"),
+            entry_name="create_other_root",
             args=[]
         );
         root1 = capture_get(captured).strip();
 
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "other_root_access.jac"),
-            entrypoint="create_other_root",
+        execution.run(
+            target=os.path.join(FIXTURES, "other_root_access.jac"),
+            entry_name="create_other_root",
             args=[]
         );
         root2 = capture_get(captured).strip();
 
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "other_root_access.jac"),
-            entrypoint="create_node",
+        execution.run(
+            target=os.path.join(FIXTURES, "other_root_access.jac"),
+            entry_name="create_node",
             args=_as_any([1]),
-            **{"root": root1}
+            root_id=root1
         );
         node_id = capture_get(captured).strip();
 
         # ---------- OWNER READS OWN NODE ---------- #
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "other_root_access.jac"),
-            entrypoint="read_target_node",
+        execution.run(
+            target=os.path.join(FIXTURES, "other_root_access.jac"),
+            entry_name="read_target_node",
             args=[node_id],
-            **{"root": root1}
+            root_id=root1
         );
         assert capture_get(captured).strip() == "A(val=1)";
 
         # ------- OTHER ROOT DENIED BY-ID READ ----- #
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "other_root_access.jac"),
-            entrypoint="read_target_node",
+        execution.run(
+            target=os.path.join(FIXTURES, "other_root_access.jac"),
+            entry_name="read_target_node",
             args=[node_id],
-            **{"root": root2}
+            root_id=root2
         );
         assert capture_get(captured).strip() == "None";
 
         # -------- GRANT READ, THEN READABLE ------- #
-        execution.enter(
-            filename=os.path.join(FIXTURES, "other_root_access.jac"),
-            entrypoint="allow_other_root_access",
+        execution.run(
+            target=os.path.join(FIXTURES, "other_root_access.jac"),
+            entry_name="allow_other_root_access",
             args=_as_any([root2, 0]),
-            **{"root": root1},
+            root_id=root1,
             nd=node_id
         );
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "other_root_access.jac"),
-            entrypoint="read_target_node",
+        execution.run(
+            target=os.path.join(FIXTURES, "other_root_access.jac"),
+            entry_name="read_target_node",
             args=[node_id],
-            **{"root": root2}
+            root_id=root2
         );
         assert capture_get(captured).strip() == "A(val=1)";
 
         # ------- REVOKE, DENIED AGAIN ------------- #
-        execution.enter(
-            filename=os.path.join(FIXTURES, "other_root_access.jac"),
-            entrypoint="disallow_other_root_access",
+        execution.run(
+            target=os.path.join(FIXTURES, "other_root_access.jac"),
+            entry_name="disallow_other_root_access",
             args=[root2],
-            **{"root": root1},
+            root_id=root1,
             nd=node_id
         );
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "other_root_access.jac"),
-            entrypoint="read_target_node",
+        execution.run(
+            target=os.path.join(FIXTURES, "other_root_access.jac"),
+            entry_name="read_target_node",
             args=[node_id],
-            **{"root": root2}
+            root_id=root2
         );
         assert capture_get(captured).strip() == "None";
     } finally {
@@ -751,9 +754,9 @@ test "savable object" {
     try {
         captured = capture_start();
 
-        execution.enter(
-            filename=os.path.join(FIXTURES, "savable_object.jac"),
-            entrypoint="create_custom_object",
+        execution.run(
+            target=os.path.join(FIXTURES, "savable_object.jac"),
+            entry_name="create_custom_object",
             args=[]
         );
 
@@ -769,9 +772,9 @@ test "savable object" {
 
         captured = capture_start();
 
-        execution.enter(
-            filename=os.path.join(FIXTURES, "savable_object.jac"),
-            entrypoint="get_custom_object",
+        execution.run(
+            target=os.path.join(FIXTURES, "savable_object.jac"),
+            entry_name="get_custom_object",
             args=[id]
         );
         got = capture_get(captured).strip();
@@ -782,8 +785,8 @@ test "savable object" {
         );
         diag = "";
         if got != expected {
-            import from jaclang.runtimelib.serializer { Serializer }
-            import from jaclang.runtimelib { typecache }
+            import from jaclang.data.serializer { Serializer }
+            import from jaclang.runtime { typecache }
             reg_cls = Serializer._registry.get("__main__.SavableObject");
             cached = typecache._cache.get(reg_cls) if reg_cls else None;
             resolved = typecache.get_field_types(reg_cls) if reg_cls else None;
@@ -799,9 +802,9 @@ test "savable object" {
 
         captured = capture_start();
 
-        execution.enter(
-            filename=os.path.join(FIXTURES, "savable_object.jac"),
-            entrypoint="update_custom_object",
+        execution.run(
+            target=os.path.join(FIXTURES, "savable_object.jac"),
+            entry_name="update_custom_object",
             args=[id]
         );
 
@@ -815,15 +818,15 @@ test "savable object" {
 
         captured = capture_start();
 
-        execution.enter(
-            filename=os.path.join(FIXTURES, "savable_object.jac"),
-            entrypoint="delete_custom_object",
+        execution.run(
+            target=os.path.join(FIXTURES, "savable_object.jac"),
+            entry_name="delete_custom_object",
             args=[id]
         );
 
-        execution.enter(
-            filename=os.path.join(FIXTURES, "savable_object.jac"),
-            entrypoint="get_custom_object",
+        execution.run(
+            target=os.path.join(FIXTURES, "savable_object.jac"),
+            entry_name="get_custom_object",
             args=[id]
         );
         got = capture_get(captured).strip();
@@ -840,15 +843,15 @@ test "traversing save" {
     Jac.set_base_path(_tmpdir);
     try {
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "traversing_save.jac"),
-            entrypoint="build",
+        execution.run(
+            target=os.path.join(FIXTURES, "traversing_save.jac"),
+            entry_name="build",
             args=[]
         );
 
-        execution.enter(
-            filename=os.path.join(FIXTURES, "traversing_save.jac"),
-            entrypoint="view",
+        execution.run(
+            target=os.path.join(FIXTURES, "traversing_save.jac"),
+            entry_name="view",
             args=[]
         );
 
@@ -877,9 +880,9 @@ test "custom access validation" {
         #              CREATE OTHER ROOT             #
         ##############################################
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "custom_access_validation.jac"),
-            entrypoint="create_other_root",
+        execution.run(
+            target=os.path.join(FIXTURES, "custom_access_validation.jac"),
+            entry_name="create_other_root",
             args=[]
         );
 
@@ -889,9 +892,9 @@ test "custom access validation" {
         #                 CREATE NODE                #
         ##############################################
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "custom_access_validation.jac"),
-            entrypoint="create",
+        execution.run(
+            target=os.path.join(FIXTURES, "custom_access_validation.jac"),
+            entry_name="create",
             args=[]
         );
         nd_str = capture_get(captured).strip();
@@ -902,9 +905,9 @@ test "custom access validation" {
 
         # BY OWNER
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "custom_access_validation.jac"),
-            entrypoint="check",
+        execution.run(
+            target=os.path.join(FIXTURES, "custom_access_validation.jac"),
+            entry_name="check",
             args=[],
             nd=nd_str
         );
@@ -913,11 +916,11 @@ test "custom access validation" {
 
         # BY OTHER
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "custom_access_validation.jac"),
-            entrypoint="check",
+        execution.run(
+            target=os.path.join(FIXTURES, "custom_access_validation.jac"),
+            entry_name="check",
             args=[],
-            **{"root": other_root},
+            root_id=other_root,
             nd=nd_str
         );
 
@@ -928,20 +931,20 @@ test "custom access validation" {
         ##############################################
 
         # UPDATE BY OWNER
-        execution.enter(
-            filename=os.path.join(FIXTURES, "custom_access_validation.jac"),
-            entrypoint="update",
+        execution.run(
+            target=os.path.join(FIXTURES, "custom_access_validation.jac"),
+            entry_name="update",
             args=_as_any(["READ", None]),
             nd=nd_str
         );
 
         # CHECK BY OTHER
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "custom_access_validation.jac"),
-            entrypoint="check",
+        execution.run(
+            target=os.path.join(FIXTURES, "custom_access_validation.jac"),
+            entry_name="check",
             args=[],
-            **{"root": other_root},
+            root_id=other_root,
             nd=nd_str
         );
 
@@ -952,21 +955,21 @@ test "custom access validation" {
         ##############################################
 
         # UPDATE BY OTHER
-        execution.enter(
-            filename=os.path.join(FIXTURES, "custom_access_validation.jac"),
-            entrypoint="update",
+        execution.run(
+            target=os.path.join(FIXTURES, "custom_access_validation.jac"),
+            entry_name="update",
             args=_as_any([None, 1]),
-            **{"root": other_root},
+            root_id=other_root,
             nd=nd_str
         );
 
         # CHECK BY OTHER
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "custom_access_validation.jac"),
-            entrypoint="check",
+        execution.run(
+            target=os.path.join(FIXTURES, "custom_access_validation.jac"),
+            entry_name="check",
             args=[],
-            **{"root": other_root},
+            root_id=other_root,
             nd=nd_str
         );
 
@@ -977,29 +980,29 @@ test "custom access validation" {
         ##############################################
 
         # UPDATE BY OWNER
-        execution.enter(
-            filename=os.path.join(FIXTURES, "custom_access_validation.jac"),
-            entrypoint="update",
+        execution.run(
+            target=os.path.join(FIXTURES, "custom_access_validation.jac"),
+            entry_name="update",
             args=_as_any(["WRITE", None]),
             nd=nd_str
         );
 
         # UPDATE BY OTHER
-        execution.enter(
-            filename=os.path.join(FIXTURES, "custom_access_validation.jac"),
-            entrypoint="update",
+        execution.run(
+            target=os.path.join(FIXTURES, "custom_access_validation.jac"),
+            entry_name="update",
             args=_as_any([None, 2]),
-            **{"root": other_root},
+            root_id=other_root,
             nd=nd_str
         );
 
         # CHECK BY OTHER
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "custom_access_validation.jac"),
-            entrypoint="check",
+        execution.run(
+            target=os.path.join(FIXTURES, "custom_access_validation.jac"),
+            entry_name="check",
             args=[],
-            **{"root": other_root},
+            root_id=other_root,
             nd=nd_str
         );
 
@@ -1010,29 +1013,29 @@ test "custom access validation" {
         ##############################################
 
         # UPDATE BY OWNER
-        execution.enter(
-            filename=os.path.join(FIXTURES, "custom_access_validation.jac"),
-            entrypoint="update",
+        execution.run(
+            target=os.path.join(FIXTURES, "custom_access_validation.jac"),
+            entry_name="update",
             args=_as_any(["NO_ACCESS", None]),
             nd=nd_str
         );
 
         # UPDATE BY OTHER
-        execution.enter(
-            filename=os.path.join(FIXTURES, "custom_access_validation.jac"),
-            entrypoint="update",
+        execution.run(
+            target=os.path.join(FIXTURES, "custom_access_validation.jac"),
+            entry_name="update",
             args=_as_any([None, 5]),
-            **{"root": other_root},
+            root_id=other_root,
             nd=nd_str
         );
 
         # CHECK BY OTHER
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "custom_access_validation.jac"),
-            entrypoint="check",
+        execution.run(
+            target=os.path.join(FIXTURES, "custom_access_validation.jac"),
+            entry_name="check",
             args=[],
-            **{"root": other_root},
+            root_id=other_root,
             nd=nd_str
         );
 
@@ -1040,9 +1043,9 @@ test "custom access validation" {
 
         # CHECK BY OWNER
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "custom_access_validation.jac"),
-            entrypoint="check",
+        execution.run(
+            target=os.path.join(FIXTURES, "custom_access_validation.jac"),
+            entry_name="check",
             args=[],
             nd=nd_str
         );
@@ -1064,11 +1067,11 @@ test "run persistent reuse" {
     try {
         # The project's rows live in its database on the shared embedded
         # server; inspect them out-of-band through a fresh store connection.
-        import from jaclang.runtimelib.pgembed { PgRuntime }
-        import from jaclang.runtimelib.session { project_db_name, shared_pg_data_dir }
-        import from jaclang.runtimelib.store { PgStore, TxnIsolation }
+        import from jaclang.data.pgembed { PgRuntime }
+        import from jaclang.server.session { project_db_name, shared_pg_data_dir }
+        import from jaclang.data.store { PgStore, TxnIsolation }
 
-        def _db_counts -> tuple {
+        def _db_counts -> tuple[any, ...] {
             rt = PgRuntime(
                 data_dir=shared_pg_data_dir(),
                 database=project_db_name(
@@ -1098,7 +1101,7 @@ test "run persistent reuse" {
         ##############################################
         #          FIRST RUN - CREATE NODES          #
         ##############################################
-        execution.run(filename=os.path.join(FIXTURES, "simple_node_connection.jac"));
+        execution.run(target=os.path.join(FIXTURES, "simple_node_connection.jac"));
 
         (first_run_keys, first_run_edges) = _db_counts();
 
@@ -1110,7 +1113,7 @@ test "run persistent reuse" {
         #    SECOND RUN - SHOULD REUSE, NOT          #
         #              RECREATE NODES                #
         ##############################################
-        execution.run(filename=os.path.join(FIXTURES, "simple_node_connection.jac"));
+        execution.run(target=os.path.join(FIXTURES, "simple_node_connection.jac"));
 
         (second_run_keys, second_run_edges) = _db_counts();
 
@@ -1132,17 +1135,17 @@ test "user isolation via set user root" {
     try {
         # Create two separate user roots
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "other_root_access.jac"),
-            entrypoint="create_other_root",
+        execution.run(
+            target=os.path.join(FIXTURES, "other_root_access.jac"),
+            entry_name="create_other_root",
             args=[]
         );
         user1_root = capture_get(captured).strip();
 
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "other_root_access.jac"),
-            entrypoint="create_other_root",
+        execution.run(
+            target=os.path.join(FIXTURES, "other_root_access.jac"),
+            entry_name="create_other_root",
             args=[]
         );
         user2_root = capture_get(captured).strip();
@@ -1152,31 +1155,31 @@ test "user isolation via set user root" {
 
         # User 1 creates a node with val=100
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "other_root_access.jac"),
-            entrypoint="create_node",
+        execution.run(
+            target=os.path.join(FIXTURES, "other_root_access.jac"),
+            entry_name="create_node",
             args=_as_any([100]),
-            **{"root": user1_root}
+            root_id=user1_root
         );
         user1_node = capture_get(captured).strip();
 
         # User 2 creates a node with val=200
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "other_root_access.jac"),
-            entrypoint="create_node",
+        execution.run(
+            target=os.path.join(FIXTURES, "other_root_access.jac"),
+            entry_name="create_node",
             args=_as_any([200]),
-            **{"root": user2_root}
+            root_id=user2_root
         );
         user2_node = capture_get(captured).strip();
 
         # Verify user 1 can only see their own node (val=100)
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "other_root_access.jac"),
-            entrypoint="check_node",
+        execution.run(
+            target=os.path.join(FIXTURES, "other_root_access.jac"),
+            entry_name="check_node",
             args=[],
-            **{"root": user1_root}
+            root_id=user1_root
         );
         user1_sees = capture_get(captured).strip();
         assert user1_sees == "A(val=100)" , (
@@ -1185,11 +1188,11 @@ test "user isolation via set user root" {
 
         # Verify user 2 can only see their own node (val=200)
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "other_root_access.jac"),
-            entrypoint="check_node",
+        execution.run(
+            target=os.path.join(FIXTURES, "other_root_access.jac"),
+            entry_name="check_node",
             args=[],
-            **{"root": user2_root}
+            root_id=user2_root
         );
         user2_sees = capture_get(captured).strip();
         assert user2_sees == "A(val=200)" , (
@@ -1198,11 +1201,11 @@ test "user isolation via set user root" {
 
         # Verify user 1 cannot see user 2's node (cross-user isolation)
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "other_root_access.jac"),
-            entrypoint="check_node",
+        execution.run(
+            target=os.path.join(FIXTURES, "other_root_access.jac"),
+            entry_name="check_node",
             args=[],
-            **{"root": user1_root},
+            root_id=user1_root,
             nd=user2_node
         );
         cross_access = capture_get(captured).strip();
@@ -1212,11 +1215,11 @@ test "user isolation via set user root" {
 
         # Verify user 2 cannot see user 1's node
         captured = capture_start();
-        execution.enter(
-            filename=os.path.join(FIXTURES, "other_root_access.jac"),
-            entrypoint="check_node",
+        execution.run(
+            target=os.path.join(FIXTURES, "other_root_access.jac"),
+            entry_name="check_node",
             args=[],
-            **{"root": user2_root},
+            root_id=user2_root,
             nd=user1_node
         );
         cross_access = capture_get(captured).strip();
