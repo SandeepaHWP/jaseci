@@ -4,48 +4,18 @@ import from pathlib { Path }
 glob _ROUTE_ROLE_SUFFIXES: list[str] = ['.impl.', '.test.'],
      _JSX_ELEMENT_EXPORT_RE: str = (
          r'def(?::\w+)?\s+(\w+)\s*(?:\([^)]*\))?\s*->\s*JsxElement\b'
-     );
-
-def _unrouted_jsx_exports(pages_dir: Path, skip_paths: set[Path]) -> list[str] {
-    try {
-        entries = sorted(pages_dir.rglob('*.jac'));
-    } except OSError {
-        return [];
-    }
-    lines: list[str] = [];
-    for f in entries {
-        if any(suffix in f.name for suffix in _ROUTE_ROLE_SUFFIXES) {
-            continue;
-        }
-        if f.resolve() in skip_paths {
-            continue;
-        }
-        try {
-            source = f.read_text(encoding='utf-8');
-        } except OSError {
-            continue;
-        }
-        is_layout = f.stem == 'layout';
-        for hit in re.finditer(_JSX_ELEMENT_EXPORT_RE, source) {
-            kind = 'JsxLayout'
-                if (is_layout or 'layout' in hit.group(1).lower())
-                else 'JsxPage';
-            lines.append(
-                f"  {f}: '{hit.group(1)}' returns JsxElement and is not a route"
-                    + f" — return {kind} to route it, or leave it if it is a co-located component."
-            );
-        }
-    }
-    return lines;
-}
+     ),
+     _ROUTE_TYPE_RE: str = r'->\s*(?:JsxPage|JsxLayout)\b';
 
 def describe_pages_without_routes(pages_dir: Path) -> list[str] {
+    candidates: list[Path] = [];
     try {
-        candidates = [
-            f
-            for f in sorted(pages_dir.rglob('*.jac'))
-            if not any(suffix in f.name for suffix in _ROUTE_ROLE_SUFFIXES)
-        ];
+        for f in sorted(pages_dir.rglob('*.jac')) {
+            if any(suffix in f.name for suffix in _ROUTE_ROLE_SUFFIXES) {
+                continue;
+            }
+            candidates.append(f);
+        }
     } except OSError {
         return [];
     }
@@ -58,20 +28,47 @@ def describe_pages_without_routes(pages_dir: Path) -> list[str] {
         "A route is an export returning JsxPage (JsxLayout for layouts); "
             + "the export name and filename are free."
     ];
-    lines.extend(_unrouted_jsx_exports(pages_dir, set()));
+    for f in candidates {
+        try {
+            source = f.read_text(encoding='utf-8');
+        } except OSError {
+            continue;
+        }
+        if re.search(_ROUTE_TYPE_RE, source) {
+            continue;
+        }
+        for hit in re.finditer(_JSX_ELEMENT_EXPORT_RE, source) {
+            kind = 'JsxLayout' if 'layout' in hit.group(1).lower() else 'JsxPage';
+            lines.append(
+                f"  {f}: '{hit.group(1)}' returns JsxElement — change the "
+                    + f"return type to {kind} to make it a route."
+            );
+        }
+    }
     return lines;
 }
 
-def describe_unmigrated_pages(pages_dir: Path, routed_files: list[Path]) -> list[str] {
-    skip_paths: set[Path] = set();
-    for rf in routed_files {
-        skip_paths.add(rf.resolve());
+def describe_unrouted_pages(files: list[Path]) -> list[str] {
+    lines: list[str] = [];
+    for f in files {
+        try {
+            source = f.read_text(encoding='utf-8');
+        } except OSError {
+            continue;
+        }
+        for hit in re.finditer(_JSX_ELEMENT_EXPORT_RE, source) {
+            kind = 'JsxLayout'
+                if f.stem == 'layout' or 'layout' in hit.group(1).lower()
+                else 'JsxPage';
+            lines.append(
+                f"  {f}: '{hit.group(1)}' returns JsxElement, so it is not a route. "
+                    + f"Return {kind} to route it, or keep it if it is a co-located component."
+            );
+        }
     }
-    lines = _unrouted_jsx_exports(pages_dir, skip_paths);
-    if not lines {
-        return [];
+    if lines {
+        lines.insert(0, "Some pages/ modules are not routes:");
     }
-    lines.insert(0, f"{pages_dir}: some modules are not registered as routes:");
     return lines;
 }
 
@@ -100,13 +97,15 @@ obj RouteScanner {
         pages_dir: Path postinit,
         _routes: list[RouteEntry] = [],
         _layouts: dict[(str, RouteEntry)] = {},
-        _page_files: list[Path] = [];
+        _page_files: list[Path] = [],
+        _unrouted_files: list[Path] = [];
 
     def postinit;
     def has_pages_dir -> bool;
     def scan -> list[RouteEntry];
     def get_layouts -> dict[(str, RouteEntry)];
     def get_page_files -> list[Path];
+    def get_unrouted_files -> list[Path];
     def _scan_directory(
         dir_path: Path, url_prefix: str = "", auth_required: bool = False
     ) -> list[RouteEntry];

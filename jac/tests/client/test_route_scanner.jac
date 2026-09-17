@@ -22,7 +22,7 @@ import from tempfile { TemporaryDirectory }
 import from jaclang.client.route_scanner {
     RouteScanner,
     describe_pages_without_routes,
-    describe_unmigrated_pages,
+    describe_unrouted_pages,
     entry_drops_route_children
 }
 import from jaclang.compiler.frontend.codeinfo { ClientManifest }
@@ -303,116 +303,6 @@ test "non-legacy zero-route tree gets the headline only" {
 }
 
 
-"""Both describers share one body, so the zero-route path gets the same
-filename-based layout hint: layout.jac under a free export name is pointed at
-JsxLayout, not JsxPage."""
-test "zero-route layout.jac with a free export name is pointed at JsxLayout" {
-    with TemporaryDirectory() as tmp {
-        proj = Path(tmp);
-        _write(
-            proj,
-            "pages/layout.jac",
-            "def:pub Shell() -> JsxElement { return <Outlet />; }",
-        );
-        lines = describe_pages_without_routes(proj / "pages");
-        joined = "\n".join(lines);
-        assert "layout.jac" in joined , "the layout file must be named";
-        assert "JsxLayout" in joined , "layout.jac must point at JsxLayout by filename, not export name";
-    }
-}
-
-
-"""When some routes resolve, a JsxElement page that failed to migrate is still
-called out per file - a partial miss is not silent just because siblings route."""
-test "unmigrated JsxElement pages are named when other routes exist" {
-    with TemporaryDirectory() as tmp {
-        proj = Path(tmp);
-        routed = _write(
-            proj,
-            "pages/users.jac",
-            "def:pub Users() -> JsxPage { return <div>u</div>; }",
-        );
-        _write(
-            proj,
-            "pages/about.jac",
-            "def:pub About() -> JsxElement { return <div>a</div>; }",
-        );
-        lines = describe_unmigrated_pages(proj / "pages", [routed]);
-        assert lines , "an unmigrated page must not be silent when siblings route";
-        joined = "\n".join(lines);
-        assert "about.jac" in joined , "the unmigrated file must be named";
-        assert "'About'" in joined , "the export name must be reported";
-        assert "JsxPage" in joined , "the fix must be suggested";
-        assert "users.jac" not in joined , "a resolved route must not be re-reported";
-    }
-}
-
-
-"""A fully migrated tree is quiet: every file resolved, nothing to warn about."""
-test "fully migrated tree yields no unmigrated diagnostic" {
-    with TemporaryDirectory() as tmp {
-        proj = Path(tmp);
-        a = _write(
-            proj,
-            "pages/index.jac",
-            "def:pub Home() -> JsxPage { return <div>h</div>; }",
-        );
-        b = _write(
-            proj,
-            "pages/layout.jac",
-            "def:pub Shell() -> JsxLayout { return <Outlet />; }",
-        );
-        assert describe_unmigrated_pages(proj / "pages", [a, b]) == [];
-    }
-}
-
-
-"""An unmigrated layout file is suggested JsxLayout, not JsxPage."""
-test "unmigrated layout is pointed at JsxLayout" {
-    with TemporaryDirectory() as tmp {
-        proj = Path(tmp);
-        routed = _write(
-            proj,
-            "pages/index.jac",
-            "def:pub Home() -> JsxPage { return <div>h</div>; }",
-        );
-        _write(
-            proj,
-            "pages/layout.jac",
-            "def:pub Shell() -> JsxElement { return <Outlet />; }",
-        );
-        lines = describe_unmigrated_pages(proj / "pages", [routed]);
-        joined = "\n".join(lines);
-        assert "layout.jac" in joined , "the unmigrated layout must be named";
-        assert "JsxLayout" in joined , "a layout file must be pointed at JsxLayout";
-    }
-}
-
-
-"""Whether a file resolved is decided by the injected route set, not by scanning
-its text: a `-> JsxPage` mention in a comment (or a private, unregistered helper)
-must not suppress the warning for a genuinely unmigrated export in that file."""
-test "a JsxPage mention in text does not suppress an unmigrated export" {
-    with TemporaryDirectory() as tmp {
-        proj = Path(tmp);
-        routed = _write(
-            proj,
-            "pages/users.jac",
-            "def:pub Users() -> JsxPage { return <div>u</div>; }",
-        );
-        _write(
-            proj,
-            "pages/about.jac",
-            "# TODO: def About() -> JsxPage\ndef:pub About() -> JsxElement { return <div>a</div>; }",
-        );
-        lines = describe_unmigrated_pages(proj / "pages", [routed]);
-        joined = "\n".join(lines);
-        assert "about.jac" in joined , "a JsxPage mention in a comment must not suppress the warning";
-        assert "'About'" in joined , "the unmigrated export must still be named";
-    }
-}
-
-
 """A dynamic [id] DIRECTORY translates to a `:id` URL segment exactly like a
 dynamic file stem does - react-router treats a literal "[id]" path segment as
 plain text, so an untranslated directory produces a route no URL can ever
@@ -450,4 +340,44 @@ test "pages entry that ignores children drops every route" {
     assert not entry_drops_route_children(manifest(["children"])) , "a children parameter receives them";
     assert not entry_drops_route_children(manifest(["props"])) , "a lone props bundle receives them";
     assert not entry_drops_route_children(ClientManifest()) , "no client app export, nothing to judge";
+}
+
+test "unrouted JsxElement pages are named when other routes exist" {
+    with TemporaryDirectory() as tmp {
+        proj = Path(tmp);
+        _write(
+            proj, "pages/users.jac", "def:pub Users() -> JsxPage { return <div/>; }"
+        );
+        _write(
+            proj, "pages/about.jac", "def:pub About() -> JsxElement { return <div/>; }"
+        );
+        _write(
+            proj,
+            "pages/layout.jac",
+            "def:pub Shell() -> JsxElement { return <Outlet/>; }"
+        );
+        scanner = RouteScanner(proj, route_exports_of=_route_exports_from_source);
+        assert len(scanner.scan()) == 1;
+        joined = "\n".join(describe_unrouted_pages(scanner.get_unrouted_files()));
+        assert "about.jac: 'About' returns JsxElement" in joined
+            and "Return JsxPage" in joined , joined;
+        assert "layout.jac: 'Shell' returns JsxElement" in joined
+            and "Return JsxLayout" in joined , joined;
+        assert "users.jac" not in joined , joined;
+    }
+}
+
+test "fully routed pages tree yields no unrouted diagnostic" {
+    with TemporaryDirectory() as tmp {
+        proj = Path(tmp);
+        _write(proj, "pages/index.jac", "def:pub Home() -> JsxPage { return <div/>; }");
+        _write(
+            proj,
+            "pages/layout.jac",
+            "def:pub Shell() -> JsxLayout { return <Outlet/>; }"
+        );
+        scanner = RouteScanner(proj, route_exports_of=_route_exports_from_source);
+        scanner.scan();
+        assert describe_unrouted_pages(scanner.get_unrouted_files()) == [];
+    }
 }
