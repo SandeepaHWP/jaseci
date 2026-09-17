@@ -708,6 +708,24 @@ impl TypeEvaluator._declared_metaclass_member(
     return member;
 }
 
+impl TypeEvaluator._report_rejected_method_call(
+    receiver: ClassType, member: ClassMember, args: list[Expr], site: UniNode
+) -> None {
+    method = self.get_type_of_symbol(member.symbol);
+    if member.overloads or not isinstance(method, FunctionType) {
+        self.emit_diag(E1055, site, method=member.symbol.sym_name);
+        return;
+    }
+    method = method.specialize(receiver);
+    arg_match = self.match_args_to_params(args, site, method);
+    if not arg_match.argument_errors {
+        self.validate_arg_types(
+            arg_match,
+            solved_type_vars=self._receiver_type_var_bindings(method, receiver)
+        );
+    }
+}
+
 impl TypeEvaluator._edge_endpoint_type(
     edge_type: ClassType, edge_dir: EdgeDir
 ) -> TypeBase | None {

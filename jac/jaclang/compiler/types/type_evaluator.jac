@@ -222,6 +222,7 @@ import from jaclang.compiler.frontend.diagnostics {
     E1052,
     E1053,
     E1054,
+    E1055,
     E1056,
     E1057,
     E1062,
@@ -498,6 +499,10 @@ walker TypeEvaluator {
     def _declared_metaclass_member(
         cls_type: ClassType, name: str
     ) -> (ClassMember | None);
+
+    def _report_rejected_method_call(
+        receiver: ClassType, member: ClassMember, args: list[Expr], site: UniNode
+    ) -> None;
 
     def _extract_type_params(node_: Archetype) -> list[TypeVarType];
     def _type_var_from_param(node_: TypeParam) -> TypeVarType;

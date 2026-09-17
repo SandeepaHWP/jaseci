@@ -21,14 +21,21 @@ test "enum member lookup by name types as that enum" {
     assert not errs , errs;
 }
 
+glob META_SRC: str = "class Meta(type) {\n"
+         + "    def __getitem__(cls: Meta, key: str) -> int {\n        return len(key);\n    }\n"
+         + "}\n"
+         + "class Foo(metaclass=Meta) {}\n";
+
 test "a user metaclass __getitem__ is dispatched from the class object" {
-    src = "class Meta(type) {\n"
-        + "    def __getitem__(cls: Meta, key: str) -> int {\n        return len(key);\n    }\n"
-        + "}\n"
-        + "class Foo(metaclass=Meta) {}\n"
-        + "def probe -> int {\n    return Foo['abc'];\n}\n";
-    errs = check_src(src);
+    errs = check_src(META_SRC + "def probe -> int {\n    return Foo['abc'];\n}\n");
     assert not errs , errs;
+}
+
+test "invalid keys to a metaclass __getitem__ are reported" {
+    for key in ["123", "1:3"] {
+        errs = check_src(META_SRC + f"def probe -> None {{\n    x = Foo[{key}];\n}}\n");
+        assert errs and "parameter 'key'" in " ".join(errs) , (key, errs);
+    }
 }
 
 test "generic classes without a metaclass __getitem__ still specialize" {

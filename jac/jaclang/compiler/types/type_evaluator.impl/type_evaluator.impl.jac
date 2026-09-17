@@ -1513,18 +1513,19 @@ impl TypeEvaluator._get_type_of_expression_core(
                 }
                 if isinstance(base_type, ClassType)
                     and base_type.is_instantiable_class() {
-                    if self._declared_metaclass_member(base_type, "__getitem__")
-                        is not None {
+                    if meta_getitem
+                        := self._declared_metaclass_member(base_type, "__getitem__") {
+                        index = self._subscript_index_expr(expr.right);
                         item_ty = self.get_type_of_magic_method_call(
-                            base_type,
-                            "__getitem__",
-                            [self._subscript_index_expr(expr.right)],
-                            expr
+                            base_type, "__getitem__", [index], expr
                         );
-                        if item_ty is not None
-                            and not isinstance(item_ty, UnknownType) {
+                        if item_ty is not None {
                             return item_ty;
                         }
+                        self._report_rejected_method_call(
+                            base_type, meta_getitem, [index], expr
+                        );
+                        return UnknownType(is_diagnosed=True);
                     }
                     type_args: list[TypeBase] = [];
                     slot_vals: list[Expr] = [];
