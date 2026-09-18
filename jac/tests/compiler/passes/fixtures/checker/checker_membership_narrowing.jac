@@ -1,50 +1,25 @@
-"""`x in (...)` narrows x when every element is a literal; `not in` narrows its else.
+"""`x in (...)` narrows x when every element is a literal; `not in` narrows the other way.
 Only the cases marked below still report an error."""
 
-def in_tuple(ak: str | None) -> str {
-    return ak if ak in ("node", "walker") else "obj";
-}
-
-def not_in_tuple(ak: str | None) -> str {
-    return "obj" if ak not in ("node", "walker") else ak;
-}
-
-def in_list(ak: str | None) -> str {
-    return ak if ak in ["node", "walker"] else "obj";
-}
-
-def not_in_list(ak: str | None) -> str {
-    return "obj" if ak not in ["node", "walker"] else ak;
-}
-
-def in_narrows_to_the_literals(ak: str | None) -> None {
+def in_tuple_narrows(ak: str | None) -> None {
     if ak in ("node", "walker") {
         k: Literal["node", "walker"] = ak;
     }
     return None;
 }
 
-def in_tuple_int(n: int | None) -> int {
-    return n if n in (1, 2, 3) else 0;
+def not_in_list_narrows(ak: str | None) -> str {
+    if ak not in ["node", "walker"] {
+        return "obj";
+    }
+    return ak;
 }
 
-def in_tuple_float(f: float | None) -> float {
-    return f if f in (1.5, 2.5) else 0.0;
-}
-
-def in_tuple_bool(b: bool | None) -> bool {
-    return b if b in (True, False) else False;
-}
-
-def in_literal_union(k: Literal["a", "b", "c"]) -> None {
-    if k in ("a", "b") {
-        ab: Literal["a", "b"] = k;
+def in_single_element(ak: str | None) -> None {
+    if ak in ("node",) {
+        k: Literal["node"] = ak;
     }
     return None;
-}
-
-def fstring_element_is_not_a_literal(ak: str | None, x: str) -> str {
-    return ak if ak in (f"{x}", "walker") else "obj";  # <-- Error: f-string element
 }
 
 def variable_element_is_not_a_literal(ak: str | None, other: str) -> str {

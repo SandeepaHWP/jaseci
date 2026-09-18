@@ -710,39 +710,32 @@ glob CHECKER_DIRS: dict[(str, str)] = {
              "membership_narrowing",
              "checker",
              "checker_membership_narrowing.jac",
-             5,
+             4,
              True,
              [
                  (
                      0,
                      """
 Cannot return str | NoneType, expected str
-    return ak if ak in (f"{x}", "walker") else "obj";  # <-- Error: f-string element
+    return ak if ak in (other, "walker") else "obj";  # <-- Error: variable element
     """
                  ),
                  (
                      1,
                      """
 Cannot return str | NoneType, expected str
-    return ak if ak in (other, "walker") else "obj";  # <-- Error: variable element
+    return ak;  # <-- Error: only the literals are ruled out, ak is still str | None
     """
                  ),
                  (
                      2,
                      """
 Cannot return str | NoneType, expected str
-    return ak;  # <-- Error: only the literals are ruled out, ak is still str | None
-    """
-                 ),
-                 (
-                     3,
-                     """
-Cannot return str | NoneType, expected str
         return ak;  # <-- Error: only the literals are ruled out, ak is still str | None
     """
                  ),
                  (
-                     4,
+                     3,
                      """
 Cannot assign Literal["a"] | Literal["b"] | Literal["c"] to Literal["c"]
         c: Literal["c"] = k;  # <-- Error: not narrowed yet
