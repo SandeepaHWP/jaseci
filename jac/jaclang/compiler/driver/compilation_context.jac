@@ -10,7 +10,7 @@ import from jaclang.compiler.driver.compile_options { CompileOptions }
 import type from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.frontend.diagnostics { E0111 }
 import from jaclang.compiler.frontend.srcloc { Span }
-import from jaclang.compiler.frontend.unitree { Module, Source }
+import from jaclang.compiler.frontend.unitree { Module, Source, UniNode }
 import from jaclang.compiler.passes.context { Alert }
 
 glob _active_options: ContextVar[CompileOptions | None] = ContextVar(
@@ -53,14 +53,27 @@ obj SourceUnit {
         warnings: list[Alert];
 }
 
-def _too_deeply_nested(source: str, path: str) -> Alert {
+def _too_deeply_nested(span: Span) -> Alert {
     return Alert(
-        E0111.format_message(),
-        Span.make(path, source, (1, 1), (0, 0), (0, 0)),
-        SourceStore,
-        code=E0111,
-        help_text=E0111.help_text
+        E0111.format_message(), span, SourceStore, code=E0111, help_text=E0111.help_text
     );
+}
+
+def _deepest_node(tree: UniNode) -> UniNode {
+    deepest = tree;
+    best = 0;
+    stack: list[tuple[UniNode, int]] = [(tree, 0)];
+    while stack {
+        (node, depth) = stack.pop();
+        if depth > best {
+            best = depth;
+            deepest = node;
+        }
+        for kid in node.kid {
+            stack.append((kid, depth + 1));
+        }
+    }
+    return deepest;
 }
 
 obj SourceStore {
@@ -81,7 +94,8 @@ obj SourceStore {
             try {
                 (syntax, failed) = parse_woven(source, path, diagnostics, annexes);
             } except RecursionError {
-                program.errors_had.append(_too_deeply_nested(source, path));
+                start = Span.make(path, source, (1, 1), (0, 0), (0, 0));
+                program.errors_had.append(_too_deeply_nested(start));
                 return (Module.make_stub(path, Source(source, path)), True);
             }
             unit = SourceUnit(
@@ -103,8 +117,9 @@ obj SourceStore {
         try {
             syntax = copy.deepcopy(unit.syntax);
         } except RecursionError {
-            program.errors_had.append(_too_deeply_nested(source, path));
-            return (unit.syntax, True);
+            deepest = _deepest_node(unit.syntax);
+            program.errors_had.append(_too_deeply_nested(Span.from_loc(deepest.loc)));
+            return (Module.make_stub(path, Source(source, path)), True);
         }
         assert isinstance(syntax, Module);
         program.errors_had.extend(unit.errors);

@@ -116,6 +116,9 @@ impl Parser.consume_uni(kind: TokenKind, value: str | None = None) -> Token {
 }
 
 impl Parser.error(message: str) {
+    if self._too_deep {
+        return;
+    }
     self.error_count += 1;
     self.diags.append(
         SrcDiag(message=message, code_str="", loc=self.current().loc, is_error=True)
@@ -125,6 +128,9 @@ impl Parser.error(message: str) {
 impl Parser.emit_diag(
     message: str, code_str: str, loc: SourceLoc | None = None, help: str = ""
 ) {
+    if self._too_deep {
+        return;
+    }
     sloc = loc if loc is not None else self.current().loc;
     self.error_count += 1;
     self.diags.append(
@@ -135,6 +141,9 @@ impl Parser.emit_diag(
 impl Parser.emit_warn(
     message: str, code_str: str, loc: SourceLoc | None = None, help: str = ""
 ) {
+    if self._too_deep {
+        return;
+    }
     sloc = loc if loc is not None else self.current().loc;
     self.diags.append(
         SrcDiag(message=message, code_str=code_str, loc=sloc, is_error=False, help=help)
@@ -488,6 +497,37 @@ impl Parser.parse_module -> Module {
 }
 
 impl Parser.parse_expression(allow_cast: bool = True) -> Expr {
+    if not self._nest_enter() {
+        return self._nest_bail();
+    }
+    expr = self._parse_expression_body(allow_cast);
+    self._nest_depth -= 1;
+    return expr;
+}
+
+impl Parser._nest_enter -> bool {
+    if self._nest_depth >= MAX_NESTING {
+        return False;
+    }
+    self._nest_depth += 1;
+    return True;
+}
+
+impl Parser._nest_bail -> Expr {
+    if not self._too_deep {
+        self.emit_diag(
+            "Expression is too deeply nested for the compiler to process",
+            "E0111",
+            help="Each nested bracket or prefix operator adds a level, and the compiler stops at "
+                + f"{MAX_NESTING}. Build the inner parts as separate values first, then combine them."
+        );
+        self._too_deep = True;
+    }
+    self.pos = self._tokens_len - 1;
+    return self.make_name(self.current());
+}
+
+impl Parser._parse_expression_body(allow_cast: bool = True) -> Expr {
     if self.check(TokenKind.KW_LAMBDA) {
         return self.parse_lambda_expr();
     }
@@ -737,7 +777,11 @@ impl Parser.parse_logical_and(allow_cast: bool = True) -> Expr {
 impl Parser.parse_logical_not(allow_cast: bool = True) -> Expr {
     if self.match_tok(TokenKind.KW_NOT) {
         op = self.make_uni_token(self.previous());
+        if not self._nest_enter() {
+            return self._nest_bail();
+        }
         operand = self.parse_logical_not(allow_cast);
+        self._nest_depth -= 1;
         return UnaryExpr(operand=operand, op=op, kid=[op, operand]);
     }
     return self.parse_compare(allow_cast);
@@ -834,7 +878,11 @@ impl Parser.parse_power -> Expr {
     left = self.parse_factor();
     if self.match_tok(TokenKind.STAR_POW) {
         op = self.make_uni_token(self.previous());
+        if not self._nest_enter() {
+            return self._nest_bail();
+        }
         right = self.parse_power();
+        self._nest_depth -= 1;
         left = BinaryExpr(left=left, op=op, right=right, kid=[left, op, right]);
     }
     return left;
@@ -844,7 +892,11 @@ impl Parser.parse_factor -> Expr {
     if self.check_any(TokenKind.BW_NOT, TokenKind.MINUS, TokenKind.PLUS) {
         tok = self.expect_any(TokenKind.BW_NOT, TokenKind.MINUS, TokenKind.PLUS);
         op = self.make_uni_token(tok);
+        if not self._nest_enter() {
+            return self._nest_bail();
+        }
         operand = self.parse_factor();
+        self._nest_depth -= 1;
         return UnaryExpr(operand=operand, op=op, kid=[op, operand]);
     }
     return self.parse_connect();
