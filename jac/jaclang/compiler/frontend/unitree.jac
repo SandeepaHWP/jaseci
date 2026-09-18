@@ -8,6 +8,7 @@ import from jaclang.compiler.frontend.constant {
     DELIM_MAP,
     BindingKind,
     CodeContext,
+    DeleteTargetError,
     ExprCtx,
     ImmutabilityKind,
     OwnershipKind,
@@ -167,7 +168,6 @@ node UniNode {
     def postinit -> None;
     can walk_kids with TreeWalker entry;
 
-    has kid: list[UniNode] { getter; }
     has parent: (UniNode | None) { getter; }
     has gen: CodeGenTarget { getter; setter(value: CodeGenTarget); }
     has _sub_node_tab: dict[(type, list[UniNode])] { getter; }
@@ -179,8 +179,8 @@ node UniNode {
     def freeze_structure -> None;
     def thaw_structure -> None;
     def structure_thawed -> StructureThaw;
-    def _attach(child: UniNode, role: type[Role]) -> None;
-    def _role_clear(role: type[Role]) -> None;
+    def _attach(child: UniNode, role: type[Edge]) -> None;
+    def _role_clear(role: type[Edge]) -> None;
     def _as_node_list(value: any) -> list[UniNode];
     def _children -> list[UniNode];
     def _role_shaped(role: type[Role], found: list[UniNode]) -> any;
@@ -1483,6 +1483,7 @@ node DeleteStmt(CodeBlockStmt) {
     def __repr__ -> str;
     def leaf_targets -> list[Expr];
     static def unwrap_target(target: Expr) -> Expr;
+    static def invalid_target(target: UniNode) -> (DeleteTargetError | None);
     static def is_location(target: Expr) -> bool;
     static def type_has_graph_member(t: (TypeBase | None)) -> bool;
     static def type_may_hold_graph(t: (TypeBase | None)) -> bool;
