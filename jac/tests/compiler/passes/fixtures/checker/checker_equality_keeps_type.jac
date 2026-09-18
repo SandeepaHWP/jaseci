@@ -42,9 +42,16 @@ def isinstance_and_eq(x: int | str) -> int {
     return 0;
 }
 
+def unrelated_member_dropped(x: int | bytes) -> int {
+    if x == 1 {
+        return x;
+    }
+    return 0;
+}
+
 def str_eq_int(v: str | None) -> int {
     if v == 1 {
-        return v;  # <-- Error: v is str, not int
+        return v;  # <-- Error: neither str nor None equals 1, so v is not narrowed
     }
     return 0;
 }

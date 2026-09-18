@@ -5507,12 +5507,19 @@ impl TypeEvaluator._may_equal(member: TypeBase, compared: TypeBase) -> bool {
     if self.is_none_type(member) or self.is_none_type(compared) {
         return self.is_none_type(member) and self.is_none_type(compared);
     }
-    if isinstance(member, ClassType)
-        and isinstance(compared, ClassType)
-        and member.is_literal_type()
-        and compared.is_literal_type()
-        and member.shared.same_class(compared.shared) {
-        return member.get_literal_value() == compared.get_literal_value();
+    if not isinstance(member, ClassType) or not isinstance(compared, ClassType) {
+        return True;
+    }
+    if member.shared.same_class(compared.shared) {
+        if member.is_literal_type() and compared.is_literal_type() {
+            return member.get_literal_value() == compared.get_literal_value();
+        }
+        return True;
+    }
+    numeric = ["bool", "int", "float", "complex"];
+    builtin_values = numeric + ["str", "bytes"];
+    if member.is_builtin(builtin_values) and compared.is_builtin(builtin_values) {
+        return member.is_builtin(numeric) and compared.is_builtin(numeric);
     }
     return True;
 }

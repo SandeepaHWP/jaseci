@@ -716,8 +716,8 @@ glob CHECKER_DIRS: dict[(str, str)] = {
                  (
                      0,
                      """
-Cannot return str, expected int
-        return v;  # <-- Error: v is str, not int
+Cannot return str | NoneType, expected int
+        return v;  # <-- Error: neither str nor None equals 1, so v is not narrowed
     """
                  ),
                  (
