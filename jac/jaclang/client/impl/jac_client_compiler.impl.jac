@@ -623,7 +623,7 @@ impl JacClientCompiler._warn_unrouted_pages(
 ) -> None {
     import from jaclang.client.route_scanner { describe_unrouted_pages }
     for line in describe_unrouted_pages(scanner.get_unrouted_files()) {
-        console.error(line);
+        console.warning(line);
     }
 }
 

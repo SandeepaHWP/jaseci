@@ -252,6 +252,12 @@ test "zero-route pages tree yields a diagnostic with a legacy hint" {
             "pages/layout.jac",
             "def:pub layout() -> JsxElement { return <Outlet />; }",
         );
+        _write(
+            proj,
+            "pages/help.jac",
+            "obj Card { def render -> JsxPage { return <div/>; } }\n"
+            "def:pub Help() -> JsxElement { return <div/>; }",
+        );
         lines = describe_pages_without_routes(proj / "pages");
         assert lines , "zero routes must not be silent";
         joined = "\n".join(lines);
@@ -260,6 +266,7 @@ test "zero-route pages tree yields a diagnostic with a legacy hint" {
         assert "JsxLayout" in joined , "hint must name the layout fix";
         assert "index.jac" in joined , "hint must name the offending page file";
         assert "layout.jac" in joined , "hint must name the offending layout file";
+        assert "help.jac: 'Help' returns JsxElement" in joined , "a JsxPage elsewhere in the file must not hide the offending export";
     }
 }
 
@@ -342,7 +349,7 @@ test "pages entry that ignores children drops every route" {
     assert not entry_drops_route_children(ClientManifest()) , "no client app export, nothing to judge";
 }
 
-test "unrouted JsxElement pages are named when other routes exist" {
+test "unrouted pages are named when other routes exist" {
     with TemporaryDirectory() as tmp {
         proj = Path(tmp);
         _write(
@@ -356,6 +363,11 @@ test "unrouted JsxElement pages are named when other routes exist" {
             "pages/layout.jac",
             "def:pub Shell() -> JsxElement { return <Outlet/>; }"
         );
+        _write(
+            proj,
+            "pages/wrapped.jac",
+            "def:pub Wrapped() -> (JsxPage) { return <div/>; }"
+        );
         scanner = RouteScanner(proj, route_exports_of=_route_exports_from_source);
         assert len(scanner.scan()) == 1;
         joined = "\n".join(describe_unrouted_pages(scanner.get_unrouted_files()));
@@ -363,21 +375,20 @@ test "unrouted JsxElement pages are named when other routes exist" {
             and "Return JsxPage" in joined , joined;
         assert "layout.jac: 'Shell' returns JsxElement" in joined
             and "Return JsxLayout" in joined , joined;
+        assert "wrapped.jac: names JsxPage but did not resolve to a route"
+            in joined , joined;
         assert "users.jac" not in joined , joined;
-    }
-}
-
-test "fully routed pages tree yields no unrouted diagnostic" {
-    with TemporaryDirectory() as tmp {
-        proj = Path(tmp);
-        _write(proj, "pages/index.jac", "def:pub Home() -> JsxPage { return <div/>; }");
+        routed = proj / "routed";
         _write(
-            proj,
+            routed, "pages/index.jac", "def:pub Home() -> JsxPage { return <div/>; }"
+        );
+        _write(
+            routed,
             "pages/layout.jac",
             "def:pub Shell() -> JsxLayout { return <Outlet/>; }"
         );
-        scanner = RouteScanner(proj, route_exports_of=_route_exports_from_source);
-        scanner.scan();
-        assert describe_unrouted_pages(scanner.get_unrouted_files()) == [];
+        clean = RouteScanner(routed, route_exports_of=_route_exports_from_source);
+        clean.scan();
+        assert describe_unrouted_pages(clean.get_unrouted_files()) == [] , "a fully routed tree stays quiet";
     }
 }
