@@ -35,7 +35,7 @@ def custom_eq_keeps_type(t: Tag | None) -> Tag {
     return Tag();
 }
 
-def isinstance_and_eq(x: int | str) -> int {
+def isinstance_and_eq(x: int | Tag) -> int {
     if isinstance(x, int) and x == 5 {
         return x + 1;
     }
