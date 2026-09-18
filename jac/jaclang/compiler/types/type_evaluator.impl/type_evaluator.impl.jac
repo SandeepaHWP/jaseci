@@ -1513,8 +1513,12 @@ impl TypeEvaluator._get_type_of_expression_core(
                 }
                 if isinstance(base_type, ClassType)
                     and base_type.is_instantiable_class() {
-                    if meta_getitem
-                        := self._declared_metaclass_member(base_type, "__getitem__") {
+                    import from jaclang.compiler.frontend.unitree { in_type_position }
+                    if not in_type_position(expr, include_subscripts=False)
+                        and (
+                            meta_getitem
+                            := self._declared_metaclass_member(base_type, "__getitem__")
+                        ) {
                         index = self._subscript_index_expr(expr.right);
                         item_ty = self.get_type_of_magic_method_call(
                             base_type, "__getitem__", [index], expr
