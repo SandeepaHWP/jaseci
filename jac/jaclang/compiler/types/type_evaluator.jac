@@ -1,3 +1,4 @@
+import from jaclang.compiler.frontend.roles { Kid }
 import from jaclang.compiler.passes.context { CompileContext }
 import from jaclang.compiler.types.builtin_extensions { install_builtin_extensions }
 import os;
@@ -304,6 +305,36 @@ obj MatchArgsToParamsResult {
         argument_errors: bool = False;
 }
 
+glob MAX_LISTED_OVERLOADS: int = 4,
+     MAX_TYPE_TEXT: int = 80;
+
+obj CallableMismatch {}
+
+obj GradualSourceMismatch(CallableMismatch) {}
+
+obj ParameterMismatch(CallableMismatch) {
+    has src_param: Parameter,
+        dest_param: Parameter;
+}
+
+obj ArityMismatch(CallableMismatch) {
+    has src_count: int,
+        dest_count: int;
+}
+
+obj ReturnMismatch(CallableMismatch) {
+    has src_return: TypeBase,
+        dest_return: TypeBase;
+}
+
+obj ArgTypeMismatch {
+    has param_name: str,
+        value: Expr,
+        actual: TypeBase,
+        param_type: TypeBase,
+        bindings: dict[str, TypeBase];
+}
+
 obj NarrowingTarget {
     has key: str,
         declared_type: TypeBase,
@@ -566,6 +597,10 @@ walker TypeEvaluator {
         src_func: FunctionType, dest_func: FunctionType, strict: bool = False
     ) -> bool;
 
+    def _callable_mismatch(
+        src_func: FunctionType, dest_func: FunctionType, strict: bool = False
+    ) -> CallableMismatch | None;
+
     def _is_ability_classmethod(node_: Ability) -> bool;
     def _is_ability_staticmethod(node_: Ability) -> bool;
     def _classify_property_symbol(symbol: Symbol) -> PropertyWriteKind;
@@ -694,7 +729,6 @@ walker TypeEvaluator {
     def validate_call_args(expr: FuncCall) -> TypeBase;
     def _validate_call_type(expr: FuncCall, caller_type: TypeBase) -> TypeBase;
     def _container_value_type(value_type: TypeBase, at: Expr) -> TypeBase;
-    def _unannotated_lambda_arg_name(expr: FuncCall) -> str | None;
     def _make_coroutine_type(inner: TypeBase) -> TypeBase;
     def _is_awaitable_type(t: TypeBase) -> bool;
     def _unwrap_awaitable_type(t: TypeBase, node_: UniNode) -> TypeBase;
@@ -702,9 +736,16 @@ walker TypeEvaluator {
     def validate_arg_types(
         args: MatchArgsToParamsResult,
         checking_overload: bool = False,
+        mismatches: list[ArgTypeMismatch] | None = None,
         solved_type_vars: (dict[str, TypeBase] | None) = None
     ) -> bool;
 
+    def _callable_reason(arg_type: TypeBase, expected: TypeBase) -> str | None;
+    def _describe_overload_rejections(
+        rejections: list[tuple[int, ArgTypeMismatch]], overload_count: int
+    ) -> str | None;
+
+    def _shown_expected(mismatch: ArgTypeMismatch) -> TypeBase;
     def _merge_catalog_field_params(
         tab: CatScope, param_map: dict[str, Parameter], skip_deferred: bool
     ) -> None;
