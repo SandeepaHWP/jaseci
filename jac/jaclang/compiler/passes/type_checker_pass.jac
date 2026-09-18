@@ -165,6 +165,7 @@ walker TypeCheckPass(TreeWalker) {
         module: Module,
         prog: JacProgram,
         evaluator: TypeEvaluator postinit,
+        _deferred_writes: list[tuple[Expr, (UniNode | None)]] postinit,
         _lambda_depth: int = 0;
 
     def postinit -> None;
@@ -230,6 +231,11 @@ walker TypeCheckPass(TreeWalker) {
     def _eval_unpacking_names(container: Expr) -> None;
     def _write_leaves(target: (Expr | None)) -> list[Expr];
     def _check_immutable_write(
+        target: (Expr | None), rebind_scope: (UniNode | None) = None
+    ) -> None;
+
+    def _flush_immutable_writes -> None;
+    def _judge_immutable_write(
         target: (Expr | None), rebind_scope: (UniNode | None) = None
     ) -> None;
 

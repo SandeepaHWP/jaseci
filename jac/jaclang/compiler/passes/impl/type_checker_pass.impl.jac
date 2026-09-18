@@ -475,6 +475,22 @@ impl TypeCheckPass._write_leaves(target: (Expr | None)) -> list[Expr] {
 impl TypeCheckPass._check_immutable_write(
     target: (Expr | None), rebind_scope: (UniNode | None) = None
 ) -> None {
+    if target is not None {
+        self._deferred_writes.append((target, rebind_scope));
+    }
+}
+
+impl TypeCheckPass._flush_immutable_writes -> None {
+    pending = self._deferred_writes;
+    self._deferred_writes = [];
+    for (target, rebind_scope) in pending {
+        self._judge_immutable_write(target, rebind_scope);
+    }
+}
+
+impl TypeCheckPass._judge_immutable_write(
+    target: (Expr | None), rebind_scope: (UniNode | None) = None
+) -> None {
     for leaf in self._write_leaves(target) {
         if isinstance(leaf, AtomTrailer)
             and leaf.is_attr
@@ -1503,6 +1519,7 @@ impl TypeCheckPass._install_client_state_setters -> None {
 
 impl TypeCheckPass.postinit -> None {
     self.evaluator = self.prog.get_type_evaluator();
+    self._deferred_writes = [];
 }
 
 impl TypeCheckPass.initialize with entry {
@@ -1526,6 +1543,7 @@ impl TypeCheckPass.prepare with entry {
 }
 
 impl TypeCheckPass.finish with exit {
+    self._flush_immutable_writes();
     if self.ctx.nested_depth {
         return;
     }
