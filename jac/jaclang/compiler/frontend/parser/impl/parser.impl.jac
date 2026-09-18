@@ -500,7 +500,32 @@ impl Parser.parse_expression(allow_cast: bool = True) -> Expr {
     if not self._nest_enter() {
         return self._nest_bail();
     }
-    expr = self._parse_expression_body(allow_cast);
+    if self.check(TokenKind.KW_LAMBDA) {
+        lambda_expr = self.parse_lambda_expr();
+        self._nest_depth -= 1;
+        return lambda_expr;
+    }
+
+    expr = self.parse_concurrent_expr(allow_cast);
+    if self._check_js_arrow_fault() {
+        expr = self._recover_js_arrow_fault(expr);
+    }
+    if self.match_tok(TokenKind.KW_IF) {
+        if_uni = self.make_uni_token(self.previous());
+        condition = self.parse_expression(allow_cast);
+        else_uni = self.consume_uni(TokenKind.KW_ELSE);
+        else_value = self.parse_expression(allow_cast);
+        cond_cfg = CfgExpr(expr=condition, kid=[condition]);
+        val_cfg = CfgExpr(expr=expr, kid=[expr]);
+        else_cfg = CfgExpr(expr=else_value, kid=[else_value]);
+        self._nest_depth -= 1;
+        return IfElseExpr(
+            condition=cond_cfg,
+            value=val_cfg,
+            else_value=else_cfg,
+            kid=[val_cfg, if_uni, cond_cfg, else_uni, else_cfg]
+        );
+    }
     self._nest_depth -= 1;
     return expr;
 }
@@ -525,33 +550,6 @@ impl Parser._nest_bail -> Expr {
     }
     self.pos = self._tokens_len - 1;
     return self.make_name(self.current());
-}
-
-impl Parser._parse_expression_body(allow_cast: bool = True) -> Expr {
-    if self.check(TokenKind.KW_LAMBDA) {
-        return self.parse_lambda_expr();
-    }
-
-    expr = self.parse_concurrent_expr(allow_cast);
-    if self._check_js_arrow_fault() {
-        expr = self._recover_js_arrow_fault(expr);
-    }
-    if self.match_tok(TokenKind.KW_IF) {
-        if_uni = self.make_uni_token(self.previous());
-        condition = self.parse_expression(allow_cast);
-        else_uni = self.consume_uni(TokenKind.KW_ELSE);
-        else_value = self.parse_expression(allow_cast);
-        cond_cfg = CfgExpr(expr=condition, kid=[condition]);
-        val_cfg = CfgExpr(expr=expr, kid=[expr]);
-        else_cfg = CfgExpr(expr=else_value, kid=[else_value]);
-        return IfElseExpr(
-            condition=cond_cfg,
-            value=val_cfg,
-            else_value=else_cfg,
-            kid=[val_cfg, if_uni, cond_cfg, else_uni, else_cfg]
-        );
-    }
-    return expr;
 }
 
 impl Parser._check_js_arrow_fault -> bool {

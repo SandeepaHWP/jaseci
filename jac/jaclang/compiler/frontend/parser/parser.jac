@@ -439,7 +439,6 @@ obj Parser {
     def parse -> Module;
     def parse_module -> Module;
     def parse_expression(allow_cast: bool = True) -> Expr;
-    def _parse_expression_body(allow_cast: bool = True) -> Expr;
     def _nest_enter -> bool;
     def _nest_bail -> Expr;
     def _check_js_arrow_fault -> bool;

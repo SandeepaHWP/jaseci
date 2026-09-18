@@ -9,6 +9,7 @@ import from collections.abc { Iterator }
 import from jaclang.compiler.driver.compile_options { CompileOptions }
 import type from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.frontend.diagnostics { E0111 }
+import from jaclang.compiler.frontend.roles { Kid }
 import from jaclang.compiler.frontend.srcloc { Span }
 import from jaclang.compiler.frontend.unitree { Module, Source, UniNode }
 import from jaclang.compiler.passes.context { Alert }
@@ -64,12 +65,12 @@ def _deepest_node(tree: UniNode) -> UniNode {
     best = 0;
     stack: list[tuple[UniNode, int]] = [(tree, 0)];
     while stack {
-        (node, depth) = stack.pop();
+        (cur, depth) = stack.pop();
         if depth > best {
             best = depth;
-            deepest = node;
+            deepest = cur;
         }
-        for kid in node.kid {
+        for kid in [cur->:Kid:->] {
             stack.append((kid, depth + 1));
         }
     }
