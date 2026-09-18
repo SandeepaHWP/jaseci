@@ -515,9 +515,6 @@ impl TypeCheckPass._check_immutable_write(
 impl TypeCheckPass._rebound_enclosing_symbol(
     scope: UniNode, leaf: Name
 ) -> (Symbol | None) {
-    # A `for`/`with as`/`except as`/`match` target binds in its own scope but the
-    # emitted code writes the enclosing binding -- only within the same function,
-    # so a nested rebind of an outer Final leaves that Final untouched.
     py_scope = find_python_scope_node_of(scope);
     return py_scope.names_in_scope.get(leaf.value) if py_scope is not None else None;
 }
