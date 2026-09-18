@@ -35,6 +35,13 @@ def custom_eq_keeps_type(t: Tag | None) -> Tag {
     return Tag();
 }
 
+def isinstance_and_eq(x: int | str) -> int {
+    if isinstance(x, int) and x == 5 {
+        return x + 1;
+    }
+    return 0;
+}
+
 def str_eq_int(v: str | None) -> int {
     if v == 1 {
         return v;  # <-- Error: v is str, not int
