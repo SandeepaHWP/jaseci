@@ -1,5 +1,5 @@
 import from pathlib { Path }
-import from jaclang.cache.policy { Policy, Retention, SweepReport }
+import from jaclang.cache.policy { Policy, Retention, SweepReport, KeepMatch, TempLock }
 
 obj Bucket {
     has name: str,
@@ -7,9 +7,11 @@ obj Bucket {
         policy: Policy,
         summary: str = "",
         root_env: str = "",
-        root_prefix: str = "";
+        root_prefix: str = "",
+        root_dir: str = "";
 
     def path -> Path;
+    def ensure -> Path;
     def is_external -> bool;
     def note_hit(item: Path) -> None;
 }
@@ -74,7 +76,7 @@ glob RETIRED: tuple[str, ...] = (
          Bucket(
              name="jir-kernel-units",
              relpath="jir/kernel_units",
-             policy=Policy(ttl_days=14.0, keep_match="fragment"),
+             policy=Policy(ttl_days=14.0, keep_match=KeepMatch.FRAGMENT),
              summary="native kernel unit sources and their compiled artifacts"
          ),
          Bucket(
@@ -108,7 +110,9 @@ glob RETIRED: tuple[str, ...] = (
          Bucket(
              name="toolchains-downloads",
              relpath="toolchains/downloads",
-             policy=Policy(ttl_days=14.0),
+             policy=Policy(
+                 ttl_days=14.0, temp_patterns=["*.part"], temp_lock=TempLock.SUFFIX
+             ),
              summary="verified toolchain archives (extracted into installed/)",
              root_env="JAC_TOOLCHAIN_DIR",
              root_prefix="toolchains"
@@ -116,7 +120,13 @@ glob RETIRED: tuple[str, ...] = (
          Bucket(
              name="toolchains-installed",
              relpath="toolchains/installed",
-             policy=Policy(ttl_days=90.0, depth=3, markers=[".jac-install.json"]),
+             policy=Policy(
+                 ttl_days=90.0,
+                 depth=3,
+                 markers=[".jac-install.json"],
+                 temp_patterns=[".install-*"],
+                 temp_lock=TempLock.SIBLINGS
+             ),
              summary="installed toolchains by name, version and platform",
              root_env="JAC_TOOLCHAIN_DIR",
              root_prefix="toolchains"
@@ -124,7 +134,13 @@ glob RETIRED: tuple[str, ...] = (
          Bucket(
              name="toolchains-build",
              relpath="toolchains/build",
-             policy=Policy(ttl_days=90.0, depth=3, markers=[".ready"]),
+             policy=Policy(
+                 ttl_days=90.0,
+                 depth=3,
+                 markers=[".ready"],
+                 temp_patterns=["tmp????????"],
+                 temp_lock=TempLock.SIBLINGS
+             ),
              summary="toolchain builds by source digest",
              root_env="JAC_TOOLCHAIN_DIR",
              root_prefix="toolchains"
@@ -155,7 +171,9 @@ glob RETIRED: tuple[str, ...] = (
 
 def bucket(name: str) -> Bucket;
 
-def family_root(prefix: str) -> Path;
+def project_bucket -> Bucket | None;
+
+def all_buckets -> list[Bucket];
 
 def managed_buckets -> list[Bucket];
 def external_buckets -> list[Bucket];

@@ -29,7 +29,10 @@ def _live_keys -> dict[str, set[str]] {
     } except Exception {}
     try {
         import from jaclang.compiler.driver.jir { compiler_generation }
-        live["jir-modules"] = {compiler_generation()};
+
+        generation = {compiler_generation()};
+        live["jir-modules"] = generation;
+        live["project"] = generation;
     } except Exception {}
     try {
         import from jaclang.compiler.backends.common.kernel_units { live_unit_digests }
@@ -122,7 +125,7 @@ def _cache_purge(bucket_name: str, dry_run: bool) -> int {
         console.print(f"  {verb} {label}");
     }
     for label in result.kept {
-        console.print(f"  kept {label} (the runtime this process runs on)");
+        console.print(f"  kept {label} (in use or ownership unknown)");
     }
     for err in result.errors {
         console.warning(err);

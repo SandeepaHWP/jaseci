@@ -17,7 +17,7 @@ import tempfile;
 import time;
 import from pathlib { Path }
 import from unittest.mock { patch }
-import from tests.support { jac_command }
+import from tests.support { cache_env, jac_command }
 import from jaclang.cli.commands.cache { cache }
 import from jaclang.cache.registry { BUCKETS, bucket }
 
@@ -25,7 +25,7 @@ glob DAY: float = 86400.0;
 
 def private_env -> tuple[Path, dict[str, str]] {
     base = Path(tempfile.mkdtemp(prefix="jac-cache-cli-"));
-    return (base, {"JAC_CACHE_HOME": str(base), "XDG_CACHE_HOME": str(base / "xdg")});
+    return (base, cache_env(base));
 }
 
 def seed_entry(base: Path, rel: str, age_days: float, marker: str = ".used") -> Path {
@@ -223,4 +223,83 @@ test "cache purge exits nonzero when a removal fails and still reports what it r
     assert not gone.exists() , "the deletable sibling must still be removed";
     assert stuck.exists();
     assert "b" * 20 in out , "what was removed must still be reported";
+}
+
+
+test "runtime lookup uses the authority and the launcher fallback, never a legacy root" {
+    import from jaclang.dist.fused_binary { materialized_runtime_dir }
+    if os.name != "posix" {
+        testskip("the native launcher uses POSIX runtime roots");
+    }
+    with tempfile.TemporaryDirectory() as tmp {
+        base = Path(tmp);
+        env = cache_env(base / "cache");
+        env["XDG_CACHE_HOME"] = str(base / "legacy");
+        env["TMPDIR"] = str(base / "temp");
+        key = "0123456789abcdef";
+        legacy = base / "legacy" / "jac" / "rt" / key;
+        legacy.mkdir(parents=True);
+        (legacy / ".ok").touch();
+        with patch.dict(os.environ, env) {
+            with patch(
+                "jaclang.dist.fused_binary.running_runtime_key", return_value=key
+            ) {
+                assert materialized_runtime_dir("explicit-binary") is None;
+                fallback = base / "temp" / f"jac-cache-{os.getuid()}" / "rt" / key;
+                fallback.mkdir(parents=True);
+                (fallback / ".ok").touch();
+                assert materialized_runtime_dir("explicit-binary") == str(fallback);
+                current = base / "cache" / "rt" / key;
+                current.mkdir(parents=True);
+                (current / ".ok").touch();
+                assert materialized_runtime_dir("explicit-binary") == str(current);
+            }
+        }
+    }
+}
+
+test "a project's own cache is a bucket when the command runs inside a project" {
+    # A project's compiled modules live beside it, under `<project>/.jac/cache`,
+    # not under `cache_home()`. Every bucket path resolved through the cache
+    # home, so `jac cache` could neither report nor reclaim them (#9284).
+    import from jaclang.cache.registry { all_buckets, project_bucket }
+    import from jaclang.project.config {
+        get_config,
+        get_config_for_path,
+        pin_project_scope,
+        project_scope_is_pinned,
+        set_config
+    }
+    (cache_base, env) = private_env();
+    project = Path(os.path.realpath(tempfile.mkdtemp(prefix="jac-cache-project-")));
+    (project / "jac.toml").write_text('[project]\nname = "cached"\n');
+    generation = project / ".jac" / "cache" / ("a" * 16);
+    generation.mkdir(parents=True);
+    (generation / "mod.deadbeef.cpython-314.jir").write_bytes(b"x" * 4096);
+    pinned = project_scope_is_pinned();
+    saved = get_config();
+    try {
+        pin_project_scope(get_config_for_path(project));
+        local = project_bucket();
+        assert local is not None , "inside a project the project cache must register";
+        assert local.path() == project / ".jac" / "cache" , (
+            f"the project bucket must point at the project's own cache, got "
+            f"{local.path()}"
+        );
+        assert "project" in [b.name for b in all_buckets()] , (
+            "the project bucket must join the registry, so gc and purge reach it"
+        );
+        (rc, out) = run_cache(env, action="status");
+        assert rc == 0;
+        assert str(project / ".jac" / "cache") in out , (
+            f"jac cache status must report the project's cache:\n{out}"
+        );
+    } finally {
+        if pinned {
+            pin_project_scope(saved);
+        } else {
+            set_config(None);
+            get_config(force_discover=True);
+        }
+    }
 }
