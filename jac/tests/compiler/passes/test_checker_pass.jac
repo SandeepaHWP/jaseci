@@ -696,6 +696,16 @@ glob CHECKER_DIRS: dict[(str, str)] = {
              []
          ),
          ("expr_narrowing", "checker", "checker_expr_narrowing.jac", 0, True, []),
+         # A comprehension's `if` clauses run in order, so each narrows the
+         # element expression, the later clauses and any later `for` clause.
+         (
+             "comprehension_clause_narrowing",
+             "checker",
+             "checker_comprehension_clause_narrowing.jac",
+             0,
+             True,
+             []
+         ),
          # `x == "literal"` narrows like the int, float and bool forms; `!=`
          # rules out one value, never the whole class.
          (
@@ -5413,6 +5423,19 @@ test "bare_list_flow_inference" {
         assert seen.get(target) == want , f"{target}: expected {want}, got {seen.get(
             target
         )}";
+    }
+}
+
+test "final_reassignment_errors" {
+    program = JacProgram();
+    program.compile(
+        os.path.join(CHECKER_FIXTURES, "checker_final_reassignment.jac"), options=NO_TC
+    );
+    errors = [e.pretty_print() for e in program.errors_had];
+    names = ["SHARED_RATE", "x", "x", "y", "y", "label", "LIMIT"];
+    assert len(errors) == len(names) , "\n---\n".join(errors);
+    for (err, name) in zip(errors, names) {
+        assert "E1135" in err and f"'{name}'" in err , err;
     }
 }
 
