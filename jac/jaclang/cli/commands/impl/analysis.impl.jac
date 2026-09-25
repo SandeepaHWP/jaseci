@@ -135,7 +135,7 @@ def _check_file_job(request: dict[(str, any)]) -> dict[(str, any)] {
                 Parser as _SyntaxParser
             }
             import from jaclang.compiler.frontend.unitree { Source as _Src }
-            import from jaclang.project.source { read_file_with_encoding as _read_src }
+            import from jaclang.project.textio { read_file_with_encoding as _read_src }
             _src_txt = _read_src(file_path);
             (_had, _pd, _ld) = parse_diags(_src_txt, file_path);
             if _pd or _ld {
@@ -147,7 +147,6 @@ def _check_file_job(request: dict[(str, any)]) -> dict[(str, any)] {
             compile_options = CompileOptions(
                 no_cgen=not bool(opts.get("native_coverage")),
                 native_parity=True,
-                force_target_program=True,
                 iface_ok=True,
                 strict_dependencies=True,
                 suppress_codes=list(opts.get("suppress_codes") or []),
@@ -159,7 +158,9 @@ def _check_file_job(request: dict[(str, any)]) -> dict[(str, any)] {
             );
             compile_options.entry_point = file_path;
             if opts.get('closure') {
-                import from jaclang.compiler.driver.pipeline { compile_application }
+                import from jaclang.compiler.driver.pipeline_runner {
+                    compile_application
+                }
                 compile_application(prog, file_path, compile_options);
             } else {
                 prog.compile(file_path, options=compile_options);
@@ -186,7 +187,9 @@ def _check_file_job(request: dict[(str, any)]) -> dict[(str, any)] {
             }
         }
         if opts.get("placements") {
-            import from jaclang.compiler.placement.placement { collect_placement_rows }
+            import from jaclang.compiler.placement.placement_export {
+                collect_placement_rows
+            }
             result['placements'] = collect_placement_rows(prog);
         }
         if opts.get("native_coverage") {
@@ -231,7 +234,12 @@ def _check_file_job(request: dict[(str, any)]) -> dict[(str, any)] {
         result['success'] = False;
         return result;
     } finally {
-        prog.release_compile_closure(collect=bool(request.get("collect")));
+        if opts.get('closure') {
+            prog._get_compiler().release_compile_state(prog);
+            _CHECK_STATE['prog'] = None;
+        } else {
+            prog.release_compile_closure(collect=bool(request.get("collect")));
+        }
         _maybe_malloc_trim();
     }
 }
@@ -265,12 +273,9 @@ impl check(
     }
     import gc;
     import os;
-    import from jaclang.compiler.driver.compiler { COMPILE_GC_THRESHOLDS }
-    if (
-        not os.environ.get('JAC_GC_NO_COMPILE_BOOST')
-        and gc.get_threshold()[0] < COMPILE_GC_THRESHOLDS[0]
-    ) {
-        gc.set_threshold(*COMPILE_GC_THRESHOLDS);
+    import from jaclang.compiler.driver.compiler { CHECK_GC_THRESHOLDS }
+    if not os.environ.get('JAC_GC_NO_COMPILE_BOOST') {
+        gc.set_threshold(*CHECK_GC_THRESHOLDS);
     }
     if isinstance(paths, str) {
         paths = [paths];
@@ -739,7 +744,7 @@ def _format_single_file_worker(
 ) -> dict[str, any] {
     import os;
     import from jaclang.compiler.driver.program { JacProgram }
-    import from jaclang.project.source { read_file_with_encoding }
+    import from jaclang.project.textio { read_file_with_encoding }
     path_obj = Path(file_path);
 
     effective_logical = logical_path or file_path;
@@ -1763,12 +1768,7 @@ impl grammar(output: str = "", strict: bool = False) -> int {
     prog = JacProgram();
     mod = prog.compile(
         parser_path,
-        options=CompileOptions(
-            symtab_ir_only=True,
-            no_cgen=True,
-            need_full_ast=True,
-            force_target_program=True
-        )
+        options=CompileOptions(symtab_ir_only=True, no_cgen=True, need_full_ast=True)
     );
     if prog.errors_had {
         console.error("Failed to compile parser module.");
@@ -1777,7 +1777,8 @@ impl grammar(output: str = "", strict: bool = False) -> int {
         }
         return 1;
     }
-    import from jaclang.compiler.driver.pipeline { run_utility, UtilityProduct }
+    import from jaclang.compiler.driver.pipeline_runner { run_utility }
+    import from jaclang.compiler.driver.pipeline_types { UtilityProduct }
     import from typing { cast }
     pass_ = cast(GrammarExtractPass, run_utility(UtilityProduct.GRAMMAR, mod, prog));
     if len(pass_.rules) == 0 {
@@ -1979,7 +1980,9 @@ impl explain(topic: str, filename: str, output: str = "", memory: str = "") -> i
         return 0;
     }
     if topic == "placement" {
-        import from jaclang.compiler.placement.placement { collect_placement_rows }
+        import from jaclang.compiler.placement.placement_export {
+            collect_placement_rows
+        }
         import from jaclang.cli.check_report { print_placement_report }
         prog.compile(file_path=path);
         for err in prog.errors_had {
@@ -1994,9 +1997,7 @@ impl explain(topic: str, filename: str, output: str = "", memory: str = "") -> i
     }
     mod = prog.compile(
         file_path=path,
-        options=CompileOptions(
-            aot_mode=True, default_codespace="native", force_target_program=True
-        )
+        options=CompileOptions(aot_mode=True, default_codespace="native")
     );
     for err in prog.errors_had {
         console.print(err.pretty_print());

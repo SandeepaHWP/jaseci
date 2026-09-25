@@ -173,7 +173,6 @@ node UniNode {
     has _sub_node_tab: dict[(type, list[UniNode])] { getter; }
 
     def _link(kid: Sequence[UniNode], roles: dict[type, any]) -> None;
-    def detached_copy -> UniNode;
     def __deepcopy__(memo: dict[int, object]) -> UniNode;
     def _assert_thawed -> None;
     def freeze_structure -> None;
@@ -278,7 +277,8 @@ node Symbol {
         na_stack_ok: bool = False,
         _in_stub_scope: (bool | None) = None,
         _binding_kind: (BindingKind | None) = None,
-        provider: SymbolProvider | None = None;
+        provider: SymbolProvider | None = None,
+        imported_from: Symbol | None = None;
 
     def init(
         defn: NameAtom,
@@ -702,7 +702,6 @@ node Module(AstDocNode, UniScopeNode) {
     has annexable_by: (str | None) { getter; }
 
     def declares_codespace(ctx: CodeContext, path_hint: str = '') -> bool;
-    def absorb_annex_body(stmts: Sequence[UniNode]) -> None;
     def record_comptime_dependency(path: str, body: bool = False) -> None;
     static def make_stub(
         inject_name: (str | None) = None, inject_src: (Source | None) = None
@@ -1218,6 +1217,7 @@ node Ability(ContextAwareNode, AstAccessNode, ElementStmt, AstAsyncNode, ArchBlo
     has is_cls_method: bool { getter; }
     has is_def: bool { getter; }
     has method_owner: Archetype | Enum | None { getter; }
+    has class_body_owner: Archetype | Enum | None { getter; }
     has is_genai_ability: bool { getter; }
     has surface_kind: str { getter; }
     has served: bool { getter; }
