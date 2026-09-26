@@ -125,6 +125,56 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # The kernel's stage-0 compiler, as jac/bootstrap/stage0.json pins it.
+      # Under "self" every stage-0 step is skipped and the seal builds the
+      # kernel with this checkout's compiler. A pinned commit builds it inside
+      # the seal from that commit's jaclang snapshot: the snapshot (immutable
+      # per commit) and the units stage 0 lowered come back from the cache,
+      # and the seal finds the pin, the git history and the cache through
+      # JAC_STAGE0_ROOT and JAC_CACHE_HOME, which precompile_env passes on.
+      - name: Resolve the stage-0 pin
+        id: stage0
+        run: |
+          set -euo pipefail
+          bash scripts/ci_cache_keys.sh | grep '^stage0=' >> "$GITHUB_OUTPUT"
+          echo "python=$(jq -r '.cpython.version' jac/bootstrap/python/sources.json | cut -d. -f1,2)" >> "$GITHUB_OUTPUT"
+          echo "cache_home=$RUNNER_TEMP/jac-stage0-cache" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the stage-0 snapshot
+        id: stage0-src
+        if: steps.stage0.outputs.stage0 != 'self'
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.stage0.outputs.cache_home }}/stage0/${{ steps.stage0.outputs.stage0 }}
+          key: stage0-src-${{ steps.stage0.outputs.stage0 }}
+
+      - name: Restore the stage-0 kernel units
+        id: stage0-units
+        if: steps.stage0.outputs.stage0 != 'self'
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.stage0.outputs.cache_home }}/jir/modules
+          key: stage0-units-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.stage0.outputs.stage0 }}-py${{ steps.stage0.outputs.python }}-${{ github.run_id }}
+          restore-keys: |
+            stage0-units-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.stage0.outputs.stage0 }}-py${{ steps.stage0.outputs.python }}-
+
+      # The checkout is shallow; the seal's guards read the pinned commit's
+      # trees, so fetch that one commit.
+      - name: Provision stage 0
+        if: steps.stage0.outputs.stage0 != 'self'
+        env:
+          STAGE0_COMMIT: ${{ steps.stage0.outputs.stage0 }}
+          STAGE0_CACHE: ${{ steps.stage0.outputs.cache_home }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$STAGE0_COMMIT"
+          mkdir -p "$STAGE0_CACHE/jir/modules"
+          touch "$RUNNER_TEMP/stage0.before"
+          {
+            echo "JAC_CACHE_HOME=$STAGE0_CACHE"
+            echo "JAC_STAGE0_ROOT=$GITHUB_WORKSPACE/jac"
+          } >> "$GITHUB_ENV"
+
       - name: Build the jac binary (cached)
         uses: ./.github/actions/setup-jac
         with:
@@ -132,6 +182,45 @@ jobs:
           # source-built interpreter and its native compiler object. A binary
           # cache hit skips producing both, so ask for them explicitly.
           need-build-inputs: "true"
+
+      # Only main seeds the stage-0 caches, and only with what this run made:
+      # a binary cache hit or a fallback to the self build leaves nothing new.
+      - name: Check the stage-0 products
+        id: stage0-made
+        if: steps.stage0.outputs.stage0 != 'self'
+        env:
+          STAGE0_COMMIT: ${{ steps.stage0.outputs.stage0 }}
+          STAGE0_CACHE: ${{ steps.stage0.outputs.cache_home }}
+        run: |
+          set -euo pipefail
+          src=false; units=false
+          [ -f "$STAGE0_CACHE/stage0/$STAGE0_COMMIT/.stage0.json" ] && src=true
+          if [ -n "$(find "$STAGE0_CACHE/jir/modules" -newer "$RUNNER_TEMP/stage0.before" -type f -print -quit)" ]; then
+            units=true
+          fi
+          echo "src=$src" >> "$GITHUB_OUTPUT"
+          echo "units=$units" >> "$GITHUB_OUTPUT"
+
+      - name: Save the stage-0 snapshot (main only)
+        if: >-
+          steps.stage0.outputs.stage0 != 'self' &&
+          github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+          steps.stage0-src.outputs.cache-hit != 'true' &&
+          steps.stage0-made.outputs.src == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ steps.stage0.outputs.cache_home }}/stage0/${{ steps.stage0.outputs.stage0 }}
+          key: stage0-src-${{ steps.stage0.outputs.stage0 }}
+
+      - name: Save the stage-0 kernel units (main only)
+        if: >-
+          steps.stage0.outputs.stage0 != 'self' &&
+          github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+          steps.stage0-made.outputs.units == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ steps.stage0.outputs.cache_home }}/jir/modules
+          key: stage0-units-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.stage0.outputs.stage0 }}-py${{ steps.stage0.outputs.python }}-${{ github.run_id }}
 
       - name: Set up Zig 0.16.0
         uses: mlugg/setup-zig@v2
@@ -180,7 +269,7 @@ jobs:
           env -i HOME="$WORK" PATH=/usr/bin:/bin JAC_NO_DEV_SOURCE=1 "$BIN" --version
           env -i HOME="$WORK" PATH=/usr/bin:/bin JAC_NO_DEV_SOURCE=1 "$BIN" -c 'import os, ssl; assert os.path.isfile(os.environ["SSL_CERT_FILE"]); assert ssl.create_default_context().cert_store_stats()["x509_ca"] > 0'
           out="$(env -i HOME="$WORK" PATH=/usr/bin:/bin JAC_NO_DEV_SOURCE=1 "$BIN" run "$WORK/obj.jac")"
-          echo "$out" | grep -q 49
+          grep -q 49 <<<"$out"
 
       - name: Run real jac programs (end-to-end execution)
         working-directory: jac
@@ -197,8 +286,8 @@ jobs:
           }
           JAC
           out="$(env -i HOME="$WORK" PATH=/usr/bin:/bin JAC_NO_DEV_SOURCE=1 "$BIN" run "$WORK/a.jac")"
-          echo "$out" | grep -q "dist 5.0"
-          echo "$out" | grep -q "0, 1, 4, 9, 16"
+          grep -q "dist 5.0" <<<"$out"
+          grep -q "0, 1, 4, 9, 16" <<<"$out"
 
       - name: jac test runner (self-contained test file)
         working-directory: jac
@@ -353,7 +442,7 @@ jobs:
             "firebase-admin>=6.0.0,<8.0.0" "requests>=2.32.0,<3.0.0" \
             --global
           jac install \
-            "litellm>=1.75.2,<=1.82.6" "pillow>=12.0.0,<13.0.0" \
+            "litellm>=1.102.1,<1.103.0" "pillow>=12.0.0,<13.0.0" \
             "httpx>=0.27.0" "loguru>=0.7.2,<0.8.0" \
             --global
 
@@ -574,8 +663,7 @@ jobs:
             paths: jaclang/compiler/tests
             sealed: ""
             iface_verify: "1"
-            # Source compiler workers peak above 4 GB; four can exhaust this
-            # 16 GB runner before the pool's per-file recycling can intervene.
+            # Leave room for native analysis and ES child processes.
             jobs: "2"
     steps:
       - uses: actions/checkout@v5
@@ -584,14 +672,28 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+      - name: Set up Zig for compiler runtime and ELF fixtures
+        if: matrix.chunk == 'passes-native'
+        uses: mlugg/setup-zig@v2
+        with:
+          version: "0.16.0"
+          use-cache: false
       - name: Run ${{ matrix.chunk }} chunk
         working-directory: jac
         env:
           JAC_IFACE_VERIFY: ${{ matrix.iface_verify || '' }}
+          JAC_TEST_ARTIFACTS: ${{ runner.temp }}/native-test-artifacts
         run: |
           set -uxo pipefail
           WORK="$(mktemp -d)"
           HOME="$WORK" JAC_TEST_RSS_LOG=1 JAC_TEST_JOBS=${{ matrix.jobs || 'auto' }} JAC_TEST_STRICT=1 jac test ${{ matrix.paths }}
+      - name: Preserve failed native executables
+        if: failure() && matrix.chunk == 'passes-native'
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-test-failures
+          path: ${{ runner.temp }}/native-test-artifacts
+          if-no-files-found: ignore
       - name: Check JacPython native code-object boundary
         if: matrix.chunk == 'passes-native'
         run: jac run scripts/test_jacpython_native.jac
@@ -696,7 +798,7 @@ jobs:
             requests "moto[s3]>=5.0.0" \
             --global
           jac install \
-            "litellm>=1.75.2,<=1.82.6" "pillow>=12.0.0,<13.0.0" \
+            "litellm>=1.102.1,<1.103.0" "pillow>=12.0.0,<13.0.0" \
             "httpx>=0.27.0" "loguru>=0.7.2,<0.8.0" \
             --global
       # Run from a copy OUTSIDE the checkout. The resolver's self-tree rule
@@ -780,7 +882,7 @@ jobs:
       - name: Install byllm deps + test deps
         run: |
           jac install \
-            "litellm>=1.75.2,<=1.82.6" "pillow>=12.0.0,<13.0.0" \
+            "litellm>=1.102.1,<1.103.0" "pillow>=12.0.0,<13.0.0" \
             "httpx>=0.27.0" "loguru>=0.7.2,<0.8.0" \
             --global
       # test_mtir_integration.jac runs in test-in-package-sealed (see there).
@@ -910,7 +1012,11 @@ jobs:
           JAC_TEST_JOBS: "0"
         run: |
           jac test jac/jaclang/scale/tests/deploy/test_deploy_k8s.jac -x -f "not (early and exit)"
-      - name: Run KEDA HTTP-activation e2e
+      # Runs the HTTP-activation e2e under an observer, so the 0 -> 1 -> ready
+      # -> 0 cycle it already drives is also the cycle watch_scale_targets is
+      # proven against. A second deploy would cost minutes for a cycle already
+      # paid for.
+      - name: Run KEDA HTTP-activation + observer e2e
         env:
           # Ship the jac built from this checkout to the pods (channel LOCAL),
           # so the e2e validates the code under test rather than a published
@@ -920,7 +1026,7 @@ jobs:
           # PVC no longer trusts a cluster default silently; name it.
           BUNDLE_STORAGE_CLASS: microk8s-hostpath
         run: |
-          bash jac/jaclang/scale/tests/deploy/keda_http_activation_real_e2e.sh \
+          bash jac/jaclang/scale/tests/deploy/keda_observer_real_e2e.sh \
             jac/jaclang/scale/tests/fixtures/keda_http_activation_e2e
       - name: Run K8 tests (failure-path)
         env:
@@ -1519,6 +1625,10 @@ jobs:
           echo 'deb [signed-by=/usr/share/keyrings/llvm.asc] https://apt.llvm.org/noble/ llvm-toolchain-noble-22 main' | sudo tee /etc/apt/sources.list.d/llvm.list
           sudo apt-get update
           sudo apt-get install -y llvm-22-dev cmake
+      # This step carries test_c_backend.jac's coverage: test-runtime also
+      # discovers it but skips it there, having no LLVM 22 toolchain.
+      - name: Verify C backend comparisons and executable startup
+        run: jac test jac/tests/toolchains/test_c_backend.jac
       - name: Scaffold and export the jaclang.org site
         run: |
           jac create site --awesome
@@ -1530,6 +1640,13 @@ jobs:
       - name: Export the existing native arena replay fixture
         run: |
           cp jac/tests/compiler/backends/native/fixtures/arena_replay.jac site/core/site/game/arena_replay.jac
+          sed -i '/^import from sim /d' site/core/site/game/arena_replay.jac
+          cat >> site/arch.jac <<'JAC'
+
+          impl import core.site.game {
+              sim --> core.site.game.arena_replay { Game, world_new, sim_tick }
+          }
+          JAC
           cat >> site/jac.toml <<'TOML'
           [apps.replay]
           kind = "native-binary"

@@ -482,11 +482,17 @@ impl ModuleIntrospector._load_manifest -> None {
 
 impl ModuleIntrospector._load_surface -> None {
     import from jaclang.server.sealed_serve { serve_manifest_for }
-    import from jaclang.compiler.frontend.codeinfo { SurfaceEntry }
+    import from jaclang.runtime.surface { SurfaceEntry }
     path: str = getattr(self._module, '__file__', '') if self._module else '';
     manifest = serve_manifest_for(path) if path else None;
     if manifest is None {
         raise RuntimeError(f"No prepared access metadata for '{path}'.");
+    }
+    if not isinstance(manifest.get('surface'), dict) {
+        raise RuntimeError(
+            f"Prepared access metadata for '{path}' has no valid surface. "
+                + "Rebuild and reseal the application with the current Jac version."
+        );
     }
     self._surface = {
         str(name): SurfaceEntry.from_dict(str(name), dict(rec))
@@ -1128,7 +1134,11 @@ impl JacAPIServer.add_shutdown_hook(fn: Callable[..., any]) -> None {
 
 impl JacAPIServer._install_middleware -> None {
     import from jaclang.server.middleware { jwt_middleware, request_context_middleware }
-    self.add_middleware(request_context_middleware());
+    self.add_middleware(
+        request_context_middleware(
+            base_path_dir=self.base_path or None, full_target_path=self.module_file
+        )
+    );
     self.add_middleware(jwt_middleware(self.user_manager));
 }
 
@@ -1438,6 +1448,11 @@ impl JacAPIServer._register_scheduled_tasks -> None {
             registry: dict[str, any] = (
                 dict(intro._walkers) if is_walker else dict(intro._functions)
             );
+            for (member_name, member, member_is_walker) in intro.scheduled_members() {
+                if member_is_walker == is_walker {
+                    registry[member_name] = member;
+                }
+            }
             if name not in registry {
                 return {'error': f"'{name}' is no longer registered"};
             }
@@ -1613,7 +1628,10 @@ impl JacAPIServer.start(
     port_retries = 0 if settings.strict_port else PORT_RETRY_LIMIT;
     if settings.workers.multi_process() {
         supervisor = WorkerSupervisor(
-            settings=settings, worker_main=self._worker_main, on_ready=_announce
+            settings=settings,
+            worker_main=self._worker_main,
+            on_ready=_announce,
+            on_worker_exit=self._on_worker_exit
         );
         return supervisor.run(port_retries=port_retries);
     }
@@ -1657,6 +1675,18 @@ impl JacAPIServer._worker_main(
     } finally {
         self.scheduler.stop();
         stop_worker();
+    }
+}
+
+impl JacAPIServer._on_worker_exit(pid: int) -> None {
+    for ext in (self.extensions or []) {
+        try {
+            ext.on_worker_exit(self, pid);
+        } except Exception {
+            logger.exception(
+                f"{type(ext).__name__}.on_worker_exit failed for worker pid {pid}"
+            );
+        }
     }
 }
 
