@@ -88,7 +88,7 @@ def _context_sections(path: any) -> dict[int, bytes] {
 
 def _project_modules(program: any, `root: any) -> dict[str, uni.Module] {
     result: dict[str, uni.Module] = {};
-    for hub in program._search_hubs() {
+    for hub in program.execution_hubs() {
         for (path, module) in `list(hub.items()) {
             if (module and os.path.realpath(path).startswith((`root + os.sep))) {
                 result[os.path.realpath(path)] = module;
@@ -114,65 +114,100 @@ def _semantic_metadata(revision: PreparedApplication, program: any) {
 
 def _manifest(program: any, path: any, `root: any, mod: any = None) -> dict[str, any] {
     import from jaclang.compiler.frontend { unitree as uni }
-    import from jaclang.compiler.frontend.constant { Tokens as Tok }
     mod = mod if (mod is not None) else program.find_module(path);
     if (mod is None) {
         raise RuntimeError(f'Preparation did not produce metadata for {path}');
     }
     sources = [mod];
-    for item in mod.body {
-        if (isinstance(item, uni.Import) and item.is_jac and item.from_loc) {
-            source = item.from_loc.resolve_relative_path();
+    namespace_sources = [mod];
+    imported_functions: set[tuple[str, str]] = set();
+
+    for namespace in namespace_sources {
+        for item in namespace.body {
+            if not (isinstance(item, uni.Import) and item.is_jac) {
+                continue;
+            }
+            module_path = item.from_loc;
+            if item.is_absorb
+                and item.items
+                and isinstance(item.items[0], uni.ModulePath) {
+                module_path = item.items[0];
+            }
+            if module_path is None {
+                continue;
+            }
+            source = module_path.resolve_relative_path();
             imported = program.find_module(source) if source else None;
-            if (imported is not None) {
+            if imported is None {
+                continue;
+            }
+            if imported not in sources {
                 sources.append(imported);
+            }
+            if item.is_absorb {
+                if imported not in namespace_sources {
+                    namespace_sources.append(imported);
+                }
+            } else {
+                for name in item.items {
+                    if isinstance(name, uni.ModuleItem) {
+                        imported_functions.add(
+                            (imported.loc.mod_path, name.name.value)
+                        );
+                    }
+                }
             }
         }
     }
-    (funcs, walkers, effects) = ({}, {}, {});
     import from jaclang.compiler.driver.pipeline { require_product, CompilationProduct }
     for source in sources {
         manifest = source.gen.interop_manifest;
-        if (manifest and not (manifest.func_access or manifest.walker_access)) {
+        if not (manifest and manifest.surface) {
             require_product(program, source, CompilationProduct.BOUNDARIES);
-            manifest = source.gen.interop_manifest;
-        }
-        if manifest {
-            for (name, access) in manifest.func_access.items() {
-                funcs.setdefault(name, access);
-            }
-            for (name, access) in manifest.walker_access.items() {
-                walkers.setdefault(name, access);
-            }
         }
     }
-    (cross, seen) = ([], `set());
-    for source in _project_modules(program, `root).values() {
+    surface: dict[str, dict[str, any]] = {};
+    private_declarations: set[str] = set();
+    effects: dict[str, dict[str, any]] = {};
+    own_app = mod.app or '';
+    ordered = list(sources)
+        + [
+            m
+            for m in _project_modules(program, `root).values()
+            if m not in sources
+        ];
+    for source in ordered {
         manifest = source.gen.interop_manifest;
         if not manifest {
             continue;
         }
         effects.update(manifest.endpoint_effects);
-        for binding in manifest.server_exports_to_client {
-            `node = binding.ast_node;
-            if ((`node is None) or ((binding.name, binding.kind) in seen)) {
-                continue;
-            }
-            src = `node.loc.mod_path;
-            if (not src or not os.path.realpath(src).startswith((`root + os.sep))) {
-                continue;
-            }
-            access = `node?.access;
-            auth = not ((access is not None) and (access.tag.name == Tok.KW_PUB));
-            seen.add((binding.name, binding.kind));
-            cross.append(
-                `dict(
-                    name=binding.name,
-                    kind=binding.kind,
-                    src=os.path.relpath(src, `root),
-                    auth=auth
+        if not manifest.surface or (source.app or '') != own_app {
+            continue;
+        }
+        src_path = source.loc.mod_path if source.loc else '';
+        if not src_path {
+            continue;
+        }
+        rel = os.path.relpath(os.path.realpath(src_path), `root).replace(os.sep, '/');
+        for (name, rec) in manifest.surface.items() {
+            if (
+                not rec.explicit_access
+                and rec.exposure == 'private'
+                and rec.placement != 'client'
+                and not name.startswith('_')
+                and (
+                    rec.kind == 'walker'
+                    or source in namespace_sources
+                    or (src_path, name) in imported_functions
                 )
-            );
+            ) {
+                private_declarations.add(f'{rel}:{name}');
+            }
+            if name in surface or not rec.is_served() {
+                continue;
+            }
+            surface[name] = {** rec.to_dict(), 'src': rel};
         }
     }
     client = mod.gen.client_manifest;
@@ -188,12 +223,32 @@ def _manifest(program: any, path: any, `root: any, mod: any = None) -> dict[str,
         )
             if client
             else {},
-        func_access=funcs,
-        walker_access=walkers,
-        endpoint_effects=effects,
-        cross_bindings=cross
+        surface=surface,
+        private_declarations=sorted(private_declarations),
+        endpoint_effects=effects
     );
 }
+
+def _warn_private_declarations(application: PreparedApplication, console: any) {
+    import from jaclang.project.workspace { app_for_path }
+    app = app_for_path(application.entry);
+    if app is None or not app.has_server {
+        return;
+    }
+    metadata = application.manifests.get(application.entry, {});
+    declarations = metadata.get('private_declarations', []);
+    if declarations {
+        console.warning(
+            f"App '{app.name}' has unmarked declarations that are now private "
+                + "and are not served: "
+                + ', '.join(declarations)
+                + ". "
+                + "Review the migration with jac fix access --dry-run; "
+                + "use :protect or :pub for endpoints, or :priv to keep them private."
+        );
+    }
+}
+
 
 def _check(program: any, before: any) {
     errors = program.errors_had[before:];
@@ -228,7 +283,14 @@ def _prepare_sealed(
             f'Sealed application has no artifact manifest: {image_root}'
         );
     }
-    manifest = json.loads((Path(image_root) / SERVE_MANIFEST_REL).read_text());
+    serve_manifest = Path(image_root) / SERVE_MANIFEST_REL;
+    if not serve_manifest.is_file() {
+        raise RuntimeError(
+            f'Sealed application has no serving manifest: {serve_manifest}; '
+            'rebuild the bundle so the seal step writes it'
+        );
+    }
+    manifest = json.loads(serve_manifest.read_text());
     manifest['root'] = image_root;
     revision = PreparedApplication(
         image_root, `entry, services=tuple(entries[1:]), dev=False
@@ -252,10 +314,13 @@ def _prepare_sealed(
         }
     }
     pending = set(entries);
-    pending.update(
-        os.path.realpath(os.path.join(image_root, binding['src']))
-        for binding in manifest.get('cross_bindings', [])
-    );
+    for metadata in list(manifest['module_manifests'].values()) + [manifest] {
+        for rec in (metadata.get('surface') or {}).values() {
+            if rec.get('src') {
+                pending.add(os.path.realpath(os.path.join(image_root, rec['src'])));
+            }
+        }
+    }
     for path in list(pending) {
         parent = Path(path).parent;
         while parent.is_relative_to(image_root) {
@@ -333,11 +398,19 @@ def prepare_application(
     `entry = os.path.realpath(`entry);
     `root = os.path.realpath((`root or os.path.dirname(`entry)));
     entries = `list(`dict.fromkeys([`entry, *(os.path.realpath(p) for p in services)]));
-    import from jaclang.server.sealed_serve { sealed_root_for }
+    import from jaclang.server.sealed_serve { sealed_root_for, unlisted_image_root }
     image_root = sealed_root_for(`entry);
     if image_root is not None {
         console.print('  Loading sealed application artifacts');
         return _prepare_sealed(`entry, program, image_root, entries);
+    }
+    unlisted = unlisted_image_root(`entry);
+    if unlisted is not None {
+        missing = os.path.relpath(`entry, unlisted);
+        console.print(
+            f'  Sealed image at {unlisted} does not list {missing}; '
+            'preparing from source'
+        );
     }
     import from jaclang.compiler.driver.pass_driver { compile_progress }
     started = time.monotonic();
@@ -381,6 +454,7 @@ def prepare_application(
                         program,
                         CompileOptions(
                             default_codespace='server',
+                            skip_native_engine=program.options.skip_native_engine,
                             entry_point=path,
                             project_root=`root
                         )
@@ -400,6 +474,7 @@ def prepare_application(
                 }
                 revision = applications[0];
                 for application in applications {
+                    _warn_private_declarations(application, console);
                     application.name = application.manifests.get(
                         application.entry, {}
                     ).get(
@@ -504,7 +579,7 @@ def _prepare(
     before = len(program.errors_had);
     import copy;
     modules: dict[str, uni.Module] = {};
-    import from jaclang.compiler.driver.pipeline { compile_application }
+    import from jaclang.compiler.driver.pipeline_runner { compile_application }
     for path in entries {
         options = copy.copy(program.options);
         options.project_root = `root;
@@ -551,8 +626,10 @@ def _prepare(
         pending.update(package_sources(path, `root));
     }
     for manifest in revision.manifests.values() {
-        for binding in manifest['cross_bindings'] {
-            pending.add(os.path.realpath(os.path.join(`root, binding['src'])));
+        for rec in (manifest.get('surface') or {}).values() {
+            if rec.get('src') {
+                pending.add(os.path.realpath(os.path.join(`root, rec['src'])));
+            }
         }
     }
     while pending {
@@ -599,7 +676,7 @@ def _prepare(
             dependencies[path] = (stat.st_mtime_ns, stat.st_size);
         }
     }
-    for hub in program._search_hubs() {
+    for hub in program.execution_hubs() {
         for path in hub {
             if (
                 os.path.isfile(path)
@@ -649,7 +726,7 @@ def prepare_route_metadata(`root: str, program: any) -> (list[str] | None) {
         return None;
     }
     import from jaclang.client.route_scanner { RouteScanner }
-    import from jaclang.compiler.driver.pipeline { route_exports }
+    import from jaclang.compiler.driver.pipeline_runner { route_exports }
     def exports(path: Path) -> tuple[str | None, str | None] {
         return route_exports(program, str(path));
     }

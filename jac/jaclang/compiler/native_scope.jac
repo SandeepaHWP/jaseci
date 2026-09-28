@@ -1,112 +1,95 @@
 import os;
 
 obj NativeScopeEntry {
-    has module: str,
-        strict: bool = False;
+    has module: str;
 }
 
 glob NATIVE_SCOPE: tuple[NativeScopeEntry, ...] = (
-         NativeScopeEntry(module="jaclang.compiler.frontend.constant", strict=True),
-         NativeScopeEntry(module="jaclang.compiler.frontend.srcloc", strict=True),
-         NativeScopeEntry(module="jaclang.compiler.frontend.roles", strict=True),
-         NativeScopeEntry(module="jaclang.compiler.frontend.relations", strict=True),
-         NativeScopeEntry(module="jaclang.compiler.frontend.unitree", strict=True),
-         NativeScopeEntry(
-             module="jaclang.compiler.frontend.parser.tokens", strict=True
-         ),
-         NativeScopeEntry(module="jaclang.compiler.frontend.parser.lexer", strict=True),
-         NativeScopeEntry(
-             module="jaclang.compiler.frontend.parser.parser", strict=True
-         ),
-         NativeScopeEntry(module="jaclang.compiler.jc_materialize", strict=True),
-         NativeScopeEntry(module="jaclang.compiler.jc_unit", strict=True),
-         NativeScopeEntry(module="jaclang.compiler.frontend.diagnostics", strict=True),
-         NativeScopeEntry(module="jaclang.compiler.passes.context", strict=True),
-         NativeScopeEntry(
-             module="jaclang.compiler.passes.ast_validation_pass", strict=True
-         ),
-         NativeScopeEntry(
-             module="jaclang.compiler.passes.sym_tab_build_pass", strict=True
-         ),
+         NativeScopeEntry(module="jaclang.compiler.frontend.constant"),
+         NativeScopeEntry(module="jaclang.compiler.frontend.srcloc"),
+         NativeScopeEntry(module="jaclang.compiler.frontend.roles"),
+         NativeScopeEntry(module="jaclang.compiler.frontend.relations"),
+         NativeScopeEntry(module="jaclang.compiler.frontend.unitree"),
+         NativeScopeEntry(module="jaclang.compiler.frontend.parser.tokens"),
+         NativeScopeEntry(module="jaclang.compiler.frontend.parser.lexer"),
+         NativeScopeEntry(module="jaclang.compiler.frontend.parser.parser"),
+         NativeScopeEntry(module="jaclang.compiler.jc_materialize"),
+         NativeScopeEntry(module="jaclang.compiler.jc_unit"),
+         NativeScopeEntry(module="jaclang.compiler.frontend.diagnostics"),
+         NativeScopeEntry(module="jaclang.compiler.passes.context"),
+         NativeScopeEntry(module="jaclang.compiler.passes.ast_validation_pass"),
+         NativeScopeEntry(module="jaclang.compiler.passes.sym_tab_build_pass"),
+         NativeScopeEntry(module="jaclang.compiler.passes.annex_weave"),
+         NativeScopeEntry(module="jaclang.compiler.passes.early_passes"),
+         NativeScopeEntry(module="jaclang.compiler.passes.graph_lowering_pass"),
+         NativeScopeEntry(module="jaclang.compiler.passes.decl_impl_match_pass"),
+         NativeScopeEntry(module="jaclang.compiler.passes.semantic_analysis_pass"),
+         NativeScopeEntry(module="jaclang.compiler.passes.sem_def_match_pass"),
+         NativeScopeEntry(module="jaclang.compiler.passes.cfg_build_pass"),
+         NativeScopeEntry(module="jaclang.compiler.passes.jsx_intrinsic_guard_pass"),
+         NativeScopeEntry(module="jaclang.compiler.expr_keys"),
+         NativeScopeEntry(module="jaclang.project.mobui_scope"),
+         NativeScopeEntry(module="jaclang.project.source"),
+         NativeScopeEntry(module="jaclang.client.targets.react_native.html_tag_map"),
 
-     );
+     ),
+     KERNEL_ROOT_MODULE: str = "jaclang.compiler.jc_unit",
+     KERNEL_ABI_CONTRACT_REL: tuple[str, ...] = (
+         "runtime/osp_kernel.jac",
+         "runtime/osp_graph.jac",
+         "runtime/region_native.jac",
+         "compiler/backends/common/fmt_kernel.jac",
+         "runtime/osp_tag.jac",
+         "compiler/backends/native/region_abi.jac",
+         "compiler/native_compiler.jac"
+     ),
+     _SCOPE_SUFFIX_CACHE: list[str] = [],
+     _SCOPE_SUFFIX_GEN: list[int] = [-1];
 
-obj ActiveNativeScope {
-    has compiler_roots: set[str];
-}
-
-glob _SCOPE_SUFFIX_CACHE: list[str] = [],
-     _SCOPE_ACTIVE: list[ActiveNativeScope] = [];
-
-def activate_scope_lowering(source_path: str | None = None) -> None {
-    if _SCOPE_ACTIVE {
-        return;
+def package_host_edge(mod_path: str) -> bool {
+    import from jaclang.compiler.frontend.codeinfo { native_unit_identity }
+    identity = native_unit_identity(mod_path);
+    if not identity.startswith("jaclang/") or identity.startswith("jaclang/runtime/") {
+        return False;
     }
-    roots = {os.path.dirname(os.path.realpath(__file__)) + os.sep};
-    if source_path is not None {
-        source = os.path.realpath(source_path);
-        for suffix in native_scope_path_suffixes() {
-            if source.endswith(suffix) {
-                checkout = source[:-len(suffix)];
-                roots.add(os.path.join(checkout, "jaclang", "compiler") + os.sep);
-                break;
-            }
-        }
+    import from jaclang.compiler.placement.placement_facts {
+        native_lowered,
+        native_unit
     }
-    _SCOPE_ACTIVE.append(ActiveNativeScope(compiler_roots=roots));
-    try {
-        import from jaclang.runtime.runtime { JacRuntime }
-        sh = JacRuntime.get_selfhost();
-        prog = sh.peek_program();
-        if prog is not None {
-            hub = prog.mod.hub;
-            for k in list(hub.keys()) {
-                if in_native_scope_path(k) {
-                    del hub[k];
-                }
-            }
-        }
-    } except Exception {}
-}
-
-def scope_lowering_active -> bool {
-    return len(_SCOPE_ACTIVE) > 0;
+    return not native_lowered(mod_path)
+        and not native_unit(mod_path, native_unit_compile=True);
 }
 
 def scope_allows_inferred_path(mod_path: str) -> bool {
-    if not scope_lowering_active() {
-        return True;
-    }
-    candidate = os.path.realpath(mod_path);
-    for compiler_root in _SCOPE_ACTIVE[-1].compiler_roots {
-        if candidate.startswith(compiler_root) {
-            return in_native_scope_path(candidate);
-        }
-    }
-    return True;
+    import from jaclang.compiler.frontend.codeinfo { native_unit_compile_active }
+    return not native_unit_compile_active() or not package_host_edge(mod_path);
 }
 
-def deactivate_scope_lowering {
-    """Turn scope lowering back off once the build that armed it is done.
+def scope_modules -> list[str] {
+    import from jaclang.compiler.kernel_target { active_kernel_target }
+    spec = active_kernel_target();
+    if spec is not None {
+        return list(spec.scope_modules);
+    }
+    return [e.module for e in NATIVE_SCOPE];
+}
 
-    Scope lowering is a property of one ahead-of-time native build (the
-    kernel's), not of the process. While it is on, the selfhost resolver
-    hands NATIVE_SCOPE modules to the target program instead of the
-    compiler's own, so in a sealed image, where those are two different
-    trees, a compile that outlives the build sees the frontend twice:
-    `Source` from the checkout and `Source` from the shipped compiler, and
-    the checker reports "Cannot assign Source to parameter of type Source".
-    The outermost compile that armed it disarms it on exit.
-    """;
-    _SCOPE_ACTIVE.clear();
+def kernel_root_module -> str {
+    import from jaclang.compiler.kernel_target { active_kernel_target }
+    spec = active_kernel_target();
+    return spec.root_module if spec is not None else KERNEL_ROOT_MODULE;
 }
 
 def native_scope_path_suffixes -> list[str] {
-    if not _SCOPE_SUFFIX_CACHE {
-        for e in NATIVE_SCOPE {
-            rel = e.module.replace("jaclang.", "", 1).replace(".", "/") + ".jac";
+    import from jaclang.compiler.kernel_target { kernel_target_generation }
+    gen = kernel_target_generation();
+    if _SCOPE_SUFFIX_GEN[0] != gen {
+        _SCOPE_SUFFIX_CACHE.clear();
+        for module in scope_modules() {
+            rel = module.replace("jaclang.", "", 1).replace(".", "/") + ".jac";
             _SCOPE_SUFFIX_CACHE.append("jaclang/" + rel);
         }
+        _SCOPE_SUFFIX_GEN[0] = gen;
     }
     return _SCOPE_SUFFIX_CACHE;
 }
@@ -122,4 +105,18 @@ def in_native_scope_path(mod_path: str) -> bool {
         }
     }
     return False;
+}
+
+def scope_module_path(module: str) -> str {
+    import from jaclang.compiler.kernel_target { target_pkg_root }
+    rel = module.replace("jaclang.", "", 1).replace(".", os.sep) + ".jac";
+    return os.path.join(target_pkg_root(), rel);
+}
+
+def native_scope_paths -> list[str] {
+    return [scope_module_path(m) for m in scope_modules()];
+}
+
+def kernel_root_path -> str {
+    return scope_module_path(kernel_root_module());
 }

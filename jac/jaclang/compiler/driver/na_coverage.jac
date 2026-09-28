@@ -3,14 +3,11 @@ import sys;
 import jaclang.compiler.frontend.unitree as uni;
 
 glob _na_coverage: dict[str, dict[str, any]] = {},
-     _na_coverage_state: dict[str, bool] = {"enabled": False},
-     _na_cap_noted: dict[str, bool] = {};
+     _na_coverage_state: dict[str, bool] = {"enabled": False};
 
 def na_coverage_begin {
-    import from jaclang.compiler.placement.placement_pins { _na_demotion_memo }
     import from jaclang.compiler.placement.placement_solver { native_scan_memo_clear }
     _na_coverage.clear();
-    _na_demotion_memo.clear();
     native_scan_memo_clear();
     _na_coverage_state["enabled"] = True;
 }
@@ -43,7 +40,9 @@ def na_coverage_seam(path: str, reason: str) {
         rec = {'outcome': 'native', 'code': '', 'detail': '', 'seams': []};
         _na_coverage[key] = rec;
     }
-    rec['seams'].append(reason);
+    if reason not in rec['seams'] {
+        rec['seams'].append(reason);
+    }
 }
 
 def na_coverage_capture(path: str) -> dict[str, any] {
@@ -122,23 +121,4 @@ def _drop_demoted_native_bindings(mod: uni.Module, resolved: str) {
     for name in stale {
         manifest.bindings.pop(name, None);
     }
-}
-
-def _note_native_closure_cap(root_path: str, cap: int) {
-    rp = os.path.realpath(root_path);
-    if rp in _na_cap_noted {
-        return;
-    }
-    _na_cap_noted[rp] = True;
-    try {
-        import from jaclang.cli.console { console }
-        console.print(
-            f"note: {root_path} preferred native but its import closure "
-            f"exceeded the inference cap ({cap} modules); compiled in the "
-            f"server codespace. Raise [build] native_closure_cap in jac.toml "
-            f"to scan larger closures.",
-            style="dim",
-            file=sys.stderr
-        );
-    } except Exception {}
 }
