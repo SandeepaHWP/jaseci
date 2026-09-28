@@ -83,3 +83,10 @@ def eq_under_not(n: int | None) -> bool {
     }
     return False;
 }
+
+def in_keeps_type(n: int | None) -> bool {
+    if n in (True, False) {
+        return n;  # <-- Error: `in` compares with ==, so n is int, not bool
+    }
+    return False;
+}

@@ -793,7 +793,7 @@ Cannot assign Literal["a"] | Literal["b"] | Literal["c"] to Literal["c"]
              "equality_keeps_type",
              "checker",
              "checker_equality_keeps_type.jac",
-             5,
+             6,
              True,
              [
                  (
@@ -829,6 +829,13 @@ Cannot return int, expected bool
                      """
 Cannot return int, expected bool
         return n;  # <-- Error: `not` keeps the equality rule
+    """
+                 ),
+                 (
+                     5,
+                     """
+Cannot return int, expected bool
+        return n;  # <-- Error: `in` compares with ==, so n is int, not bool
     """
                  )
              ]
