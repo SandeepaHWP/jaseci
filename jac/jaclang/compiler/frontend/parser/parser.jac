@@ -156,6 +156,7 @@ import from jaclang.compiler.frontend.constant {
 }
 
 glob MAX_NESTING: int = 200,
+     MAX_CHAIN_DEPTH: int = 3000,
      TOKEN_KIND_TO_TOK: dict[TokenKind, str] = {
          TokenKind.INT: Tok.INT.value,
          TokenKind.HEX: Tok.HEX.value,
@@ -398,6 +399,7 @@ obj Parser {
         _no_connect_op_depth: int = 0,
         _gen_test_idx: int = 0,
         _nest_depth: int = 0,
+        _chain_depth: int = 0,
         _too_deep: bool = False;
 
     def postinit;
@@ -447,7 +449,8 @@ obj Parser {
     def parse_module -> Module;
     def parse_expression(allow_cast: bool = True) -> Expr;
     def _nest_enter -> bool;
-    def _nest_bail -> Expr;
+    def _chain_link -> bool;
+    def _nest_bail(chain: bool = False) -> Expr;
     def _check_js_arrow_fault -> bool;
     def _recover_js_arrow_fault(left: Expr) -> Expr;
     def _recover_removed_marker -> ElementStmt | EmptyToken | None;

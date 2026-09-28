@@ -538,13 +538,29 @@ impl Parser._nest_enter -> bool {
     return True;
 }
 
-impl Parser._nest_bail -> Expr {
+impl Parser._chain_link -> bool {
+    if self._nest_depth + self._chain_depth >= MAX_CHAIN_DEPTH {
+        return False;
+    }
+    self._chain_depth += 1;
+    return True;
+}
+
+impl Parser._nest_bail(chain: bool = False) -> Expr {
     if not self._too_deep {
+        help = (
+            "A chain of operators nests one level per operator, and the compiler stops at "
+            + f"{MAX_CHAIN_DEPTH}. Split it across several statements, or build the value in a loop."
+        )
+            if chain
+            else (
+                "Each nested bracket or prefix operator adds a level, and the compiler stops at "
+                + f"{MAX_NESTING}. Build the inner parts as separate values first, then combine them."
+            );
         self.emit_diag(
             "Expression is too deeply nested for the compiler to process",
             "E0111",
-            help="Each nested bracket or prefix operator adds a level, and the compiler stops at "
-                + f"{MAX_NESTING}. Build the inner parts as separate values first, then combine them."
+            help=help
         );
         self._too_deep = True;
     }
@@ -655,72 +671,107 @@ impl Parser.parse_cast(allow_cast: bool = True) -> Expr {
 
 impl Parser.parse_cast_type -> Expr {
     left = self.parse_atomic_chain();
+    chain_base = self._chain_depth;
     while self.match_tok(TokenKind.BW_OR) {
         op = self.make_uni_token(self.previous());
         right = self.parse_atomic_chain();
+        if not self._chain_link() {
+            return self._nest_bail(chain=True);
+        }
         left = BinaryExpr(left=left, op=op, right=right, kid=[left, op, right]);
     }
+    self._chain_depth = chain_base;
     return left;
 }
 
 impl Parser.parse_pipe(allow_cast: bool = True) -> Expr {
     left = self.parse_pipe_back(allow_cast);
+    chain_base = self._chain_depth;
     while self.match_tok(TokenKind.PIPE_FWD) {
         op = self.make_uni_token(self.previous());
         right = self.parse_pipe_back(allow_cast);
+        if not self._chain_link() {
+            return self._nest_bail(chain=True);
+        }
         left = BinaryExpr(left=left, op=op, right=right, kid=[left, op, right]);
     }
+    self._chain_depth = chain_base;
     return left;
 }
 
 impl Parser.parse_pipe_back(allow_cast: bool = True) -> Expr {
     left = self.parse_logical_or(allow_cast);
+    chain_base = self._chain_depth;
     while self.match_tok(TokenKind.PIPE_BKWD) {
         op = self.make_uni_token(self.previous());
         right = self.parse_logical_or(allow_cast);
+        if not self._chain_link() {
+            return self._nest_bail(chain=True);
+        }
         left = BinaryExpr(left=left, op=op, right=right, kid=[left, op, right]);
     }
+    self._chain_depth = chain_base;
     return left;
 }
 
 impl Parser.parse_bitwise_or -> Expr {
     left = self.parse_bitwise_xor();
+    chain_base = self._chain_depth;
     while self.match_tok(TokenKind.BW_OR) {
         op = self.make_uni_token(self.previous());
         right = self.parse_bitwise_xor();
+        if not self._chain_link() {
+            return self._nest_bail(chain=True);
+        }
         left = BinaryExpr(left=left, op=op, right=right, kid=[left, op, right]);
     }
+    self._chain_depth = chain_base;
     return left;
 }
 
 impl Parser.parse_bitwise_xor -> Expr {
     left = self.parse_bitwise_and();
+    chain_base = self._chain_depth;
     while self.match_tok(TokenKind.BW_XOR) {
         op = self.make_uni_token(self.previous());
         right = self.parse_bitwise_and();
+        if not self._chain_link() {
+            return self._nest_bail(chain=True);
+        }
         left = BinaryExpr(left=left, op=op, right=right, kid=[left, op, right]);
     }
+    self._chain_depth = chain_base;
     return left;
 }
 
 impl Parser.parse_bitwise_and -> Expr {
     left = self.parse_shift();
+    chain_base = self._chain_depth;
     while self.match_tok(TokenKind.BW_AND) {
         op = self.make_uni_token(self.previous());
         right = self.parse_shift();
+        if not self._chain_link() {
+            return self._nest_bail(chain=True);
+        }
         left = BinaryExpr(left=left, op=op, right=right, kid=[left, op, right]);
     }
+    self._chain_depth = chain_base;
     return left;
 }
 
 impl Parser.parse_shift -> Expr {
     left = self.parse_arithmetic();
+    chain_base = self._chain_depth;
     while self.check_any(TokenKind.LSHIFT, TokenKind.RSHIFT) {
         tok = self.expect_any(TokenKind.LSHIFT, TokenKind.RSHIFT);
         op = self.make_uni_token(tok);
         right = self.parse_arithmetic();
+        if not self._chain_link() {
+            return self._nest_bail(chain=True);
+        }
         left = BinaryExpr(left=left, op=op, right=right, kid=[left, op, right]);
     }
+    self._chain_depth = chain_base;
     return left;
 }
 
@@ -840,17 +891,23 @@ impl Parser.parse_compare(allow_cast: bool = True) -> Expr {
 
 impl Parser.parse_arithmetic -> Expr {
     left = self.parse_term();
+    chain_base = self._chain_depth;
     while self.check_any(TokenKind.PLUS, TokenKind.MINUS) {
         tok = self.expect_any(TokenKind.PLUS, TokenKind.MINUS);
         op = self.make_uni_token(tok);
         right = self.parse_term();
+        if not self._chain_link() {
+            return self._nest_bail(chain=True);
+        }
         left = BinaryExpr(left=left, op=op, right=right, kid=[left, op, right]);
     }
+    self._chain_depth = chain_base;
     return left;
 }
 
 impl Parser.parse_term -> Expr {
     left = self.parse_power();
+    chain_base = self._chain_depth;
     while self.check_any(
         TokenKind.STAR_MUL,
         TokenKind.DIV,
@@ -867,8 +924,12 @@ impl Parser.parse_term -> Expr {
         );
         op = self.make_uni_token(tok);
         right = self.parse_power();
+        if not self._chain_link() {
+            return self._nest_bail(chain=True);
+        }
         left = BinaryExpr(left=left, op=op, right=right, kid=[left, op, right]);
     }
+    self._chain_depth = chain_base;
     return left;
 }
 
@@ -912,6 +973,7 @@ impl Parser.parse_connect -> Expr {
     if self._no_connect_op_depth > 0 {
         return left;
     }
+    chain_base = self._chain_depth;
     while True {
         conn_op = self.parse_connect_op();
         if conn_op is None {
@@ -922,8 +984,12 @@ impl Parser.parse_connect -> Expr {
         }
         right = self.parse_atomic_pipe();
         kid: list[UniNode] = [left, conn_op, right];
+        if not self._chain_link() {
+            return self._nest_bail(chain=True);
+        }
         left = BinaryExpr(left=left, op=conn_op, right=right, kid=kid);
     }
+    self._chain_depth = chain_base;
     return left;
 }
 
@@ -1092,21 +1158,31 @@ impl Parser.parse_connect_op -> ConnectOp | DisconnectOp | None {
 
 impl Parser.parse_atomic_pipe -> Expr {
     left = self.parse_atomic_pipe_back();
+    chain_base = self._chain_depth;
     while self.match_tok(TokenKind.A_PIPE_FWD) {
         op = self.make_uni_token(self.previous());
         right = self.parse_atomic_pipe_back();
+        if not self._chain_link() {
+            return self._nest_bail(chain=True);
+        }
         left = BinaryExpr(left=left, op=op, right=right, kid=[left, op, right]);
     }
+    self._chain_depth = chain_base;
     return left;
 }
 
 impl Parser.parse_atomic_pipe_back -> Expr {
     left = self.parse_spawn();
+    chain_base = self._chain_depth;
     while self.match_tok(TokenKind.A_PIPE_BKWD) {
         op = self.make_uni_token(self.previous());
         right = self.parse_spawn();
+        if not self._chain_link() {
+            return self._nest_bail(chain=True);
+        }
         left = BinaryExpr(left=left, op=op, right=right, kid=[left, op, right]);
     }
+    self._chain_depth = chain_base;
     return left;
 }
 
@@ -1119,11 +1195,16 @@ impl Parser.parse_spawn -> Expr {
         return UnaryExpr(operand=target, op=op, kid=[op, target]);
     }
     left = self.parse_unpack();
+    chain_base = self._chain_depth;
     while self.match_tok(TokenKind.KW_SPAWN) {
         op = self.make_uni_token(self.previous());
         right = self.parse_unpack();
+        if not self._chain_link() {
+            return self._nest_bail(chain=True);
+        }
         left = BinaryExpr(left=left, op=op, right=right, kid=[left, op, right]);
     }
+    self._chain_depth = chain_base;
     return left;
 }
 

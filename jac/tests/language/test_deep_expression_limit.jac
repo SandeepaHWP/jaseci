@@ -50,6 +50,15 @@ test "nesting within the limit still compiles and runs" {
     }
 }
 
+test "a chain within the limit still compiles and runs" {
+    with tempfile.TemporaryDirectory() as dir {
+        chain = "+".join(["1"] * 1000);
+        out = run_source(dir, f"with entry {{\n    print({chain});\n}}\n");
+        assert "E0111" not in out , out;
+        assert "1000" in out.splitlines() , out;
+    }
+}
+
 test "recursion while running the program keeps its own failure" {
     with tempfile.TemporaryDirectory() as dir {
         out = run_source(
