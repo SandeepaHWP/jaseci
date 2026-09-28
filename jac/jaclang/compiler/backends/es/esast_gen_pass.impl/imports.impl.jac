@@ -26,12 +26,15 @@ impl EsastGenPass._register_jac_runtime_import -> None {
     self._register_jac_virtual_import(self.resolved_backend.runtime_module());
 }
 
-impl EsastGenPass._inject_runtime_import(name: str, nd: uni.UniNode) -> None {
+impl EsastGenPass._inject_runtime_import(
+    name: str, nd: uni.UniNode, src: str = ""
+) -> None {
     import from jaclang.client.client_surface { runtime_import_source }
+    import from jaclang.compiler.backends.es.jac_runtime_js { JAC_PRELUDE_MODULE }
     if name in self.injected_imports or self._has_import(name) {
         return;
     }
-    src = runtime_import_source(name, self.resolved_backend);
+    src = src or runtime_import_source(name, self.resolved_backend);
     specifier = self.sync_loc(
         es.ImportSpecifier(
             imported=es.Identifier(name=name), local=es.Identifier(name=name)
@@ -44,7 +47,7 @@ impl EsastGenPass._inject_runtime_import(name: str, nd: uni.UniNode) -> None {
     );
     self.imports.append(import_decl);
     self.injected_imports.add(name);
-    if src.startswith('@jac/') {
+    if src.startswith('@jac/') and (src != JAC_PRELUDE_MODULE) {
         self._register_jac_runtime_import();
     }
 }
@@ -200,8 +203,6 @@ impl EsastGenPass._partition_client_import_items(
     import from jaclang.compiler.symbol_utils {
         ClientImportVerdict,
         classify_client_import_item,
-        decl_has_access,
-        import_target_pinned_server,
         is_client_boundary_import,
         report_dead_client_import
     }
@@ -209,11 +210,10 @@ impl EsastGenPass._partition_client_import_items(
         return None;
     }
     import from jaclang.compiler.driver.boundary_classify { import_crosses_apps }
-    pinned_server = import_target_pinned_server(nd);
     cross_app = import_crosses_apps(nd);
     source_mod = self._resolve_source_module(nd);
     if source_mod is None {
-        return ([], list(nd.items)) if pinned_server else None;
+        return None;
     }
     kept: list[uni.ModuleItem | uni.ModulePath] = [];
     bridged: list[uni.ModuleItem | uni.ModulePath] = [];
@@ -227,22 +227,11 @@ impl EsastGenPass._partition_client_import_items(
             }
         }
         verdict = classify_client_import_item(source_mod, item);
-        if pinned_server and verdict != ClientImportVerdict.DEAD {
-            bridged.append(item);
-            continue;
-        }
-        if pinned_server
-            and verdict == ClientImportVerdict.DEAD
-            and isinstance(item, uni.ModuleItem)
-            and decl_has_access(source_mod, item) {
-            bridged.append(item);
-            continue;
-        }
         if verdict == ClientImportVerdict.BRIDGED {
             bridged.append(item);
         } elif verdict == ClientImportVerdict.DEAD {
             if not cross_app and isinstance(item, uni.ModuleItem) {
-                report_dead_client_import(self, nd, item);
+                report_dead_client_import(self, nd, item, self._unbound_reported);
             }
         } else {
             kept.append(item);

@@ -173,7 +173,6 @@ node UniNode {
     has _sub_node_tab: dict[(type, list[UniNode])] { getter; }
 
     def _link(kid: Sequence[UniNode], roles: dict[type, any]) -> None;
-    def detached_copy -> UniNode;
     def __deepcopy__(memo: dict[int, object]) -> UniNode;
     def _assert_thawed -> None;
     def freeze_structure -> None;
@@ -278,7 +277,8 @@ node Symbol {
         na_stack_ok: bool = False,
         _in_stub_scope: (bool | None) = None,
         _binding_kind: (BindingKind | None) = None,
-        provider: SymbolProvider | None = None;
+        provider: SymbolProvider | None = None,
+        imported_from: Symbol | None = None;
 
     def init(
         defn: NameAtom,
@@ -401,6 +401,7 @@ node AstAccessNode(UniNode) {
     has access: (SubTag[Token] | None) { getter; }
     has access_type: SymbolAccess { getter; }
     has public_access: bool { getter; }
+    has exposure: SymbolAccess { getter; }
 
     def init(
         *, access: (SubTag[Token] | None) = None, kid: Sequence[UniNode] = []
@@ -412,6 +413,7 @@ node AstAccessNode(UniNode) {
 node ContextAwareNode(UniNode) {
     has codespace_dual: bool = False;
     has code_context: CodeContext { getter; setter(code_context: CodeContext); }
+    has placement_name: str { getter; }
 
     def init(*, codespace_dual: bool = False, kid: Sequence[UniNode] = []) -> None;
     def postinit -> None;
@@ -700,7 +702,7 @@ node Module(AstDocNode, UniScopeNode) {
     has annexable_by: (str | None) { getter; }
 
     def declares_codespace(ctx: CodeContext, path_hint: str = '') -> bool;
-    def absorb_annex_body(stmts: Sequence[UniNode]) -> None;
+    def record_comptime_dependency(path: str, body: bool = False) -> None;
     static def make_stub(
         inject_name: (str | None) = None, inject_src: (Source | None) = None
     ) -> Module {
@@ -847,7 +849,6 @@ obj ImportBoundaryFacts {
     has native_from_path: (str | None) = None,
         from_loc_resolved: (str | None) = None,
         is_service: bool = False,
-        pinned_server: bool = False,
         client_native_edge: bool = False,
         sv_abilities: dict[(str, Ability)] = {},
         sv_walkers: dict[(str, Archetype)] = {},
@@ -891,6 +892,7 @@ node Import(ContextAwareNode, ElementStmt, CodeBlockStmt) {
     }
 
     def postinit -> None;
+    def prune_items(doomed: set[int]) -> bool;
 
     has is_jac: bool { getter; }
     has __jac_detected: bool { getter; }
@@ -950,6 +952,117 @@ node ModuleItem(UniNode) {
     def __repr__ -> str;
 }
 
+node ImplImport(ElementStmt) {
+    has scope: (ModulePath | None) { getter; }
+    has body: Sequence[ImportWire | ImportRule] { getter; }
+
+    def init(
+        *,
+        doc: (String | None) = None,
+        scope: (ModulePath | None),
+        body: Sequence[ImportWire | ImportRule],
+        kid: Sequence[UniNode] = []
+    ) -> None;
+
+    def postinit -> None;
+
+    has scope_prefix: str { getter; }
+
+    def __repr__ -> str;
+}
+
+node ImportWire(UniNode) {
+    has is_absorb: bool = False,
+        is_typed: bool = False,
+        is_comptime: bool = False,
+        is_module_form: bool = False;
+
+    has provider: ModulePath { getter; }
+    has consumers: Sequence[ModulePath] { getter; }
+    has items: Sequence[WireItem] { getter; }
+
+    def init(
+        *,
+        provider: ModulePath,
+        consumers: Sequence[ModulePath],
+        items: (Sequence[WireItem] | None),
+        is_absorb: bool = False,
+        is_typed: bool = False,
+        is_comptime: bool = False,
+        kid: Sequence[UniNode] = []
+    ) -> None;
+
+    def postinit -> None;
+
+    has block: ImplImport { getter; }
+    has provider_path: str { getter; }
+    has consumer_paths: list[str] { getter; }
+
+    def __repr__ -> str;
+}
+
+node ImportRule(UniNode) {
+    has is_open: bool = False;
+    has name: Name { getter; }
+    has sources: Sequence[ModulePattern] { getter; }
+    has targets: Sequence[ModulePattern] { getter; }
+    has items: Sequence[WireItem] { getter; }
+
+    def init(
+        *,
+        name: Name,
+        sources: Sequence[ModulePattern],
+        targets: Sequence[ModulePattern],
+        items: (Sequence[WireItem] | None),
+        kid: Sequence[UniNode] = []
+    ) -> None;
+
+    def postinit -> None;
+
+    has block: ImplImport { getter; }
+    has item_names: set[str] { getter; }
+
+    def __repr__ -> str;
+}
+
+node ModulePattern(UniNode) {
+    has is_glob: bool = False,
+        is_any: bool = False;
+
+    has path: (ModulePath | None) { getter; }
+
+    def init(
+        *,
+        path: (ModulePath | None),
+        is_glob: bool = False,
+        is_any: bool = False,
+        kid: Sequence[UniNode] = []
+    ) -> None;
+
+    def postinit -> None;
+
+    has dotted: str { getter; }
+
+    static def join_scope(prefix: str, name: str) -> str;
+    def matches(module: str, prefix: str = "") -> bool;
+    def __repr__ -> str;
+}
+
+node WireItem(UniNode) {
+    has name: (Name | Token) { getter; }
+    has alias: (Name | None) { getter; }
+
+    def init(
+        *, name: (Name | Token), alias: (Name | None), kid: Sequence[UniNode] = []
+    ) -> None;
+
+    def postinit -> None;
+
+    has binding: str { getter; }
+
+    def __repr__ -> str;
+}
+
 node Archetype(ContextAwareNode, ArchSpec, AstAccessNode, ArchBlockStmt, AstImplNeedingNode, UniScopeNode, UniCFGNode) {
     has name: Name { getter; }
     has arch_type: Token { getter; }
@@ -982,9 +1095,13 @@ node Archetype(ContextAwareNode, ArchSpec, AstAccessNode, ArchBlockStmt, AstImpl
 
     has is_abstract: bool { getter; }
     has arch_kind: (str | None) { getter; }
+    has surface_kind: str { getter; }
+    has served: bool { getter; }
 
     def get_has_vars -> list[HasVar];
     def get_methods -> list[Ability];
+    def base_archetypes -> list[Archetype];
+    def declares_endpoints -> bool;
     def __repr__ -> str;
 }
 
@@ -1100,7 +1217,10 @@ node Ability(ContextAwareNode, AstAccessNode, ElementStmt, AstAsyncNode, ArchBlo
     has is_cls_method: bool { getter; }
     has is_def: bool { getter; }
     has method_owner: Archetype | Enum | None { getter; }
+    has class_body_owner: Archetype | Enum | None { getter; }
     has is_genai_ability: bool { getter; }
+    has surface_kind: str { getter; }
+    has served: bool { getter; }
 
     def py_resolve_name -> str;
     def event_trigger_type_names -> (list[str] | None);

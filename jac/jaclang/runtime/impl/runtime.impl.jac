@@ -1295,13 +1295,38 @@ impl JacGraph.heavy_edge(
     return `edge;
 }
 
-impl JacPersistence.save(`obj: (Archetype | Anchor)) -> None {
+impl JacPersistence.save(
+    `obj: (Archetype | Anchor), owner: (UUID | None) = None
+) -> None {
     anchor = `obj.__jac__ if isinstance(`obj, Archetype) else `obj;
     jctx = JacRuntimeInterface.get_context();
     anchor.ensure_id();
+    if (owner is not None and anchor.persistent and anchor.`root != owner) {
+        current_owner = anchor.`root;
+        raise ValueError(
+            f"anchor {anchor.id} is already owned by root {current_owner} and "
+            'cannot be re-owned'
+        );
+    }
     if (not anchor.persistent and not anchor.root) {
+        if (owner is not None and owner != jctx.user_root.id) {
+            target = jctx.mem.get(owner);
+            if not isinstance(target, NodeAnchor) or not target.is_populated() {
+                raise ValueError(f"owner root {owner} does not exist");
+            }
+            if not isinstance(target.archetype, Root) {
+                raise ValueError(f"owner {owner} is not a root");
+            }
+            if JacRuntimeInterface.check_access_level(target).value
+                < AccessLevel.WRITE.value {
+                raise PermissionError(
+                    f"caller root may not create content owned by root {owner}: "
+                    'requires WRITE on that root'
+                );
+            }
+        }
         anchor.persistent = True;
-        anchor.`root = jctx.user_root.id;
+        anchor.`root = owner if owner is not None else jctx.user_root.id;
     }
     jctx.mem.put(anchor);
     match anchor {
@@ -1324,6 +1349,11 @@ impl JacPersistence.save(`obj: (Archetype | Anchor)) -> None {
             ;
 
     }
+}
+
+impl JacPersistence.owner_of(`obj: (Archetype | Anchor)) -> (UUID | None) {
+    anchor = `obj.__jac__ if isinstance(`obj, Archetype) else `obj;
+    return anchor.root;
 }
 
 impl JacPersistence._destroy_anchors(objs: any, strict: bool) -> list[Anchor] {
@@ -1524,9 +1554,8 @@ impl JacLLM.get_mtir(
     args: dict[((int | str), object)],
     call_params: dict[(str, object)]
 ) -> MTRuntime {
-    import from jaclang.runtime.semantic { fetch_mtir }
     import from jaclang.byllm.mtir { MTIR }
-    return MTIR(caller, args, call_params, fetch_mtir(caller)).runtime;
+    return MTIR(caller, args, call_params, JacLLM.fetch_mtir(caller)).runtime;
 }
 
 impl JacLLM.`sem(semstr: str, inner_semstr: dict[(str, str)]) -> Callable {
@@ -1549,7 +1578,6 @@ impl JacLLM.acall_llm(model: LLMModel, mt_run: MTRuntime) -> any {
 impl JacLLM.`by(model: LLMModel) -> Callable {
     def _decorator(caller: Callable) -> Callable {
         def _wrapped_caller(*args: object, **kwargs: object) -> object {
-            import from jaclang.runtime.semantic { fetch_mtir }
             import from jaclang.byllm.mtir { MTIR }
             invoke_args: dict[((int | str), object)] = {};
             for (i, arg) in enumerate(args) {
@@ -1559,7 +1587,7 @@ impl JacLLM.`by(model: LLMModel) -> Callable {
                 invoke_args[key] = value;
             }
             mt_run = MTIR(
-                caller, invoke_args, model.call_params, fetch_mtir(caller)
+                caller, invoke_args, model.call_params, JacLLM.fetch_mtir(caller)
             ).runtime;
             return model.invoke(mt_run=mt_run);
         }
@@ -1652,13 +1680,6 @@ impl JacLLM.default_llm -> LLMModel {
     return instance;
 }
 
-impl JacLLM.add_mtir_to_map(scope: str, mtir: Info) -> None {
-    if (JacRuntime.program is None) {
-        raise AttributeError('JacRuntime.program is not initialized');
-    }
-    JacRuntime.program.mtir_map[scope] = mtir;
-}
-
 impl JacLLM.get_mtir_from_map(scope: str) -> (Info | None) {
     import from jaclang.runtime.prepared { semantic_for_scope }
     prepared = semantic_for_scope(scope);
@@ -1668,10 +1689,59 @@ impl JacLLM.get_mtir_from_map(scope: str) -> (Info | None) {
     if (JacRuntime.program is None) {
         raise AttributeError('JacRuntime.program is not initialized');
     }
-    if (scope not in JacRuntime.program.mtir_map) {
-        raise KeyError(f"MTIR not found for scope {scope}");
+    owner = JacRuntime.program.context_root or JacRuntime.program;
+    programs = [owner, *owner.contexts.values()];
+    internal = JacRuntime.get_compiler().selfhost.peek_program();
+    if internal is not None {
+        programs.append(internal);
     }
-    return JacRuntime.program.mtir_map[scope];
+    for program in programs {
+        found = program.mtir_map.get(scope);
+        if found is not None {
+            return found;
+        }
+    }
+    raise KeyError(f"MTIR not found for scope {scope}");
+}
+
+impl JacLLM.fetch_mtir(func: Callable) -> (Info | None) {
+    import sys;
+    import from pathlib { Path }
+    module_name = None;
+    try {
+        module_name = getattr(func, "__module__");
+    } except AttributeError {
+        module_name = None;
+    }
+
+    if module_name and module_name == "__main__" {
+        main_mod = sys.modules.get("__main__");
+        main_file = main_mod?.__file__ if main_mod else None;
+        if main_file {
+            stem = Path(main_file).stem;
+
+            if stem.endswith(".impl") {
+                stem = stem[:-5];
+            } elif stem.endswith(".cl") {
+                stem = stem[:-3];
+            }
+            module = stem;
+        } else {
+            module = Path(sys.argv[0]).stem if sys.argv and sys.argv[0] else "__main__";
+        }
+    } elif module_name {
+        module = module_name;
+    } else {
+        module = "__main__";
+    }
+
+    try {
+        qualname = func.__qualname__;
+        current_scope = ".".join([module, qualname]);
+        return JacRuntime.get_mtir_from_map(current_scope);
+    } except (KeyError, AttributeError) {
+        return None;
+    }
 }
 
 impl JacContext.create_j_context(

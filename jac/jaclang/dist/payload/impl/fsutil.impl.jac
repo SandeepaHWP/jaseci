@@ -154,16 +154,9 @@ impl skip_none(p: str) -> bool {
 }
 
 impl skip_jaclang(p: str) -> bool {
-    if p != "runtime/python/LICENSE.cpython" {
-        for replacement in (
-            "compiler/frontend/python",
-            "compiler/backends/py/jacpython",
-            "runtime/python"
-        ) {
-            if p == replacement or p.startswith(replacement + "/") {
-                return True;
-            }
-        }
+    import from jaclang.bootstrap_manifest { is_native_lowered }
+    if p != "runtime/python/LICENSE.cpython" and is_native_lowered(p) {
+        return True;
     }
     return (
         "__pycache__" in p
@@ -263,14 +256,22 @@ impl run_child(argv: list[str], env: dict[str, str] | None, allow_fail: bool) ->
     return ok;
 }
 
-impl strip_best_effort(path: str) {
+impl strip_best_effort(path: str, args: list[str] | None = None) {
     before = file_size_or_zero(path);
     if before == 0 {
         return;
     }
+
+    if sys.platform == "darwin" {
+        mapped: list[str] = [];
+        for a in (args or []) {
+            mapped.append("-S" if a == "--strip-debug" else a);
+        }
+        args = mapped;
+    }
     try {
         subprocess.run(
-            ["strip", path],
+            ["strip"] + (args or []) + [path],
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
