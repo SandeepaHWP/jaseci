@@ -426,9 +426,10 @@ impl NaIRGenPass._tuple_seq_coerce(
 ) -> (ir.Value | None) {
     """Materialize a tuple value into the sequence a variadic tuple lowers to.
 
-    Only fires when the target is exactly the sequence type the value's own
-    element flavor would build, so the conversion never silently reinterprets
-    one element flavor as another.
+    Fires when the target is exactly the sequence type the value's own element
+    flavor would build, or when it is the boxed `jacval` sequence an erased
+    `tuple[Any, ...]` lowers to, which holds any element flavor by boxing each
+    one. It never reinterprets one unboxed element flavor as another.
     """;
     if not isinstance(target_type, ir.PointerType) {
         return None;
@@ -445,11 +446,43 @@ impl NaIRGenPass._tuple_seq_coerce(
         return None;
     }
     flavor = self._tuple_seq_flavor([e for e in st.elements]);
-    if flavor is None or flavor[0] != spec {
+    if flavor is None {
         return None;
     }
-    seq = self._tuple_iter_seq(None, val);
-    return seq[0] if seq is not None else None;
+    if flavor[0] == spec {
+        seq = self._tuple_iter_seq(None, val);
+        return seq[0] if seq is not None else None;
+    }
+    if spec != "jacval" {
+        return None;
+    }
+    boxed = self._tuple_iter_seq(None, val, element_type=self.jacval_type);
+    return boxed[0] if boxed is not None else None;
+}
+
+impl NaIRGenPass._variadic_elem_coerce(
+    val: ir.Value, container: (uni.UniNode | None)
+) -> ir.Value {
+    """Give a fixed-arity tuple the shape a `list[tuple[T, ...]]` slot holds.
+
+    A variadic tuple lowers to the sequence `list[T]` does (see
+    `_variadic_tuple_seq_type`), and every read out of such a list views its
+    erased slot through that sequence type. A tuple display stored into the
+    list is built with its own fixed arity, though, and the erased `i8*` slot
+    took the tuple box as it was, so the next read walked a tuple struct as a
+    list header. Every element store into a list whose checked element type
+    is variadic comes through here and is materialized as that sequence; any
+    other value, or a list of anything else, passes through untouched.
+    """;
+    if self._tuple_struct_of_value(val) is None {
+        return val;
+    }
+    decl = self._list_elem_llvm_of(container);
+    if decl is None or self._spec_from_list_slot_type(decl) is None {
+        return val;
+    }
+    seq = self._tuple_seq_coerce(val, decl);
+    return seq if seq is not None else val;
 }
 
 impl NaIRGenPass._tuple_struct_of_value(

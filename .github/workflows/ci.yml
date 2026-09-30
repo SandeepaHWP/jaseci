@@ -121,7 +121,22 @@ jobs:
 
   # The kit lane builds this checkout and publishes it for every test lane.
   build-kit:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    # The kit seals the native compiler kernel. A cold kernel build (a new
+    # stage-0 pin or a units-cache miss) lowers the analysis zone in one
+    # process and peaks near 15 GB, which starves a 4-vCPU runner.
+    runs-on: blacksmith-8vcpu-ubuntu-2404
+    env:
+      # A pull request's kit links the stage-0 kernel from cached unit objects
+      # instead of re-optimizing it as one program, so a kernel-touching PR
+      # relinks in seconds. Main, release and nightly kits keep the bitcode
+      # link: the seal honors this only for pull_request events, and the kit's
+      # manifest records the mode for the runtime to check.
+      JAC_PR_KIT_KERNEL_LINK: ${{ github.event_name == 'pull_request' && 'objects' || '' }}
+      # A pull request reuses a JacPython whose lowered sources are unchanged.
+      # Every step that runs build_python needs it, not only the jac binary
+      # build: the vendor step's zig build depends on the runtime too, and
+      # without it rebuilt JacPython from scratch after the kit was built.
+      JAC_JACPYTHON_REUSE: ${{ github.event_name == 'pull_request' && '1' || '' }}
     steps:
       - uses: actions/checkout@v5
 
@@ -153,7 +168,11 @@ jobs:
         if: steps.stage0.outputs.stage0 != 'self'
         uses: actions/cache/restore@v4
         with:
-          path: ${{ steps.stage0.outputs.cache_home }}/jir/modules
+          path: |
+            ${{ steps.stage0.outputs.cache_home }}/jir/modules
+            ${{ steps.stage0.outputs.cache_home }}/jir/stage0-kernel/out
+            ${{ steps.stage0.outputs.cache_home }}/jir/stubcat
+            ${{ steps.stage0.outputs.cache_home }}/jir/bootstrap
           key: stage0-units-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.stage0.outputs.stage0 }}-py${{ steps.stage0.outputs.python }}-${{ github.run_id }}
           restore-keys: |
             stage0-units-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.stage0.outputs.stage0 }}-py${{ steps.stage0.outputs.python }}-
@@ -168,7 +187,8 @@ jobs:
         run: |
           set -euo pipefail
           git fetch --no-tags --depth=1 origin "$STAGE0_COMMIT"
-          mkdir -p "$STAGE0_CACHE/jir/modules"
+          mkdir -p "$STAGE0_CACHE/jir/modules" "$STAGE0_CACHE/jir/stage0-kernel/out" \
+            "$STAGE0_CACHE/jir/stubcat" "$STAGE0_CACHE/jir/bootstrap"
           touch "$RUNNER_TEMP/stage0.before"
           {
             echo "JAC_CACHE_HOME=$STAGE0_CACHE"
@@ -183,7 +203,8 @@ jobs:
           # cache hit skips producing both, so ask for them explicitly.
           need-build-inputs: "true"
 
-      # Only main seeds the stage-0 caches, and only with what this run made:
+      # Only main (a push or a manual dispatch) seeds the stage-0 caches, and only
+      # with what this run made:
       # a binary cache hit or a fallback to the self build leaves nothing new.
       - name: Check the stage-0 products
         id: stage0-made
@@ -195,7 +216,8 @@ jobs:
           set -euo pipefail
           src=false; units=false
           [ -f "$STAGE0_CACHE/stage0/$STAGE0_COMMIT/.stage0.json" ] && src=true
-          if [ -n "$(find "$STAGE0_CACHE/jir/modules" -newer "$RUNNER_TEMP/stage0.before" -type f -print -quit)" ]; then
+          if [ -n "$(find "$STAGE0_CACHE/jir/modules" "$STAGE0_CACHE/jir/stage0-kernel/out" \
+            "$STAGE0_CACHE/jir/stubcat" "$STAGE0_CACHE/jir/bootstrap" -newer "$RUNNER_TEMP/stage0.before" -type f -print -quit)" ]; then
             units=true
           fi
           echo "src=$src" >> "$GITHUB_OUTPUT"
@@ -204,7 +226,7 @@ jobs:
       - name: Save the stage-0 snapshot (main only)
         if: >-
           steps.stage0.outputs.stage0 != 'self' &&
-          github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+          github.event_name != 'pull_request' && github.ref == 'refs/heads/main' &&
           steps.stage0-src.outputs.cache-hit != 'true' &&
           steps.stage0-made.outputs.src == 'true'
         uses: actions/cache/save@v4
@@ -215,11 +237,15 @@ jobs:
       - name: Save the stage-0 kernel units (main only)
         if: >-
           steps.stage0.outputs.stage0 != 'self' &&
-          github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+          github.event_name != 'pull_request' && github.ref == 'refs/heads/main' &&
           steps.stage0-made.outputs.units == 'true'
         uses: actions/cache/save@v4
         with:
-          path: ${{ steps.stage0.outputs.cache_home }}/jir/modules
+          path: |
+            ${{ steps.stage0.outputs.cache_home }}/jir/modules
+            ${{ steps.stage0.outputs.cache_home }}/jir/stage0-kernel/out
+            ${{ steps.stage0.outputs.cache_home }}/jir/stubcat
+            ${{ steps.stage0.outputs.cache_home }}/jir/bootstrap
           key: stage0-units-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.stage0.outputs.stage0 }}-py${{ steps.stage0.outputs.python }}-${{ github.run_id }}
 
       - name: Set up Zig 0.16.0
@@ -600,6 +626,33 @@ jobs:
             exit 1
           fi
 
+      # Only main saves the stage-0 snapshot and kernel-units caches
+      # (build-kit), so a PR that moves the pin builds its kernel from a cold
+      # stage 0 on every push. A pin-only PR lands first and main warms the
+      # caches before anything builds on it (stage0-bump.yml opens those).
+      # Diffed from the PR's merge base, so a pin bump that landed on main
+      # after this branch forked is not this PR's change.
+      - name: Keep stage-0 pin bumps in their own PR
+        if: |
+          github.event_name == 'pull_request' &&
+          !contains(github.event.pull_request.labels.*.name, 'skip-stage0-pin-check')
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          pin=jac/bootstrap/stage0.json
+          base=$(git merge-base "origin/$BASE_REF" "$HEAD_SHA")
+          changed=$(git diff --name-only --no-renames "$base" "$HEAD_SHA")
+          grep -qxF "$pin" <<<"$changed" || exit 0
+          others=$(grep -vxF "$pin" <<<"$changed" || true)
+          [ -z "$others" ] && exit 0
+          echo "::error file=$pin::This PR changes $pin together with $(grep -c . <<<"$others") other file(s). Bump the stage-0 pin in a PR that changes only $pin and merge it first: only runs on main save the stage-0 snapshot and kernel-units caches, so until the new pin lands on its own every push here builds the kernel from a cold stage 0 (slow, and it can run build-kit out of memory). Then rebase this PR onto main. The Stage-0 pin bump workflow (Actions tab, Run workflow, optionally naming a commit) opens such a PR."
+          echo "To skip this check, add the 'skip-stage0-pin-check' label to your PR."
+          echo "Other files changed since the merge base ($base):"
+          head -n 50 <<<"$others"
+          exit 1
+
       - name: Block duplicate diagnostic codes
         # Two branches each take the next free code and the merge keeps both;
         # the registry refuses at import, which here means the kit fails to
@@ -701,26 +754,12 @@ jobs:
         if: matrix.chunk == 'passes-native'
         run: |
           jac install "hypothesis>=6,<7" --global
-          jac run scripts/run_cpython_compiler_tests.jac --module test.test_deque --native-modules _collections
-          jac run scripts/run_cpython_compiler_tests.jac --module test.test_defaultdict --native-modules _collections
-          jac run scripts/run_cpython_compiler_tests.jac --module test.test_collections --native-modules _collections
-          jac run scripts/run_cpython_compiler_tests.jac --module test.test_struct --native-modules _struct
-          jac run scripts/run_cpython_compiler_tests.jac --module test.test_functools --native-modules _functools
-          jac run scripts/run_cpython_compiler_tests.jac --module test.test_itertools --native-modules itertools
-          jac run scripts/run_cpython_compiler_tests.jac --module test.test_array --native-modules array
-          jac run scripts/run_cpython_compiler_tests.jac --module test.test_pickle --native-modules _pickle
-          jac run scripts/run_cpython_compiler_tests.jac --module test.test_math --native-modules math
-          jac run scripts/run_cpython_compiler_tests.jac --module test.test_cmath --native-modules cmath
-          jac run scripts/run_cpython_compiler_tests.jac --module test.test_csv --native-modules _csv
-          jac run scripts/run_cpython_compiler_tests.jac --module test.test_json --native-modules _json
-          jac run scripts/run_cpython_compiler_tests.jac --module test.test_queue --native-modules _queue
-          jac run scripts/run_cpython_compiler_tests.jac --module test.test_operator --native-modules _operator
-          jac run scripts/run_cpython_compiler_tests.jac --module test.test_hmac --native-modules _operator
-          jac run scripts/run_cpython_compiler_tests.jac --module test.test_binascii --native-modules binascii
-          jac run scripts/run_cpython_compiler_tests.jac --module test.test_bisect --native-modules _bisect
-          jac run scripts/run_cpython_compiler_tests.jac --module test.test_heapq --native-modules _heapq
-          jac run scripts/run_cpython_compiler_tests.jac --module test.test_random --native-modules _random
-          jac run scripts/run_cpython_compiler_tests.jac --module test.test_statistics --native-modules _statistics
+          while read -r module tests _ <&3; do
+            case "$module" in ''|'#'*) continue ;; esac
+            for test in $(printf '%s' "$tests" | tr ',' ' '); do
+              jac run scripts/run_cpython_compiler_tests.jac --module "$test" --native-modules "$module"
+            done
+          done 3< jac/bootstrap/python/jacpython-modules.txt
 
   # Everything except the compiler tests.
   test-runtime:

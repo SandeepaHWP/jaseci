@@ -216,6 +216,7 @@ impl NaIRGenPass._codegen_destroy_target(target: uni.Expr, nd: uni.DeleteStmt) -
             _fa_argtys = _forget_all_fn.function_type.args;
             self.builder.call(_forget_all_fn, [self._coerce_type(_hs, _fa_argtys[0])]);
         }
+        self._osp_sync();
         self._release_owned_args([_val], op="del_stmt");
         return;
     }
@@ -231,6 +232,7 @@ impl NaIRGenPass._codegen_destroy_target(target: uni.Expr, nd: uni.DeleteStmt) -
         _f_argtys = _forget_fn.function_type.args;
         self.builder.call(_forget_fn, [self._coerce_type(_h, _f_argtys[0])]);
     }
+    self._osp_sync();
     self._release_owned_args([_val], op="del_stmt");
 }
 
@@ -1394,6 +1396,11 @@ impl NaIRGenPass._match_arch_cond(
                 if cmp is None
                 else self.builder.or_(cmp, eq, name="match.arch.or");
         }
+        if self._vtable_slot_certain(subj_ty) {
+            cmp = self._isinstance_vtable_fallback(
+                cmp, vptr, [arch_name], "match.arch"
+            );
+        }
         fld_bb = func.append_basic_block(name="match.arch.fld");
         self.builder.cbranch(cmp, fld_bb, merge_bb);
         self.builder.position_at_end(fld_bb);
@@ -2072,7 +2079,12 @@ impl NaIRGenPass._codegen_assignment(nd: uni.Assignment) -> None {
                                         );
                                     }
                                     self._codegen_index_set(
-                                        target_val, idx_val, store_val, elem_type_name
+                                        target_val,
+                                        idx_val,
+                                        self._variadic_elem_coerce(
+                                            store_val, target_expr.target
+                                        ),
+                                        elem_type_name
                                     );
                                     _idx_stored = True;
                                 }
@@ -2897,6 +2909,34 @@ impl NaIRGenPass._codegen_assignment(nd: uni.Assignment) -> None {
                         loc=f"{os.path.basename(self.module.loc.mod_path)}:{nd.loc.first_line
                             if nd.loc
                             else 0}"
+                    );
+                }
+            } elif self._opt_ptr_payload_of(global_var.value_type) is not None
+                and not raw_int_ptr_global {
+                _opt_glob_loc = f"{os.path.basename(self.module.loc.mod_path)}:{nd.loc.first_line
+                    if nd.loc
+                    else 0}";
+                if not self._opt_result_owned(value, nd.value) {
+                    self._emit_rc_retain(
+                        self.builder.extract_value(
+                            coerced, 1, name=f"glob.{var_name}.opt.newpv"
+                        ),
+                        op="assign",
+                        loc=_opt_glob_loc
+                    );
+                } else {
+                    self.rc_ops_elided += 1;
+                }
+                if not self._nogc_headerless() {
+                    _opt_glob_old = self.builder.load(
+                        global_var, name=f"glob.{var_name}.opt.old"
+                    );
+                    self._emit_rc_release_simple(
+                        self.builder.extract_value(
+                            _opt_glob_old, 1, name=f"glob.{var_name}.opt.oldpv"
+                        ),
+                        op="overwrite",
+                        loc=_opt_glob_loc
                     );
                 }
             } elif _jacval_global {
