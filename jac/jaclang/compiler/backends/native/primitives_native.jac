@@ -14,6 +14,7 @@ import from jaclang.compiler.backends.common.primitives {
     BuiltinEmitter
 }
 import type from jaclang.compiler.backends.native.na_ir_gen_pass { NaIRGenPass }
+import type from jaclang.compiler.types.types { TypeBase }
 import from jaclang.compiler.frontend.constant { Tokens as Tok }
 import from jaclang.compiler.frontend.unitree { Expr, UniNode }
 
@@ -1036,7 +1037,7 @@ class NativeListEmitter(ListEmitter[(ir.Value, NativeEmitCtx)]) {
         ctx: NativeEmitCtx,
         target: ir.Value,
         reverse: (ir.Value | None)
-    ) -> ir.Value;
+    ) -> (ir.Value | None);
 
     def emit_reverse(
         self: NativeListEmitter,
@@ -2239,6 +2240,17 @@ class NativeBuiltinEmitter(BuiltinEmitter[(ir.Value, NativeEmitCtx)]) {
     def emit_int(
         self: NativeBuiltinEmitter, ctx: NativeEmitCtx, args: list[ir.Value]
     ) -> (ir.Value | None);
+
+    def _int_from_c_string(
+        self: NativeBuiltinEmitter,
+        ctx: NativeEmitCtx,
+        text: ir.Value,
+        base: (ir.Value | None) = None
+    ) -> ir.Value;
+
+    def _int_from_boxed(
+        self: NativeBuiltinEmitter, ctx: NativeEmitCtx, boxed: ir.Value
+    ) -> ir.Value;
 
     def emit_float(
         self: NativeBuiltinEmitter, ctx: NativeEmitCtx, args: list[ir.Value]
