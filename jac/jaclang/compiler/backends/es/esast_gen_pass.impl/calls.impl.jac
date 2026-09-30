@@ -46,8 +46,6 @@ impl EsastGenPass._resolve_dynamic_import_spec(
 impl EsastGenPass._prepare_dynamic_import(
     nd: uni.FuncCall
 ) -> (tuple[str, (str | None)] | None) {
-    import from jaclang.project.modresolver { relative_js_specifier }
-
     params: list[uni.Expr | uni.KWPair] = list(nd.params or []);
     positional = [
         p
