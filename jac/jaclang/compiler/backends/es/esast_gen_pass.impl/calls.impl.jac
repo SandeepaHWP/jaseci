@@ -90,6 +90,15 @@ impl EsastGenPass._prepare_dynamic_import(
             );
             return None;
         }
+        if not export_name.isidentifier() {
+            self._reject_dynamic_import(
+                nd,
+                "fromlist names '"
+                    + export_name
+                    + "', which is not a valid export name"
+            );
+            return None;
+        }
     }
     raw = self._literal_import_spec(positional[0]);
     if raw is None {

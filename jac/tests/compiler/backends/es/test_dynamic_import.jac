@@ -109,6 +109,14 @@ test "a path naming no jac module is rejected" {
 }
 
 
+test "a fromlist name that is not a valid identifier is rejected" {
+    (js, codes, inst) = _emit(
+        "    m = __import__(\"./MessageCard\", fromlist=[\"my-card\"]);\n"
+    );
+    assert "E5113" in codes , codes;
+}
+
+
 test "python-only import parameters are rejected" {
     (js, codes, inst) = _emit("    m = __import__(\"./MessageCard\", level=1);\n");
     assert "E5113" in codes , codes;
