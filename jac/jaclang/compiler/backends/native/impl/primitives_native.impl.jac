@@ -2405,23 +2405,10 @@ impl NativeStrEmitter.emit_maketrans(
 impl NativeBytesEmitter.emit_decode(
     self: NativeBytesEmitter, ctx: NativeEmitCtx, target: ir.Value, args: list[ir.Value]
 ) -> (ir.Value | None) {
-    p = ctx.pass_ref;
-    b = get_builder(p);
-    i8p = ir.IntType(8).as_pointer();
-    i64 = ir.IntType(64);
-    n = p._bytes_len_val(target);
-    alloc_sz = b.add(n, ir.Constant(i64, 1), name="dec.alloc");
-    p._set_rc_ctx("bytes_decode", "");
-    new_str = p._str_alloc(b, alloc_sz, name="dec.str");
-    p._clear_rc_ctx();
-    memcpy_fn = p._get_or_declare_extern("memcpy", i8p, [i8p, i8p, i64]);
-    b.call(memcpy_fn, [new_str, p._bytes_data_ptr(target), n]);
-    dec_end = b.gep(new_str, [n], name="dec.end");
-    b.store(ir.Constant(ir.IntType(8), 0), dec_end);
-
-    p._stamp_str_len(b, new_str, n);
-    p._mark_owned(new_str);
-    return new_str;
+    call_node = ctx.receiver_node?.parent?.parent if ctx.receiver_node else None;
+    return ctx.pass_ref._emit_bytes_decode(
+        target, args, ctx.call_kwargs or {}, call_node
+    );
 }
 
 impl NativeBytesEmitter.emit_hex(
@@ -2728,7 +2715,9 @@ impl NativeListEmitter.emit_append(
         return None;
     }
 
-    _boxed_val = p._box_value_tuple(p._wrap_fn_as_closure_value(args[0]));
+    _boxed_val = p._variadic_elem_coerce(
+        p._box_value_tuple(p._wrap_fn_as_closure_value(args[0])), ctx.receiver_node
+    );
     if p._reject_ptr_into_raw_slot(
         None, _boxed_val, helpers["elem_type"], "list append"
     ) {
@@ -2838,12 +2827,13 @@ impl NativeListEmitter.emit_insert(
     i64 = ir.IntType(64);
     insert_idx = args[0];
     _ins_wrapped = p._wrap_fn_as_closure_value(args[1]);
+    insert_arg = p._variadic_elem_coerce(_ins_wrapped, ctx.receiver_node);
     if p._reject_ptr_into_raw_slot(
-        None, _ins_wrapped, helpers["elem_type"], "list insert"
+        None, insert_arg, helpers["elem_type"], "list insert"
     ) {
         return ir.Constant(i64, 0);
     }
-    insert_val = p._coerce_type(_ins_wrapped, helpers["elem_type"]);
+    insert_val = p._coerce_type(insert_arg, helpers["elem_type"]);
     _aos_struct = p._aos_elem_struct(ctx.type_key);
     if _aos_struct is not None {
         return self._emit_aos_insert(
@@ -3431,7 +3421,20 @@ impl NativeListEmitter._emit_value_sort(
     ctx: NativeEmitCtx,
     target: ir.Value,
     reverse: (ir.Value | None)
-) -> ir.Value {
+) -> (ir.Value | None) {
+    """Stable merge sort of the list's own elements, compared in place.
+
+    Scalars compare as themselves. Every other element lives in an erased
+    `i8*` slot, whatever it holds, so the slot type cannot say how to order
+    it: only the checked element type can. A `str` compares through the
+    string helper; anything else -- a tuple, `bytes`, a nested list --
+    goes through the same `_emit_comparison` a `key=` result does, which
+    views the pointers through that type. Treating every pointer as a
+    string ordered a tuple by the bytes of its first field, so float and
+    string leads (and most ints) came back unsorted. An element type the
+    comparison cannot order (a class without the protocol) refuses rather
+    than guess; one whose shape is not fully known keeps the string compare.
+    """;
     p = ctx.pass_ref;
     b = get_builder(p);
     i32 = ir.IntType(32);
@@ -3444,6 +3447,30 @@ impl NativeListEmitter._emit_value_sort(
     assert isinstance(data.type, ir.PointerType) and not data.type.is_opaque;
     elem_type = data.type.pointee;
     itemsize = p._abi_sizeof(elem_type);
+    checked_elem: (TypeBase | None) = None;
+    for source_node in (ctx.receiver_node, ctx.call_node) {
+        elem_args = (
+            p._agg_key_args(p._flow_narrowed_type_of(source_node), "list")
+                if source_node is not None
+                else None
+        );
+        if elem_args {
+            checked_elem = elem_args[0];
+            break;
+        }
+    }
+    orderable = p._sort_key_orderable(checked_elem);
+    compare_as_str = isinstance(elem_type, ir.PointerType)
+        and (orderable is None or p._container_class_name(checked_elem) == "str");
+    if isinstance(elem_type, ir.PointerType) and orderable is False {
+        p.ctx.emit(
+            E5092,
+            node_override=ctx.call_node or ctx.receiver_node,
+            kind="sort",
+            name=SORT_KEY_MSG
+        );
+        return None;
+    }
     fn = b.basic_block.function;
     allocate = fn.append_basic_block("sort.allocate");
     outer = fn.append_basic_block("sort.merge.pass");
@@ -3526,12 +3553,33 @@ impl NativeListEmitter._emit_value_sort(
     if isinstance(elem_type, (ir.DoubleType, ir.FloatType)) {
         before = b.fcmp_ordered("<", c, a);
         after = b.fcmp_ordered("<", a, c);
-    } elif isinstance(elem_type, ir.PointerType) {
+    } elif compare_as_str {
         result = p._call_str_cmp(
             b, b.bitcast(a, i8p), b.bitcast(c, i8p), name="sort.compare"
         );
         before = b.icmp_signed(">", result, ir.Constant(i32, 0));
         after = b.icmp_signed("<", result, ir.Constant(i32, 0));
+    } elif isinstance(elem_type, ir.PointerType) {
+        sort_errs = len(p.ctx.errors_had);
+        ordered_before = p._emit_comparison(Tok.LT, c, a, False, key_ret=checked_elem);
+        ordered_after = (
+            p._emit_comparison(Tok.LT, a, c, False, key_ret=checked_elem)
+                if ordered_before is not None and reverse is not None
+                else None
+        );
+        if ordered_before is None or (reverse is not None and ordered_after is None) {
+            if len(p.ctx.errors_had) == sort_errs {
+                p.ctx.emit(
+                    E5092,
+                    node_override=ctx.call_node or ctx.receiver_node,
+                    kind="sort",
+                    name=SORT_KEY_MSG
+                );
+            }
+            return None;
+        }
+        before = ordered_before;
+        after = ordered_after if ordered_after is not None else ordered_before;
     } else {
         collection = ctx.receiver_node;
         if collection is None and ctx.arg_nodes {
@@ -5803,15 +5851,38 @@ impl NativeBuiltinEmitter.emit_int(
         return b.fptosi(arg_val, i64, name="int.from.float");
     }
 
+    if p._is_jacval_ty(arg_val.type) {
+        return self._int_from_boxed(ctx, arg_val);
+    }
+    base: (ir.Value | None) = None;
+    if len(args) >= 2 and isinstance(args[1].type, ir.IntType) {
+        base = b.trunc(args[1], ir.IntType(32), name="int.base")
+            if args[1].type.width > 32
+            else args[1];
+    }
+    return self._int_from_c_string(ctx, arg_val, base);
+}
+
+impl NativeBuiltinEmitter._int_from_c_string(
+    self: NativeBuiltinEmitter,
+    ctx: NativeEmitCtx,
+    text: ir.Value,
+    base: (ir.Value | None) = None
+) -> ir.Value {
+    p = ctx.pass_ref;
+    b = get_builder(p);
+    i64 = ir.IntType(64);
     i8p = ir.IntType(8).as_pointer();
     i32 = ir.IntType(32);
     strtol_fn = p._get_or_declare_extern("strtol", i64, [i8p, i8p.as_pointer(), i32]);
     endptr_alloca = b.alloca(i8p, name="endptr");
     result_val = b.call(
-        strtol_fn, [arg_val, endptr_alloca, ir.Constant(i32, 10)], name="strtol.result"
+        strtol_fn,
+        [text, endptr_alloca, base if base is not None else ir.Constant(i32, 10)],
+        name="strtol.result"
     );
     endptr_val = b.load(endptr_alloca, name="endptr.val");
-    no_parse = b.icmp_unsigned("==", endptr_val, arg_val, name="int.noparse");
+    no_parse = b.icmp_unsigned("==", endptr_val, text, name="int.noparse");
     p._emit_runtime_raise(no_parse, "ValueError", "invalid literal for int()");
     end_char = b.load(endptr_val, name="end.char");
     has_trail = b.icmp_unsigned(
@@ -5819,6 +5890,57 @@ impl NativeBuiltinEmitter.emit_int(
     );
     p._emit_runtime_raise(has_trail, "ValueError", "invalid literal for int()");
     return result_val;
+}
+
+impl NativeBuiltinEmitter._int_from_boxed(
+    self: NativeBuiltinEmitter, ctx: NativeEmitCtx, boxed: ir.Value
+) -> ir.Value {
+    p = ctx.pass_ref;
+    b = get_builder(p);
+    i8 = ir.IntType(8);
+    i64 = ir.IntType(64);
+    tag = b.extract_value(boxed, 0, name="int.box.tag");
+    payload = b.extract_value(boxed, 1, name="int.box.payload");
+    func = b.function;
+    str_bb = func.append_basic_block(name="int.box.str");
+    num_bb = func.append_basic_block(name="int.box.num");
+    done_bb = func.append_basic_block(name="int.box.done");
+    is_str = b.icmp_unsigned("==", tag, ir.Constant(i8, 2), name="int.box.isstr");
+    b.cbranch(is_str, str_bb, num_bb);
+
+    b.position_at_end(str_bb);
+    parsed = self._int_from_c_string(
+        ctx, b.inttoptr(payload, ir.IntType(8).as_pointer(), name="int.box.strp")
+    );
+    str_end = b.block;
+    b.branch(done_bb);
+
+    b.position_at_end(num_bb);
+    is_float = b.icmp_unsigned("==", tag, ir.Constant(i8, 1), name="int.box.isflt");
+    is_int = b.icmp_unsigned("==", tag, ir.Constant(i8, 0), name="int.box.isint");
+    is_bool = b.icmp_unsigned("==", tag, ir.Constant(i8, 7), name="int.box.isbool");
+    numeric = b.or_(
+        is_float, b.or_(is_int, is_bool, name="int.box.intish"), name="int.box.numeric"
+    );
+    p._emit_runtime_raise(
+        b.not_(numeric, name="int.box.bad"),
+        "TypeError",
+        "int() argument must be a string, a bytes-like object or a real number"
+    );
+    truncated = b.fptosi(
+        b.bitcast(payload, ir.DoubleType(), name="int.box.fbits"),
+        i64,
+        name="int.box.ftrunc"
+    );
+    number = b.select(is_float, truncated, payload, name="int.box.number");
+    num_end = b.block;
+    b.branch(done_bb);
+
+    b.position_at_end(done_bb);
+    result = b.phi(i64, name="int.box.result");
+    result.add_incoming(parsed, str_end);
+    result.add_incoming(number, num_end);
+    return result;
 }
 
 impl NativeBuiltinEmitter.emit_float(

@@ -49,8 +49,14 @@ impl ProjectHost.check_settings(target_app: str) -> CheckSettings {
     return check_settings_of(cfg.check);
 }
 
+def package_name_of(name: str) -> str {
+    import from jaclang.project.modresolver { is_scoped_package_name }
+    return name if is_scoped_package_name(name) else "";
+}
+
 impl ProjectHost.project_facts(path: str) -> (ProjectFacts | None) {
     import from pathlib { Path }
+    import from jaclang.project.modresolver { project_mounts_dir }
     try {
         import from jaclang.project.config { get_config_for_path }
         cfg = get_config_for_path(Path(path));
@@ -69,7 +75,10 @@ impl ProjectHost.project_facts(path: str) -> (ProjectFacts | None) {
         project_root=project_root,
         check=check_settings_of(cfg.check),
         arch_closed=list(cfg.arch.closed),
-        client_framework=cfg.client.framework if cfg.client else "react"
+        client_framework=cfg.client.framework if cfg.client else "react",
+        package_name=package_name_of(cfg.project.name),
+        package_exports=list(cfg.project.exports),
+        package_mounts=project_mounts_dir(project_root)
     );
     self._facts[project_root] = (cfg, facts);
     return facts;
@@ -106,14 +115,24 @@ impl ProjectHost.declared_dependencies(
     if cfg is None {
         return None;
     }
-    names: list[str] = [*cfg.dependencies, *cfg.dev_dependencies];
+    scopes = [cfg];
     owner = cfg.app_for_path(str(Path(module_path).resolve()));
     app_name = owner.name if owner is not None else fallback_app;
     if app_name and app_name in cfg.apps {
         try {
-            app_cfg = cfg.effective_for_app(app_name);
-            names.extend([*app_cfg.dependencies, *app_cfg.dev_dependencies]);
+            scopes.append(cfg.effective_for_app(app_name));
         } except Exception {}
+    }
+    names: list[str] = [];
+    for scope in scopes {
+        names.extend(
+            [
+                *scope.dependencies,
+                *scope.dev_dependencies,
+                *scope.pypi_dependencies,
+                *scope.pypi_dev_dependencies
+            ]
+        );
     }
     return [str(n) for n in names];
 }
@@ -282,10 +301,8 @@ impl ProjectHost.native_analyze(
     if program.internal or not kernel_host_enabled() {
         return None;
     }
-    import from jaclang.compiler.frontend.kernel_host {
-        KernelHost,
-        record_kernel_session
-    }
+    import from jaclang.compiler.frontend.kernel_host { KernelHost }
+    import from jaclang.project.kernel_snapshot { record_kernel_session }
     import from jaclang.compiler.driver.module_analysis { analyze_module }
     import from jaclang.compiler.frontend.host { active_host, install_host }
     import time;
@@ -392,6 +409,11 @@ impl ProjectHost.resolve_local_module(
 ) -> (tuple[str, str] | None) {
     import from jaclang.project.modresolver { resolve_local_module }
     return resolve_local_module(base, parts);
+}
+
+impl ProjectHost.jac_virtual_module_path(target: str) -> (str | None) {
+    import from jaclang.project.modresolver { resolve_jac_virtual_module_path }
+    return resolve_jac_virtual_module_path(target);
 }
 
 impl ProjectHost.path_facts(path: str) -> PathFacts {
@@ -530,6 +552,17 @@ impl ProjectHost.build_module(
     program: JacProgram, file_path: str, use_str: (str | None)
 ) -> Module {
     return self.compiler_for(program).build(file_path, program, use_str);
+}
+
+impl ProjectHost.run_module_pipeline(
+    program: JacProgram, file_path: str, use_str: (str | None), options: CompileOptions
+) -> Module {
+    return self.compiler_for(program).run_module(file_path, program, use_str, options);
+}
+
+impl ProjectHost.native_session_active(program: JacProgram) -> bool {
+    natives = program._natives;
+    return natives is not None and natives.session is not None;
 }
 
 impl ProjectHost.internal_program(program: JacProgram) -> (JacProgram | None) {

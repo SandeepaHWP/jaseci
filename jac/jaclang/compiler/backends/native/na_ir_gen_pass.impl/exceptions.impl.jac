@@ -19,11 +19,12 @@ impl NaIRGenPass._get_exception_state_type -> ir.Type {
 impl NaIRGenPass._declare_exception_runtime -> None {
     i8p = ir.IntType(8).as_pointer();
     i32 = ir.IntType(32);
+    (setjmp_name, longjmp_name) = self._exc_jmp_symbols();
 
-    setjmp_fn = self._get_or_declare_extern("setjmp", i32, [i8p]);
+    setjmp_fn = self._get_or_declare_extern(setjmp_name, i32, [i8p]);
     setjmp_fn.attributes.add("returns_twice");
 
-    longjmp_fn = self._get_or_declare_extern("longjmp", ir.VoidType(), [i8p, i32]);
+    longjmp_fn = self._get_or_declare_extern(longjmp_name, ir.VoidType(), [i8p, i32]);
     longjmp_fn.attributes.add("noreturn");
 
     self._get_or_declare_extern("abort", ir.VoidType(), []);
@@ -33,6 +34,39 @@ impl NaIRGenPass._declare_exception_runtime -> None {
     self._emit_exc_pop_helper();
 
     self._emit_exc_raise_helper();
+}
+
+impl NaIRGenPass._exc_jmp_symbols -> tuple[str, str] {
+    """The setjmp/longjmp pair every native exception frame arms and unwinds through.
+
+    Plain `setjmp` saves the signal mask: on Darwin it costs a `sigprocmask`
+    and a `sigaltstack` syscall per armed frame (and `longjmp` two more per
+    raise), on glibc it is `__sigsetjmp(env, 1)` and one `rt_sigprocmask`. Jac
+    code never changes the mask between arming a frame and raising into it,
+    so that is dead work on every `try`, walker spawn and guarded call.
+    `_setjmp`/`_longjmp` leave the mask alone. They only work as a pair --
+    Darwin's `longjmp` restores the mask from a buffer slot `_setjmp` never
+    writes -- so every frame raises through the matching `_longjmp`. Windows
+    and wasm keep the portable names: neither saves a mask, and wasm's SjLj
+    lowering matches the names.
+    """;
+    triple = str(self.llvm_module.triple or "").lower();
+    if any(
+        os_name in triple for os_name in ("wasm", "windows", "win32", "mingw", "msvc")
+    ) {
+        return ("setjmp", "longjmp");
+    }
+    return ("_setjmp", "_longjmp");
+}
+
+impl NaIRGenPass._exc_setjmp_fn -> ir.Function {
+    """The setjmp of `_exc_jmp_symbols`, once `_declare_exception_runtime` ran.""";
+    return self.extern_funcs[self._exc_jmp_symbols()[0]];
+}
+
+impl NaIRGenPass._exc_longjmp_fn -> ir.Function {
+    """The longjmp of `_exc_jmp_symbols`, the pair of `_exc_setjmp_fn`.""";
+    return self.extern_funcs[self._exc_jmp_symbols()[1]];
 }
 
 impl NaIRGenPass._emit_exc_push_helper -> None {
@@ -165,8 +199,7 @@ impl NaIRGenPass._emit_exc_raise_helper -> None {
         cur_handler, [ir.Constant(i32, 0), ir.Constant(i32, 0)], name="env.ptr"
     );
     env_i8p = b.bitcast(env_ptr, i8p, name="env.i8p");
-    longjmp_fn = self.extern_funcs["longjmp"];
-    b.call(longjmp_fn, [env_i8p, ir.Constant(i32, 1)]);
+    b.call(self._exc_longjmp_fn(), [env_i8p, ir.Constant(i32, 1)]);
     b.unreachable();
     self._exc_raise_fn = func;
 }
@@ -181,7 +214,6 @@ impl NaIRGenPass._emit_runtime_raise(
         self._declare_exception_runtime();
     }
     i8p = ir.IntType(8).as_pointer();
-    i32 = ir.IntType(32);
     func = self.builder.function;
     raise_bb = func.append_basic_block(name=f"raise.{exc_type_name}");
     ok_bb = func.append_basic_block(name=f"ok.{exc_type_name}");
@@ -196,7 +228,6 @@ impl NaIRGenPass._emit_runtime_raise(
             self._emit_rc_release_simple(value, op="read_error");
         }
     }
-    exc_type_id = self._get_or_register_exc_type(exc_type_name);
 
     if msg in self._rt_error_msgs {
         global_str = self._rt_error_msgs[msg];
@@ -213,16 +244,34 @@ impl NaIRGenPass._emit_runtime_raise(
         self._rt_error_msgs[msg] = global_str;
     }
     msg_val = self.builder.bitcast(global_str, i8p, name="rt.msg.cast");
-    if self._slot_lowering_active() {
-        self._codegen_raise_slot(msg_val, exc_type_id, msg_val);
-    } else {
-        self.builder.call(
-            self._exc_raise_fn, [msg_val, ir.Constant(i32, exc_type_id), msg_val]
-        );
-        self.builder.unreachable();
-    }
+    self._emit_raise_value(exc_type_name, msg_val);
 
     self.builder.position_at_end(ok_bb);
+}
+
+impl NaIRGenPass._emit_raise_value(exc_type_name: str, msg_val: ir.Value) -> None {
+    """Raise `exc_type_name` here with a message computed at run time.
+
+    The block ends at the raise, so the caller positions the builder elsewhere
+    before emitting more code.
+    """;
+    if not self._slot_lowering_active() and self._exc_raise_fn is None {
+        self._declare_exception_runtime();
+    }
+    i8p = ir.IntType(8).as_pointer();
+    i32 = ir.IntType(32);
+    if msg_val.type != i8p {
+        msg_val = self.builder.bitcast(msg_val, i8p, name="rt.msg.cast");
+    }
+    exc_type_id = self._get_or_register_exc_type(exc_type_name);
+    if self._slot_lowering_active() {
+        self._codegen_raise_slot(msg_val, exc_type_id, msg_val);
+        return;
+    }
+    self.builder.call(
+        self._exc_raise_fn, [msg_val, ir.Constant(i32, exc_type_id), msg_val]
+    );
+    self.builder.unreachable();
 }
 
 impl NaIRGenPass._get_or_register_exc_type(exc_name: str) -> int {
@@ -254,6 +303,28 @@ impl NaIRGenPass._get_exc_descendants(type_name: str) -> list[str] {
     return descendants;
 }
 
+impl NaIRGenPass._exception_member_name(member: uni.UniNode) -> (str | None) {
+    name: str | None = None;
+    if isinstance(member, uni.Name) {
+        name = member.value;
+    } elif isinstance(member, uni.AtomTrailer) and isinstance(member.right, uni.Name) {
+        name = member.right.value;
+    }
+    if name is None {
+        return None;
+    }
+    arch_key = self._arch_ref_key(member);
+    if arch_key is not None {
+        return arch_key;
+    }
+    import from jaclang.compiler.types.types { ClassType }
+    import from jaclang.compiler.passes.layout_pass { class_type_native_name }
+    if isinstance(member, uni.Expr) and isinstance(member.type, ClassType) {
+        name = class_type_native_name(member.type) or name;
+    }
+    return name;
+}
+
 impl NaIRGenPass._exception_handler_targets(ex: uni.Expr | None) -> (list[str] | None) {
     if ex is None {
         return None;
@@ -261,13 +332,7 @@ impl NaIRGenPass._exception_handler_targets(ex: uni.Expr | None) -> (list[str] |
     members = list(ex.values) if isinstance(ex, uni.TupleVal) else [ex];
     targets: list[str] = [];
     for member in members {
-        name: str | None = None;
-        if isinstance(member, uni.Name) {
-            name = member.value;
-        } elif isinstance(member, uni.AtomTrailer)
-            and isinstance(member.right, uni.Name) {
-            name = member.right.value;
-        }
+        name = self._exception_member_name(member);
         if name is None {
             self.ctx.emit(
                 E5090,
@@ -276,11 +341,6 @@ impl NaIRGenPass._exception_handler_targets(ex: uni.Expr | None) -> (list[str] |
                 name="dynamic exception type"
             );
             continue;
-        }
-        import from jaclang.compiler.types.types { ClassType }
-        import from jaclang.compiler.passes.layout_pass { class_type_native_name }
-        if isinstance(member, uni.Expr) and isinstance(member.type, ClassType) {
-            name = class_type_native_name(member.type) or name;
         }
         if name in ("Exception", "BaseException") {
             return None;
@@ -315,6 +375,18 @@ impl NaIRGenPass._emit_exception_match(
                 "==", type_val, ir.Constant(i32, tid + id_bias), name=f"exc.is.{tid}"
             ),
             name="exc.match"
+        );
+    }
+    if targets {
+        raised = b.sub(type_val, ir.Constant(i32, id_bias), name="exc.raised")
+            if id_bias
+            else type_val;
+        does_match = b.or_(
+            does_match,
+            self._emit_exc_lineage_match(
+                raised, [self._get_or_register_exc_type(name) for name in targets]
+            ),
+            name="exc.match.lineage"
         );
     }
     known: set[str] = set();
@@ -498,7 +570,7 @@ impl NaIRGenPass._exc_bound_struct(ex: (uni.Expr | None)) -> (str | None) {
     if ex is None or isinstance(ex, uni.TupleVal) {
         return None;
     }
-    key = self._arch_ref_key(ex) or self._get_name(ex);
+    key = self._exception_member_name(ex);
     if key is None or key not in self.struct_types {
         return None;
     }
@@ -549,6 +621,191 @@ impl NaIRGenPass._reraise_if_bound(cause: uni.Expr) -> None {
         self._reraise_caught(values);
         self.builder.position_at_end(fresh_bb);
         return;
+    }
+}
+
+impl NaIRGenPass._exc_lineage_fns -> tuple[ir.Function, ir.Function] {
+    if "__jac_exc_lineage_has" in self.extern_funcs {
+        return (
+            self.extern_funcs["__jac_exc_lineage_add"],
+            self.extern_funcs["__jac_exc_lineage_has"]
+        );
+    }
+    i1 = ir.IntType(1);
+    i64 = ir.IntType(64);
+    zero = ir.Constant(i64, 0);
+    table_ty = ir.ArrayType(i64, EXC_LINEAGE_SLOTS);
+    table = ir.GlobalVariable(self.llvm_module, table_ty, name="__jac_exc_lineage");
+    table.linkage = "weak";
+    table.initializer = ir.Constant(table_ty, None);
+    atomic = "wasm" not in str(self.llvm_module.triple or "");
+
+    has_fn = ir.Function(
+        self.llvm_module, ir.FunctionType(i1, [i64]), name="__jac_exc_lineage_has"
+    );
+    has_fn.linkage = "linkonce_odr";
+    has_fn.args[0].name = "key";
+    b = ir.IRBuilder(has_fn.append_basic_block("entry"));
+    (_slot, _v, found, empty, full) = self._emit_exc_lineage_probe(
+        b, table, has_fn.args[0], atomic
+    );
+    ir.IRBuilder(found).ret(ir.Constant(i1, 1));
+    ir.IRBuilder(empty).ret(ir.Constant(i1, 0));
+    ir.IRBuilder(full).ret(ir.Constant(i1, 0));
+
+    add_fn = ir.Function(
+        self.llvm_module,
+        ir.FunctionType(ir.VoidType(), [i64]),
+        name="__jac_exc_lineage_add"
+    );
+    add_fn.linkage = "linkonce_odr";
+    add_fn.args[0].name = "key";
+    key = add_fn.args[0];
+    start_bb = add_fn.append_basic_block("entry");
+    insert = add_fn.append_basic_block("insert");
+    done = add_fn.append_basic_block("done");
+    b = ir.IRBuilder(start_bb);
+    b.cbranch(b.call(has_fn, [key], name="known"), done, insert);
+    b = ir.IRBuilder(insert);
+    lock: (ir.GlobalVariable | None) = None;
+    if atomic {
+        lock = ir.GlobalVariable(self.llvm_module, i64, name="__jac_exc_lineage_lock");
+        lock.linkage = "weak";
+        lock.initializer = zero;
+        spin = add_fn.append_basic_block("lock");
+        held = add_fn.append_basic_block("held");
+        b.branch(spin);
+        b = ir.IRBuilder(spin);
+        old = b.atomic_rmw(
+            "xchg", lock, ir.Constant(i64, 1), ordering="acquire", name="lock.old"
+        );
+        b.cbranch(b.icmp_unsigned("!=", old, zero), spin, held);
+        b = ir.IRBuilder(held);
+    }
+    (slot, _v, found, empty, full) = self._emit_exc_lineage_probe(b, table, key, False);
+    unlock = add_fn.append_basic_block("unlock");
+    ir.IRBuilder(found).branch(unlock);
+    ir.IRBuilder(full).branch(unlock);
+    b = ir.IRBuilder(empty);
+    if atomic {
+        b.store_atomic(key, slot, "release", 8);
+    } else {
+        b.store(key, slot);
+    }
+    b.branch(unlock);
+    b = ir.IRBuilder(unlock);
+    if lock is not None {
+        b.store_atomic(zero, lock, "release", 8);
+    }
+    b.branch(done);
+    ir.IRBuilder(done).ret_void();
+
+    self.extern_funcs["__jac_exc_lineage_has"] = has_fn;
+    self.extern_funcs["__jac_exc_lineage_add"] = add_fn;
+    return (add_fn, has_fn);
+}
+
+impl NaIRGenPass._emit_exc_lineage_probe(
+    b: ir.IRBuilder, table: ir.GlobalVariable, key: ir.Value, atomic: bool
+) -> tuple[ir.Value, ir.Value, ir.Block, ir.Block, ir.Block] {
+    i32 = ir.IntType(32);
+    i64 = ir.IntType(64);
+    func = b.function;
+    start = b.block;
+    loop = func.append_basic_block("probe");
+    step = func.append_basic_block("probe.next");
+    miss = func.append_basic_block("probe.miss");
+    found = func.append_basic_block("probe.found");
+    empty = func.append_basic_block("probe.empty");
+    full = func.append_basic_block("probe.full");
+    mixed = b.mul(key, ir.Constant(i64, EXC_LINEAGE_MIX), name="probe.mix");
+    home = b.lshr(mixed, ir.Constant(i64, 64 - EXC_LINEAGE_BITS), name="probe.home");
+    b.branch(loop);
+    b = ir.IRBuilder(loop);
+    idx = b.phi(i64, name="probe.idx");
+    tried = b.phi(i64, name="probe.tried");
+    slot = b.gep(table, [ir.Constant(i32, 0), idx], name="probe.slot");
+    value = b.load_atomic(slot, "acquire", 8, name="probe.v")
+        if atomic
+        else b.load(slot, name="probe.v");
+    b.cbranch(b.icmp_unsigned("==", value, key), found, miss);
+    b = ir.IRBuilder(miss);
+    b.cbranch(b.icmp_unsigned("==", value, ir.Constant(i64, 0)), empty, step);
+    b = ir.IRBuilder(step);
+    nxt = b.and_(
+        b.add(idx, ir.Constant(i64, 1)),
+        ir.Constant(i64, EXC_LINEAGE_SLOTS - 1),
+        name="probe.nxt"
+    );
+    more = b.add(tried, ir.Constant(i64, 1), name="probe.more");
+    b.cbranch(
+        b.icmp_unsigned("==", more, ir.Constant(i64, EXC_LINEAGE_SLOTS)), full, loop
+    );
+    idx.add_incoming(home, start);
+    idx.add_incoming(nxt, step);
+    tried.add_incoming(ir.Constant(i64, 0), start);
+    tried.add_incoming(more, step);
+    return (slot, value, found, empty, full);
+}
+
+impl NaIRGenPass._emit_exc_lineage_match(
+    type_val: ir.Value, bases: list[int]
+) -> ir.Value {
+    i64 = ir.IntType(64);
+    (_add, has_fn) = self._exc_lineage_fns();
+    high = self.builder.shl(
+        self.builder.zext(type_val, i64), ir.Constant(i64, 32), name="exc.lineage.hi"
+    );
+    matched: ir.Value = ir.Constant(ir.IntType(1), 0);
+    for base in bases {
+        key = self.builder.or_(high, ir.Constant(i64, base), name="exc.lineage.key");
+        matched = self.builder.or_(
+            matched, self.builder.call(has_fn, [key], name="exc.lineage.has")
+        );
+    }
+    return matched;
+}
+
+impl NaIRGenPass._register_exc_lineage(cause: (uni.Expr | None), type_id: int) -> None {
+    import from jaclang.compiler.types.types { ClassType, TypeBase }
+    import from jaclang.compiler.passes.layout_pass { class_type_native_name }
+    if type_id == 0 or cause is None {
+        return;
+    }
+    typ = cause.type;
+    if not isinstance(typ, ClassType) or typ._shared is None {
+        return;
+    }
+    if not isinstance(typ.shared.symbol_table, uni.Archetype) {
+        return;
+    }
+    ancestors: list[int] = [];
+    seen: set[int] = set();
+    pending: list[TypeBase] = list(typ.shared.base_classes);
+    while pending {
+        base = pending.pop(0);
+        if not isinstance(base, ClassType) or base._shared is None {
+            continue;
+        }
+        if id(base.shared) in seen {
+            continue;
+        }
+        seen.add(id(base.shared));
+        name = class_type_native_name(base) or base.shared.class_name;
+        if name not in ("object", "Exception", "BaseException") {
+            aid = self._get_or_register_exc_type(name);
+            if aid not in (0, type_id) and aid not in ancestors {
+                ancestors.append(aid);
+            }
+        }
+        pending.extend(base.shared.base_classes);
+    }
+    if not ancestors {
+        return;
+    }
+    (add_fn, _has) = self._exc_lineage_fns();
+    for aid in ancestors {
+        self.builder.call(add_fn, [ir.Constant(ir.IntType(64), (type_id << 32) | aid)]);
     }
 }
 
@@ -651,6 +908,7 @@ impl NaIRGenPass._codegen_raise(nd: uni.RaiseStmt) -> None {
         exc_payload = self.builder.bitcast(exc_payload, i8p, name="exc.obj.cast");
     }
 
+    self._register_exc_lineage(nd.cause, exc_type_id);
     if self._slot_lowering_active() {
         self._codegen_raise_slot(exc_payload, exc_type_id, exc_msg);
         return;
@@ -1234,9 +1492,7 @@ impl NaIRGenPass._push_exception_handler(
     self.builder.call(self._exc_push_fn, [state]);
     self.builder.store(self._region_depth(), depth);
     env = self.builder.gep(state, [ir.Constant(i32, 0), ir.Constant(i32, 0)]);
-    result = self.builder.call(
-        self.extern_funcs["setjmp"], [self.builder.bitcast(env, i8p)]
-    );
+    result = self.builder.call(self._exc_setjmp_fn(), [self.builder.bitcast(env, i8p)]);
     self.builder.cbranch(
         self.builder.icmp_signed("!=", result, ir.Constant(i32, 0)), dispatch, body
     );

@@ -22,6 +22,7 @@ obj CompileOptions {
         native_require: (list[str] | None) = None,
         iface_ok: bool = False,
         need_full_ast: bool = False,
+        skip_analysis: bool = False,
         skip_native_engine: bool = False,
         no_ir_cache: bool = False,
         resolve_annex_parent: bool = False,
@@ -209,6 +210,19 @@ obj CompileOptions {
         therefore serve every consumer whose memory model and target agree.""";
         required = int(self.native_required_for(path)) if path else 0;
         return self.base_codegen_identity() + f";required={required}";
+    }
+
+    def dependency_projection(path: str) -> str {
+        return ";".join(
+            [
+                self.unit_codegen_identity(path),
+                f"app_kind={self.app_kind}",
+                f"aot={int(bool(self.aot_mode))}",
+                f"force_cs={self.force_codespace}",
+                f"default_cs={self.default_codespace}",
+                f"ui={self.ui}"
+            ]
+        );
     }
 
     def module_projection -> str {

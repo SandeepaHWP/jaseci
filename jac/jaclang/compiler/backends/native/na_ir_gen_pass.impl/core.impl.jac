@@ -6,6 +6,15 @@ def scalar_llvm_type(`entry: JacTypeEntry) -> ir.Type {
     return ir.IntType(`entry.width);
 }
 
+def _source_param_names(func: ir.Function) -> list[str] {
+    names: list[str] = [];
+    for arg in func.args {
+        (stem, _, suffix) = arg.name.rpartition(".");
+        names.append(stem if stem and suffix.isdigit() else arg.name);
+    }
+    return names;
+}
+
 impl NaIRGenPass.postinit -> None {
     import os as _ni_os;
 
@@ -155,6 +164,7 @@ impl NaIRGenPass._run_impl(ir_in: uni.Module) -> uni.Module {
             self._codegen_test(stmt);
         }
     }
+    self._propagate_seam_demotions();
     _unclaimed = False;
     for (_ck, _cviols) in self._capability_demotions.items() {
         if _ck in self._claimed_capability_demotions {
@@ -172,6 +182,7 @@ impl NaIRGenPass._run_impl(ir_in: uni.Module) -> uni.Module {
     }
     self._codegen_entry(_entry_nodes);
     self._finalize_trace_lookup();
+    self._finish_osp_reclaim_hook();
 
     if self.has_native_code {
         if self.ctx.errors_had {
@@ -531,6 +542,111 @@ impl NaIRGenPass._rename_demoted_symbol(name: str, func: ir.Function) -> None {
     } except Exception {}
 }
 
+impl NaIRGenPass._propagate_seam_demotions -> None {
+    """Demote every lowered function, method, and test that still reaches a seam
+    stub. A caller lowered before its callee demoted holds a direct call to the
+    callee's abort stub: the call-site check only sees demotions that already
+    happened. Demoting such a caller can strand its own earlier callers, so this
+    runs to a fixpoint after the module's bodies are lowered.""";
+    if not self._seam_stub_ids {
+        return;
+    }
+    method_names = {id(fn): name for (name, fn) in self.method_funcs.items()};
+    owners: list[tuple[str, ir.Function, uni.Ability, bool]] = [];
+    for (_fid, (func, decl)) in self._linked_fn_decls.items() {
+        if func is None or not func.blocks or id(func) in self._seam_stub_ids {
+            continue;
+        }
+        if id(func) in method_names {
+            owners.append((method_names[id(func)], func, decl, True));
+        } elif decl.name_ref is not None
+            and self.func_symtab.get(decl.name_ref.sym_name) is func {
+            owners.append((decl.name_ref.sym_name, func, decl, False));
+        }
+    }
+    changed = True;
+    while changed {
+        changed = False;
+        for (name, func, decl, is_method) in owners {
+            if id(func) in self._seam_stub_ids {
+                continue;
+            }
+            reached = self._reaches_seam_stub(func, set());
+            if reached is None {
+                continue;
+            }
+            mark = len(self.ctx.errors_had);
+            self.emit(
+                E5092,
+                node_override=decl,
+                kind="function",
+                name=reached,
+                help_text=f"'{reached}' demoted to its Python-only implementation "
+                f"(native seam), so '{name}' cannot reach it natively; hoist the "
+                f"blocking construct out of '{reached}' or move '{name}' off the "
+                f"native pathway."
+            );
+            if self._demote_method_if_unlowerable(name, func, mark, keep_func=is_method)
+                and not is_method {
+                self._rename_demoted_symbol(name, func);
+            }
+            changed = True;
+        }
+    }
+    for (symbol, nd) in list(self._native_test_nodes.items()) {
+        func = self.llvm_module.globals.get(symbol);
+        if not isinstance(func, ir.Function) or id(func) in self._seam_stub_ids {
+            continue;
+        }
+        reached = self._reaches_seam_stub(func, set());
+        if reached is None {
+            continue;
+        }
+        mark = len(self.ctx.errors_had);
+        self.emit(
+            E5092,
+            node_override=nd,
+            kind="function",
+            name=reached,
+            help_text=f"'{reached}' demoted to its Python-only implementation "
+            f"(native seam); the test runs in the server codespace instead."
+        );
+        self._demote_native_test(nd, func, mark);
+    }
+}
+
+impl NaIRGenPass._reaches_seam_stub(func: ir.Function, seen: set[int]) -> (str | None) {
+    """The name of a seam stub `func` calls or references, directly or through the
+    private helpers (lambdas, closure bodies) it lowered, or None.""";
+    seen.add(id(func));
+    for blk in func.blocks {
+        for instr in blk.instructions {
+            if not isinstance(instr, ir.Instruction) {
+                continue;
+            }
+            for op in instr.operands {
+                if not isinstance(op, ir.Function) or id(op) in seen {
+                    continue;
+                }
+                if id(op) in self._seam_stub_ids {
+                    linked = self._linked_fn_decls.get(id(op));
+                    if linked is not None and linked[1].name_ref is not None {
+                        return linked[1].name_ref.sym_name;
+                    }
+                    return op.name.removesuffix(".__jac_demoted");
+                }
+                if op.blocks and op.linkage in ("private", "internal") {
+                    found = self._reaches_seam_stub(op, seen);
+                    if found is not None {
+                        return found;
+                    }
+                }
+            }
+        }
+    }
+    return None;
+}
+
 impl NaIRGenPass._llvm_type_str(
     ty: ir.Type, pointee_names: dict[(ir.Type, str)]
 ) -> str {
@@ -685,7 +801,7 @@ impl NaIRGenPass._export_native_layout -> None {
         param_types = [
             self._llvm_type_str(a, pointee_names) for a in func.function_type.args
         ];
-        param_names: list[str] = [a.name for a in func.args];
+        param_names = _source_param_names(func);
         ret_type = self._llvm_type_str(func.function_type.return_type, pointee_names);
         ret_struct: (str | None) = None;
         ret_tuple: (NativeTupleLayout | None) = None;
@@ -757,7 +873,7 @@ impl NaIRGenPass._export_native_layout -> None {
         param_types = [
             self._llvm_type_str(a, pointee_names) for a in func.function_type.args
         ];
-        param_names = [a.name for a in func.args];
+        param_names = _source_param_names(func);
         ret_type = self._llvm_type_str(func.function_type.return_type, pointee_names);
         ret_struct: (str | None) = None;
         if isinstance(func.function_type.return_type, ir.PointerType) {
@@ -1294,30 +1410,41 @@ impl NaIRGenPass._forward_declare_archetype_methods(arch: uni.Archetype) -> None
 }
 
 impl NaIRGenPass._register_imported_hierarchy(imported_mod: uni.Module) -> None {
+    """An imported module's registry also holds the layouts it took from its
+    own imports, and those can be older objects than the ones their defining
+    module holds now: a unit's tree is laid out afresh whenever the link plan
+    reloads it, while a sibling lowered earlier keeps the layouts it adopted
+    then. `_codegen_archetype` reads an archetype's slots from its defining
+    module and `adopt_imported_bases` rewrites the object this registry holds,
+    so the two must be one object: the defining module's layout replaces any
+    copy that reached this registry first.""";
     import from jaclang.compiler.passes.layout_pass { get_layout_registry }
     _imp_reg = get_layout_registry(imported_mod, self.prog);
     _cons_reg = get_layout_registry(self.module, self.prog);
+    _owned = set(_imp_reg.local_names) - set(_cons_reg.local_names);
     for (_name, _parents) in _imp_reg.class_parents.items() {
-        if _name not in _cons_reg.class_parents
+        if _name in _owned
+            or _name not in _cons_reg.class_parents
             or (_name in _imp_reg.layouts and _name not in _cons_reg.layouts) {
             _cons_reg.class_parents[_name] = _parents;
         }
     }
     for (_name, _pmods) in _imp_reg.parent_mods.items() {
-        if _name not in _cons_reg.parent_mods {
+        if _name in _owned or _name not in _cons_reg.parent_mods {
             _cons_reg.parent_mods[_name] = _pmods;
         }
     }
     for (_name, _mro) in _imp_reg.mro_order.items() {
         _have = _cons_reg.mro_order.get(_name);
-        if _have is None
+        if _name in _owned
+            or _have is None
             or (_name in _imp_reg.layouts and _name not in _cons_reg.layouts)
             or len(_mro) > len(_have) {
             _cons_reg.mro_order[_name] = _mro;
         }
     }
     for (_name, _lay) in _imp_reg.layouts.items() {
-        if _name not in _cons_reg.layouts {
+        if _name in _owned or _name not in _cons_reg.layouts {
             _cons_reg.layouts[_name] = _lay;
         }
     }
@@ -1348,11 +1475,12 @@ impl NaIRGenPass._register_imported_archetype(arch: uni.Archetype) -> None {
     _arch_src = os.path.realpath(arch.loc.mod_path) if arch.loc.mod_path else "";
     _seen_src = self._struct_source_mod.get(aname);
     if _seen_src is not None and _arch_src and _seen_src != _arch_src {
-        import from jaclang.cli.console { console }
-        console.warning(
+        import from jaclang.compiler.frontend.host { active_host }
+        active_host().note(
             f"native struct name collision -- '{aname}' from "
             f"{_arch_src} shadows the one from {_seen_src}; skipping "
-            f"re-registration"
+            f"re-registration",
+            style="warning"
         );
         return;
     }
@@ -1792,7 +1920,8 @@ impl NaIRGenPass._primitive_method_names(type_name: str) -> set[str] {
 impl NaIRGenPass._primitive_method_takes_kwargs(
     type_name: str, method_name: str
 ) -> bool {
-    return (type_name, method_name) in {("list", "sort"), ("str", "splitlines")};
+    return (type_name, method_name)
+        in {("list", "sort"), ("str", "splitlines"), ("bytes", "decode")};
 }
 
 impl NaIRGenPass._dispatch_primitive_method(
@@ -1805,7 +1934,8 @@ impl NaIRGenPass._dispatch_primitive_method(
     kw_node: (uni.UniNode | None) = None
 ) -> (ir.Value | None) {
     target = self._str_norm(target);
-    args = [self._str_norm(_a) for _a in args];
+    originals = list(args);
+    args = [self._str_borrow(_a) for _a in args];
     _emitter = self._ensure_emitters().get(type_name);
     if _emitter is None {
         return None;
@@ -1829,7 +1959,11 @@ impl NaIRGenPass._dispatch_primitive_method(
         _ctx.receiver_node = kw_node.target.target;
     }
     try {
-        return _emit_fn(_ctx, target, args);
+        result = _emit_fn(_ctx, target, args);
+        if result is not None {
+            self._consume_str_args(originals);
+        }
+        return result;
     } except Exception as _pm_exc {
         if self._na_debug_on() {
             import sys as _pm_sys;
@@ -1860,7 +1994,8 @@ impl NaIRGenPass._dispatch_builtin(
     type_key: str = "",
     arg_nodes: (list[uni.UniNode] | None) = None
 ) -> (ir.Value | None) {
-    args = [self._str_norm(_a) for _a in args];
+    originals = list(args);
+    args = [self._str_borrow(_a) for _a in args];
     self._ensure_emitters();
     if (
         func_name == "str"
@@ -1889,7 +2024,11 @@ impl NaIRGenPass._dispatch_builtin(
         arg_nodes=(arg_nodes or []),
         call_node=kw_node
     );
-    return _emit_fn(_ctx, args);
+    result = _emit_fn(_ctx, args);
+    if result is not None {
+        self._consume_str_args(originals);
+    }
+    return result;
 }
 
 impl NaIRGenPass._split_call_kwargs(nd: uni.FuncCall) -> dict[str, uni.UniNode] {

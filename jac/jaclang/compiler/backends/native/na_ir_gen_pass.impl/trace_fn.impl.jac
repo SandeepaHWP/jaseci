@@ -133,11 +133,28 @@ impl NaIRGenPass._register_trace_pair(dtor_fn: object, trace_fn: ir.Function) ->
 impl NaIRGenPass._finalize_trace_lookup -> None {
     lookup_fn = self.rc_trace_lookup_fn;
     if lookup_fn is None or lookup_fn.blocks {
+        self.rc_treg_final = True;
+        self._fill_rc_treg_register();
         return;
     }
     i64 = ir.IntType(64);
+    if self.rc_treg_find_fn is None {
+        self._emit_rc_trace_registry();
+    }
+
     entry_bb = lookup_fn.append_basic_block("entry");
+    chain_bb = lookup_fn.append_basic_block("chain");
+    found_bb = lookup_fn.append_basic_block("found");
     b = ir.IRBuilder(entry_bb);
+    _shared = b.call(self.rc_treg_find_fn, [lookup_fn.args[0]], name="t.shared");
+    b.cbranch(
+        b.icmp_unsigned("!=", _shared, ir.Constant(i64, 0), name="t.hit"),
+        found_bb,
+        chain_bb
+    );
+    fb = ir.IRBuilder(found_bb);
+    fb.ret(_shared);
+    b = ir.IRBuilder(chain_bb);
     for (_key, _pair) in self.rc_trace_pairs.items() {
         (_dtor_fn, _trace_fn) = _pair;
         _hit_bb = lookup_fn.append_basic_block(f"hit.{_key}");
@@ -152,5 +169,8 @@ impl NaIRGenPass._finalize_trace_lookup -> None {
         hb.ret(hb.ptrtoint(_trace_fn, i64, name=f"t.{_key}"));
         b = ir.IRBuilder(_next_bb);
     }
+
     b.ret(ir.Constant(i64, 0));
+    self.rc_treg_final = True;
+    self._fill_rc_treg_register();
 }

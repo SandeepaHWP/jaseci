@@ -515,6 +515,21 @@ impl Module.record_comptime_dependency(path: str, body: bool = False) -> None {
     }
 }
 
+impl Module.record_comptime_definition(path: str, qualname: str) -> None {
+    import os;
+    if not path or not qualname {
+        return;
+    }
+    resolved = os.path.realpath(path);
+    if self.loc and os.path.realpath(self.loc.mod_path) == resolved {
+        return;
+    }
+    row = (resolved, qualname);
+    if row not in self.ct_def_deps {
+        self.ct_def_deps.append(row);
+    }
+}
+
 impl Module.declares_codespace(ctx: CodeContext, path_hint: str = '') -> bool {
     if ctx != CodeContext.SERVER and self.decided_codespace == ctx.value {
         return True;
@@ -1441,8 +1456,10 @@ impl SubTag.postinit -> None {
 impl Module.postinit -> None {
     self.src_terminals = self.terminals;
     self.codespace_inferred = False;
+    self.persistence = [];
     self.ct_file_deps = [];
     self.ct_body_deps = [];
+    self.ct_def_deps = [];
     self.rc_last_use = {};
     self.rc_scope_cleanup = {};
     _rc_move_in: set[int] = set();
@@ -3326,7 +3343,7 @@ impl Float.lit_value.getter -> float {
 }
 
 impl Int.lit_value.getter -> int {
-    return int(self.value, 0);
+    return int_literal_value(self.value);
 }
 
 impl String.lit_value.getter -> str | bytes {
@@ -3441,11 +3458,15 @@ impl Source.init(source: str, mod_path: str) -> None {
 
 impl Source.hash.getter -> str {
     if not self._hash {
-        h = 0xCBF29CE484222325;
+        hi = 0xCBF29CE4;
+        lo = 0x84222325;
         for b in self.value.encode() {
-            h = ((h ^ b) * 0x100000001B3) & 0xFFFFFFFFFFFFFFFF;
+            lo = lo ^ b;
+            low = lo * 0x1B3;
+            hi = (hi * 0x1B3 + (low >> 32) + ((lo << 8) & 0xFFFFFFFF)) & 0xFFFFFFFF;
+            lo = low & 0xFFFFFFFF;
         }
-        self._hash = f"{h:016x}";
+        self._hash = f"{hi:08x}{lo:08x}";
     }
     return self._hash;
 }
@@ -3798,6 +3819,25 @@ impl in_type_position(nd: UniNode, include_subscripts: bool = True) -> bool {
         parent = cur.parent;
     }
     return False;
+}
+
+impl definition_qualname(decl: UniNode) -> str {
+    if not isinstance(decl, (Ability, Archetype, Enum)) {
+        return "";
+    }
+    name = decl.sym_name;
+    if not name {
+        return "";
+    }
+    parts: list[str] = [name];
+    cur = decl.parent;
+    while cur is not None and not isinstance(cur, Module) {
+        if isinstance(cur, (Archetype, Enum)) {
+            parts.insert(0, cur.sym_name);
+        }
+        cur = cur.parent;
+    }
+    return ".".join(parts);
 }
 
 impl bind_assignment_targets(nd: Assignment) -> None {
