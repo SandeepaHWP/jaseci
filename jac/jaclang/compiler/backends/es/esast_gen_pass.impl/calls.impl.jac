@@ -120,6 +120,11 @@ impl EsastGenPass._prepare_dynamic_import(
         );
         return None;
     }
+    if export_name is None {
+        import os;
+        stem = os.path.basename(resolved).split(".")[0];
+        export_name = stem if stem.isidentifier() else None;
+    }
     js_spec = relative_js_specifier(resolved, importer);
     if self.client_manifest {
         self.client_manifest.imports[raw] = resolved;
@@ -1427,7 +1432,7 @@ impl EsastGenPass.exit_func_call with uni.FuncCall exit {
                 _args_strs = ['"' + _dyn_spec + '"'];
                 _kwargs = {};
                 if _dyn_export is not None {
-                    _kwargs["fromlist"] = _dyn_export;
+                    _kwargs["default_export"] = _dyn_export;
                 }
             }
             _ctx = ESEmitCtx(

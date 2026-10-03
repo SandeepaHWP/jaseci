@@ -72,12 +72,20 @@ test "a jac module path resolves to its compiled location" {
 }
 
 
-test "fromlist emits the default-export mapping react lazy needs" {
+test "the component named after the file becomes the default export" {
+    (js, codes, inst) = _emit("    m = __import__(\"./MessageCard\");\n");
+    assert codes == [] , codes;
+    assert 'import("./MessageCard.js").then((m) => ({...m, default: m.MessageCard}))'
+        in js , js;
+}
+
+
+test "fromlist picks which export becomes the default" {
     (js, codes, inst) = _emit(
-        "    m = __import__(\"./MessageCard\", fromlist=[\"MessageCard\"]);\n"
+        "    m = __import__(\"./MessageCard\", fromlist=[\"CardBody\"]);\n"
     );
     assert codes == [] , codes;
-    assert 'import("./MessageCard.js").then((m) => ({default: m.MessageCard}))'
+    assert 'import("./MessageCard.js").then((m) => ({...m, default: m.CardBody}))'
         in js , js;
 }
 
