@@ -292,3 +292,58 @@ test "a database recreated under the same name gets its schema again" {
         }
     }
 }
+
+
+# Drops its own database on the first schema stamp read, so the reconnect
+# inside ensure_schema recreates the database while the schema gate is held.
+obj _DropMidSchemaStore(PgStore) {
+    has rt: any = None,
+        dropped: bool = False;
+
+    def _schema_stamp -> (str | None) {
+        if not self.dropped {
+            self.dropped = True;
+            self.rt.drop_database(self.conninfo.database, force=True);
+        }
+        return super._schema_stamp();
+    }
+}
+
+
+test "a database dropped during schema setup is recreated without hanging" {
+    import threading;
+    with TemporaryDirectory() as td {
+        (rt, info) = _fresh_db(td);
+        store = _DropMidSchemaStore(conninfo=info, ensure_cb=rt.ensure, rt=rt);
+        store.server_version();
+        outcome: list[any] = [];
+        def setup {
+            try {
+                store.ensure_schema_once({});
+                outcome.append(_has_anchors(store));
+            } except Exception as e {
+                outcome.append(e);
+            }
+        }
+        t = threading.Thread(
+            target=setup, name="jac-schema-drop-mid-setup", daemon=True
+        );
+        t.start();
+        t.join(30);
+        try {
+            assert store.dropped , "the database was never dropped during schema setup";
+            assert not t.is_alive() , (
+                'schema setup hung: recreating the database inside ensure_schema '
+                'asked for the schema gate that the same thread already held'
+            );
+            assert outcome == [True] , (
+                f'schema setup on the recreated database ended with {outcome}'
+            );
+        } finally {
+            if not t.is_alive() {
+                store.close();
+            }
+            rt.drop_database(info.database, force=True);
+        }
+    }
+}
