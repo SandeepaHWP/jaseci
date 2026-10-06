@@ -18,7 +18,7 @@ def run_source(dir: str, source: str) -> str {
         text=True,
         cwd=JAC_ROOT
     );
-    return result.stdout + result.stderr;
+    return f"{result.stdout}{result.stderr}\nexit status {result.returncode}";
 }
 
 test "a chain too deep to compile reports the construct" {
