@@ -10,14 +10,17 @@
 # so its exit code is honoured before any transition is inspected.
 set -euo pipefail
 
-# The cycle under test runs from the start of the recording to the first return
-# to inactive after the target was active; earlier lines are the deploy settling.
+# The cycle under test ends at the first return to inactive after a wake out of
+# inactive reached active. Anything before that wake is the deploy settling,
+# which can itself pass through active before KEDA first idles the target.
+CYCLE_CUT='$2=="inactive" { woke=1 } woke && $4=="active" { seen=1 } seen && $4=="inactive" { done=1; exit }'
+
 cycle_of() {
-    awk '{ print } / -> active( |$)/ { seen=1 } seen && / -> inactive( |$)/ { exit }' "$1"
+    awk "{ print } ${CYCLE_CUT}" "$1"
 }
 
 cycle_complete() {
-    awk '/ -> active( |$)/ { seen=1 } seen && / -> inactive( |$)/ { done=1; exit } END { exit !done }' "$1"
+    awk "${CYCLE_CUT} END { exit !done }" "$1"
 }
 
 check_cycle() {
