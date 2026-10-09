@@ -125,6 +125,18 @@ cleanup() {
     # The inner e2e hands its namespace over rather than deleting it, so the
     # recorder above could read a settled idle state instead of a terminating
     # one. Teardown lands here, after the recorder is stopped.
+    if [[ "${rc}" != "0" ]]; then
+        # What the cluster did, with its own clock: when KEDA deactivated the
+        # target, when the pod was told to stop and when it was gone. The
+        # recorder only sees ScaledObject updates, so this is what tells a late
+        # transition from one that never came.
+        echo "=== cluster state at failure ==="
+        kubectl get scaledobject,deploy,pods -n "${NAMESPACE}" -o wide || true
+        echo "=== events ==="
+        kubectl get events -n "${NAMESPACE}" --sort-by=.lastTimestamp \
+            -o custom-columns=LAST:.lastTimestamp,KIND:.involvedObject.kind,NAME:.involvedObject.name,REASON:.reason,MESSAGE:.message \
+            | tail -40 || true
+    fi
     if [[ "${rc}" != "0" && "${E2E_KEEP_NS_ON_FAIL:-1}" == "1" ]]; then
         echo "=== observer e2e failed (rc=${rc}); KEEPING namespace '${NAMESPACE}' for inspection (set E2E_KEEP_NS_ON_FAIL=0 to force cleanup) ==="
     else
@@ -149,10 +161,18 @@ echo "=== drive a real cycle via the HTTP-activation e2e ==="
 E2E_KEEP_NS=1 bash "${INNER_E2E}" "${FIXTURE_DIR}"
 
 echo "=== stop the observer and inspect what it saw ==="
-# The namespace is still up, so wait for the cycle to return to inactive rather
-# than for a fixed time: on a busy runner that last step can take longer.
-deadline=$((SECONDS + ${E2E_SETTLE_SECONDS:-120}))
+# The namespace is still up, so this waits for the watch to report a workload
+# that is genuinely idle at zero. Deleting first made the same wait read
+# teardown: the last transition landed on degraded or unknown, never on
+# inactive.
+#
+# The wait is for the cycle's return to inactive, not for a fixed time. The
+# inner e2e returns at its first ten-second poll that reads zero replicas, and
+# the ScaledObject's next update follows the scale-down by ten seconds or more.
+SETTLE_SECONDS="${E2E_SETTLE_SECONDS:-150}"
+deadline=$((SECONDS + SETTLE_SECONDS))
 until cycle_complete "${TRANSITIONS}" || (( SECONDS >= deadline )); do
+    kill -0 "${RECORDER_PID}" 2>/dev/null || break
     sleep 2
 done
 if kill -0 "${RECORDER_PID}" 2>/dev/null; then
