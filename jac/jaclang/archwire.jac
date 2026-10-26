@@ -540,6 +540,10 @@ graph import {
         JAC_PRELUDE_BASENAME,
         build_jac_prelude_module
     }
+    compiler.backends.es.js_paths ++> [
+        client.jac_client_compiler { client_output_path, jac_js_path },
+        client.targets.react_native.build { jac_js_path },
+    ]
     compiler.backends.es.js_paths --> project.modresolver.resolve_module {
         convert_to_js_import_path
     }
@@ -710,6 +714,9 @@ graph import {
         packages.api.package_surface { compilation_scope },
         project.compiler_host.ProjectHost.lint_settings { context_app },
     ]
+    compiler.driver.compilation_context --> client.client_bundle.ClientBundleBuilder._compile_to_js {
+        context_program
+    }
     compiler.driver.compile_options ++> [
         cli.commands.analysis._check_file_job
             | cli.mcp.compiler_bridge.CompilerBridge.typecheck_snippet._do_typecheck
@@ -1794,7 +1801,6 @@ graph import {
             is_jac,
             is_retired_native_marker
         },
-        client.jac_client_compiler { ANNEX_SUFFIXES },
         compiler.driver.bccache { ANNEX_FOLDER, MODULE_SUFFIXES },
         compiler.tools.code_intel {
             ANNEX_FOLDER,
@@ -5123,7 +5129,7 @@ graph import client {
             __overlaps as cache___overlaps
         },
     ]
-    jac_client_compiler ++> compiler | targets.react_native.build { JacClientCompiler }
+    jac_client_compiler ++> compiler { JacClientCompiler }
     jac_to_js ++> jac_client_compiler { JacToJSCompiler }
     js_engine --> js_runtime.js_runtime_path { node_executable }
     js_runtime ++> [
@@ -7456,7 +7462,8 @@ graph import compiler {
         types.type_evaluator.TypeEvaluator.get_type_of_module { active_host },
     ]
     frontend.host --> [
-        backends.native.na_ir_gen_pass.NaIRGenPass._opaque_field_if_unlowerable
+        backends.es.js_paths.jac_js_path
+            | backends.native.na_ir_gen_pass.NaIRGenPass._opaque_field_if_unlowerable
             | driver.compilation_context.context_program
             | driver.compile_options.CompileOptions.effective_triple
             | driver.jir._memoized
