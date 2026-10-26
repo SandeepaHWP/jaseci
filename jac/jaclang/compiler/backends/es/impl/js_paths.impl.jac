@@ -21,6 +21,22 @@ impl client_output_path(source_path: str, source_root: str) -> str {
         relative = '..';
     }
     if relative == '..' or relative.startswith('../') {
+        import from jaclang.compiler.frontend.host { active_host }
+        runtime = active_host().jac_virtual_module_path('@jac/runtime');
+        if runtime {
+            runtime_relative = '..';
+            try {
+                runtime_relative = os.path.relpath(
+                    source, os.path.dirname(os.path.realpath(runtime))
+                ).replace(
+                    os.sep, '/'
+                );
+            } except ValueError {}
+
+            if runtime_relative != '..' and not runtime_relative.startswith('../') {
+                return jac_js_path(runtime_relative);
+            }
+        }
         tail = source.replace(os.sep, '/');
         anchor = 'root';
         if len(tail) > 1 and tail[1] == ':' {

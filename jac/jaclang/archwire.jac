@@ -7462,7 +7462,7 @@ graph import compiler {
         types.type_evaluator.TypeEvaluator.get_type_of_module { active_host },
     ]
     frontend.host --> [
-        backends.es.js_paths.jac_js_path
+        backends.es.js_paths.client_output_path
             | backends.native.na_ir_gen_pass.NaIRGenPass._opaque_field_if_unlowerable
             | driver.compilation_context.context_program
             | driver.compile_options.CompileOptions.effective_triple
@@ -7479,7 +7479,8 @@ graph import compiler {
             | types.type_evaluator.TypeEvaluator.get_type_of_module_item {
             active_host
         },
-        backends.native.na_ir_gen_pass.NaIRGenPass._place_unit_python
+        backends.es.js_paths.jac_js_path
+            | backends.native.na_ir_gen_pass.NaIRGenPass._place_unit_python
             | driver.jir._project_env_fingerprint_uncached
             | driver.program.JacProgram.compile
             | passes.ownership_check_pass.OwnershipCheckPass._nogc_resolve_provenance {

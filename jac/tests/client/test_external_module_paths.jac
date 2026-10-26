@@ -2,9 +2,13 @@ import json;
 import re;
 import from pathlib { Path }
 import from tempfile { TemporaryDirectory }
+import from types { SimpleNamespace }
+import from unittest.mock { patch }
 import from jaclang.client.vite_client_bundle { ViteClientBundleBuilder }
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.project.config { set_config }
+import from jaclang.server.hmr { HotReloader }
+import from jaclang.server.watcher { JacFileWatcher }
 
 def _compiler(project: Path, program: JacProgram | None = None) -> any {
     project.mkdir(exist_ok=True);
@@ -39,7 +43,9 @@ def _assert_import(importer: Path, target: Path) {
 }
 
 test "external imports keep same-named modules and their dependencies on cold and warm builds" {
-    with TemporaryDirectory() as tmp {
+    with TemporaryDirectory() as tmp, patch(
+        "jaclang.project.kernel_compile._IN_PROCESS", [True]
+    ) {
         set_config(None);
         base = Path(tmp).resolve();
         project = base / "myapp";
@@ -81,6 +87,35 @@ test "external imports keep same-named modules and their dependencies on cold an
             }
         } finally {
             set_config(None);
+        }
+    }
+}
+
+test "hot reload updates and removes external assets at the build's output paths" {
+    with TemporaryDirectory() as tmp {
+        project = Path(tmp).resolve() / "myapp";
+        compiler = _compiler(project);
+        source_root = project / "src";
+        source_root.mkdir();
+        compiler.jac_compiler.source_root = source_root;
+        reloader = HotReloader(
+            base_path=str(project),
+            module_name="frontend",
+            watcher=JacFileWatcher(watch_paths=[str(project)]),
+            client_compiler=SimpleNamespace(jac_client_compiler=compiler)
+        );
+        for suffix in ["js", "tsx", "css"] {
+            asset = project / f"shared.{suffix}";
+            asset.write_text("initial");
+            compiler._copy_asset_file(asset, source_root);
+            output = compiler._output_path_for(asset, source_root);
+            assert output.read_text() == "initial";
+            asset.write_text("edited");
+            reloader._copy_frontend_files(str(asset));
+            assert output.read_text() == "edited";
+            asset.unlink();
+            reloader._copy_frontend_files(str(asset));
+            assert not output.exists();
         }
     }
 }
