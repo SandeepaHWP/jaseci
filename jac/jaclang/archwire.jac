@@ -512,6 +512,10 @@ graph import {
     compiler.backends.es.client_kernel_cache ++> project.compiler_host.ProjectHost.client_osp_core_js {
         osp_core_js
     }
+    compiler.backends.es.client_paths ++> [
+        client.jac_client_compiler { client_output_path, jac_js_path },
+        client.targets.react_native.build { jac_js_path },
+    ]
     type compiler.backends.es.framework_backend ++> client.client_surface {
         FrameworkBackend
     }
@@ -540,10 +544,6 @@ graph import {
         JAC_PRELUDE_BASENAME,
         build_jac_prelude_module
     }
-    compiler.backends.es.js_paths ++> [
-        client.jac_client_compiler { client_output_path, jac_js_path },
-        client.targets.react_native.build { jac_js_path },
-    ]
     compiler.backends.es.js_paths --> project.modresolver.resolve_module {
         convert_to_js_import_path
     }
@@ -7462,7 +7462,7 @@ graph import compiler {
         types.type_evaluator.TypeEvaluator.get_type_of_module { active_host },
     ]
     frontend.host --> [
-        backends.es.js_paths.client_output_path
+        backends.es.client_paths.client_output_path
             | backends.native.na_ir_gen_pass.NaIRGenPass._opaque_field_if_unlowerable
             | driver.compilation_context.context_program
             | driver.compile_options.CompileOptions.effective_triple
@@ -7479,7 +7479,7 @@ graph import compiler {
             | types.type_evaluator.TypeEvaluator.get_type_of_module_item {
             active_host
         },
-        backends.es.js_paths.jac_js_path
+        backends.es.client_paths.jac_js_path
             | backends.native.na_ir_gen_pass.NaIRGenPass._place_unit_python
             | driver.jir._project_env_fingerprint_uncached
             | driver.program.JacProgram.compile
@@ -10930,6 +10930,7 @@ graph import compiler.backends.es {
         active_framework,
         resolve_framework_backend
     }
+    client_paths ++> esast_gen_pass { relative_js_specifier }
     es_unparse ++> [
         client_kernel_cache._lower { es_to_js },
         esast_gen_pass { JSCodeGenerator, es_to_js },
@@ -10966,7 +10967,7 @@ graph import compiler.backends.es {
         build_osp_core_js,
         build_osp_driver_js
     }
-    js_paths ++> esast_gen_pass { convert_to_js_import_path, relative_js_specifier }
+    js_paths ++> esast_gen_pass { convert_to_js_import_path }
     jsx_processor ++> esast_gen_pass { EsJsxProcessor }
     primitives_es ++> [
         esast_gen_pass | jac_runtime_js._build_types_runtime_js {

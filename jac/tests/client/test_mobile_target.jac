@@ -582,7 +582,7 @@ test "JacClientCompiler selects the native runtime with native=True" {
     assert "target_name" not in src_content , "compile() takes native=, not target_name=";
     assert "target_name" not in impl_content;
     assert "self.compile_runtime_utils(self.NATIVE_RUNTIME_FILE)" in impl_content;
-    import from jaclang.compiler.backends.es.js_paths { jac_js_path }
+    import from jaclang.compiler.backends.es.client_paths { jac_js_path }
     assert jac_js_path("Header.native.jac") == "Header.js";
     assert jac_js_path("Header.jac") == "Header.js";
     assert "client_react_core.jac" in impl_content , (
