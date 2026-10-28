@@ -18,9 +18,9 @@ impl client_output_path(source_path: str, source_root: str) -> str {
     try {
         relative = os.path.relpath(source, root_path).replace(os.sep, '/');
     } except ValueError {
-        relative = '..';
+        relative = '';
     }
-    if relative == '..' or relative.startswith('../') {
+    if not relative or relative == '..' or relative.startswith('../') {
         import from jaclang.compiler.frontend.host { active_host }
         runtime = active_host().jac_virtual_module_path('@jac/runtime');
         if runtime {
@@ -37,15 +37,27 @@ impl client_output_path(source_path: str, source_root: str) -> str {
                 return jac_js_path(runtime_relative);
             }
         }
-        tail = source.replace(os.sep, '/');
-        anchor = 'root';
-        if len(tail) > 1 and tail[1] == ':' {
-            anchor = 'drive/' + tail[0];
-            tail = tail[2:];
-        } elif tail.startswith('//') {
-            anchor = 'unc';
+        if relative {
+            parts = relative.split('/');
+            depth = 0;
+            while depth < len(parts) and parts[depth] == '..' {
+                depth += 1;
+            }
+            relative = '__jac_external__/up'
+                + str(depth)
+                + '/'
+                + '/'.join(parts[depth:]);
+        } else {
+            tail = source.replace(os.sep, '/');
+            anchor = 'root';
+            if len(tail) > 1 and tail[1] == ':' {
+                anchor = 'drive/' + tail[0];
+                tail = tail[2:];
+            } elif tail.startswith('//') {
+                anchor = 'unc';
+            }
+            relative = '__jac_external__/source/' + anchor + '/' + tail.lstrip('/');
         }
-        relative = '__jac_external__/source/' + anchor + '/' + tail.lstrip('/');
     } elif relative.split('/')[0] == '__jac_external__' {
         relative = '__jac_external__/project/' + relative;
     }

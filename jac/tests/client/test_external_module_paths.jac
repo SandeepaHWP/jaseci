@@ -76,6 +76,8 @@ test "external imports keep same-named modules and their dependencies on cold an
                 assert outputs[0] != outputs[1];
                 for (card, output) in zip(cards, outputs) {
                     assert output.is_relative_to(compiler.compiled_dir);
+                    assert str(base)
+                        not in str(output.relative_to(compiler.compiled_dir)) , output;
                     _assert_import(_emitted(compiler, entry_file), output);
                     _assert_import(output, _emitted(compiler, local));
                     source_map = json.loads(output.with_suffix(".js.map").read_text());
