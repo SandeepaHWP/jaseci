@@ -28,7 +28,8 @@ import from tests.support {
     TESTS_DIR,
     native_address,
     native_force_opts,
-    native_str_func
+    native_str_func,
+    run_cases
 }
 import from tests.support { jac_command }
 import from jaclang.compiler.driver.program { JacProgram }
@@ -79,53 +80,85 @@ def _get_s(eng: any, name: str, restype: type | None, *argtypes: type) -> any {
 }
 
 
-test "hetero list read-back: str, int, float slots" {
-    (eng, _) = _compile(PROG);
-    rs = _get_s(eng, "hl_read_str", ctypes.c_char_p, ctypes.c_char_p);
-    ri = _get(eng, "hl_read_int", ctypes.c_int64);
-    rf = _get(eng, "hl_read_float", ctypes.c_double);
-    assert rs(b"in").decode("utf-8") == "in!";
-    assert ri() == 42;
-    assert rf() == 2.5;
+test "hetero list read-back: str, int, float slots, and related cases" {
+    def check_hetero_list_read_back_str_int_float_slots {
+        (eng, _) = _compile(PROG);
+
+        rs = _get_s(eng, "hl_read_str", ctypes.c_char_p, ctypes.c_char_p);
+        ri = _get(eng, "hl_read_int", ctypes.c_int64);
+        rf = _get(eng, "hl_read_float", ctypes.c_double);
+        assert rs(b"in").decode("utf-8") == "in!";
+        assert ri() == 42;
+        assert rf() == 2.5;
+    }
+
+    def check_hetero_list_slot_overwrite_and_append_pop {
+        (eng, _) = _compile(PROG);
+
+        ow = _get_s(eng, "hl_overwrite", ctypes.c_char_p, ctypes.c_char_p);
+        ap = _get(eng, "hl_append_pop", ctypes.c_int64);
+        ann = _get_s(eng, "hl_annotated", ctypes.c_char_p, ctypes.c_char_p);
+        assert ow(b"ow").decode("utf-8") == "ow-two";
+        assert ap() == 6;
+        assert ann(b"q").decode("utf-8") == "q?" , repr(ann(b"q"));
+    }
+
+    def check_hetero_list_iteration_dispatches_isinstance_by_t {
+        (eng, _) = _compile(PROG);
+
+        it = _get(eng, "hl_iter_int_total", ctypes.c_int64);
+        assert it() == 13;
+    }
+
+    def check_hetero_list_and_dict_repr_render_mixed_elements {
+        (eng, _) = _compile(PROG);
+
+        lr = _get_s(eng, "hl_repr", ctypes.c_char_p);
+        dr = _get_s(eng, "hd_repr", ctypes.c_char_p);
+        assert lr().decode("utf-8") == "[1, 'two', 3.5, True]";
+        assert dr().decode("utf-8") == "{'a': 1, 'b': 'two'}";
+    }
+
+    def check_hetero_dict_read_back_overwrite_pop_clear {
+        (eng, _) = _compile(PROG);
+
+        rs = _get_s(eng, "hd_read_str", ctypes.c_char_p);
+        ri = _get(eng, "hd_read_int", ctypes.c_int64);
+        ow = _get_s(eng, "hd_overwrite", ctypes.c_char_p, ctypes.c_char_p);
+        pl = _get_s(eng, "hd_pop_len", ctypes.c_int64, ctypes.c_char_p);
+        cl = _get_s(eng, "hd_clear_len", ctypes.c_int64, ctypes.c_char_p);
+        assert rs().decode("utf-8") == "bee";
+        assert ri() == 42;
+        assert ow(b"dv").decode("utf-8") == "dv-second";
+        assert pl(b"z") == 5;
+        assert cl(b"z") == 0;
+    }
+    run_cases(
+        [
+            (
+                "hetero list read-back: str, int, float slots",
+                check_hetero_list_read_back_str_int_float_slots
+            ),
+            (
+                "hetero list slot overwrite and append/pop",
+                check_hetero_list_slot_overwrite_and_append_pop
+            ),
+            (
+                "hetero list iteration dispatches isinstance by tag",
+                check_hetero_list_iteration_dispatches_isinstance_by_t
+            ),
+            (
+                "hetero list and dict repr render mixed elements",
+                check_hetero_list_and_dict_repr_render_mixed_elements
+            ),
+            (
+                "hetero dict read-back, overwrite, pop, clear",
+                check_hetero_dict_read_back_overwrite_pop_clear
+            )
+        ]
+    );
 }
 
-test "hetero list slot overwrite and append/pop" {
-    (eng, _) = _compile(PROG);
-    ow = _get_s(eng, "hl_overwrite", ctypes.c_char_p, ctypes.c_char_p);
-    ap = _get(eng, "hl_append_pop", ctypes.c_int64);
-    ann = _get_s(eng, "hl_annotated", ctypes.c_char_p, ctypes.c_char_p);
-    assert ow(b"ow").decode("utf-8") == "ow-two";
-    assert ap() == 6;
-    assert ann(b"q").decode("utf-8") == "q?" , repr(ann(b"q"));
-}
-
-test "hetero list iteration dispatches isinstance by tag" {
-    (eng, _) = _compile(PROG);
-    it = _get(eng, "hl_iter_int_total", ctypes.c_int64);
-    assert it() == 13;
-}
-
-test "hetero list and dict repr render mixed elements" {
-    (eng, _) = _compile(PROG);
-    lr = _get_s(eng, "hl_repr", ctypes.c_char_p);
-    dr = _get_s(eng, "hd_repr", ctypes.c_char_p);
-    assert lr().decode("utf-8") == "[1, 'two', 3.5, True]";
-    assert dr().decode("utf-8") == "{'a': 1, 'b': 'two'}";
-}
-
-test "hetero dict read-back, overwrite, pop, clear" {
-    (eng, _) = _compile(PROG);
-    rs = _get_s(eng, "hd_read_str", ctypes.c_char_p);
-    ri = _get(eng, "hd_read_int", ctypes.c_int64);
-    ow = _get_s(eng, "hd_overwrite", ctypes.c_char_p, ctypes.c_char_p);
-    pl = _get_s(eng, "hd_pop_len", ctypes.c_int64, ctypes.c_char_p);
-    cl = _get_s(eng, "hd_clear_len", ctypes.c_int64, ctypes.c_char_p);
-    assert rs().decode("utf-8") == "bee";
-    assert ri() == 42;
-    assert ow(b"dv").decode("utf-8") == "dv-second";
-    assert pl(b"z") == 5;
-    assert cl(b"z") == 0;
-}
 
 test "IR shape: hetero containers are jacval; no ptrtoint into integer slots" {
     for fixture in [PROG, "hetero_list_str.jac"] {
@@ -204,33 +237,48 @@ def _assert_reclaims_all(fixture: str, fnames: list[str], options: object) {
 }
 
 
-test "hetero death/overwrite/clear reclaim all elements under gc rc" {
-    _assert_reclaims_all(
-        PROG,
+test "hetero death/overwrite/clear reclaim all elements under gc cases" {
+    def check_hetero_death_overwrite_clear_reclaim_all_element {
+        _assert_reclaims_all(
+            PROG,
+            [
+                "hl_churn",
+                "hd_churn",
+                "hl_overwrite_churn",
+                "hd_overwrite_churn",
+                "hd_clear_churn"
+            ],
+            _opts("rc")
+        );
+    }
+
+    def check_hetero_death_overwrite_clear_reclaim_all_element_2 {
+        _assert_reclaims_all(
+            PROG,
+            [
+                "hl_churn",
+                "hd_churn",
+                "hl_overwrite_churn",
+                "hd_overwrite_churn",
+                "hd_clear_churn"
+            ],
+            _opts("cycles")
+        );
+    }
+    run_cases(
         [
-            "hl_churn",
-            "hd_churn",
-            "hl_overwrite_churn",
-            "hd_overwrite_churn",
-            "hd_clear_churn"
-        ],
-        _opts("rc")
+            (
+                "hetero death/overwrite/clear reclaim all elements under gc rc",
+                check_hetero_death_overwrite_clear_reclaim_all_element
+            ),
+            (
+                "hetero death/overwrite/clear reclaim all elements under gc cycles",
+                check_hetero_death_overwrite_clear_reclaim_all_element_2
+            )
+        ]
     );
 }
 
-test "hetero death/overwrite/clear reclaim all elements under gc cycles" {
-    _assert_reclaims_all(
-        PROG,
-        [
-            "hl_churn",
-            "hd_churn",
-            "hl_overwrite_churn",
-            "hd_overwrite_churn",
-            "hd_clear_churn"
-        ],
-        _opts("cycles")
-    );
-}
 
 test "hetero death reclaims elements under headerless gc none (stamped drops)" {
     _assert_reclaims_all(
@@ -257,17 +305,36 @@ def _run_fixture_with_gc(extra_flags: list[str], tag: str) {
     assert proc.stdout.strip() == "OK hetero_matrix" , f"unexpected output under {tag}: {proc.stdout.strip()!r}";
 }
 
-test "hetero matrix passes under --memory rc (AOT)" {
-    _run_fixture_with_gc(["--memory", "rc"], "rc");
+test "hetero matrix passes under --memory cases" {
+    def check_hetero_matrix_passes_under_memory_rc_aot {
+        _run_fixture_with_gc(["--memory", "rc"], "rc");
+    }
+
+    def check_hetero_matrix_passes_under_memory_managed_aot {
+        _run_fixture_with_gc(["--memory", "managed"], "cycles");
+    }
+
+    def check_hetero_matrix_passes_under_memory_nogc_aot {
+        _run_fixture_with_gc(["--memory", "nogc"], "none");
+    }
+    run_cases(
+        [
+            (
+                "hetero matrix passes under --memory rc (AOT)",
+                check_hetero_matrix_passes_under_memory_rc_aot
+            ),
+            (
+                "hetero matrix passes under --memory managed (AOT)",
+                check_hetero_matrix_passes_under_memory_managed_aot
+            ),
+            (
+                "hetero matrix passes under --memory nogc (AOT)",
+                check_hetero_matrix_passes_under_memory_nogc_aot
+            )
+        ]
+    );
 }
 
-test "hetero matrix passes under --memory managed (AOT)" {
-    _run_fixture_with_gc(["--memory", "managed"], "cycles");
-}
-
-test "hetero matrix passes under --memory nogc (AOT)" {
-    _run_fixture_with_gc(["--memory", "nogc"], "none");
-}
 
 test "hetero nogc fixture passes under headerless --memory nogc (AOT)" {
     src = os.path.join(FIXTURES, "nogc", "hetero_nogc.jac");

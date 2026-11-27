@@ -15,7 +15,7 @@ import re;
 import tempfile;
 import from pathlib { Path }
 import from jaclang.compiler.backends.native.llvm.binding { parse_bitcode }
-import from tests.support { compile_native_ir, native_build, native_run }
+import from tests.support { compile_native_ir, native_build, native_run, run_cases }
 
 glob FIXTURE: str = "inline_checked_helpers.jac",
      CALLERS: list[str] = ["sum_keys", "first_and_last", "key_or_flag"];
@@ -31,27 +31,44 @@ def entry_key_calls(body: str) -> list[str] {
     return re.findall(r'call [^\n]*\.entry_key"?\(', body);
 }
 
-test "the raise helper charges the inliner one instruction per raise site" {
-    mod = compile_native_ir(FIXTURE);
-    text = str(mod.gen.llvm_ir);
-    head = re.search(r'define [^\n]*@"?__jac_exc_raise"?\([^\n]*', text);
-    assert head is not None , "no raise helper in the unit";
-    assert '"call-inline-cost"="5"' in head.group(0) , head.group(0);
-    assert "noreturn" in head.group(0) , head.group(0);
+test "the raise helper charges the inliner one instruction per raise site, and related cases" {
+    def check_the_raise_helper_charges_the_inliner_one_instruc {
+        mod = compile_native_ir(FIXTURE);
+
+        text = str(mod.gen.llvm_ir);
+        head = re.search(r'define [^\n]*@"?__jac_exc_raise"?\([^\n]*', text);
+        assert head is not None , "no raise helper in the unit";
+        assert '"call-inline-cost"="5"' in head.group(0) , head.group(0);
+        assert "noreturn" in head.group(0) , head.group(0);
+    }
+
+    def check_a_checked_accessor_inlines_into_every_caller_of {
+        mod = compile_native_ir(FIXTURE);
+
+        assert mod.gen.native_bitcode is not None , "no optimized bitcode";
+        raw = str(mod.gen.llvm_ir);
+        opt = str(parse_bitcode(mod.gen.native_bitcode));
+        for caller in CALLERS {
+            assert entry_key_calls(fn_body(raw, caller)) , f"{caller} never called entry_key";
+            body = fn_body(opt, caller);
+            assert body , f"{caller} not found in the optimized IR";
+            assert not entry_key_calls(body) , f"entry_key stayed out of line in {caller}:\n{body}";
+        }
+    }
+    run_cases(
+        [
+            (
+                "the raise helper charges the inliner one instruction per raise site",
+                check_the_raise_helper_charges_the_inliner_one_instruc
+            ),
+            (
+                "a checked accessor inlines into every caller of its unit",
+                check_a_checked_accessor_inlines_into_every_caller_of
+            )
+        ]
+    );
 }
 
-test "a checked accessor inlines into every caller of its unit" {
-    mod = compile_native_ir(FIXTURE);
-    assert mod.gen.native_bitcode is not None , "no optimized bitcode";
-    raw = str(mod.gen.llvm_ir);
-    opt = str(parse_bitcode(mod.gen.native_bitcode));
-    for caller in CALLERS {
-        assert entry_key_calls(fn_body(raw, caller)) , f"{caller} never called entry_key";
-        body = fn_body(opt, caller);
-        assert body , f"{caller} not found in the optimized IR";
-        assert not entry_key_calls(body) , f"entry_key stayed out of line in {caller}:\n{body}";
-    }
-}
 
 test "a raise from an inlined accessor lands in the caller's handler" {
     source = str(Path(__file__).resolve().parent / "fixtures" / FIXTURE);

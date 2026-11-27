@@ -28,6 +28,8 @@ import from .checker_npm_harness {
     make_npm_client_project,
     pretty_checker_errors
 }
+import from tests.support { run_cases }
+
 
 test "generated cn() type-checks cleanly against declared npm types" {
     with TemporaryDirectory() as td {
@@ -52,22 +54,54 @@ test "generated cn() type-checks cleanly against declared npm types" {
     }
 }
 
-test "declared npm types are real: misuse is a genuine type error" {
-    with TemporaryDirectory() as td {
-        proj = make_npm_client_project(Path(td));
-        bad = proj / "lib" / "misuse.jac";
-        bad.write_text(
-            'import from "clsx" { clsx }\n\n'
-            'def:pub bad() -> int {\n'
-            '    return clsx("a");\n'
-            '}\n'
-        );
-        (program, err_codes, _) = check_npm_file(bad);
-        # clsx's d.ts declares `(...inputs) => string`; returning it as int
-        # must fail -- proving declared types flow, not just gradual any.
-        assert "E1002" in err_codes , f"str->int misuse of a declared npm import must error, got "
-        f"codes={err_codes}:\n{pretty_checker_errors(program)}";
+test "declared npm types are real: misuse is a genuine type error, and related cases" {
+    def check_declared_npm_types_are_real_misuse_is_a_genuine {
+        with TemporaryDirectory() as td {
+            proj = make_npm_client_project(Path(td));
+            bad = proj / "lib" / "misuse.jac";
+            bad.write_text(
+                'import from "clsx" { clsx }\n\n'
+                'def:pub bad() -> int {\n'
+                '    return clsx("a");\n'
+                '}\n'
+            );
+            (program, err_codes, _) = check_npm_file(bad);
+            # clsx's d.ts declares `(...inputs) => string`; returning it as int
+            # must fail -- proving declared types flow, not just gradual any.
+            assert "E1002" in err_codes , f"str->int misuse of a declared npm import must error, got "
+            f"codes={err_codes}:\n{pretty_checker_errors(program)}";
+        }
     }
+
+    def check_declared_default_export_is_real_misuse_is_a_genu {
+        with TemporaryDirectory() as td {
+            proj = make_npm_client_project(Path(td));
+            bad = proj / "lib" / "dflt_misuse.jac";
+            bad.write_text(
+                'import from "clsx" { default as cx }\n\n'
+                'def:pub bad() -> int {\n'
+                '    return cx("a");\n'
+                '}\n'
+            );
+            (program, err_codes, _) = check_npm_file(bad);
+            # The d.ts default export is `(...inputs) => string`; returning it as
+            # int must fail -- guards against typing default imports as plain any.
+            assert "E1002" in err_codes , f"str->int misuse of a declared default import must error, "
+            f"got codes={err_codes}:\n{pretty_checker_errors(program)}";
+        }
+    }
+    run_cases(
+        [
+            (
+                "declared npm types are real: misuse is a genuine type error",
+                check_declared_npm_types_are_real_misuse_is_a_genuine
+            ),
+            (
+                "declared default export is real: misuse is a genuine type error",
+                check_declared_default_export_is_real_misuse_is_a_genu
+            )
+        ]
+    );
 }
 
 test "default-as import types from the package d.ts default export" {
@@ -93,23 +127,6 @@ test "default-as import types from the package d.ts default export" {
     }
 }
 
-test "declared default export is real: misuse is a genuine type error" {
-    with TemporaryDirectory() as td {
-        proj = make_npm_client_project(Path(td));
-        bad = proj / "lib" / "dflt_misuse.jac";
-        bad.write_text(
-            'import from "clsx" { default as cx }\n\n'
-            'def:pub bad() -> int {\n'
-            '    return cx("a");\n'
-            '}\n'
-        );
-        (program, err_codes, _) = check_npm_file(bad);
-        # The d.ts default export is `(...inputs) => string`; returning it as
-        # int must fail -- guards against typing default imports as plain any.
-        assert "E1002" in err_codes , f"str->int misuse of a declared default import must error, "
-        f"got codes={err_codes}:\n{pretty_checker_errors(program)}";
-    }
-}
 
 test "undeclared default import stays gradual with W1102" {
     with TemporaryDirectory() as td {

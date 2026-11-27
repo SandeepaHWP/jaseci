@@ -14,31 +14,49 @@ import from tests.support {
     compile_native,
     get_func,
     native_force_opts,
-    python_run
+    python_run,
+    run_cases
 }
 
 glob FIXTURES = os.path.join(
          TESTS_DIR, "compiler", "backends", "native", "fixtures"
      );
 
-test "entry globals: lambda reads an entry-assigned name late-bound" {
-    (eng, _) = compile_native("entry_globals.jac");
-    entry_fn = get_func(eng, "jac_entry", None);
-    entry_fn();
-    n = get_func(eng, "acc_len", ctypes.c_int64);
-    assert n() == 2 , "both appends ran through the stored closure";
-    at = get_func(eng, "acc_at", ctypes.c_int64, ctypes.c_int64);
-    assert at(0) == 8 , "f(1) before rebind reads k == 7 (Python parity)";
-    assert at(1) == 101 , "f(1) after rebind reads k == 100: entry names are late-bound module globals";
+test "entry globals: cases on entry_globals.jac" {
+    def check_entry_globals_lambda_reads_an_entry_assigned_nam {
+        (eng, _) = compile_native("entry_globals.jac");
+
+        entry_fn = get_func(eng, "jac_entry", None);
+        entry_fn();
+        n = get_func(eng, "acc_len", ctypes.c_int64);
+        assert n() == 2 , "both appends ran through the stored closure";
+        at = get_func(eng, "acc_at", ctypes.c_int64, ctypes.c_int64);
+        assert at(0) == 8 , "f(1) before rebind reads k == 7 (Python parity)";
+        assert at(1) == 101 , "f(1) after rebind reads k == 100: entry names are late-bound module globals";
+    }
+
+    def check_entry_globals_a_free_def_reads_entry_assigned_mo {
+        (eng, _) = compile_native("entry_globals.jac");
+
+        entry_fn = get_func(eng, "jac_entry", None);
+        entry_fn();
+        f = get_func(eng, "read_k", ctypes.c_int64);
+        assert f() == 100 , "def sees the final entry-assigned value of k";
+    }
+    run_cases(
+        [
+            (
+                "entry globals: lambda reads an entry-assigned name late-bound",
+                check_entry_globals_lambda_reads_an_entry_assigned_nam
+            ),
+            (
+                "entry globals: a free def reads entry-assigned module state",
+                check_entry_globals_a_free_def_reads_entry_assigned_mo
+            )
+        ]
+    );
 }
 
-test "entry globals: a free def reads entry-assigned module state" {
-    (eng, _) = compile_native("entry_globals.jac");
-    entry_fn = get_func(eng, "jac_entry", None);
-    entry_fn();
-    f = get_func(eng, "read_k", ctypes.c_int64);
-    assert f() == 100 , "def sees the final entry-assigned value of k";
-}
 
 test "entry globals: augmented assignment and bool() rows match Python" {
     (eng, _) = compile_native("entry_aug_bool.jac");

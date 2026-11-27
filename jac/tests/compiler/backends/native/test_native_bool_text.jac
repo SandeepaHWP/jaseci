@@ -17,7 +17,8 @@ import from tests.support {
     TESTS_DIR,
     assert_native_identity,
     compile_native,
-    native_str_func
+    native_str_func,
+    run_cases
 }
 
 glob FIXTURES = os.path.join(
@@ -41,45 +42,62 @@ def sv_module(stem: str) -> object {
     }
 }
 
-test "membership and comparison results render as True and False" {
-    (eng, _) = compile_native("bool_text.jac");
-    sv = sv_module("bool_text");
-    for name in [
-        "membership_fstring",
-        "comparison_fstring",
-        "spec_fstring",
-        "repr_fstring",
-        "repr_text",
-        "str_text"
-    ] {
-        na_fn = native_str_func(eng, name, ctypes.c_char_p, ctypes.c_int64);
-        sv_fn = getattr(sv, name);
-        for x in [0, 1, 2, 5] {
-            na_out = na_fn(x);
-            sv_out = sv_fn(x).encode("utf8");
-            assert na_out == sv_out , f"{name}({x}): native {na_out!r} != sv {sv_out!r}";
+test "bool_text.jac cases" {
+    def check_membership_and_comparison_results_render_as_true {
+        (eng, _) = compile_native("bool_text.jac");
+        sv = sv_module("bool_text");
+
+        for name in [
+            "membership_fstring",
+            "comparison_fstring",
+            "spec_fstring",
+            "repr_fstring",
+            "repr_text",
+            "str_text"
+        ] {
+            na_fn = native_str_func(eng, name, ctypes.c_char_p, ctypes.c_int64);
+            sv_fn = getattr(sv, name);
+            for x in [0, 1, 2, 5] {
+                na_out = na_fn(x);
+                sv_out = sv_fn(x).encode("utf8");
+                assert na_out == sv_out , f"{name}({x}): native {na_out!r} != sv {sv_out!r}";
+            }
         }
     }
+
+    def check_str_predicates_render_as_true_and_false {
+        (eng, _) = compile_native("bool_text.jac");
+        sv = sv_module("bool_text");
+
+        for name in [
+            "predicate_str",
+            "affix_fstring",
+            "predicate_repr",
+            "predicate_value"
+        ] {
+            na_fn = native_str_func(eng, name, ctypes.c_char_p, ctypes.c_int64);
+            sv_fn = getattr(sv, name);
+            for x in range(8) {
+                na_out = na_fn(x);
+                sv_out = sv_fn(x).encode("utf8");
+                assert na_out == sv_out , f"{name}({x}): native {na_out!r} != sv {sv_out!r}";
+            }
+        }
+    }
+    run_cases(
+        [
+            (
+                "membership and comparison results render as True and False",
+                check_membership_and_comparison_results_render_as_true
+            ),
+            (
+                "str predicates render as True and False",
+                check_str_predicates_render_as_true_and_false
+            )
+        ]
+    );
 }
 
-test "str predicates render as True and False" {
-    (eng, _) = compile_native("bool_text.jac");
-    sv = sv_module("bool_text");
-    for name in [
-        "predicate_str",
-        "affix_fstring",
-        "predicate_repr",
-        "predicate_value"
-    ] {
-        na_fn = native_str_func(eng, name, ctypes.c_char_p, ctypes.c_int64);
-        sv_fn = getattr(sv, name);
-        for x in range(8) {
-            na_out = na_fn(x);
-            sv_out = sv_fn(x).encode("utf8");
-            assert na_out == sv_out , f"{name}({x}): native {na_out!r} != sv {sv_out!r}";
-        }
-    }
-}
 
 test "print of a str predicate matches the Python backend" {
     out = assert_native_identity(

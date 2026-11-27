@@ -1,7 +1,7 @@
 """Optional results carry ownership through boolean expressions and dictionary reads."""
 
 import ctypes;
-import from tests.support { native_address }
+import from tests.support { native_address, run_cases }
 import from pathlib { Path }
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.driver.compile_options { CompileOptions }
@@ -60,10 +60,24 @@ def check_optional_temporaries(profile: str) {
     }
 }
 
-test "optional temporaries preserve values and release references" {
-    check_optional_temporaries("rc");
-}
+test "optional temporaries preserve values cases" {
+    def check_optional_temporaries_preserve_values_and_release {
+        check_optional_temporaries("rc");
+    }
 
-test "optional temporaries preserve values with cycle collection" {
-    check_optional_temporaries("managed");
+    def check_optional_temporaries_preserve_values_with_cycle {
+        check_optional_temporaries("managed");
+    }
+    run_cases(
+        [
+            (
+                "optional temporaries preserve values and release references",
+                check_optional_temporaries_preserve_values_and_release
+            ),
+            (
+                "optional temporaries preserve values with cycle collection",
+                check_optional_temporaries_preserve_values_with_cycle
+            )
+        ]
+    );
 }

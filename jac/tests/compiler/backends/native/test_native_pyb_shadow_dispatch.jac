@@ -25,7 +25,7 @@ closes the divergence the tree can prove.
 """
 
 import os;
-import from tests.support { TESTS_DIR }
+import from tests.support { TESTS_DIR, run_cases }
 import from jaclang.compiler.driver.compile_options { CompileOptions }
 import from jaclang.compiler.driver.na_coverage { na_coverage_begin, na_coverage_end }
 import from jaclang.compiler.driver.program { JacProgram }
@@ -84,20 +84,43 @@ def _sv_module(fixture: str) -> any {
 }
 
 
-test "the sv lane runs the override, which is the answer native must not miss" {
-    sv = _sv_module(MAIN);
-    assert sv.overridden_dispatch() == 1020 , (
-        "`dispatches(2)` is `self.hook(2) * 10`, and Overrider's hook adds "
-        "100: the override runs, so the answer is 1020. Running the base's "
-        "hook instead would give 30 -- a plausible number, which is what "
-        "makes the silent version dangerous"
-    );
-    assert sv.overridden_dispatch_twice() == 108 , (
-        "`plain(2)` is 6, plus Overrider's `hook(2)` of 102"
-    );
-    assert sv.bystander_dispatch() == 30 , (
-        "Bystander overrides nothing the base dispatches to, so the base's "
-        "own hook is the right body: 30"
+test "the sv lane runs the override, which is the answer native must not miss, and related cases" {
+    def check_the_sv_lane_runs_the_override_which_is_the_answe {
+        sv = _sv_module(MAIN);
+
+        assert sv.overridden_dispatch() == 1020 , (
+            "`dispatches(2)` is `self.hook(2) * 10`, and Overrider's hook adds "
+            "100: the override runs, so the answer is 1020. Running the base's "
+            "hook instead would give 30 -- a plausible number, which is what "
+            "makes the silent version dangerous"
+        );
+        assert sv.overridden_dispatch_twice() == 108 , (
+            "`plain(2)` is 6, plus Overrider's `hook(2)` of 102"
+        );
+        assert sv.bystander_dispatch() == 30 , (
+            "Bystander overrides nothing the base dispatches to, so the base's "
+            "own hook is the right body: 30"
+        );
+    }
+
+    def check_the_refused_call_still_gives_the_right_answer_th {
+        sv = _sv_module(MAIN);
+
+        assert sv.overridden_dispatch() == 1020 , (
+            "the demoted callable must still run the override on the Python lane"
+        );
+    }
+    run_cases(
+        [
+            (
+                "the sv lane runs the override, which is the answer native must not miss",
+                check_the_sv_lane_runs_the_override_which_is_the_answe
+            ),
+            (
+                "the refused call still gives the right answer through sv",
+                check_the_refused_call_still_gives_the_right_answer_th
+            )
+        ]
     );
 }
 
@@ -152,13 +175,5 @@ test "a subclass that overrides nothing dispatched to still lowers" {
         f"Refusing here would mean refusing on 'has a Python-side base', "
         f"which would cost every interop call in the tree. Got: "
         f"{_seams_for(MAIN, 'bystander_dispatch')}"
-    );
-}
-
-
-test "the refused call still gives the right answer through sv" {
-    sv = _sv_module(MAIN);
-    assert sv.overridden_dispatch() == 1020 , (
-        "the demoted callable must still run the override on the Python lane"
     );
 }

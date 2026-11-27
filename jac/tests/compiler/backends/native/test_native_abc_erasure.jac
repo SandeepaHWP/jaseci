@@ -27,7 +27,7 @@ import os;
 import from jaclang.compiler.frontend.parser { parse as rd_parse }
 import from jaclang.compiler.placement.placement { scan_native_blockers }
 import from jaclang.compiler.driver.program { JacProgram }
-import from tests.support { JAC_ROOT, native_address, native_force_opts }
+import from tests.support { JAC_ROOT, native_address, native_force_opts, run_cases }
 
 glob FIXTURES = os.path.join(
          JAC_ROOT, "tests", "compiler", "backends", "native", "fixtures"
@@ -72,20 +72,33 @@ test "the abstractmethod import keeps refusing" {
 }
 
 
-test "a non-erasable abc name still refuses" {
-    verdict = scan_verdict(module_with("import from abc { ABCMeta }"));
-    assert verdict != "OK" , (
-        "`ABCMeta` was waved through -- `register` performs virtual "
-        "subclassing, which no native unit can honor"
-    );
-}
+test "a non-erasable abc name still refuses, and related cases" {
+    def check_a_non_erasable_abc_name_still_refuses {
+        verdict = scan_verdict(module_with("import from abc { ABCMeta }"));
+        assert verdict != "OK" , (
+            "`ABCMeta` was waved through -- `register` performs virtual "
+            "subclassing, which no native unit can honor"
+        );
+    }
 
-
-test "a bare abc module import still refuses" {
-    verdict = scan_verdict(module_with("import abc;"));
-    assert verdict != "OK" , (
-        "a bare `import abc` binds a module object whose attributes are read "
-        "at run time; only named imports are erasable"
+    def check_a_bare_abc_module_import_still_refuses {
+        verdict = scan_verdict(module_with("import abc;"));
+        assert verdict != "OK" , (
+            "a bare `import abc` binds a module object whose attributes are read "
+            "at run time; only named imports are erasable"
+        );
+    }
+    run_cases(
+        [
+            (
+                "a non-erasable abc name still refuses",
+                check_a_non_erasable_abc_name_still_refuses
+            ),
+            (
+                "a bare abc module import still refuses",
+                check_a_bare_abc_module_import_still_refuses
+            )
+        ]
     );
 }
 

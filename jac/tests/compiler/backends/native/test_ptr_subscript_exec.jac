@@ -1,4 +1,4 @@
-import from tests.support { native_address, native_force_opts }
+import from tests.support { native_address, native_force_opts, run_cases }
 import ctypes;
 import os;
 import from pathlib { Path }
@@ -42,84 +42,106 @@ test "ptr subscript fixture compiles with no errors, no E9002 ICE (#6707, #6708)
     ]}";
 }
 
-# ─── read path execution (#6708) ─────────────────────────────────────────────
-test "ptr subscript read returns correct field values (#6708)" {
-    (prog, ir) = _compile("ptr_subscript.jac");
-    # Guard: fail cleanly on a broken compile rather than calling garbage JIT
-    # code (which segfaults the worker).
-    assert not prog.errors_had , f"compile errors block execution: {[
-        str(e) for e in prog.errors_had
-    ]}";
-    eng = ir.gen.native_engine;
-    assert eng is not None , "no native engine produced";
+test "ptr subscript cases on ptr_subscript.jac" {
+    # ─── read path execution (#6708) ─────────────────────────────────────────────
+    def check_ptr_subscript_read_returns_correct_field_values {
+        (prog, ir) = _compile("ptr_subscript.jac");
 
-    # Color[4] as raw bytes: element i .r at byte 4*i, .g at byte 4*i+1.
-    cbuf = (ctypes.c_uint8 * 16)();
-    vals = [(10, 20, 30, 40), (11, 21, 31, 41), (12, 22, 32, 42), (13, 23, 33, 43)];
-    for i in range(4) {
-        (r, g, b, a) = vals[i];
-        cbuf[4 * i] = r;
-        cbuf[4 * i + 1] = g;
-        cbuf[4 * i + 2] = b;
-        cbuf[4 * i + 3] = a;
-    }
-    cptr = ctypes.cast(cbuf, ctypes.c_void_p);
-    rr = _getf(eng, "read_color_r", ctypes.c_int64, ctypes.c_void_p, ctypes.c_int64);
-    rg = _getf(eng, "read_color_g", ctypes.c_int64, ctypes.c_void_p, ctypes.c_int64);
-    for i in range(4) {
-        assert rr(cptr, i) == vals[i][0] , f"read_color_r[{i}] = {rr(
-            cptr, i
-        )}, expected {vals[i][0]}";
-        assert rg(cptr, i) == vals[i][1] , f"read_color_g[{i}] = {rg(
-            cptr, i
-        )}, expected {vals[i][1]}";
-    }
-
-    # Vec2[3]: element i .x at doubles[2*i]. Proves the GEP stride is one whole
-    # 16-byte struct, not a fixed 8.
-    vbuf = (ctypes.c_double * 6)();
-    xs = [1.5, 3.5, 5.5];
-    for i in range(3) {
-        vbuf[2 * i] = xs[i];
-    }
-    vptr = ctypes.cast(vbuf, ctypes.c_void_p);
-    rvx = _getf(eng, "read_vec2_x", ctypes.c_double, ctypes.c_void_p, ctypes.c_int64);
-    for i in range(3) {
-        assert rvx(vptr, i) == xs[i] , f"read_vec2_x[{i}] = {rvx(vptr, i)}, expected {xs[
-            i
+        # Guard: fail cleanly on a broken compile rather than calling garbage JIT
+        # code (which segfaults the worker).
+        assert not prog.errors_had , f"compile errors block execution: {[
+            str(e) for e in prog.errors_had
         ]}";
+        eng = ir.gen.native_engine;
+        assert eng is not None , "no native engine produced";
+
+        # Color[4] as raw bytes: element i .r at byte 4*i, .g at byte 4*i+1.
+        cbuf = (ctypes.c_uint8 * 16)();
+        vals = [(10, 20, 30, 40), (11, 21, 31, 41), (12, 22, 32, 42), (13, 23, 33, 43)];
+        for i in range(4) {
+            (r, g, b, a) = vals[i];
+            cbuf[4 * i] = r;
+            cbuf[4 * i + 1] = g;
+            cbuf[4 * i + 2] = b;
+            cbuf[4 * i + 3] = a;
+        }
+        cptr = ctypes.cast(cbuf, ctypes.c_void_p);
+        rr = _getf(
+            eng, "read_color_r", ctypes.c_int64, ctypes.c_void_p, ctypes.c_int64
+        );
+        rg = _getf(
+            eng, "read_color_g", ctypes.c_int64, ctypes.c_void_p, ctypes.c_int64
+        );
+        for i in range(4) {
+            assert rr(cptr, i) == vals[i][0] , f"read_color_r[{i}] = {rr(
+                cptr, i
+            )}, expected {vals[i][0]}";
+            assert rg(cptr, i) == vals[i][1] , f"read_color_g[{i}] = {rg(
+                cptr, i
+            )}, expected {vals[i][1]}";
+        }
+
+        # Vec2[3]: element i .x at doubles[2*i]. Proves the GEP stride is one whole
+        # 16-byte struct, not a fixed 8.
+        vbuf = (ctypes.c_double * 6)();
+        xs = [1.5, 3.5, 5.5];
+        for i in range(3) {
+            vbuf[2 * i] = xs[i];
+        }
+        vptr = ctypes.cast(vbuf, ctypes.c_void_p);
+        rvx = _getf(
+            eng, "read_vec2_x", ctypes.c_double, ctypes.c_void_p, ctypes.c_int64
+        );
+        for i in range(3) {
+            assert rvx(vptr, i) == xs[i] , f"read_vec2_x[{i}] = {rvx(
+                vptr, i
+            )}, expected {xs[i]}";
+        }
     }
-}
 
-# ─── write path execution (#6707) ────────────────────────────────────────────
-test "ptr subscript write stores into the right element, neighbors intact (#6707)" {
-    (prog, ir) = _compile("ptr_subscript.jac");
-    assert not prog.errors_had , f"compile errors block execution: {[
-        str(e) for e in prog.errors_had
-    ]}";
-    eng = ir.gen.native_engine;
-    assert eng is not None , "no native engine produced";
+    # ─── write path execution (#6707) ────────────────────────────────────────────
+    def check_ptr_subscript_write_stores_into_the_right_elemen {
+        (prog, ir) = _compile("ptr_subscript.jac");
 
-    cbuf = (ctypes.c_uint8 * 16)();
-    cptr = ctypes.cast(cbuf, ctypes.c_void_p);
-    wc = _getf(
-        eng,
-        "write_color",
-        None,
-        ctypes.c_void_p,
-        ctypes.c_int64,
-        ctypes.c_int64,
-        ctypes.c_int64,
-        ctypes.c_int64,
-        ctypes.c_int64
+        assert not prog.errors_had , f"compile errors block execution: {[
+            str(e) for e in prog.errors_had
+        ]}";
+        eng = ir.gen.native_engine;
+        assert eng is not None , "no native engine produced";
+
+        cbuf = (ctypes.c_uint8 * 16)();
+        cptr = ctypes.cast(cbuf, ctypes.c_void_p);
+        wc = _getf(
+            eng,
+            "write_color",
+            None,
+            ctypes.c_void_p,
+            ctypes.c_int64,
+            ctypes.c_int64,
+            ctypes.c_int64,
+            ctypes.c_int64,
+            ctypes.c_int64
+        );
+        wc(cptr, 2, 99, 88, 77, 66);
+        assert [cbuf[k] for k in range(8, 12)] == [99, 88, 77, 66] , f"write_color did not store at element 2: {[
+            cbuf[k] for k in range(8, 12)
+        ]}";
+        assert all(
+            cbuf[k] == 0
+            for k in range(16)
+            if k < 8 or k >= 12
+        ) , "write_color spilled outside element 2";
+    }
+    run_cases(
+        [
+            (
+                "ptr subscript read returns correct field values (#6708)",
+                check_ptr_subscript_read_returns_correct_field_values
+            ),
+            (
+                "ptr subscript write stores into the right element, neighbors intact (#6707)",
+                check_ptr_subscript_write_stores_into_the_right_elemen
+            )
+        ]
     );
-    wc(cptr, 2, 99, 88, 77, 66);
-    assert [cbuf[k] for k in range(8, 12)] == [99, 88, 77, 66] , f"write_color did not store at element 2: {[
-        cbuf[k] for k in range(8, 12)
-    ]}";
-    assert all(
-        cbuf[k] == 0
-        for k in range(16)
-        if k < 8 or k >= 12
-    ) , "write_color spilled outside element 2";
 }

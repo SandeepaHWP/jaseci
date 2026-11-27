@@ -12,31 +12,61 @@ import from tests.support {
     compile_native,
     compile_native_ir,
     get_func,
-    native_force_opts
+    native_force_opts,
+    run_cases
 }
 
 glob FIXTURES = os.path.join(
          TESTS_DIR, "compiler", "backends", "native", "fixtures"
      );
 
-test "star re-export chain compiles" {
-    (eng, ir) = compile_native("na_star_reexport_main.jac");
-    assert ir.gen.llvm_ir is not None;
-}
+test "na_star_reexport_main.jac cases" {
+    def check_star_re_export_chain_compiles {
+        (eng, ir) = compile_native("na_star_reexport_main.jac");
 
-test "star re-export chain executes" {
-    (eng, ir) = compile_native("na_star_reexport_main.jac");
-    f = get_func(eng, "use_star", ctypes.c_int64, ctypes.c_int64);
-    assert f(5) == 11 , "star_helper(5) must be 5 * 2 + 1";
-}
+        assert ir.gen.llvm_ir is not None;
+    }
 
-test "star re-exported binding resolves to the defining module" {
-    (eng, ir) = compile_native("na_star_reexport_main.jac");
-    b = ir.gen.interop_manifest.bindings["star_helper"];
-    assert b.source_module == "na_star_reexport_lib.jac" , (
-        f"binding must name the defining module, got {b.source_module}"
+    def check_star_re_export_chain_executes {
+        (eng, ir) = compile_native("na_star_reexport_main.jac");
+
+        f = get_func(eng, "use_star", ctypes.c_int64, ctypes.c_int64);
+        assert f(5) == 11 , "star_helper(5) must be 5 * 2 + 1";
+    }
+
+    def check_star_re_exported_binding_resolves_to_the_definin {
+        (eng, ir) = compile_native("na_star_reexport_main.jac");
+
+        b = ir.gen.interop_manifest.bindings["star_helper"];
+        assert b.source_module == "na_star_reexport_lib.jac" , (
+            f"binding must name the defining module, got {b.source_module}"
+        );
+    }
+
+    def check_struct_re_export_through_include_chain_executes {
+        (eng, ir) = compile_native("na_star_reexport_main.jac");
+
+        f = get_func(
+            eng, "use_star_obj", ctypes.c_int64, ctypes.c_int64, ctypes.c_int64
+        );
+        assert f(7, 9) == 7 , "StarPoint.x must round-trip through star_make";
+    }
+    run_cases(
+        [
+            ("star re-export chain compiles", check_star_re_export_chain_compiles),
+            ("star re-export chain executes", check_star_re_export_chain_executes),
+            (
+                "star re-exported binding resolves to the defining module",
+                check_star_re_exported_binding_resolves_to_the_definin
+            ),
+            (
+                "struct re-export through include chain executes",
+                check_struct_re_export_through_include_chain_executes
+            )
+        ]
     );
 }
+
 
 test "entry-module include of native module executes" {
     (eng, ir) = compile_native("na_star_include_main.jac");
@@ -56,10 +86,4 @@ test "a typed import through a re-export module links to the defining unit" {
         f"a module with no code of its own is not a link unit, got {deps}"
     );
     assert "na_star_reexport_lib.jac" in deps , f"got {deps}";
-}
-
-test "struct re-export through include chain executes" {
-    (eng, ir) = compile_native("na_star_reexport_main.jac");
-    f = get_func(eng, "use_star_obj", ctypes.c_int64, ctypes.c_int64, ctypes.c_int64);
-    assert f(7, 9) == 7 , "StarPoint.x must round-trip through star_make";
 }

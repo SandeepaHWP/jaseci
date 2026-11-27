@@ -15,6 +15,8 @@ and `class TextTestResult(unittest.result.TestResult, ...)`.
 
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.driver.compile_options { CompileOptions }
+import from tests.support { run_cases }
+
 
 def check_src(src: str) -> list[str] {
     prog = JacProgram();
@@ -24,33 +26,51 @@ def check_src(src: str) -> list[str] {
     return [str(e) for e in prog.errors_had];
 }
 
-test "members inherited through a package-qualified base stay visible" {
-    src = "import from email.mime.multipart { MIMEMultipart }\n"
-        + "import from email.mime.text { MIMEText }\n"
-        + "def probe -> str {\n"
-        + "    msg = MIMEMultipart('alternative');\n"
-        + "    msg.attach(MIMEText('hi', 'plain'));\n"
-        + "    return msg.as_string();\n"
-        + "}\n";
-    errs = check_src(src);
-    assert not errs , f"package-qualified base lost its members: {errs}";
-}
+test "members inherited through a package-qualified base stay visible, and related cases" {
+    def check_members_inherited_through_a_package_qualified_ba {
+        src = "import from email.mime.multipart { MIMEMultipart }\n"
+            + "import from email.mime.text { MIMEText }\n"
+            + "def probe -> str {\n"
+            + "    msg = MIMEMultipart('alternative');\n"
+            + "    msg.attach(MIMEText('hi', 'plain'));\n"
+            + "    return msg.as_string();\n"
+            + "}\n";
+        errs = check_src(src);
+        assert not errs , f"package-qualified base lost its members: {errs}";
+    }
 
-test "a package segment of a dotted import resolves to the package" {
-    src = "import email.message;\n"
-        + "def probe(m: email.message.Message) -> str {\n"
-        + "    return m.as_string();\n"
-        + "}\n";
-    errs = check_src(src);
-    assert not errs , f"package segment unresolved: {errs}";
-}
+    def check_a_package_segment_of_a_dotted_import_resolves_to {
+        src = "import email.message;\n"
+            + "def probe(m: email.message.Message) -> str {\n"
+            + "    return m.as_string();\n"
+            + "}\n";
+        errs = check_src(src);
+        assert not errs , f"package segment unresolved: {errs}";
+    }
 
-test "a namespace package resolves without an __init__" {
-    src = "import xml.etree.ElementTree;\n"
-        + "def probe(s: str) -> None {\n"
-        + "    parsed = xml.etree.ElementTree.fromstring(s);\n"
-        + "    assert parsed is not None;\n"
-        + "}\n";
-    errs = check_src(src);
-    assert not errs , f"package segment unresolved: {errs}";
+    def check_a_namespace_package_resolves_without_an_init {
+        src = "import xml.etree.ElementTree;\n"
+            + "def probe(s: str) -> None {\n"
+            + "    parsed = xml.etree.ElementTree.fromstring(s);\n"
+            + "    assert parsed is not None;\n"
+            + "}\n";
+        errs = check_src(src);
+        assert not errs , f"package segment unresolved: {errs}";
+    }
+    run_cases(
+        [
+            (
+                "members inherited through a package-qualified base stay visible",
+                check_members_inherited_through_a_package_qualified_ba
+            ),
+            (
+                "a package segment of a dotted import resolves to the package",
+                check_a_package_segment_of_a_dotted_import_resolves_to
+            ),
+            (
+                "a namespace package resolves without an __init__",
+                check_a_namespace_package_resolves_without_an_init
+            )
+        ]
+    );
 }

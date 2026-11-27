@@ -18,7 +18,7 @@ enforcement enabled via CompileOptions, matching
 import os;
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.driver.compile_options { CompileOptions }
-import from tests.support { JAC_ROOT }
+import from tests.support { JAC_ROOT, run_cases }
 
 glob FIXTURES = os.path.join(
          JAC_ROOT, "tests", "compiler", "passes", "fixtures", "nogc_infer"
@@ -40,29 +40,56 @@ def enforced_codes(fixture: str) -> list[str] {
     return sorted(codes);
 }
 
-test "scalar call-result local reused in a for-range header is clean" {
-    assert enforced_codes("scalar_call_range.jac") == [];
+test "scalar call-result local reused in a for-range header is clean, and related cases" {
+    def check_scalar_call_result_local_reused_in_a_for_range_h {
+        assert enforced_codes("scalar_call_range.jac") == [];
+    }
+
+    def check_slice_of_a_borrowed_param_infers_an_owned_local {
+        assert enforced_codes("slice_of_borrow.jac") == [];
+    }
+
+    def check_typed_base_enum_members_are_scalar_constants_und {
+        assert enforced_codes("int_enum_members.jac") == [];
+    }
+
+    def check_read_only_method_calls_borrow_their_owned_receiv {
+        assert enforced_codes("readonly_borrows.jac") == [];
+    }
+
+    def check_native_stdlib_sinks_borrow_named_owned_arguments {
+        assert enforced_codes("stdlib_sink_borrows.jac") == [];
+    }
+    run_cases(
+        [
+            (
+                "scalar call-result local reused in a for-range header is clean",
+                check_scalar_call_result_local_reused_in_a_for_range_h
+            ),
+            (
+                "slice of a borrowed param infers an owned local",
+                check_slice_of_a_borrowed_param_infers_an_owned_local
+            ),
+            (
+                "typed-base enum members are scalar constants under enforcement",
+                check_typed_base_enum_members_are_scalar_constants_und
+            ),
+            (
+                "read-only method calls borrow their owned receiver and args",
+                check_read_only_method_calls_borrow_their_owned_receiv
+            ),
+            (
+                "native stdlib sinks borrow named owned arguments",
+                check_native_stdlib_sinks_borrow_named_owned_arguments
+            )
+        ]
+    );
 }
 
 test "heap call-result local is still move-tracked (E1301 on reuse)" {
     assert enforced_codes("heap_call_still_tracked.jac") == ["E1301"];
 }
 
-test "slice of a borrowed param infers an owned local" {
-    assert enforced_codes("slice_of_borrow.jac") == [];
-}
-
-test "typed-base enum members are scalar constants under enforcement" {
-    assert enforced_codes("int_enum_members.jac") == [];
-}
-
-test "read-only method calls borrow their owned receiver and args" {
-    assert enforced_codes("readonly_borrows.jac") == [];
-}
-
-test "native stdlib sinks borrow named owned arguments" {
-    assert enforced_codes("stdlib_sink_borrows.jac") == [];
-}
 
 test "compiler-internal modules are exempt from ambient enforcement" {
     import jaclang;

@@ -4,6 +4,7 @@ import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.driver.compile_options { CompileOptions }
 import from jaclang.compiler.frontend.parser.frontend { parse_expression }
 import from jaclang.compiler.frontend.unitree { Module }
+import from tests.support { run_cases }
 
 
 def _scope(program: JacProgram) -> Module {
@@ -28,48 +29,80 @@ test "standalone expression parsing consumes the complete input" {
     }
 }
 
-test "quoted generic union and callable annotations share normal type semantics" {
-    program = JacProgram();
-    scope = _scope(program);
-    evaluator = program.get_type_evaluator();
-    for (source, expected) in [
-        ("int", "int"),
-        ("Item", "Item"),
-        ("int | None", "int | NoneType"),
-        ("(str, int)", "tuple[str, int]"),
-        ("Literal[\"x\"]", "Literal[\"x\"]"),
-        ("list[Item]", "list[Item]"),
-        ("dict[str, list[Item]]", "dict[str, list[Item]]"),
-        ("Callable[[int, str], Item]", "Callable[[int, str], Item]"),
-        ("Callable[..., Item]", "Callable[..., Item]"),
-        ("typing.Callable[[Item], str]", "Callable[[Item], str]")
-    ] {
-        resolved = evaluator._resolve_string_type_expr(source, scope);
-        assert resolved is not None , source;
-        assert str(resolved) == expected , f"{source}: {resolved}";
+test "quoted generic union and callable annotations share normal type semantics, and related cases" {
+    def check_quoted_generic_union_and_callable_annotations_sh {
+        program = JacProgram();
+        scope = _scope(program);
+        evaluator = program.get_type_evaluator();
+        for (source, expected) in [
+            ("int", "int"),
+            ("Item", "Item"),
+            ("int | None", "int | NoneType"),
+            ("(str, int)", "tuple[str, int]"),
+            ("Literal[\"x\"]", "Literal[\"x\"]"),
+            ("list[Item]", "list[Item]"),
+            ("dict[str, list[Item]]", "dict[str, list[Item]]"),
+            ("Callable[[int, str], Item]", "Callable[[int, str], Item]"),
+            ("Callable[..., Item]", "Callable[..., Item]"),
+            ("typing.Callable[[Item], str]", "Callable[[Item], str]")
+        ] {
+            resolved = evaluator._resolve_string_type_expr(source, scope);
+            assert resolved is not None , source;
+            assert str(resolved) == expected , f"{source}: {resolved}";
+        }
     }
+
+    def check_temporary_quoted_syntax_does_not_accumulate_symb {
+        program = JacProgram();
+        scope = _scope(program);
+        evaluator = program.get_type_evaluator();
+        symbol = scope.lookup("Item");
+        assert symbol is not None;
+        before = len(symbol.uses);
+        errors_before = len(program.errors_had);
+        warnings_before = len(program.warnings_had);
+        for _ in range(20) {
+            resolved = evaluator._resolve_string_type_expr("list[Item]", scope);
+            assert resolved is not None;
+            assert str(resolved) == "list[Item]";
+            assert evaluator._resolve_string_type_expr("MissingType", scope) is None;
+            assert evaluator._resolve_string_type_expr("int; str", scope) is None;
+        }
+        assert len(symbol.uses) == before;
+        assert len(program.errors_had) == errors_before;
+        assert len(program.warnings_had) == warnings_before;
+    }
+
+    def check_standalone_expression_diagnostics_retain_their_s {
+        program = JacProgram();
+        (_expression, failed) = parse_expression(
+            "int; str", "quoted_diagnostic.jac", program
+        );
+        assert failed;
+        assert program.errors_had;
+        for error in program.errors_had {
+            assert error.loc.mod_path == "quoted_diagnostic.jac";
+            assert error.loc.first_line == 1;
+        }
+    }
+    run_cases(
+        [
+            (
+                "quoted generic union and callable annotations share normal type semantics",
+                check_quoted_generic_union_and_callable_annotations_sh
+            ),
+            (
+                "temporary quoted syntax does not accumulate symbol uses or diagnostics",
+                check_temporary_quoted_syntax_does_not_accumulate_symb
+            ),
+            (
+                "standalone expression diagnostics retain their source location",
+                check_standalone_expression_diagnostics_retain_their_s
+            )
+        ]
+    );
 }
 
-test "temporary quoted syntax does not accumulate symbol uses or diagnostics" {
-    program = JacProgram();
-    scope = _scope(program);
-    evaluator = program.get_type_evaluator();
-    symbol = scope.lookup("Item");
-    assert symbol is not None;
-    before = len(symbol.uses);
-    errors_before = len(program.errors_had);
-    warnings_before = len(program.warnings_had);
-    for _ in range(20) {
-        resolved = evaluator._resolve_string_type_expr("list[Item]", scope);
-        assert resolved is not None;
-        assert str(resolved) == "list[Item]";
-        assert evaluator._resolve_string_type_expr("MissingType", scope) is None;
-        assert evaluator._resolve_string_type_expr("int; str", scope) is None;
-    }
-    assert len(symbol.uses) == before;
-    assert len(program.errors_had) == errors_before;
-    assert len(program.warnings_had) == warnings_before;
-}
 
 test "type aliases resolve all adjacent literal fragments" {
     program = JacProgram();
@@ -89,18 +122,6 @@ test "type aliases resolve all adjacent literal fragments" {
     }
 }
 
-test "standalone expression diagnostics retain their source location" {
-    program = JacProgram();
-    (_expression, failed) = parse_expression(
-        "int; str", "quoted_diagnostic.jac", program
-    );
-    assert failed;
-    assert program.errors_had;
-    for error in program.errors_had {
-        assert error.loc.mod_path == "quoted_diagnostic.jac";
-        assert error.loc.first_line == 1;
-    }
-}
 
 test "speculative type lookup preserves existing and subsequent diagnostics" {
     program = JacProgram();

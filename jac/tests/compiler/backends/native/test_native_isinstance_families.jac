@@ -24,7 +24,7 @@ to a native sequence, so the compare runs as a loop over a runtime length.
 
 import ctypes;
 import os;
-import from tests.support { TESTS_DIR, native_address, native_force_opts }
+import from tests.support { TESTS_DIR, native_address, native_force_opts, run_cases }
 import jaclang;
 import jaclang.compiler.frontend.unitree as uni;
 import from jaclang.compiler.driver.program { JacProgram }
@@ -141,75 +141,101 @@ test "abc arm: Mapping separates dicts from sequences" {
 }
 
 
-test "abc arm: an ABC with no exact reduction refuses instead of guessing" {
-    import from jaclang.compiler.driver.na_coverage {
-        na_coverage_begin,
-        na_coverage_end
-    }
-    prog = JacProgram();
-    na_coverage_begin();
-    try {
-        prog.compile(
-            file_path=str(os.path.join(FIXTURES, "isinstance_abc_opaque.jac")),
-            options=native_force_opts()
+test "abc arm: cases" {
+    def check_abc_arm_an_abc_with_no_exact_reduction_refuses_i {
+        import from jaclang.compiler.driver.na_coverage {
+            na_coverage_begin,
+            na_coverage_end
+        }
+        prog = JacProgram();
+        na_coverage_begin();
+        try {
+            prog.compile(
+                file_path=str(os.path.join(FIXTURES, "isinstance_abc_opaque.jac")),
+                options=native_force_opts()
+            );
+        } finally {
+            coverage = na_coverage_end();
+        }
+        said = " ".join(
+            str(seam) for rec in coverage.values() for seam in (rec["seams"] or [])
         );
-    } finally {
-        coverage = na_coverage_end();
+        assert "isinstance against `Iterable`" in said , (
+            "an unreducible ABC has to name itself in the seam that demotes the "
+            f"method, so the refusal is actionable; got: {said}"
+        );
     }
-    said = " ".join(
-        str(seam) for rec in coverage.values() for seam in (rec["seams"] or [])
-    );
-    assert "isinstance against `Iterable`" in said , (
-        "an unreducible ABC has to name itself in the seam that demotes the "
-        f"method, so the refusal is actionable; got: {said}"
+
+    def check_abc_arm_a_python_based_operand_refuses_rather_th {
+        import from jaclang.compiler.driver.na_coverage {
+            na_coverage_begin,
+            na_coverage_end
+        }
+        prog = JacProgram();
+        na_coverage_begin();
+        try {
+            prog.compile(
+                file_path=str(os.path.join(FIXTURES, "isinstance_pyb_abc.jac")),
+                options=native_force_opts()
+            );
+        } finally {
+            coverage = na_coverage_end();
+        }
+        said = " ".join(
+            str(seam) for rec in coverage.values() for seam in (rec["seams"] or [])
+        );
+        assert "isinstance against `Sequence`" in said , (
+            "a reducible ABC is only exact while the operand's whole MRO is "
+            f"native; a Python-side base has to refuse it; got: {said}"
+        );
+    }
+    run_cases(
+        [
+            (
+                "abc arm: an ABC with no exact reduction refuses instead of guessing",
+                check_abc_arm_an_abc_with_no_exact_reduction_refuses_i
+            ),
+            (
+                "abc arm: a Python-based operand refuses rather than read a partial MRO",
+                check_abc_arm_a_python_based_operand_refuses_rather_th
+            )
+        ]
     );
 }
 
 
-test "abc arm: a Python-based operand refuses rather than read a partial MRO" {
-    import from jaclang.compiler.driver.na_coverage {
-        na_coverage_begin,
-        na_coverage_end
+test "value arms: cases" {
+    def check_value_arms_a_fixed_arity_tuple_of_types_unrolls {
+        f = native_fn("chk_types_fixed");
+        picks: list[any] = [PyFoo(), PyBar(), PyBaz()];
+        for k in range(3) {
+            assert f(k) == py_verdict(picks[k], (PyFoo, PyBar, )) , (
+                f"chk_types_fixed({k}) disagrees with CPython"
+            );
+        }
     }
-    prog = JacProgram();
-    na_coverage_begin();
-    try {
-        prog.compile(
-            file_path=str(os.path.join(FIXTURES, "isinstance_pyb_abc.jac")),
-            options=native_force_opts()
-        );
-    } finally {
-        coverage = na_coverage_end();
+
+    def check_value_arms_a_variadic_tuple_of_types_loops_over {
+        f = native_fn("chk_types_variadic");
+        picks: list[any] = [PyFoo(), PyBar(), PyBaz()];
+        for k in range(3) {
+            assert f(k) == py_verdict(picks[k], (PyFoo, PyBar, )) , (
+                f"chk_types_variadic({k}) disagrees with CPython"
+            );
+        }
     }
-    said = " ".join(
-        str(seam) for rec in coverage.values() for seam in (rec["seams"] or [])
+    run_cases(
+        [
+            (
+                "value arms: a fixed-arity tuple of types unrolls",
+                check_value_arms_a_fixed_arity_tuple_of_types_unrolls
+            ),
+            (
+                "value arms: a variadic tuple of types loops over a runtime length",
+                check_value_arms_a_variadic_tuple_of_types_loops_over
+            )
+        ]
     );
-    assert "isinstance against `Sequence`" in said , (
-        "a reducible ABC is only exact while the operand's whole MRO is "
-        f"native; a Python-side base has to refuse it; got: {said}"
-    );
-}
-
-
-test "value arms: a fixed-arity tuple of types unrolls" {
-    f = native_fn("chk_types_fixed");
-    picks: list[any] = [PyFoo(), PyBar(), PyBaz()];
-    for k in range(3) {
-        assert f(k) == py_verdict(picks[k], (PyFoo, PyBar, )) , (
-            f"chk_types_fixed({k}) disagrees with CPython"
-        );
-    }
-}
-
-
-test "value arms: a variadic tuple of types loops over a runtime length" {
-    f = native_fn("chk_types_variadic");
-    picks: list[any] = [PyFoo(), PyBar(), PyBaz()];
-    for k in range(3) {
-        assert f(k) == py_verdict(picks[k], (PyFoo, PyBar, )) , (
-            f"chk_types_variadic({k}) disagrees with CPython"
-        );
-    }
 }
 
 

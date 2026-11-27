@@ -9,7 +9,7 @@ rejected (E1107).
 
 import from jaclang.compiler.backends.py.codegen_shim { generated_python }
 import os;
-import from tests.support { JAC_ROOT }
+import from tests.support { JAC_ROOT, run_cases }
 import from jaclang { JacRuntime as Jac }
 import from jaclang { JacRuntimeInterface }
 import from jaclang.jac0 { compile_jac }
@@ -28,19 +28,32 @@ def compile_fixture(name: str) -> list[any] {
 }
 
 
-test "distinct alias parses clean and non-distinct still works" {
-    (bad, pdiags, _l) = parse_diags(
-        "type NodeId := int;\ntype Plain = int;\n", "d.jac"
-    );
-    assert not bad , f"parse errors: {[d.message for d in pdiags]}";
-}
+test "distinct alias parses clean and non-distinct still works, and related cases" {
+    def check_distinct_alias_parses_clean_and_non_distinct_sti {
+        (bad, pdiags, _l) = parse_diags(
+            "type NodeId := int;\ntype Plain = int;\n", "d.jac"
+        );
+        assert not bad , f"parse errors: {[d.message for d in pdiags]}";
+    }
 
-
-test "distinct stays usable as an ordinary identifier" {
-    (bad, pdiags, _l) = parse_diags(
-        "with entry {\n    distinct = 4;\n    print(distinct);\n}\n", "d.jac"
+    def check_distinct_stays_usable_as_an_ordinary_identifier {
+        (bad, pdiags, _l) = parse_diags(
+            "with entry {\n    distinct = 4;\n    print(distinct);\n}\n", "d.jac"
+        );
+        assert not bad , f"parse errors: {[d.message for d in pdiags]}";
+    }
+    run_cases(
+        [
+            (
+                "distinct alias parses clean and non-distinct still works",
+                check_distinct_alias_parses_clean_and_non_distinct_sti
+            ),
+            (
+                "distinct stays usable as an ordinary identifier",
+                check_distinct_stays_usable_as_an_ordinary_identifier
+            )
+        ]
     );
-    assert not bad , f"parse errors: {[d.message for d in pdiags]}";
 }
 
 
@@ -58,25 +71,38 @@ test "cross-brand and raw-base assignments are rejected" {
 }
 
 
-test "obj inheriting a builtin primitive is E1106" {
-    errs = compile_fixture("obj_builtin.jac");
-    codes = [
-        e.code.code
-        for e in errs
-        if e.code is not None
-    ];
-    assert "E1106" in codes , f"{[str(e) for e in errs]}";
-}
+test "obj inheriting a builtin primitive is E1106, and related cases" {
+    def check_obj_inheriting_a_builtin_primitive_is_e1106 {
+        errs = compile_fixture("obj_builtin.jac");
+        codes = [
+            e.code.code
+            for e in errs
+            if e.code is not None
+        ];
+        assert "E1106" in codes , f"{[str(e) for e in errs]}";
+    }
 
-
-test "distinct over a non-primitive base is E1107" {
-    errs = compile_fixture("bad_base.jac");
-    codes = [
-        e.code.code
-        for e in errs
-        if e.code is not None
-    ];
-    assert "E1107" in codes , f"{[str(e) for e in errs]}";
+    def check_distinct_over_a_non_primitive_base_is_e1107 {
+        errs = compile_fixture("bad_base.jac");
+        codes = [
+            e.code.code
+            for e in errs
+            if e.code is not None
+        ];
+        assert "E1107" in codes , f"{[str(e) for e in errs]}";
+    }
+    run_cases(
+        [
+            (
+                "obj inheriting a builtin primitive is E1106",
+                check_obj_inheriting_a_builtin_primitive_is_e1106
+            ),
+            (
+                "distinct over a non-primitive base is E1107",
+                check_distinct_over_a_non_primitive_base_is_e1107
+            )
+        ]
+    );
 }
 
 

@@ -19,6 +19,8 @@ the metaclass never runs.
 
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.driver.compile_options { CompileOptions }
+import from tests.support { run_cases }
+
 
 glob META_GETITEM: str = "class Meta(type) {\n"
          + "    def __getitem__(cls: Meta, key: str) -> int {\n        return len(key);\n    }\n"
@@ -106,32 +108,46 @@ test "a metaclass __getitem__ does not capture generic specialization" {
     }
 }
 
-test "a ctypes array type can be built" {
-    src = "import ctypes;\n"
-        + "def probe(n: int) -> None {\n"
-        + "    arr = ctypes.c_char_p * n;\n"
-        + "    assert arr is not None;\n"
-        + "}\n";
-    errs = check_src(src);
-    assert not errs , f"ctypes array construction rejected: {errs}";
-}
+test "a ctypes array type can be built, and related cases" {
+    def check_a_ctypes_array_type_can_be_built {
+        src = "import ctypes;\n"
+            + "def probe(n: int) -> None {\n"
+            + "    arr = ctypes.c_char_p * n;\n"
+            + "    assert arr is not None;\n"
+            + "}\n";
+        errs = check_src(src);
+        assert not errs , f"ctypes array construction rejected: {errs}";
+    }
 
-test "a metaclass operator wins over one on the class itself" {
-    src = "class Meta(type) {\n"
-        + "    def __mul__(cls: Meta, other: int) -> str {\n"
-        + "        return 'meta';\n"
-        + "    }\n"
-        + "}\n"
-        + "class Both(metaclass=Meta) {\n"
-        + "    def __mul__(self: Both, other: int) -> int {\n"
-        + "        return 0;\n"
-        + "    }\n"
-        + "}\n"
-        + "def probe -> str {\n"
-        + "    return Both * 3;\n"
-        + "}\n";
-    errs = check_src(src);
-    assert not errs , f"class __mul__ shadowed the metaclass one: {errs}";
+    def check_a_metaclass_operator_wins_over_one_on_the_class {
+        src = "class Meta(type) {\n"
+            + "    def __mul__(cls: Meta, other: int) -> str {\n"
+            + "        return 'meta';\n"
+            + "    }\n"
+            + "}\n"
+            + "class Both(metaclass=Meta) {\n"
+            + "    def __mul__(self: Both, other: int) -> int {\n"
+            + "        return 0;\n"
+            + "    }\n"
+            + "}\n"
+            + "def probe -> str {\n"
+            + "    return Both * 3;\n"
+            + "}\n";
+        errs = check_src(src);
+        assert not errs , f"class __mul__ shadowed the metaclass one: {errs}";
+    }
+    run_cases(
+        [
+            (
+                "a ctypes array type can be built",
+                check_a_ctypes_array_type_can_be_built
+            ),
+            (
+                "a metaclass operator wins over one on the class itself",
+                check_a_metaclass_operator_wins_over_one_on_the_class
+            )
+        ]
+    );
 }
 
 

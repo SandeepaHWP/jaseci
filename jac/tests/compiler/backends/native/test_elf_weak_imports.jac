@@ -9,6 +9,8 @@ import tempfile;
 import from pathlib { Path }
 import from jaclang.compiler.backends.native.native_link { NativeLinkJob, link_native }
 import jaclang.compiler.backends.native.llvm.binding as llvm;
+import from tests.support { run_cases }
+
 
 def _link(
     output: Path,
@@ -110,21 +112,51 @@ def _weak_probe(shared: bool, provided: bool = False) {
     }
 }
 
-test "missing weak function has a null address in a shared library" {
-    _weak_probe(True);
+test "missing weak function has a null address cases" {
+    def check_missing_weak_function_has_a_null_address_in_a_sh {
+        _weak_probe(True);
+    }
+
+    def check_missing_weak_function_has_a_null_address_in_an_e {
+        _weak_probe(False);
+    }
+    run_cases(
+        [
+            (
+                "missing weak function has a null address in a shared library",
+                check_missing_weak_function_has_a_null_address_in_a_sh
+            ),
+            (
+                "missing weak function has a null address in an executable",
+                check_missing_weak_function_has_a_null_address_in_an_e
+            )
+        ]
+    );
 }
 
-test "missing weak function has a null address in an executable" {
-    _weak_probe(False);
+
+test "provided weak function resolves cases" {
+    def check_provided_weak_function_resolves_in_a_shared_libr {
+        _weak_probe(True, True);
+    }
+
+    def check_provided_weak_function_resolves_in_an_executable {
+        _weak_probe(False, True);
+    }
+    run_cases(
+        [
+            (
+                "provided weak function resolves in a shared library",
+                check_provided_weak_function_resolves_in_a_shared_libr
+            ),
+            (
+                "provided weak function resolves in an executable",
+                check_provided_weak_function_resolves_in_an_executable
+            )
+        ]
+    );
 }
 
-test "provided weak function resolves in a shared library" {
-    _weak_probe(True, True);
-}
-
-test "provided weak function resolves in an executable" {
-    _weak_probe(False, True);
-}
 
 test "a strong reference remains required when merged with a weak reference" {
     if sys.platform != "linux" or shutil.which("cc") is None {

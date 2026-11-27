@@ -3,7 +3,7 @@ import re;
 import shutil;
 import tempfile;
 import from pathlib { Path }
-import from tests.support { TESTS_DIR, assert_native_identity }
+import from tests.support { TESTS_DIR, assert_native_identity, run_cases }
 
 glob SITE = Path(TESTS_DIR).parent / "examples" / "jaclang_org",
      FIXTURES = Path(TESTS_DIR) / "compiler" / "backends" / "native" / "fixtures";
@@ -53,18 +53,32 @@ def arena_fixture(name: str) -> str {
     }
 }
 
-test "arena replay preserves the original simulation across memory profiles" {
-    assert arena_fixture("arena_replay")
-        == (
-            "0 0 100000 621189187\n"
-            "0 0 82000 1158027131\n"
-            "2 0 61883 332907100\n"
-            "2 0 16883 1958242580\n"
-            "2 0 12433 1715220132\n"
-            "2 0 27483 1923114171\n"
-        );
-}
+test "arena replay preserves the original simulation across memory profiles, and related cases" {
+    def check_arena_replay_preserves_the_original_simulation_a {
+        assert arena_fixture("arena_replay")
+            == (
+                "0 0 100000 621189187\n"
+                "0 0 82000 1158027131\n"
+                "2 0 61883 332907100\n"
+                "2 0 16883 1958242580\n"
+                "2 0 12433 1715220132\n"
+                "2 0 27483 1923114171\n"
+            );
+    }
 
-test "arena jump pools and event generations agree across backends" {
-    assert arena_fixture("arena_checks") == "arena checks passed\n";
+    def check_arena_jump_pools_and_event_generations_agree_acr {
+        assert arena_fixture("arena_checks") == "arena checks passed\n";
+    }
+    run_cases(
+        [
+            (
+                "arena replay preserves the original simulation across memory profiles",
+                check_arena_replay_preserves_the_original_simulation_a
+            ),
+            (
+                "arena jump pools and event generations agree across backends",
+                check_arena_jump_pools_and_event_generations_agree_acr
+            )
+        ]
+    );
 }

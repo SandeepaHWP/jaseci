@@ -39,7 +39,8 @@ import from tests.support {
     TESTS_DIR,
     native_address,
     native_force_opts,
-    native_str_func
+    native_str_func,
+    run_cases
 }
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.runtime.runtime { JacRuntime }
@@ -108,75 +109,137 @@ def _sv_module -> object {
 }
 
 
-test "a Jac enum member written as a constant expression carries its value" {
-    f = _get(_compile(), "kind_of");
-    assert f(0) == 0 , "NAMESPACE is a literal 0 and was never at risk";
-    assert f(1) == 2 , (
-        "CLASS is `1 << 1`; an unfolded initialiser gives it 0, colliding "
-        "with NAMESPACE and reporting nothing"
-    );
-    assert f(2) == 3 , "ENUM is `(1 << 1) | 1`";
-    assert f(3) == 7 , "PARAM is a literal 7";
-}
-
-
-test "a class-form IntFlag member written as a constant expression lowers" {
-    f = _get(_compile(), "mod_of");
-    assert f(0) == 1 , "DECLARATION is `1 << 0`";
-    assert f(1) == 2 , "DEFINITION is `1 << 1`";
-    assert f(2) == 4 , "READONLY is `1 << 2`";
-    assert f(3) == 1 , "LITERAL_ONE is a literal 1 and lowered before";
-}
-
-
-test "both enums combined answer the way the pair of reads does" {
-    f = _get(_compile(), "kind_and_mod");
-    assert f(0) == 1 , "NAMESPACE(0) with DECLARATION(1)";
-    assert f(1) == 202 , "CLASS(2) with DEFINITION(2)";
-    assert f(2) == 304 , "ENUM(3) with READONLY(4)";
-    assert f(3) == 701 , "PARAM(7) with LITERAL_ONE(1)";
-}
-
-
-test "__class__.__name__ off an opaque object pointer answers the runtime class" {
-    eng = _compile();
-    for name in ("open_name_rank", "open_dunder_rank") {
-        f = _get(eng, name);
-        assert f(1) == 1 , (
-            f"{name}: a type-erased generic slot holding a Leaf reports Leaf"
+test "a Jac enum member written as a constant expression carries its value, and related cases" {
+    def check_a_jac_enum_member_written_as_a_constant_expressi {
+        f = _get(_compile(), "kind_of");
+        assert f(0) == 0 , "NAMESPACE is a literal 0 and was never at risk";
+        assert f(1) == 2 , (
+            "CLASS is `1 << 1`; an unfolded initialiser gives it 0, colliding "
+            "with NAMESPACE and reporting nothing"
         );
-        assert f(2) == 2 , f"{name}: the same slot holding a Branch reports Branch";
-        assert f(0) == 3 , f"{name}: and a Node reports Node, not a subclass";
+        assert f(2) == 3 , "ENUM is `(1 << 1) | 1`";
+        assert f(3) == 7 , "PARAM is a literal 7";
     }
-}
 
-
-test "the same read off an option unwraps before it resolves" {
-    f = _get(_compile(), "opt_name_rank");
-    assert f(1) == 1 , "the present arm carries a Leaf";
-    assert f(2) == 2 , "and a Branch";
-    assert f(3) == 3 , "and a Node";
-    assert f(0) == 9 , (
-        "an unset option is None, whose class is NoneType -- the payload slot "
-        "on that arm holds nothing worth dereferencing"
+    def check_the_same_read_off_an_option_unwraps_before_it_re {
+        f = _get(_compile(), "opt_name_rank");
+        assert f(1) == 1 , "the present arm carries a Leaf";
+        assert f(2) == 2 , "and a Branch";
+        assert f(3) == 3 , "and a Node";
+        assert f(0) == 9 , (
+            "an unset option is None, whose class is NoneType -- the payload slot "
+            "on that arm holds nothing worth dereferencing"
+        );
+    }
+    run_cases(
+        [
+            (
+                "a Jac enum member written as a constant expression carries its value",
+                check_a_jac_enum_member_written_as_a_constant_expressi
+            ),
+            (
+                "the same read off an option unwraps before it resolves",
+                check_the_same_read_off_an_option_unwraps_before_it_re
+            )
+        ]
     );
 }
 
 
-test "the class name off an open receiver is the name, not a stand-in" {
-    eng = _compile();
-    f = native_str_func(eng, "open_name", ctypes.c_char_p, ctypes.c_int64);
-    assert f(1) == b"Leaf" , "the rank mapping could pass on any three values";
-    assert f(2) == b"Branch" , "so the string itself is read back too";
-    assert f(0) == b"Node" , "the base class reports its own name";
+test "a class-form IntFlag member written as a constant expression lowers, and related cases" {
+    def check_a_class_form_intflag_member_written_as_a_constan {
+        f = _get(_compile(), "mod_of");
+        assert f(0) == 1 , "DECLARATION is `1 << 0`";
+        assert f(1) == 2 , "DEFINITION is `1 << 1`";
+        assert f(2) == 4 , "READONLY is `1 << 2`";
+        assert f(3) == 1 , "LITERAL_ONE is a literal 1 and lowered before";
+    }
+
+    def check_both_enums_combined_answer_the_way_the_pair_of_r {
+        f = _get(_compile(), "kind_and_mod");
+        assert f(0) == 1 , "NAMESPACE(0) with DECLARATION(1)";
+        assert f(1) == 202 , "CLASS(2) with DEFINITION(2)";
+        assert f(2) == 304 , "ENUM(3) with READONLY(4)";
+        assert f(3) == 701 , "PARAM(7) with LITERAL_ONE(1)";
+    }
+
+    def check_a_receiver_whose_static_type_names_an_archetype {
+        f = _get(_compile(), "known_name_rank");
+        assert f(1) == 1 , "a Node-typed parameter holding a Leaf still reports Leaf";
+        assert f(2) == 2 , "and a Branch still reports Branch";
+        assert f(0) == 3 , "and a Node reports Node";
+    }
+    run_cases(
+        [
+            (
+                "a class-form IntFlag member written as a constant expression lowers",
+                check_a_class_form_intflag_member_written_as_a_constan
+            ),
+            (
+                "both enums combined answer the way the pair of reads does",
+                check_both_enums_combined_answer_the_way_the_pair_of_r
+            ),
+            (
+                "a receiver whose static type names an archetype is unaffected",
+                check_a_receiver_whose_static_type_names_an_archetype
+            )
+        ]
+    );
 }
 
 
-test "a receiver whose static type names an archetype is unaffected" {
-    f = _get(_compile(), "known_name_rank");
-    assert f(1) == 1 , "a Node-typed parameter holding a Leaf still reports Leaf";
-    assert f(2) == 2 , "and a Branch still reports Branch";
-    assert f(0) == 3 , "and a Node reports Node";
+test "__class__.__name__ off an opaque object pointer answers the runtime class, and related cases" {
+    def check_class_name_off_an_opaque_object_pointer_answers {
+        eng = _compile();
+
+        for name in ("open_name_rank", "open_dunder_rank") {
+            f = _get(eng, name);
+            assert f(1) == 1 , (
+                f"{name}: a type-erased generic slot holding a Leaf reports Leaf"
+            );
+            assert f(2) == 2 , f"{name}: the same slot holding a Branch reports Branch";
+            assert f(0) == 3 , f"{name}: and a Node reports Node, not a subclass";
+        }
+    }
+
+    def check_the_class_name_off_an_open_receiver_is_the_name {
+        eng = _compile();
+
+        f = native_str_func(eng, "open_name", ctypes.c_char_p, ctypes.c_int64);
+        assert f(1) == b"Leaf" , "the rank mapping could pass on any three values";
+        assert f(2) == b"Branch" , "so the string itself is read back too";
+        assert f(0) == b"Node" , "the base class reports its own name";
+    }
+    def check_every_function_agrees_with_the_sv_result {
+        eng = _compile();
+
+        sv = _sv_module();
+        for name in ALL_FNS {
+            na_fn = _get(eng, name);
+            sv_fn = getattr(sv, name);
+            for pick in PICKS {
+                assert na_fn(pick) == sv_fn(pick) , (
+                    f"{name}({pick}): native {na_fn(pick)} != sv {sv_fn(pick)}"
+                );
+            }
+        }
+    }
+    run_cases(
+        [
+            (
+                "__class__.__name__ off an opaque object pointer answers the runtime class",
+                check_class_name_off_an_opaque_object_pointer_answers
+            ),
+            (
+                "the class name off an open receiver is the name, not a stand-in",
+                check_the_class_name_off_an_open_receiver_is_the_name
+            ),
+            (
+                "every function agrees with the sv result",
+                check_every_function_agrees_with_the_sv_result
+            )
+        ]
+    );
 }
 
 
@@ -186,19 +249,4 @@ test "sem_token's whole shape: both gaps and a tuple[A, B] | None return" {
     assert f(1) == 201 , "Leaf -> (CLASS, DECLARATION), both folded values";
     assert f(2) == 302 , "Branch -> (ENUM, DEFINITION)";
     assert f(3) == 704 , "Node -> (PARAM, READONLY)";
-}
-
-
-test "every function agrees with the sv result" {
-    eng = _compile();
-    sv = _sv_module();
-    for name in ALL_FNS {
-        na_fn = _get(eng, name);
-        sv_fn = getattr(sv, name);
-        for pick in PICKS {
-            assert na_fn(pick) == sv_fn(pick) , (
-                f"{name}({pick}): native {na_fn(pick)} != sv {sv_fn(pick)}"
-            );
-        }
-    }
 }

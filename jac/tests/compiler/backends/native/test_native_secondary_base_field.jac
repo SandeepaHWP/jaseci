@@ -29,7 +29,8 @@ import from tests.support {
     TESTS_DIR,
     compile_native,
     native_address,
-    native_force_opts
+    native_force_opts,
+    run_cases
 }
 
 glob FIXTURES = os.path.join(
@@ -44,42 +45,74 @@ def probe(eng: any, name: str) -> list[int] {
     return [f(k) for k in range(5)];
 }
 
-test "secondary-base field read is independent of the neighbouring pointer" {
-    (eng, _) = compile_native("secondary_base_xmod_main.jac");
-    assert probe(eng, "read_narrowed") == [0, 0, 1, 1, 1] , (
-        "a read through the narrowed base must land on `flagged`, not on the "
-        "`tag` pointer the base's slot index names inside `Item`"
+test "secondary_base_xmod_main.jac cases" {
+    def check_secondary_base_field_read_is_independent_of_the {
+        (eng, _) = compile_native("secondary_base_xmod_main.jac");
+
+        assert probe(eng, "read_narrowed") == [0, 0, 1, 1, 1] , (
+            "a read through the narrowed base must land on `flagged`, not on the "
+            "`tag` pointer the base's slot index names inside `Item`"
+        );
+    }
+
+    def check_secondary_base_field_read_outside_the_isinstance {
+        (eng, _) = compile_native("secondary_base_xmod_main.jac");
+
+        assert probe(eng, "read_direct") == [0, 0, 1, 1, 1] , (
+            "a narrowed read in a separate statement must resolve the same slot"
+        );
+    }
+
+    def check_secondary_base_field_write_lands_on_the_field_no {
+        (eng, _) = compile_native("secondary_base_xmod_main.jac");
+
+        assert probe(eng, "write_narrowed") == [1, 1, 1, 1, 1] , (
+            "a store through the narrowed base must be visible through the concrete type"
+        );
+    }
+
+    def check_a_secondary_base_write_does_not_clobber_a_neighb {
+        (eng, _) = compile_native("secondary_base_xmod_main.jac");
+
+        assert probe(eng, "tag_intact") == [0, 1, 0, 1, 0] , (
+            "storing `flagged` through the base must leave the `tag` pointer alone"
+        );
+    }
+
+    def check_a_method_declared_on_the_secondary_base_still_di {
+        (eng, _) = compile_native("secondary_base_xmod_main.jac");
+
+        assert probe(eng, "call_narrowed") == [20, 20, 20, 20, 20] , (
+            "the vtable slot for a secondary base's method must not resolve to the "
+            "primary base's method"
+        );
+    }
+    run_cases(
+        [
+            (
+                "secondary-base field read is independent of the neighbouring pointer",
+                check_secondary_base_field_read_is_independent_of_the
+            ),
+            (
+                "secondary-base field read outside the isinstance condition agrees",
+                check_secondary_base_field_read_outside_the_isinstance
+            ),
+            (
+                "secondary-base field write lands on the field, not the neighbour",
+                check_secondary_base_field_write_lands_on_the_field_no
+            ),
+            (
+                "a secondary-base write does not clobber a neighbouring field",
+                check_a_secondary_base_write_does_not_clobber_a_neighb
+            ),
+            (
+                "a method declared on the secondary base still dispatches to itself",
+                check_a_method_declared_on_the_secondary_base_still_di
+            )
+        ]
     );
 }
 
-test "secondary-base field read outside the isinstance condition agrees" {
-    (eng, _) = compile_native("secondary_base_xmod_main.jac");
-    assert probe(eng, "read_direct") == [0, 0, 1, 1, 1] , (
-        "a narrowed read in a separate statement must resolve the same slot"
-    );
-}
-
-test "secondary-base field write lands on the field, not the neighbour" {
-    (eng, _) = compile_native("secondary_base_xmod_main.jac");
-    assert probe(eng, "write_narrowed") == [1, 1, 1, 1, 1] , (
-        "a store through the narrowed base must be visible through the concrete type"
-    );
-}
-
-test "a secondary-base write does not clobber a neighbouring field" {
-    (eng, _) = compile_native("secondary_base_xmod_main.jac");
-    assert probe(eng, "tag_intact") == [0, 1, 0, 1, 0] , (
-        "storing `flagged` through the base must leave the `tag` pointer alone"
-    );
-}
-
-test "a method declared on the secondary base still dispatches to itself" {
-    (eng, _) = compile_native("secondary_base_xmod_main.jac");
-    assert probe(eng, "call_narrowed") == [20, 20, 20, 20, 20] , (
-        "the vtable slot for a secondary base's method must not resolve to the "
-        "primary base's method"
-    );
-}
 
 test "the same hierarchy inside one module keeps resolving correctly" {
     (eng, _) = compile_native("secondary_base_field.jac");

@@ -12,7 +12,7 @@ import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.driver.compile_options { CompileOptions }
 import from jaclang.compiler.frontend.unitree { Assignment, Name }
 import from jaclang.compiler.frontend.constant { OwnershipKind }
-import from tests.support { JAC_ROOT }
+import from tests.support { JAC_ROOT, run_cases }
 
 glob FIXTURES = os.path.join(
          JAC_ROOT, "tests", "compiler", "passes", "fixtures", "nogc_locals"
@@ -78,15 +78,30 @@ test "an element read written through a mutable root infers a mutable borrow" {
         == sorted([str(OwnershipKind.BORROW), str(OwnershipKind.MUT_BORROW)]);
 }
 
-test "E1401: a conditional whose arms disagree is written out by hand" {
-    (codes, _) = enforced("ternary_disagree.jac");
-    assert codes == ["E1401"];
+test "E1401: a conditional whose arms disagree is written out by hand, and related cases" {
+    def check_e1401_a_conditional_whose_arms_disagree_is_writt {
+        (codes, _) = enforced("ternary_disagree.jac");
+        assert codes == ["E1401"];
+    }
+
+    def check_e1318_a_container_mutator_through_an_inferred_sh {
+        (codes, _) = enforced("mutate_through_shared.jac");
+        assert codes == ["E1318"];
+    }
+    run_cases(
+        [
+            (
+                "E1401: a conditional whose arms disagree is written out by hand",
+                check_e1401_a_conditional_whose_arms_disagree_is_writt
+            ),
+            (
+                "E1318: a container mutator through an inferred shared borrow is rejected",
+                check_e1318_a_container_mutator_through_an_inferred_sh
+            )
+        ]
+    );
 }
 
-test "E1318: a container mutator through an inferred shared borrow is rejected" {
-    (codes, _) = enforced("mutate_through_shared.jac");
-    assert codes == ["E1318"];
-}
 
 test "an inferred borrow cannot leave as an owned return" {
     (codes, _) = enforced("projection_escape.jac");

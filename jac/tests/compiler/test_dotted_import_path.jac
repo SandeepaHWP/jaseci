@@ -13,6 +13,8 @@ inherited member vanished. E1030 then asserted a definite negative --
 
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.driver.compile_options { CompileOptions }
+import from tests.support { run_cases }
+
 
 def check_src(src: str) -> list[str] {
     prog = JacProgram();
@@ -22,20 +24,34 @@ def check_src(src: str) -> list[str] {
     return [str(e) for e in prog.errors_had];
 }
 
-test "members inherited through a dotted base class stay visible" {
-    src = "import unittest;\n"
-        + "def probe(r: unittest.TextTestResult) -> bool {\n"
-        + "    return r.wasSuccessful();\n"
-        + "}\n";
-    errs = check_src(src);
-    assert not errs , f"dotted base class lost its members: {errs}";
-}
+test "members inherited through a dotted base class stay visible, and related cases" {
+    def check_members_inherited_through_a_dotted_base_class_st {
+        src = "import unittest;\n"
+            + "def probe(r: unittest.TextTestResult) -> bool {\n"
+            + "    return r.wasSuccessful();\n"
+            + "}\n";
+        errs = check_src(src);
+        assert not errs , f"dotted base class lost its members: {errs}";
+    }
 
-test "a dotted submodule reference resolves inside a loaded module" {
-    src = "import unittest;\n"
-        + "def probe(r: unittest.TextTestResult) -> int {\n"
-        + "    return len(r.failures);\n"
-        + "}\n";
-    errs = check_src(src);
-    assert not errs , f"dotted submodule reference unresolved: {errs}";
+    def check_a_dotted_submodule_reference_resolves_inside_a_l {
+        src = "import unittest;\n"
+            + "def probe(r: unittest.TextTestResult) -> int {\n"
+            + "    return len(r.failures);\n"
+            + "}\n";
+        errs = check_src(src);
+        assert not errs , f"dotted submodule reference unresolved: {errs}";
+    }
+    run_cases(
+        [
+            (
+                "members inherited through a dotted base class stay visible",
+                check_members_inherited_through_a_dotted_base_class_st
+            ),
+            (
+                "a dotted submodule reference resolves inside a loaded module",
+                check_a_dotted_submodule_reference_resolves_inside_a_l
+            )
+        ]
+    );
 }

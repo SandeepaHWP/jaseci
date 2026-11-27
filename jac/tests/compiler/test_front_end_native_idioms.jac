@@ -18,7 +18,7 @@ import from jaclang.compiler.passes.execution { run_walker }
 import os;
 import types;
 import jaclang.compiler.frontend.helpers as helpers_mod;
-import from tests.support { TESTS_DIR }
+import from tests.support { TESTS_DIR, run_cases }
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.driver.compile_options { CompileOptions }
 import from jaclang.compiler.frontend.codeinfo { native_safe_sym }
@@ -59,12 +59,54 @@ def fmt_errors(prog: JacProgram) -> str {
 # pascal_to_snake: @lru_cache -> an explicit module-level dict cache
 # ─────────────────────────────────────────────────────────────────────
 
-test "pascal_to_snake converts the shapes the compiler actually feeds it" {
-    assert pascal_to_snake("FuncCall") == "func_call";
-    assert pascal_to_snake("Name") == "name";
-    assert pascal_to_snake("KWPair") == "k_w_pair";
-    assert pascal_to_snake("JsxElement") == "jsx_element";
-    assert pascal_to_snake("") == "";
+test "pascal_to_snake converts the shapes the compiler actually feeds it, and related cases" {
+    def check_pascal_to_snake_converts_the_shapes_the_compiler {
+        assert pascal_to_snake("FuncCall") == "func_call";
+        assert pascal_to_snake("Name") == "name";
+        assert pascal_to_snake("KWPair") == "k_w_pair";
+        assert pascal_to_snake("JsxElement") == "jsx_element";
+        assert pascal_to_snake("") == "";
+    }
+
+    # Both functions used `re.sub` with an ASCII-only character class, so their
+    # real contract is code-point ranges, not the Unicode-aware `str` predicates
+    # an eyeballed rewrite reaches for: `"É".isupper()` and `"é".isalnum()` are
+    # both True, while `[A-Z]` and `[a-zA-Z0-9_]` match neither. These pin the
+    # regex semantics so a loop that drifts to `isupper`/`isalnum` fails here.
+    def check_pascal_to_snake_splits_on_ascii_capitals_only {
+        assert pascal_to_snake("") == "";
+        assert pascal_to_snake("A") == "a";
+        assert pascal_to_snake("a") == "a";
+        assert pascal_to_snake("AB") == "a_b";
+        assert pascal_to_snake("HTTPServer") == "h_t_t_p_server";
+        assert pascal_to_snake("Foo2Bar") == "foo2_bar";
+        assert pascal_to_snake("2Fast") == "2_fast";
+        assert pascal_to_snake("foo_bar") == "foo_bar";
+        assert pascal_to_snake("_Leading") == "__leading";
+        assert pascal_to_snake("Multi\nLine") == "multi\n_line";
+    }
+
+    def check_pascal_to_snake_never_splits_before_a_non_ascii {
+        assert pascal_to_snake("FooÉbar") == "fooébar";
+        assert pascal_to_snake("Éclair") == "éclair";
+        assert pascal_to_snake("CaféBar") == "café_bar";
+    }
+    run_cases(
+        [
+            (
+                "pascal_to_snake converts the shapes the compiler actually feeds it",
+                check_pascal_to_snake_converts_the_shapes_the_compiler
+            ),
+            (
+                "pascal_to_snake splits on ASCII capitals only",
+                check_pascal_to_snake_splits_on_ascii_capitals_only
+            ),
+            (
+                "pascal_to_snake never splits before a non-ASCII capital",
+                check_pascal_to_snake_never_splits_before_a_non_ascii
+            )
+        ]
+    );
 }
 
 # The `@lru_cache(maxsize=256)` this function used to carry was sized to the
@@ -87,48 +129,39 @@ test "pascal_to_snake is deterministic across repeat calls without a cache" {
 # pascal_to_snake / native_safe_sym: `re.sub` -> explicit character loops
 # ─────────────────────────────────────────────────────────────────────
 
-# Both functions used `re.sub` with an ASCII-only character class, so their
-# real contract is code-point ranges, not the Unicode-aware `str` predicates
-# an eyeballed rewrite reaches for: `"É".isupper()` and `"é".isalnum()` are
-# both True, while `[A-Z]` and `[a-zA-Z0-9_]` match neither. These pin the
-# regex semantics so a loop that drifts to `isupper`/`isalnum` fails here.
-test "pascal_to_snake splits on ASCII capitals only" {
-    assert pascal_to_snake("") == "";
-    assert pascal_to_snake("A") == "a";
-    assert pascal_to_snake("a") == "a";
-    assert pascal_to_snake("AB") == "a_b";
-    assert pascal_to_snake("HTTPServer") == "h_t_t_p_server";
-    assert pascal_to_snake("Foo2Bar") == "foo2_bar";
-    assert pascal_to_snake("2Fast") == "2_fast";
-    assert pascal_to_snake("foo_bar") == "foo_bar";
-    assert pascal_to_snake("_Leading") == "__leading";
-    assert pascal_to_snake("Multi\nLine") == "multi\n_line";
-}
-
-test "pascal_to_snake never splits before a non-ASCII capital" {
-    assert pascal_to_snake("FooÉbar") == "fooébar";
-    assert pascal_to_snake("Éclair") == "éclair";
-    assert pascal_to_snake("CaféBar") == "café_bar";
-}
-
 """Strip the sha1 disambiguator native_safe_sym appends to its sanitized stem."""
 def safe_sym_stem(src: str) -> str {
     return native_safe_sym(src).rsplit("_", 1)[0];
 }
 
-test "native_safe_sym replaces every non-ASCII-word character with underscore" {
-    assert safe_sym_stem("plain") == "plain";
-    assert safe_sym_stem("pkg.mod") == "pkg_mod";
-    assert safe_sym_stem("a/b\\c.d-e f") == "a_b_c_d_e_f";
-    assert safe_sym_stem("Mixed_CASE09") == "Mixed_CASE09";
-    assert safe_sym_stem("") == "";
-    assert safe_sym_stem("trailing.") == "trailing_";
+test "native_safe_sym replaces every non-ASCII-word character with underscore, and related cases" {
+    def check_native_safe_sym_replaces_every_non_ascii_word_ch {
+        assert safe_sym_stem("plain") == "plain";
+        assert safe_sym_stem("pkg.mod") == "pkg_mod";
+        assert safe_sym_stem("a/b\\c.d-e f") == "a_b_c_d_e_f";
+        assert safe_sym_stem("Mixed_CASE09") == "Mixed_CASE09";
+        assert safe_sym_stem("") == "";
+        assert safe_sym_stem("trailing.") == "trailing_";
+    }
+
+    def check_native_safe_sym_treats_non_ascii_letters_as_unsa {
+        assert safe_sym_stem("café") == "caf_";
+        assert safe_sym_stem("naïve_mod") == "na_ve_mod";
+    }
+    run_cases(
+        [
+            (
+                "native_safe_sym replaces every non-ASCII-word character with underscore",
+                check_native_safe_sym_replaces_every_non_ascii_word_ch
+            ),
+            (
+                "native_safe_sym treats non-ASCII letters as unsafe",
+                check_native_safe_sym_treats_non_ascii_letters_as_unsa
+            )
+        ]
+    );
 }
 
-test "native_safe_sym treats non-ASCII letters as unsafe" {
-    assert safe_sym_stem("café") == "caf_";
-    assert safe_sym_stem("naïve_mod") == "na_ve_mod";
-}
 
 test "native_safe_sym hashes the kernel modules like every other unit" {
     # Every native module is a unit named by its module key; the toolchain

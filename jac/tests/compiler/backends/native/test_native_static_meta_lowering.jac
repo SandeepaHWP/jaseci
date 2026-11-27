@@ -18,7 +18,7 @@ order and none of the instance layout rules.
 import os;
 import from jaclang.compiler.driver.compile_options { CompileOptions }
 import from jaclang.compiler.driver.program { JacProgram }
-import from tests.support { JAC_ROOT, source_spelled, unit_symbol }
+import from tests.support { JAC_ROOT, source_spelled, unit_symbol, run_cases }
 
 glob FIXTURES = os.path.join(
          JAC_ROOT, "tests", "compiler", "backends", "native", "fixtures"
@@ -62,10 +62,30 @@ def diag_codes(entries: list[any]) -> list[any] {
 }
 
 
-test "class-level tuple metadata lowers natively" {
-    (prog, ir) = compile_native("static_tuple_meta.jac");
-    assert not prog.errors_had , f"{[str(e) for e in prog.errors_had]}";
-    assert ir is not None and ir.gen.llvm_ir , "no native IR for static tuple metadata";
+test "class-level tuple metadata lowers natively, and related cases" {
+    def check_class_level_tuple_metadata_lowers_natively {
+        (prog, ir) = compile_native("static_tuple_meta.jac");
+        assert not prog.errors_had , f"{[str(e) for e in prog.errors_had]}";
+        assert ir is not None and ir.gen.llvm_ir , "no native IR for static tuple metadata";
+    }
+
+    def check_a_typealias_glob_lowers_as_a_compile_time_declar {
+        (prog, ir) = compile_native("type_alias_glob.jac");
+        assert not prog.errors_had , f"{[str(e) for e in prog.errors_had]}";
+        assert ir is not None and ir.gen.llvm_ir , "no native IR for the alias module";
+    }
+    run_cases(
+        [
+            (
+                "class-level tuple metadata lowers natively",
+                check_class_level_tuple_metadata_lowers_natively
+            ),
+            (
+                "a TypeAlias glob lowers as a compile-time declaration",
+                check_a_typealias_glob_lowers_as_a_compile_time_declar
+            )
+        ]
+    );
 }
 
 
@@ -107,13 +127,6 @@ test "a defaulted static has does not order instance fields" {
 test "the static has ordering rule matches on the server lane" {
     errs = server_errors("static_meta_ordering.jac");
     assert not errs , f"server lane rejected a class-level constant: {errs}";
-}
-
-
-test "a TypeAlias glob lowers as a compile-time declaration" {
-    (prog, ir) = compile_native("type_alias_glob.jac");
-    assert not prog.errors_had , f"{[str(e) for e in prog.errors_had]}";
-    assert ir is not None and ir.gen.llvm_ir , "no native IR for the alias module";
 }
 
 

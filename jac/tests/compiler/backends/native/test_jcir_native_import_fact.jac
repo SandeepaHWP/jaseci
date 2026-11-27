@@ -31,7 +31,7 @@ import from jaclang.compiler.driver.boundary_classify {
     python_side_name_refs
 }
 import from jaclang.compiler.driver.program { JacProgram }
-import from tests.support { TESTS_DIR, jac_command }
+import from tests.support { TESTS_DIR, jac_command, run_cases }
 
 glob FIXTURES = os.path.join(
          TESTS_DIR, "compiler", "backends", "native", "fixtures"
@@ -102,43 +102,59 @@ def _compiled(fixture: str) -> tuple[any, ...] {
 }
 
 
-test "the driver stamps every import before the emitter reads it" {
-    (prog, mod) = _compiled(PINNED_IMPORTER);
-    imports = list(mod.get_all_sub_nodes(uni.Import));
-    assert imports , f"{PINNED_IMPORTER} has no imports to stamp";
-    stamped = [
-        imp
-        for imp in imports
-        if imp.native_only_drop
-    ];
-    assert stamped , (
-        "no import in a module that imports two natively pinned modules "
-        "carries the verdict; an unstamped tree makes the emitter drop "
-        "nothing, silently"
+test "the driver stamps every import before the emitter reads it, and related cases" {
+    def check_the_driver_stamps_every_import_before_the_emitte {
+        (prog, mod) = _compiled(PINNED_IMPORTER);
+
+        imports = list(mod.get_all_sub_nodes(uni.Import));
+        assert imports , f"{PINNED_IMPORTER} has no imports to stamp";
+        stamped = [
+            imp
+            for imp in imports
+            if imp.native_only_drop
+        ];
+        assert stamped , (
+            "no import in a module that imports two natively pinned modules "
+            "carries the verdict; an unstamped tree makes the emitter drop "
+            "nothing, silently"
+        );
+    }
+
+    def check_the_stamped_verdict_is_the_computation_it_replac {
+        (prog, mod) = _compiled(PINNED_IMPORTER);
+
+        py_refs = python_side_name_refs(mod);
+        for imp in mod.get_all_sub_nodes(uni.Import) {
+            target = native_only_import_target(imp, prog);
+            expected = (
+                bool(imp.clib_decls)
+                or (
+                    target is not None
+                    and (os.sep + "jaclang" + os.sep) not in os.path.abspath(target)
+                )
+            )
+                and not any(name in py_refs for name in import_bound_names(imp));
+            assert imp.native_only_drop == expected , (
+                f"the stamp and the retired computation disagree for the "
+                f"import at line {imp.loc.first_line}: stamped "
+                f"{imp.native_only_drop}, computed {expected}"
+            );
+        }
+    }
+    run_cases(
+        [
+            (
+                "the driver stamps every import before the emitter reads it",
+                check_the_driver_stamps_every_import_before_the_emitte
+            ),
+            (
+                "the stamped verdict is the computation it replaced",
+                check_the_stamped_verdict_is_the_computation_it_replac
+            )
+        ]
     );
 }
 
-
-test "the stamped verdict is the computation it replaced" {
-    (prog, mod) = _compiled(PINNED_IMPORTER);
-    py_refs = python_side_name_refs(mod);
-    for imp in mod.get_all_sub_nodes(uni.Import) {
-        target = native_only_import_target(imp, prog);
-        expected = (
-            bool(imp.clib_decls)
-            or (
-                target is not None
-                and (os.sep + "jaclang" + os.sep) not in os.path.abspath(target)
-            )
-        )
-            and not any(name in py_refs for name in import_bound_names(imp));
-        assert imp.native_only_drop == expected , (
-            f"the stamp and the retired computation disagree for the "
-            f"import at line {imp.loc.first_line}: stamped "
-            f"{imp.native_only_drop}, computed {expected}"
-        );
-    }
-}
 
 """Write the anchored-library project: `anchor_lib` declares a C import, so it
 is native-only; `anchor_user` is inferred native and names `Counter` in a field

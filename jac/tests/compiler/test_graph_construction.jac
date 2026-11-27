@@ -6,14 +6,52 @@ import jaclang.compiler.frontend.unitree as uni;
 import from jaclang.compiler.frontend.parser { parse as rd_parse }
 import from jaclang.compiler.passes.graph_lowering_pass { GraphLoweringPass }
 import from jaclang.compiler.tools.unparse_pass { UnparsePass }
+import from tests.support { run_cases }
 
-test "graph keyword supports escaped identifiers" {
-    (module, errors) = rd_parse(
-        "def `graph(x: int) -> int { return x; } with entry { y = `graph(1); f = graph { a ++> b; }; }",
-        "graph_keyword.jac"
+
+test "graph keyword supports escaped identifiers, and related cases" {
+    def check_graph_keyword_supports_escaped_identifiers {
+        (module, errors) = rd_parse(
+            "def `graph(x: int) -> int { return x; } with entry { y = `graph(1); f = graph { a ++> b; }; }",
+            "graph_keyword.jac"
+        );
+        assert not errors;
+        assert len(module.get_all_sub_nodes(uni.GraphExpr)) == 1;
+    }
+
+    def check_graph_expressions_work_directly_in_block_heads {
+        (module, errors) = rd_parse(
+            "with entry { if graph { a; }.root {} while graph { a; }.root { break; } for item in graph { a; }.nodes {} }",
+            "graph_block_head.jac"
+        );
+        assert not errors;
+        assert len(module.get_all_sub_nodes(uni.GraphExpr)) == 3;
+    }
+
+    def check_graph_expressions_nested_in_block_heads_remain_a {
+        (module, errors) = rd_parse(
+            "with entry { if check(graph { a ++> b; }) {} if (graph { a; }).root {} }",
+            "graph_nested_head.jac"
+        );
+        assert not errors;
+        assert len(module.get_all_sub_nodes(uni.GraphExpr)) == 2;
+    }
+    run_cases(
+        [
+            (
+                "graph keyword supports escaped identifiers",
+                check_graph_keyword_supports_escaped_identifiers
+            ),
+            (
+                "graph expressions work directly in block heads",
+                check_graph_expressions_work_directly_in_block_heads
+            ),
+            (
+                "graph expressions nested in block heads remain available",
+                check_graph_expressions_nested_in_block_heads_remain_a
+            )
+        ]
     );
-    assert not errors;
-    assert len(module.get_all_sub_nodes(uni.GraphExpr)) == 1;
 }
 
 test "graph preserves its surface for syntax tools" {
@@ -90,25 +128,39 @@ test "generated construction imports inherit their enclosing codespace" {
     }
 }
 
-test "graph roots retain their node type" {
-    import from jaclang.compiler.driver.program { JacProgram }
-    prog = JacProgram();
-    prog.compile(
-        "graph_root_type.jac",
-        use_str='node N { has value: int; } def wrong -> str { f = graph { N(1) ++> N(2); }; return f.root.value; }',
-        no_cgen=True
+test "graph roots retain their node type, and related cases" {
+    def check_graph_roots_retain_their_node_type {
+        import from jaclang.compiler.driver.program { JacProgram }
+        prog = JacProgram();
+        prog.compile(
+            "graph_root_type.jac",
+            use_str='node N { has value: int; } def wrong -> str { f = graph { N(1) ++> N(2); }; return f.root.value; }',
+            no_cgen=True
+        );
+        assert prog.errors_had , "returning an int as str must not disappear through an unknown fragment type";
+    }
+
+    def check_graph_refuses_non_node_roots {
+        import from jaclang.compiler.driver.program { JacProgram }
+        prog = JacProgram();
+        prog.compile(
+            "graph_bad_root.jac",
+            use_str="with entry { f = graph { 42; }; }",
+            no_cgen=True
+        );
+        assert prog.errors_had , "graph construction must require node operands";
+    }
+    run_cases(
+        [
+            (
+                "graph roots retain their node type",
+                check_graph_roots_retain_their_node_type
+            ),
+            ("graph refuses non-node roots", check_graph_refuses_non_node_roots)
+        ]
     );
-    assert prog.errors_had , "returning an int as str must not disappear through an unknown fragment type";
 }
 
-test "graph refuses non-node roots" {
-    import from jaclang.compiler.driver.program { JacProgram }
-    prog = JacProgram();
-    prog.compile(
-        "graph_bad_root.jac", use_str="with entry { f = graph { 42; }; }", no_cgen=True
-    );
-    assert prog.errors_had , "graph construction must require node operands";
-}
 
 test "parameterless lambda bodies validate bounded generic calls" {
     import from jaclang.compiler.driver.program { JacProgram }
@@ -177,22 +229,4 @@ test "graph is reserved in declarations" {
         (_, errors) = rd_parse(source, "graph_reserved.jac");
         assert errors;
     }
-}
-
-test "graph expressions work directly in block heads" {
-    (module, errors) = rd_parse(
-        "with entry { if graph { a; }.root {} while graph { a; }.root { break; } for item in graph { a; }.nodes {} }",
-        "graph_block_head.jac"
-    );
-    assert not errors;
-    assert len(module.get_all_sub_nodes(uni.GraphExpr)) == 3;
-}
-
-test "graph expressions nested in block heads remain available" {
-    (module, errors) = rd_parse(
-        "with entry { if check(graph { a ++> b; }) {} if (graph { a; }).root {} }",
-        "graph_nested_head.jac"
-    );
-    assert not errors;
-    assert len(module.get_all_sub_nodes(uni.GraphExpr)) == 2;
 }

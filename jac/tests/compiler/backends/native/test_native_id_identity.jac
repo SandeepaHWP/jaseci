@@ -27,7 +27,7 @@ AND unequal ones do not -- so the rule is pinned rather than half-observed.
 import ctypes;
 import os;
 import from jaclang.compiler.driver.program { JacProgram }
-import from tests.support { JAC_ROOT, native_address, native_force_opts }
+import from tests.support { JAC_ROOT, native_address, native_force_opts, run_cases }
 
 glob FIXTURES = os.path.join(
          JAC_ROOT, "tests", "compiler", "backends", "native", "fixtures"
@@ -60,21 +60,82 @@ def call(name: str) -> int {
 }
 
 
-test "aliases of one archetype share an id" {
-    assert call("id_alias") == 1 , "two names for one object gave different ids";
-}
+test "aliases of one archetype share an id, and related cases" {
+    def check_aliases_of_one_archetype_share_an_id {
+        assert call("id_alias") == 1 , "two names for one object gave different ids";
+    }
 
+    def check_an_archetype_s_id_is_stable_across_calls {
+        assert call("id_stable") == 1 , "id() gave a different answer the second time";
+    }
 
-test "distinct archetypes do not share an id" {
-    assert call("id_distinct") == 0 , (
-        "two separately constructed objects collided -- an identity set keyed "
-        "on id() would silently treat them as one"
+    def check_a_none_optional_keys_as_the_null_address {
+        # None is one object, so its id is one value, and the payload of a None
+        # optional is the null pointer. This is only sound because the unwrap is
+        # gated on a POINTER payload: widening it to any payload would make
+        # id(None) collide with id(0) for an `int | None`.
+        assert call("id_optional_none_is_zero") == 0 , "id(None) was not the null address";
+    }
+    run_cases(
+        [
+            (
+                "aliases of one archetype share an id",
+                check_aliases_of_one_archetype_share_an_id
+            ),
+            (
+                "an archetype's id is stable across calls",
+                check_an_archetype_s_id_is_stable_across_calls
+            ),
+            (
+                "a None optional keys as the null address",
+                check_a_none_optional_keys_as_the_null_address
+            )
+        ]
     );
 }
 
 
-test "an archetype's id is stable across calls" {
-    assert call("id_stable") == 1 , "id() gave a different answer the second time";
+test "distinct archetypes do not share an id, and related cases" {
+    def check_distinct_archetypes_do_not_share_an_id {
+        assert call("id_distinct") == 0 , (
+            "two separately constructed objects collided -- an identity set keyed "
+            "on id() would silently treat them as one"
+        );
+    }
+
+    def check_id_drives_a_visited_set_walk_to_termination {
+        assert call("id_bfs_visited") == 2 , (
+            f"the visited-set walk took {call('id_bfs_visited')} steps, expected 2 "
+            "-- this is the shape access_check_pass._is_subclass_of uses"
+        );
+    }
+
+    def check_an_optional_the_narrower_cannot_stabilise_still {
+        # A member read under a rebinding outer loop is exactly the shape flow
+        # narrowing declines to unwrap -- a callee could rebind the attribute --
+        # so the value arrives at id() still jacketed. The two links must still
+        # come out as two identities.
+        assert call("id_optional_loop_carried") == 2 , (
+            "loop-carried optional ids collapsed to "
+            f"{call('id_optional_loop_carried')}, expected 2"
+        );
+    }
+    run_cases(
+        [
+            (
+                "distinct archetypes do not share an id",
+                check_distinct_archetypes_do_not_share_an_id
+            ),
+            (
+                "id drives a visited-set walk to termination",
+                check_id_drives_a_visited_set_walk_to_termination
+            ),
+            (
+                "an optional the narrower cannot stabilise still keys",
+                check_an_optional_the_narrower_cannot_stabilise_still
+            )
+        ]
+    );
 }
 
 
@@ -85,60 +146,50 @@ test "id keys an identity set" {
 }
 
 
-test "id drives a visited-set walk to termination" {
-    assert call("id_bfs_visited") == 2 , (
-        f"the visited-set walk took {call('id_bfs_visited')} steps, expected 2 "
-        "-- this is the shape access_check_pass._is_subclass_of uses"
-    );
-}
+test "aliased strings and lists share an id, and related cases" {
+    def check_aliased_strings_and_lists_share_an_id {
+        assert call("id_str_alias") == 1 , "aliased strings gave different ids";
+        assert call("id_list_alias") == 1 , "aliased lists gave different ids";
+    }
 
+    def check_equal_ints_share_an_id_and_unequal_ints_do_not {
+        assert call("id_int_value") == 1 , "equal ints gave different ids";
+        assert call("id_int_differs") == 0 , "unequal ints collided";
+    }
 
-test "aliased strings and lists share an id" {
-    assert call("id_str_alias") == 1 , "aliased strings gave different ids";
-    assert call("id_list_alias") == 1 , "aliased lists gave different ids";
-}
+    def check_equal_floats_share_an_id_and_unequal_floats_do_n {
+        assert call("id_float_stable") == 1 , "equal floats gave different ids";
+        assert call("id_float_differs") == 0 , "unequal floats collided";
+    }
 
-
-test "equal ints share an id and unequal ints do not" {
-    assert call("id_int_value") == 1 , "equal ints gave different ids";
-    assert call("id_int_differs") == 0 , "unequal ints collided";
-}
-
-
-test "equal floats share an id and unequal floats do not" {
-    assert call("id_float_stable") == 1 , "equal floats gave different ids";
-    assert call("id_float_differs") == 0 , "unequal floats collided";
-}
-
-
-test "an optional-typed argument keys by the pointer inside it" {
-    # `Symbol | None` is the type every `NameAtom.sym` read carries, and it
-    # reaches the emitter wearing the `{i8 tag, T*}` optional jacket rather
-    # than as a bare pointer. Refusing that jacket is why the analysis
-    # cluster's id()-keyed stamps demoted; the identity has to be the
-    # payload's address, so an alias through two optionals compares equal
-    # and two distinct nodes do not.
-    assert call("id_optional_attr") == 1 , "aliased optionals gave different ids";
-    assert call("id_optional_attr_distinct") == 0 , "distinct optionals collided";
-}
-
-
-test "a None optional keys as the null address" {
-    # None is one object, so its id is one value, and the payload of a None
-    # optional is the null pointer. This is only sound because the unwrap is
-    # gated on a POINTER payload: widening it to any payload would make
-    # id(None) collide with id(0) for an `int | None`.
-    assert call("id_optional_none_is_zero") == 0 , "id(None) was not the null address";
-}
-
-
-test "an optional the narrower cannot stabilise still keys" {
-    # A member read under a rebinding outer loop is exactly the shape flow
-    # narrowing declines to unwrap -- a callee could rebind the attribute --
-    # so the value arrives at id() still jacketed. The two links must still
-    # come out as two identities.
-    assert call("id_optional_loop_carried") == 2 , (
-        "loop-carried optional ids collapsed to "
-        f"{call('id_optional_loop_carried')}, expected 2"
+    def check_an_optional_typed_argument_keys_by_the_pointer_i {
+        # `Symbol | None` is the type every `NameAtom.sym` read carries, and it
+        # reaches the emitter wearing the `{i8 tag, T*}` optional jacket rather
+        # than as a bare pointer. Refusing that jacket is why the analysis
+        # cluster's id()-keyed stamps demoted; the identity has to be the
+        # payload's address, so an alias through two optionals compares equal
+        # and two distinct nodes do not.
+        assert call("id_optional_attr") == 1 , "aliased optionals gave different ids";
+        assert call("id_optional_attr_distinct") == 0 , "distinct optionals collided";
+    }
+    run_cases(
+        [
+            (
+                "aliased strings and lists share an id",
+                check_aliased_strings_and_lists_share_an_id
+            ),
+            (
+                "equal ints share an id and unequal ints do not",
+                check_equal_ints_share_an_id_and_unequal_ints_do_not
+            ),
+            (
+                "equal floats share an id and unequal floats do not",
+                check_equal_floats_share_an_id_and_unequal_floats_do_n
+            ),
+            (
+                "an optional-typed argument keys by the pointer inside it",
+                check_an_optional_typed_argument_keys_by_the_pointer_i
+            )
+        ]
     );
 }

@@ -22,7 +22,8 @@ import from tests.support {
     TESTS_DIR,
     names_function,
     native_address,
-    native_force_opts
+    native_force_opts,
+    run_cases
 }
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.runtime.runtime { JacRuntime }
@@ -132,60 +133,82 @@ def _assert_congruent(eng: any, sv: object, names: list[str]) {
 }
 
 
-test "ternary congruence: every conditional shape matches the sv result" {
-    (eng, _) = _compile(FIXTURE);
-    _assert_congruent(eng, _sv_module(), TERNARY_FNS);
-}
+test "ternary: a genuinely mixed pointer/i64 pair round-trips its payload, and related cases" {
+    def check_ternary_a_genuinely_mixed_pointer_i64_pair_round {
+        (eng, _) = _compile(FIXTURE);
 
+        mixed_rep = _get(eng, "mixed_rep");
+        call_arg = _get(eng, "call_arg");
+        nested = _get(eng, "nested");
 
-test "declared union congruence: param, return and global match the sv result" {
-    (eng, _) = _compile(FIXTURE);
-    _assert_congruent(eng, _sv_module(), DECLARED_UNION_FNS);
-}
+        # The int arm arrives as itself; the list arm as the negated length, so
+        # a boxed value that lost its payload or its tag cannot pass.
+        assert mixed_rep(1) == -3 , "list arm of a pointer/i64 ternary";
+        assert mixed_rep(0) == 7 , "int arm of a pointer/i64 ternary";
+        assert call_arg(1) == -4 , "list arm of a ternary passed as a call argument";
+        assert call_arg(0) == 9 , "int arm of a ternary passed as a call argument";
+        assert nested(2) == -3 , "outer arm of a nested ternary";
+        assert nested(1) == -2 , "inner pointer arm of a nested ternary";
+        assert nested(0) == 5 , "inner int arm of a nested ternary";
+    }
 
+    def check_ternary_an_all_pointer_pair_with_a_closure_arm_s {
+        (eng, _) = _compile(FIXTURE);
 
-test "ternary: a genuinely mixed pointer/i64 pair round-trips its payload" {
-    (eng, _) = _compile(FIXTURE);
-    mixed_rep = _get(eng, "mixed_rep");
-    call_arg = _get(eng, "call_arg");
-    nested = _get(eng, "nested");
+        closure_arm = _get(eng, "closure_arm");
+        assert closure_arm(1) == 15 , "capturing-closure arm (5 + 10)";
+        assert closure_arm(0) == 20 , "bare-function arm (5 * 4)";
+    }
 
-    # The int arm arrives as itself; the list arm as the negated length, so
-    # a boxed value that lost its payload or its tag cannot pass.
-    assert mixed_rep(1) == -3 , "list arm of a pointer/i64 ternary";
-    assert mixed_rep(0) == 7 , "int arm of a pointer/i64 ternary";
-    assert call_arg(1) == -4 , "list arm of a ternary passed as a call argument";
-    assert call_arg(0) == 9 , "int arm of a ternary passed as a call argument";
-    assert nested(2) == -3 , "outer arm of a nested ternary";
-    assert nested(1) == -2 , "inner pointer arm of a nested ternary";
-    assert nested(0) == 5 , "inner int arm of a nested ternary";
-}
+    def check_declared_union_mixed_members_round_trip_in_param {
+        (eng, _) = _compile(FIXTURE);
 
+        use_u_param = _get(eng, "use_u_param");
+        use_u_return = _get(eng, "use_u_return");
+        use_u_glob = _get(eng, "use_u_glob");
 
-test "ternary: an all-pointer pair with a closure arm still wraps the closure" {
-    # A stored closure ({fn, env}) and a bare named function are both
-    # pointers, so the rule keeps the closure layout and the bare function
-    # has to be wrapped into it. Short-circuiting that to a raw bitcast
-    # segfaults the moment the result is called.
-    (eng, _) = _compile(FIXTURE);
-    closure_arm = _get(eng, "closure_arm");
-    assert closure_arm(1) == 15 , "capturing-closure arm (5 + 10)";
-    assert closure_arm(0) == 20 , "bare-function arm (5 * 4)";
-}
+        assert use_u_param(1) == 7 , "int member through an `int | str` parameter";
+        assert use_u_param(0) == -4 , "str member through an `int | str` parameter";
+        assert use_u_return(1) == 5 , "int member out of an `int | str` return";
+        assert use_u_return(0) == -3 , "str member out of an `int | str` return";
+        assert use_u_glob(0) == 11 , "int member in an `int | str` global";
+        assert use_u_glob(1) == -5 , "str member in an `int | str` global";
+    }
+    def check_ternary_congruence_every_conditional_shape_match {
+        (eng, _) = _compile(FIXTURE);
 
+        _assert_congruent(eng, _sv_module(), TERNARY_FNS);
+    }
 
-test "declared union: mixed members round-trip in param, return and global" {
-    (eng, _) = _compile(FIXTURE);
-    use_u_param = _get(eng, "use_u_param");
-    use_u_return = _get(eng, "use_u_return");
-    use_u_glob = _get(eng, "use_u_glob");
+    def check_declared_union_congruence_param_return_and_globa {
+        (eng, _) = _compile(FIXTURE);
 
-    assert use_u_param(1) == 7 , "int member through an `int | str` parameter";
-    assert use_u_param(0) == -4 , "str member through an `int | str` parameter";
-    assert use_u_return(1) == 5 , "int member out of an `int | str` return";
-    assert use_u_return(0) == -3 , "str member out of an `int | str` return";
-    assert use_u_glob(0) == 11 , "int member in an `int | str` global";
-    assert use_u_glob(1) == -5 , "str member in an `int | str` global";
+        _assert_congruent(eng, _sv_module(), DECLARED_UNION_FNS);
+    }
+    run_cases(
+        [
+            (
+                "ternary: a genuinely mixed pointer/i64 pair round-trips its payload",
+                check_ternary_a_genuinely_mixed_pointer_i64_pair_round
+            ),
+            (
+                "ternary: an all-pointer pair with a closure arm still wraps the closure",
+                check_ternary_an_all_pointer_pair_with_a_closure_arm_s
+            ),
+            (
+                "declared union: mixed members round-trip in param, return and global",
+                check_declared_union_mixed_members_round_trip_in_param
+            ),
+            (
+                "ternary congruence: every conditional shape matches the sv result",
+                check_ternary_congruence_every_conditional_shape_match
+            ),
+            (
+                "declared union congruence: param, return and global match the sv result",
+                check_declared_union_congruence_param_return_and_globa
+            )
+        ]
+    );
 }
 
 

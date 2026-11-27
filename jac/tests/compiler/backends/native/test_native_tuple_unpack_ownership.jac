@@ -14,7 +14,7 @@ of reasoning about which retain the codegen happened to emit.
 
 import ctypes;
 import os;
-import from tests.support { TESTS_DIR, native_address, compile_native_ir }
+import from tests.support { TESTS_DIR, native_address, compile_native_ir, run_cases }
 import jaclang;
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.driver.compile_options { CompileOptions }
@@ -65,70 +65,105 @@ def check(eng: any, name: str, want: int, allocs: int) {
     );
 }
 
-# --- Value tuples: the target's previous contents must be released ---
-test "value-tuple unpack destroys what each target slot held" {
-    # `(p, q) = (ra, rb)` binds two live locals, so both are borrows that owe
-    # a retain, and the two `Res` that p and q already held must be released.
-    # Gating the old-value release on the incoming tuple being boxed leaks
-    # both originals.
-    (eng, _) = compile_fixture();
-    check(eng, "unpack_plain_into_plain", 34, 4);
+test "value-tuple unpack destroys what each target slot held, and related cases" {
+    # --- Value tuples: the target's previous contents must be released ---
+    def check_value_tuple_unpack_destroys_what_each_target_slo {
+        (eng, _) = compile_fixture();
+
+        check(eng, "unpack_plain_into_plain", 34, 4);
+    }
+
+    def check_value_tuple_unpack_moves_elements_it_already_own {
+        (eng, _) = compile_fixture();
+
+        check(eng, "unpack_fresh_into_plain", 34, 4);
+    }
+
+    def check_optional_elements_unpacked_into_plain_slots_cost {
+        (eng, _) = compile_fixture();
+
+        check(eng, "unpack_optional_into_plain", 34, 4);
+    }
+
+    # --- Boxed tuples: fields are borrowed from a box that owns them ---
+    def check_boxed_tuple_unpacked_into_optional_slots_destroy {
+        (eng, _) = compile_fixture();
+
+        check(eng, "unpack_boxed_into_optional", 34, 2);
+    }
+
+    def check_boxed_tuple_unpacked_into_plain_slots_destroys_t {
+        (eng, _) = compile_fixture();
+
+        check(eng, "unpack_boxed_into_plain", 34, 4);
+    }
+
+    def check_boxed_tuple_unpacked_into_fresh_names_destroys_b {
+        (eng, _) = compile_fixture();
+
+        check(eng, "unpack_boxed_into_fresh", 34, 2);
+    }
+
+    # --- Single field binds: a box outliving the read is a borrow, not a move ---
+    def check_one_field_bound_into_an_optional_local_leaves_no {
+        (eng, _) = compile_fixture();
+
+        check(eng, "index_into_optional", 34, 2);
+    }
+
+    def check_one_field_bound_into_a_plain_local_releases_what {
+        (eng, _) = compile_fixture();
+
+        check(eng, "index_into_plain", 34, 3);
+    }
+
+    def check_the_same_field_bound_twice_is_destroyed_exactly {
+        (eng, _) = compile_fixture();
+
+        check(eng, "index_twice_into_optional", 33, 2);
+    }
+    run_cases(
+        [
+            (
+                "value-tuple unpack destroys what each target slot held",
+                check_value_tuple_unpack_destroys_what_each_target_slo
+            ),
+            (
+                "value-tuple unpack moves elements it already owns",
+                check_value_tuple_unpack_moves_elements_it_already_own
+            ),
+            (
+                "optional elements unpacked into plain slots cost no extra reference",
+                check_optional_elements_unpacked_into_plain_slots_cost
+            ),
+            (
+                "boxed tuple unpacked into optional slots destroys each payload once",
+                check_boxed_tuple_unpacked_into_optional_slots_destroy
+            ),
+            (
+                "boxed tuple unpacked into plain slots destroys targets and fields",
+                check_boxed_tuple_unpacked_into_plain_slots_destroys_t
+            ),
+            (
+                "boxed tuple unpacked into fresh names destroys both fields",
+                check_boxed_tuple_unpacked_into_fresh_names_destroys_b
+            ),
+            (
+                "one field bound into an optional local leaves nothing alive",
+                check_one_field_bound_into_an_optional_local_leaves_no
+            ),
+            (
+                "one field bound into a plain local releases what the slot held",
+                check_one_field_bound_into_a_plain_local_releases_what
+            ),
+            (
+                "the same field bound twice is destroyed exactly once",
+                check_the_same_field_bound_twice_is_destroyed_exactly
+            )
+        ]
+    );
 }
 
-test "value-tuple unpack moves elements it already owns" {
-    # `(p, q) = (Res(a), Res(b))` binds two temporaries nothing else holds.
-    # Retaining them the way a borrowed element is retained strands the
-    # +1 each was created with.
-    (eng, _) = compile_fixture();
-    check(eng, "unpack_fresh_into_plain", 34, 4);
-}
-
-test "optional elements unpacked into plain slots cost no extra reference" {
-    # The elements arrive as `Res | None` payloads and the slots are plain
-    # pointers, so the coercion crosses representations on the way in. The
-    # count must match the all-plain shape above.
-    (eng, _) = compile_fixture();
-    check(eng, "unpack_optional_into_plain", 34, 4);
-}
-
-# --- Boxed tuples: fields are borrowed from a box that owns them ---
-test "boxed tuple unpacked into optional slots destroys each payload once" {
-    # Neither target slot is a raw pointer, so the retain and the old-value
-    # release have to follow the coerced optional payload rather than the
-    # slot's representation.
-    (eng, _) = compile_fixture();
-    check(eng, "unpack_boxed_into_optional", 34, 2);
-}
-
-test "boxed tuple unpacked into plain slots destroys targets and fields" {
-    (eng, _) = compile_fixture();
-    check(eng, "unpack_boxed_into_plain", 34, 4);
-}
-
-test "boxed tuple unpacked into fresh names destroys both fields" {
-    (eng, _) = compile_fixture();
-    check(eng, "unpack_boxed_into_fresh", 34, 2);
-}
-
-# --- Single field binds: a box outliving the read is a borrow, not a move ---
-test "one field bound into an optional local leaves nothing alive" {
-    # `x = pair[0]` does not consume `pair`, so the bind owes a retain and
-    # the field the bind never touched still has to die with the box.
-    (eng, _) = compile_fixture();
-    check(eng, "index_into_optional", 34, 2);
-}
-
-test "one field bound into a plain local releases what the slot held" {
-    (eng, _) = compile_fixture();
-    check(eng, "index_into_plain", 34, 3);
-}
-
-test "the same field bound twice is destroyed exactly once" {
-    # Two binds of `pair[0]` must take two references. Treating a field read
-    # as a move of the box's reference double-frees here.
-    (eng, _) = compile_fixture();
-    check(eng, "index_twice_into_optional", 33, 2);
-}
 
 # --- The box destructor is what makes the borrows balance ---
 test "a boxed tuple carries a destructor that releases its fields" {

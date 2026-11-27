@@ -27,7 +27,8 @@ import from tests.support {
     TESTS_DIR,
     native_address,
     native_force_opts,
-    native_str_func
+    native_str_func,
+    run_cases
 }
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.runtime.runtime { JacRuntime }
@@ -117,26 +118,95 @@ test "a read through an erased generic slot lowers rather than demoting" {
 }
 
 
-test "a field off the type argument arrives as itself" {
-    eng = _compile(FIXTURE);
-    f = _get(eng, "direct_num");
-    assert f(2) == 42 , "the Leaf behind the erased slot must keep its num";
-    assert f(0) == 40 , "the same read with a different payload";
-}
+test "a field off the type argument arrives as itself, and related cases" {
+    def check_a_field_off_the_type_argument_arrives_as_itself {
+        eng = _compile(FIXTURE);
 
+        f = _get(eng, "direct_num");
+        assert f(2) == 42 , "the Leaf behind the erased slot must keep its num";
+        assert f(0) == 40 , "the same read with a different payload";
+    }
 
-test "the slot after the erased one keeps its own offset" {
-    f = _get(_compile(FIXTURE), "direct_kind");
-    assert f(0) == 7 , (
-        "an erased slot sized wrongly would shift `kind` and return the "
-        "pointer's low word instead of 7"
+    def check_the_same_read_off_self_inside_a_method {
+        eng = _compile(FIXTURE);
+
+        f = _get(eng, "method_num");
+        g = _get(eng, "method_name_len");
+        assert f(1) == 21 , "`self.one.slot.num` is the sealed parser's own shape";
+        assert f(0) == -1 , "the unset option inside the method";
+        assert g(1) == 6 , "'pqrstu' through `self.one.slot.name`";
+    }
+
+    def check_a_generic_through_a_return_type_and_through_a_pa {
+        eng = _compile(FIXTURE);
+
+        r = _get(eng, "returned_num");
+        p = _get(eng, "param_num");
+        assert r(0) == 141 , "70 + 71: the returned cell's slot and its kind";
+        assert p(0) == 86 , "80 + 6 through the annotated parameter";
+    }
+    def check_every_erased_slot_read_agrees_with_the_sv_result {
+        eng = _compile(FIXTURE);
+
+        sv = _sv_module(FIXTURE);
+        for name in ALL_FNS {
+            na_fn = _get(eng, name);
+            sv_fn = getattr(sv, name);
+            for flag in FLAGS {
+                assert na_fn(flag) == sv_fn(flag) , (
+                    f"{name}({flag}): native {na_fn(flag)} != sv {sv_fn(flag)}"
+                );
+            }
+        }
+    }
+    run_cases(
+        [
+            (
+                "a field off the type argument arrives as itself",
+                check_a_field_off_the_type_argument_arrives_as_itself
+            ),
+            (
+                "the same read off `self` inside a method",
+                check_the_same_read_off_self_inside_a_method
+            ),
+            (
+                "a generic through a return type and through a parameter",
+                check_a_generic_through_a_return_type_and_through_a_pa
+            ),
+            (
+                "every erased-slot read agrees with the sv result",
+                check_every_erased_slot_read_agrees_with_the_sv_result
+            )
+        ]
     );
 }
 
 
-test "a str field through the erased slot reads its whole payload" {
-    f = _get(_compile(FIXTURE), "direct_name_len");
-    assert f(0) == 5 , "'abcde' behind the erased slot";
+test "the slot after the erased one keeps its own offset, and related cases" {
+    def check_the_slot_after_the_erased_one_keeps_its_own_offs {
+        f = _get(_compile(FIXTURE), "direct_kind");
+        assert f(0) == 7 , (
+            "an erased slot sized wrongly would shift `kind` and return the "
+            "pointer's low word instead of 7"
+        );
+    }
+
+    def check_a_str_field_through_the_erased_slot_reads_its_wh {
+        f = _get(_compile(FIXTURE), "direct_name_len");
+        assert f(0) == 5 , "'abcde' behind the erased slot";
+    }
+    run_cases(
+        [
+            (
+                "the slot after the erased one keeps its own offset",
+                check_the_slot_after_the_erased_one_keeps_its_own_offs
+            ),
+            (
+                "a str field through the erased slot reads its whole payload",
+                check_a_str_field_through_the_erased_slot_reads_its_wh
+            )
+        ]
+    );
 }
 
 
@@ -147,25 +217,35 @@ test "an option holding a generic carries its type argument to the read" {
 }
 
 
-test "the same read off `self` inside a method" {
-    eng = _compile(FIXTURE);
-    f = _get(eng, "method_num");
-    g = _get(eng, "method_name_len");
-    assert f(1) == 21 , "`self.one.slot.num` is the sealed parser's own shape";
-    assert f(0) == -1 , "the unset option inside the method";
-    assert g(1) == 6 , "'pqrstu' through `self.one.slot.name`";
-}
+test "a `{ getter; }` accessor reads through the erased slot, and related cases" {
+    def check_a_getter_accessor_reads_through_the_erased_slot {
+        # The waived shape itself: `AstAccessNode.access_type` is a property
+        # whose body compares a str reached through `SubTag[Token]` and answers
+        # with an enum member, and a property lowers through the accessor call
+        # path rather than the method one.
+        f = _get(_compile(FIXTURE), "rank_ord");
+        assert f(1) == 3 , "'hi' behind the erased slot selects HIGH";
+        assert f(2) == 2 , "'mid' selects MID";
+        assert f(0) == 1 , "an unset option falls through to LOW";
+    }
 
-
-test "a `{ getter; }` accessor reads through the erased slot" {
-    # The waived shape itself: `AstAccessNode.access_type` is a property
-    # whose body compares a str reached through `SubTag[Token]` and answers
-    # with an enum member, and a property lowers through the accessor call
-    # path rather than the method one.
-    f = _get(_compile(FIXTURE), "rank_ord");
-    assert f(1) == 3 , "'hi' behind the erased slot selects HIGH";
-    assert f(2) == 2 , "'mid' selects MID";
-    assert f(0) == 1 , "an unset option falls through to LOW";
+    def check_a_store_into_the_erased_slot_is_what_the_next_re {
+        f = _get(_compile(FIXTURE), "store_num");
+        assert f(1) == 61 , "the stored Leaf, not the constructed one";
+        assert f(0) == 1 , "no store: the constructed Leaf";
+    }
+    run_cases(
+        [
+            (
+                "a `{ getter; }` accessor reads through the erased slot",
+                check_a_getter_accessor_reads_through_the_erased_slot
+            ),
+            (
+                "a store into the erased slot is what the next read sees",
+                check_a_store_into_the_erased_slot_is_what_the_next_re
+            )
+        ]
+    );
 }
 
 
@@ -174,37 +254,6 @@ test "a union arm narrowed to the generic reads through the erased slot" {
     assert f(1) == 31 , "the Cell arm's payload through the erased slot";
     assert f(2) == 55 , "the non-generic arm must not be read at Cell's offset";
     assert f(0) == -1 , "the unset union";
-}
-
-
-test "a store into the erased slot is what the next read sees" {
-    f = _get(_compile(FIXTURE), "store_num");
-    assert f(1) == 61 , "the stored Leaf, not the constructed one";
-    assert f(0) == 1 , "no store: the constructed Leaf";
-}
-
-
-test "a generic through a return type and through a parameter" {
-    eng = _compile(FIXTURE);
-    r = _get(eng, "returned_num");
-    p = _get(eng, "param_num");
-    assert r(0) == 141 , "70 + 71: the returned cell's slot and its kind";
-    assert p(0) == 86 , "80 + 6 through the annotated parameter";
-}
-
-
-test "every erased-slot read agrees with the sv result" {
-    eng = _compile(FIXTURE);
-    sv = _sv_module(FIXTURE);
-    for name in ALL_FNS {
-        na_fn = _get(eng, name);
-        sv_fn = getattr(sv, name);
-        for flag in FLAGS {
-            assert na_fn(flag) == sv_fn(flag) , (
-                f"{name}({flag}): native {na_fn(flag)} != sv {sv_fn(flag)}"
-            );
-        }
-    }
 }
 
 

@@ -22,7 +22,8 @@ import from tests.support {
     compile_native,
     native_address,
     native_force_opts,
-    native_str_func
+    native_str_func,
+    run_cases
 }
 
 import jaclang.compiler.frontend.unitree as uni;
@@ -60,29 +61,45 @@ test "str dunders reading through a trailer are not demoted to Python" {
     }
 }
 
-test "class-form enum members and trailer dunders match the sv values" {
-    (eng, _) = compile_native("dunder_str_trailer.jac");
-    sv = sv_module("dunder_str_trailer");
-    for name in [
-        "alpha_value",
-        "alpha_str",
-        "beta_render",
-        "outer_str",
-        "indexed_str"
-    ] {
-        na_out = native_str_func(eng, name, ctypes.c_char_p)();
-        sv_out = getattr(sv, name)().encode("utf8");
-        assert na_out == sv_out , f"{name}: native {na_out!r} != sv {sv_out!r}";
-    }
-}
+test "dunder_str_trailer.jac cases" {
+    def check_class_form_enum_members_and_trailer_dunders_matc {
+        (eng, _) = compile_native("dunder_str_trailer.jac");
+        sv = sv_module("dunder_str_trailer");
 
-test "a StrEnum member compares equal to its text on both backends" {
-    (eng, _) = compile_native("dunder_str_trailer.jac");
-    sv = sv_module("dunder_str_trailer");
-    addr = native_address(eng, "alpha_is_text");
-    assert addr != 0 , "alpha_is_text not found in the JIT engine";
-    na_out = ctypes.CFUNCTYPE(ctypes.c_int64)(addr)();
-    assert na_out == sv.alpha_is_text() , (
-        f"alpha_is_text: native {na_out} != sv {sv.alpha_is_text()}"
+        for name in [
+            "alpha_value",
+            "alpha_str",
+            "beta_render",
+            "outer_str",
+            "indexed_str"
+        ] {
+            na_out = native_str_func(eng, name, ctypes.c_char_p)();
+            sv_out = getattr(sv, name)().encode("utf8");
+            assert na_out == sv_out , f"{name}: native {na_out!r} != sv {sv_out!r}";
+        }
+    }
+
+    def check_a_strenum_member_compares_equal_to_its_text_on_b {
+        (eng, _) = compile_native("dunder_str_trailer.jac");
+        sv = sv_module("dunder_str_trailer");
+
+        addr = native_address(eng, "alpha_is_text");
+        assert addr != 0 , "alpha_is_text not found in the JIT engine";
+        na_out = ctypes.CFUNCTYPE(ctypes.c_int64)(addr)();
+        assert na_out == sv.alpha_is_text() , (
+            f"alpha_is_text: native {na_out} != sv {sv.alpha_is_text()}"
+        );
+    }
+    run_cases(
+        [
+            (
+                "class-form enum members and trailer dunders match the sv values",
+                check_class_form_enum_members_and_trailer_dunders_matc
+            ),
+            (
+                "a StrEnum member compares equal to its text on both backends",
+                check_a_strenum_member_compares_equal_to_its_text_on_b
+            )
+        ]
     );
 }

@@ -47,7 +47,8 @@ import from tests.support {
     jac_command,
     native_address,
     native_force_opts,
-    source_spelled
+    source_spelled,
+    run_cases
 }
 import jaclang;
 import from jaclang.compiler.driver.program { JacProgram }
@@ -1799,68 +1800,87 @@ test "chess compiles" {
     assert ir.gen.llvm_ir is not None;
 }
 
-test "chess opposite color" {
-    (eng, _ir) = compile_native("chess.jac");
-    opp = get_func(eng, "opposite_color", ctypes.c_int64, ctypes.c_int64);
-    assert opp(0) == 1;  # WHITE -> BLACK
-    assert opp(1) == 0;  # BLACK -> WHITE
-}
 
-test "chess create piece" {
-    (eng, _ir) = compile_native("chess.jac");
-    addr = native_address(eng, unit_sym(_ir, "create_piece"));
-    assert addr != 0;
-}
+test "chess.jac cases" {
+    def check_chess_create_piece {
+        (eng, _ir) = compile_native("chess.jac");
 
-test "chess has entry" {
-    (eng, _ir) = compile_native("chess.jac");
-    addr = native_address(eng, "jac_entry");
-    assert addr != 0;
-}
-
-test "chess all piece types" {
-    (eng, _ir) = compile_native("chess.jac");
-    # Verify all piece class methods are callable.
-    piece_types = ["Pawn", "Knight", "Bishop", "Rook", "Queen", "King"];
-    for piece_type in piece_types {
-        addr = native_address(eng, unit_sym(_ir, f"{piece_type}.get_symbol"));
-        assert addr != 0 , f"{piece_type}.get_symbol not found";
+        addr = native_address(eng, unit_sym(_ir, "create_piece"));
+        assert addr != 0;
     }
+
+    def check_chess_has_entry {
+        (eng, _ir) = compile_native("chess.jac");
+
+        addr = native_address(eng, "jac_entry");
+        assert addr != 0;
+    }
+
+    def check_chess_all_piece_types {
+        (eng, _ir) = compile_native("chess.jac");
+
+        # Verify all piece class methods are callable.
+        piece_types = ["Pawn", "Knight", "Bishop", "Rook", "Queen", "King"];
+        for piece_type in piece_types {
+            addr = native_address(eng, unit_sym(_ir, f"{piece_type}.get_symbol"));
+            assert addr != 0 , f"{piece_type}.get_symbol not found";
+        }
+    }
+
+    def check_chess_board_methods {
+        (eng, _ir) = compile_native("chess.jac");
+
+        # Verify Board methods are callable.
+        methods = [
+            "Board.is_valid_pos",
+            "Board.get_piece",
+            "Board.set_piece",
+            "Board.make_move",
+            "Board.undo_move",
+            "Board.display"
+        ];
+        for method in methods {
+            addr = native_address(eng, unit_sym(_ir, method));
+            assert addr != 0 , f"{method} not found";
+        }
+    }
+
+    def check_chess_game_methods {
+        (eng, _ir) = compile_native("chess.jac");
+
+        # Verify Game methods are callable.
+        methods = [
+            "Game.find_king",
+            "Game.is_in_check",
+            "Game.get_legal_moves",
+            "Game.is_checkmate",
+            "Game.is_stalemate",
+            "Game.parse_input"
+        ];
+        for method in methods {
+            addr = native_address(eng, unit_sym(_ir, method));
+            assert addr != 0 , f"{method} not found";
+        }
+    }
+    def check_chess_opposite_color {
+        (eng, _ir) = compile_native("chess.jac");
+
+        opp = get_func(eng, "opposite_color", ctypes.c_int64, ctypes.c_int64);
+        assert opp(0) == 1;  # WHITE -> BLACK
+        assert opp(1) == 0;  # BLACK -> WHITE
+    }
+    run_cases(
+        [
+            ("chess create piece", check_chess_create_piece),
+            ("chess has entry", check_chess_has_entry),
+            ("chess all piece types", check_chess_all_piece_types),
+            ("chess board methods", check_chess_board_methods),
+            ("chess game methods", check_chess_game_methods),
+            ("chess opposite color", check_chess_opposite_color)
+        ]
+    );
 }
 
-test "chess board methods" {
-    (eng, _ir) = compile_native("chess.jac");
-    # Verify Board methods are callable.
-    methods = [
-        "Board.is_valid_pos",
-        "Board.get_piece",
-        "Board.set_piece",
-        "Board.make_move",
-        "Board.undo_move",
-        "Board.display"
-    ];
-    for method in methods {
-        addr = native_address(eng, unit_sym(_ir, method));
-        assert addr != 0 , f"{method} not found";
-    }
-}
-
-test "chess game methods" {
-    (eng, _ir) = compile_native("chess.jac");
-    # Verify Game methods are callable.
-    methods = [
-        "Game.find_king",
-        "Game.is_in_check",
-        "Game.get_legal_moves",
-        "Game.is_checkmate",
-        "Game.is_stalemate",
-        "Game.parse_input"
-    ];
-    for method in methods {
-        addr = native_address(eng, unit_sym(_ir, method));
-        assert addr != 0 , f"{method} not found";
-    }
-}
 
 test "chess play random moves stress" {
     # Stress test: play 20 random moves then quit.
@@ -1999,259 +2019,355 @@ test "isinstance_user" {
     _isinstance_user__isinstance_user_no_vtable_operand_is_clean_false(_eng, _ir);
 }
 
-test "dicts dict new empty" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    f = get_func(eng, "dict_new_empty", ctypes.c_int64);
-    assert f() == 0;
+test "dicts_sets.jac cases" {
+    def check_dicts_dict_new_empty {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        f = get_func(eng, "dict_new_empty", ctypes.c_int64);
+        assert f() == 0;
+    }
+
+    def check_dicts_dict_literal_len {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        f = get_func(eng, "dict_literal_len", ctypes.c_int64);
+        assert f() == 3;
+    }
+
+    def check_dicts_dict_get_value {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        f = get_func(eng, "dict_get_value", ctypes.c_int64);
+        assert f() == 200;
+    }
+
+    def check_dicts_dict_set_value {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        f = get_func(eng, "dict_set_value", ctypes.c_int64);
+        assert f() == 20;
+    }
+
+    def check_dicts_dict_update_value {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        f = get_func(eng, "dict_update_value", ctypes.c_int64);
+        assert f() == 99;
+    }
+
+    def check_dicts_dict_len_after_set {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        f = get_func(eng, "dict_len_after_set", ctypes.c_int64);
+        assert f() == 3;
+    }
+
+    def check_dicts_dict_contains_true {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        f = get_func(eng, "dict_contains_true", ctypes.c_int64);
+        assert f() == 1;
+    }
+
+    def check_dicts_dict_contains_false {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        f = get_func(eng, "dict_contains_false", ctypes.c_int64);
+        assert f() == 0;
+    }
+
+    def check_dicts_dict_string_keys {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        f = get_func(eng, "dict_string_keys", ctypes.c_int64);
+        assert f() == 2;
+    }
+
+    def check_dicts_dict_string_values {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        f = get_func(eng, "dict_string_values", ctypes.c_char_p);
+        result = f();
+        assert result == b"two";
+    }
+
+    def check_dicts_dict_sum_values {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        f = get_func(eng, "dict_sum_values", ctypes.c_int64);
+        assert f() == 100;
+    }
+
+    def check_dicts_dict_overwrite {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        f = get_func(eng, "dict_overwrite", ctypes.c_int64);
+        assert f() == 30;
+    }
+
+    def check_dicts_dict_multiple_types {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        f = get_func(eng, "dict_multiple_types", ctypes.c_int64);
+        assert f() == 300;
+    }
+
+    def check_dicts_dict_get_first {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        f = get_func(eng, "dict_get_first", ctypes.c_int64);
+        assert f() == 100;
+    }
+
+    def check_dicts_dict_get_third {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        f = get_func(eng, "dict_get_third", ctypes.c_int64);
+        assert f() == 300;
+    }
+
+    def check_dicts_dict_set_then_get {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        f = get_func(eng, "dict_set_then_get", ctypes.c_int64);
+        assert f() == 1500;
+    }
+
+    def check_dicts_global_dict_get {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        # Need to call jac_entry first to initialize globals
+        entry_fn = get_func(eng, "jac_entry", None);
+        entry_fn();
+        f = get_func(eng, "global_dict_get", ctypes.c_int64);
+        assert f() == 200;
+    }
+
+    def check_dicts_global_dict_len {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        entry_fn = get_func(eng, "jac_entry", None);
+        entry_fn();
+        f = get_func(eng, "global_dict_len", ctypes.c_int64);
+        assert f() == 3;
+    }
+
+    def check_sets_set_new_empty {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        f = get_func(eng, "set_new_empty", ctypes.c_int64);
+        assert f() == 0;
+    }
+
+    def check_sets_set_literal_len {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        f = get_func(eng, "set_literal_len", ctypes.c_int64);
+        assert f() == 5;
+    }
+
+    def check_sets_set_add_element {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        f = get_func(eng, "set_add_element", ctypes.c_int64);
+        assert f() == 4;
+    }
+
+    def check_sets_set_contains_true {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        f = get_func(eng, "set_contains_true", ctypes.c_int64);
+        assert f() == 1;
+    }
+
+    def check_sets_set_contains_false {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        f = get_func(eng, "set_contains_false", ctypes.c_int64);
+        assert f() == 0;
+    }
+
+    def check_sets_set_string_elements {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        f = get_func(eng, "set_string_elements", ctypes.c_int64);
+        assert f() == 1;
+    }
+
+    def check_sets_global_set_contains {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        entry_fn = get_func(eng, "jac_entry", None);
+        entry_fn();
+        f = get_func(eng, "global_set_contains", ctypes.c_int64);
+        assert f() == 1;
+    }
+
+    def check_sets_global_set_len {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        entry_fn = get_func(eng, "jac_entry", None);
+        entry_fn();
+        f = get_func(eng, "global_set_len", ctypes.c_int64);
+        assert f() == 5;
+    }
+
+    def check_dicts_items_iteration_sum {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        f = get_func(eng, "dict_items_iter_sum", ctypes.c_int64);
+        assert f() == 60;
+    }
+
+    def check_dicts_empty_glob_dict_set_and_get {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        # glob x: dict[K,V] = {} previously left the global as null -> segfault on first access.
+        entry_fn = get_func(eng, "jac_entry", None);
+        entry_fn();
+        f = get_func(eng, "empty_glob_dict_set_get", ctypes.c_int64);
+        assert f() == 7;
+    }
+
+    def check_dicts_dict_get_found {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        f = get_func(eng, "dict_get_found", ctypes.c_int64);
+        assert f() == 10 , f"Expected 10, got {f()}";
+    }
+
+    def check_dicts_dict_get_not_found {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        f = get_func(eng, "dict_get_notfound", ctypes.c_int64);
+        assert f() == -99 , f"Expected -99, got {f()}";
+    }
+
+    def check_dicts_dict_get_no_default {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        f = get_func(eng, "dict_get_no_default", ctypes.c_int64);
+        assert f() == 100 , f"Expected 100, got {f()}";
+    }
+
+    def check_dicts_global_dict_get_method {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        entry_fn = get_func(eng, "jac_entry", None);
+        entry_fn();
+        f = get_func(eng, "global_dict_get_method", ctypes.c_int64);
+        assert f() == 200 , f"Expected 200, got {f()}";
+    }
+
+    def check_dicts_global_dict_get_not_found_method {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        entry_fn = get_func(eng, "jac_entry", None);
+        entry_fn();
+        f = get_func(eng, "global_dict_get_notfound_method", ctypes.c_int64);
+        assert f() == -42 , f"Expected -42, got {f()}";
+    }
+
+    def check_dicts_for_in_dict_param_iteration {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        # for k in d where d is a dict parameter was always elided (body never ran).
+        f = get_func(eng, "dict_param_iter_sum_fixture", ctypes.c_int64);
+        assert f() == 60;
+    }
+
+    def check_dicts_for_in_dict_field_access_iteration {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        # for k in c.props where c is a struct with a dict field used to segfault
+        # because the AtomTrailer expression had no bare name to look up in var_dict_type.
+        f = get_func(eng, "dict_field_iter_sum_fixture", ctypes.c_int64);
+        assert f() == 60;
+    }
+    def check_sets_set_add_duplicate {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        f = get_func(eng, "set_add_duplicate", ctypes.c_int64);
+        assert f() == 3;  # Duplicates shouldn't increase length
+    }
+
+    def check_sets_set_multiple_adds {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        f = get_func(eng, "set_multiple_adds", ctypes.c_int64);
+        assert f() == 3;  # 1, 2, 3 (duplicates ignored)
+    }
+
+    def check_dicts_dict_remove_method {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        f = get_func(eng, "dict_remove_method", ctypes.c_int64);
+        assert f() == 1;  # key must be absent after .remove()
+    }
+
+    def check_dicts_dict_delete_keyword {
+        (eng, _ir) = compile_native("dicts_sets.jac");
+
+        f = get_func(eng, "dict_delete_keyword", ctypes.c_int64);
+        assert f() == 1;  # key must be absent after del d[k]
+    }
+    run_cases(
+        [
+            ("dicts dict new empty", check_dicts_dict_new_empty),
+            ("dicts dict literal len", check_dicts_dict_literal_len),
+            ("dicts dict get value", check_dicts_dict_get_value),
+            ("dicts dict set value", check_dicts_dict_set_value),
+            ("dicts dict update value", check_dicts_dict_update_value),
+            ("dicts dict len after set", check_dicts_dict_len_after_set),
+            ("dicts dict contains true", check_dicts_dict_contains_true),
+            ("dicts dict contains false", check_dicts_dict_contains_false),
+            ("dicts dict string keys", check_dicts_dict_string_keys),
+            ("dicts dict string values", check_dicts_dict_string_values),
+            ("dicts dict sum values", check_dicts_dict_sum_values),
+            ("dicts dict overwrite", check_dicts_dict_overwrite),
+            ("dicts dict multiple types", check_dicts_dict_multiple_types),
+            ("dicts dict get first", check_dicts_dict_get_first),
+            ("dicts dict get third", check_dicts_dict_get_third),
+            ("dicts dict set then get", check_dicts_dict_set_then_get),
+            ("dicts global dict get", check_dicts_global_dict_get),
+            ("dicts global dict len", check_dicts_global_dict_len),
+            ("sets set new empty", check_sets_set_new_empty),
+            ("sets set literal len", check_sets_set_literal_len),
+            ("sets set add element", check_sets_set_add_element),
+            ("sets set contains true", check_sets_set_contains_true),
+            ("sets set contains false", check_sets_set_contains_false),
+            ("sets set string elements", check_sets_set_string_elements),
+            ("sets global set contains", check_sets_global_set_contains),
+            ("sets global set len", check_sets_global_set_len),
+            ("dicts items iteration sum", check_dicts_items_iteration_sum),
+            (
+                "dicts empty glob dict set and get",
+                check_dicts_empty_glob_dict_set_and_get
+            ),
+            ("dicts dict.get found", check_dicts_dict_get_found),
+            ("dicts dict.get not found", check_dicts_dict_get_not_found),
+            ("dicts dict.get no default", check_dicts_dict_get_no_default),
+            ("dicts global dict.get method", check_dicts_global_dict_get_method),
+            (
+                "dicts global dict.get not found method",
+                check_dicts_global_dict_get_not_found_method
+            ),
+            (
+                "dicts for-in-dict param iteration",
+                check_dicts_for_in_dict_param_iteration
+            ),
+            (
+                "dicts for-in-dict field access iteration",
+                check_dicts_for_in_dict_field_access_iteration
+            ),
+            ("sets set add duplicate", check_sets_set_add_duplicate),
+            ("sets set multiple adds", check_sets_set_multiple_adds),
+            ("dicts dict remove method", check_dicts_dict_remove_method),
+            ("dicts dict delete keyword", check_dicts_dict_delete_keyword)
+        ]
+    );
 }
 
-test "dicts dict literal len" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    f = get_func(eng, "dict_literal_len", ctypes.c_int64);
-    assert f() == 3;
-}
-
-test "dicts dict get value" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    f = get_func(eng, "dict_get_value", ctypes.c_int64);
-    assert f() == 200;
-}
-
-test "dicts dict set value" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    f = get_func(eng, "dict_set_value", ctypes.c_int64);
-    assert f() == 20;
-}
-
-test "dicts dict update value" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    f = get_func(eng, "dict_update_value", ctypes.c_int64);
-    assert f() == 99;
-}
-
-test "dicts dict len after set" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    f = get_func(eng, "dict_len_after_set", ctypes.c_int64);
-    assert f() == 3;
-}
-
-test "dicts dict contains true" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    f = get_func(eng, "dict_contains_true", ctypes.c_int64);
-    assert f() == 1;
-}
-
-test "dicts dict contains false" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    f = get_func(eng, "dict_contains_false", ctypes.c_int64);
-    assert f() == 0;
-}
-
-test "dicts dict string keys" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    f = get_func(eng, "dict_string_keys", ctypes.c_int64);
-    assert f() == 2;
-}
-
-test "dicts dict string values" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    f = get_func(eng, "dict_string_values", ctypes.c_char_p);
-    result = f();
-    assert result == b"two";
-}
-
-test "dicts dict sum values" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    f = get_func(eng, "dict_sum_values", ctypes.c_int64);
-    assert f() == 100;
-}
-
-test "dicts dict overwrite" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    f = get_func(eng, "dict_overwrite", ctypes.c_int64);
-    assert f() == 30;
-}
-
-test "dicts dict multiple types" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    f = get_func(eng, "dict_multiple_types", ctypes.c_int64);
-    assert f() == 300;
-}
-
-test "dicts dict get first" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    f = get_func(eng, "dict_get_first", ctypes.c_int64);
-    assert f() == 100;
-}
-
-test "dicts dict get third" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    f = get_func(eng, "dict_get_third", ctypes.c_int64);
-    assert f() == 300;
-}
-
-test "dicts dict set then get" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    f = get_func(eng, "dict_set_then_get", ctypes.c_int64);
-    assert f() == 1500;
-}
-
-test "dicts global dict get" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    # Need to call jac_entry first to initialize globals
-    entry_fn = get_func(eng, "jac_entry", None);
-    entry_fn();
-    f = get_func(eng, "global_dict_get", ctypes.c_int64);
-    assert f() == 200;
-}
-
-test "dicts global dict len" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    entry_fn = get_func(eng, "jac_entry", None);
-    entry_fn();
-    f = get_func(eng, "global_dict_len", ctypes.c_int64);
-    assert f() == 3;
-}
-
-test "sets set new empty" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    f = get_func(eng, "set_new_empty", ctypes.c_int64);
-    assert f() == 0;
-}
-
-test "sets set literal len" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    f = get_func(eng, "set_literal_len", ctypes.c_int64);
-    assert f() == 5;
-}
-
-test "sets set add element" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    f = get_func(eng, "set_add_element", ctypes.c_int64);
-    assert f() == 4;
-}
-
-test "sets set add duplicate" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    f = get_func(eng, "set_add_duplicate", ctypes.c_int64);
-    assert f() == 3;  # Duplicates shouldn't increase length
-}
-
-test "sets set contains true" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    f = get_func(eng, "set_contains_true", ctypes.c_int64);
-    assert f() == 1;
-}
-
-test "sets set contains false" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    f = get_func(eng, "set_contains_false", ctypes.c_int64);
-    assert f() == 0;
-}
-
-test "sets set string elements" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    f = get_func(eng, "set_string_elements", ctypes.c_int64);
-    assert f() == 1;
-}
-
-test "sets set multiple adds" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    f = get_func(eng, "set_multiple_adds", ctypes.c_int64);
-    assert f() == 3;  # 1, 2, 3 (duplicates ignored)
-}
-
-test "sets global set contains" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    entry_fn = get_func(eng, "jac_entry", None);
-    entry_fn();
-    f = get_func(eng, "global_set_contains", ctypes.c_int64);
-    assert f() == 1;
-}
-
-test "sets global set len" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    entry_fn = get_func(eng, "jac_entry", None);
-    entry_fn();
-    f = get_func(eng, "global_set_len", ctypes.c_int64);
-    assert f() == 5;
-}
-
-test "dicts items iteration sum" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    f = get_func(eng, "dict_items_iter_sum", ctypes.c_int64);
-    assert f() == 60;
-}
-
-test "dicts empty glob dict set and get" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    # glob x: dict[K,V] = {} previously left the global as null -> segfault on first access.
-    entry_fn = get_func(eng, "jac_entry", None);
-    entry_fn();
-    f = get_func(eng, "empty_glob_dict_set_get", ctypes.c_int64);
-    assert f() == 7;
-}
-
-test "dicts dict remove method" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    f = get_func(eng, "dict_remove_method", ctypes.c_int64);
-    assert f() == 1;  # key must be absent after .remove()
-}
-
-test "dicts dict delete keyword" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    f = get_func(eng, "dict_delete_keyword", ctypes.c_int64);
-    assert f() == 1;  # key must be absent after del d[k]
-}
-
-test "dicts dict.get found" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    f = get_func(eng, "dict_get_found", ctypes.c_int64);
-    assert f() == 10 , f"Expected 10, got {f()}";
-}
-
-test "dicts dict.get not found" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    f = get_func(eng, "dict_get_notfound", ctypes.c_int64);
-    assert f() == -99 , f"Expected -99, got {f()}";
-}
-
-test "dicts dict.get no default" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    f = get_func(eng, "dict_get_no_default", ctypes.c_int64);
-    assert f() == 100 , f"Expected 100, got {f()}";
-}
-
-test "dicts global dict.get method" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    entry_fn = get_func(eng, "jac_entry", None);
-    entry_fn();
-    f = get_func(eng, "global_dict_get_method", ctypes.c_int64);
-    assert f() == 200 , f"Expected 200, got {f()}";
-}
-
-test "dicts global dict.get not found method" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    entry_fn = get_func(eng, "jac_entry", None);
-    entry_fn();
-    f = get_func(eng, "global_dict_get_notfound_method", ctypes.c_int64);
-    assert f() == -42 , f"Expected -42, got {f()}";
-}
-
-test "dicts for-in-dict param iteration" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    # for k in d where d is a dict parameter was always elided (body never ran).
-    f = get_func(eng, "dict_param_iter_sum_fixture", ctypes.c_int64);
-    assert f() == 60;
-}
-
-test "dicts for-in-dict field access iteration" {
-    (eng, _ir) = compile_native("dicts_sets.jac");
-    # for k in c.props where c is a struct with a dict field used to segfault
-    # because the AtomTrailer expression had no bare name to look up in var_dict_type.
-    f = get_func(eng, "dict_field_iter_sum_fixture", ctypes.c_int64);
-    assert f() == 60;
-}
 
 # --- TestNativeExceptions ---
 """exceptions basic try except"""
@@ -2714,11 +2830,32 @@ test "runtime_errors" {
     _runtime_errors__runtime_errors_error_in_loop(_eng, _ir);
 }
 
-test "list method on object field (pop)" {
-    (eng, _) = compile_native("list_field_methods.jac");
-    # pop() on a field list must shrink it: depth 2 -> 1 encodes as 21.
-    f = get_func(eng, "field_pop_shrinks", ctypes.c_int64);
-    assert f() == 21;
+test "list method on object field (pop), and related cases" {
+    def check_list_method_on_object_field_pop {
+        (eng, _) = compile_native("list_field_methods.jac");
+        # pop() on a field list must shrink it: depth 2 -> 1 encodes as 21.
+        f = get_func(eng, "field_pop_shrinks", ctypes.c_int64);
+        assert f() == 21;
+    }
+
+    def check_user_function_shadowing_a_builtin_name_is_called {
+        (eng, _) = compile_native("shadow_builtin.jac");
+        f = get_func(eng, "call_shadowed_len", ctypes.c_int64);
+        # User `def len(x) { return x + 99; }` must win over the `len` builtin.
+        assert f() == 100;
+    }
+    run_cases(
+        [
+            (
+                "list method on object field (pop)",
+                check_list_method_on_object_field_pop
+            ),
+            (
+                "user function shadowing a builtin name is called instead of the builtin",
+                check_user_function_shadowing_a_builtin_name_is_called
+            )
+        ]
+    );
 }
 
 # --- TestNativePyInterop ---
@@ -2740,103 +2877,131 @@ test "py interop native function exists in engine" {
     assert addr != 0 , "native_add_one_to_doubled not found in JIT engine";
 }
 
-test "py interop py function not defined in native ir" {
-    # py_double should be declared (external) but NOT defined in LLVM IR.
-    prog = JacProgram();
-    ir = prog.compile(
-        str(os.path.join(FIXTURES, "na_py_interop.jac")),
-        options=CompileOptions(default_codespace='server')
+
+test "py interop cases on na_py_interop.jac" {
+    def check_py_interop_py_functions_in_python_codegen {
+        prog = JacProgram();
+        ir = prog.compile(
+            str(os.path.join(FIXTURES, "na_py_interop.jac")),
+            options=CompileOptions(default_codespace='server')
+        );
+
+        py_src = generated_python(ir.gen);
+        assert "py_double" in py_src;
+        assert "call_native" in py_src;
+    }
+
+    def check_py_interop_native_function_has_stub_in_python {
+        prog = JacProgram();
+        ir = prog.compile(
+            str(os.path.join(FIXTURES, "na_py_interop.jac")),
+            options=CompileOptions(default_codespace='server')
+        );
+
+        py_src = generated_python(ir.gen);
+        # Stub for the native function should exist
+        assert "native_add_one_to_doubled" in py_src;
+        # The native function body should NOT appear as executable code in Python
+        assert "return py_double(x) + 1" not in py_src;
+        # Should reference ctypes for the bridge
+        assert "CFUNCTYPE" in py_src;
+        assert "get_function_address" in py_src;
+    }
+
+    def check_py_interop_interop_manifest_built {
+        prog = JacProgram();
+        ir = prog.compile(
+            str(os.path.join(FIXTURES, "na_py_interop.jac")),
+            options=CompileOptions(default_codespace='server')
+        );
+
+        manifest = ir.gen.interop_manifest;
+        assert manifest is not None;
+        # py_double: defined in SERVER, called from NATIVE
+        assert "py_double" in manifest.bindings;
+        b = manifest.bindings["py_double"];
+        assert b.source_context.value == "server";
+        # native_add_one_to_doubled: defined in NATIVE, called from SERVER
+        assert "native_add_one_to_doubled" in manifest.bindings;
+        b2 = manifest.bindings["native_add_one_to_doubled"];
+        assert b2.source_context.value == "native";
+    }
+    def check_py_interop_py_function_not_defined_in_native_ir {
+        prog = JacProgram();
+        ir = prog.compile(
+            str(os.path.join(FIXTURES, "na_py_interop.jac")),
+            options=CompileOptions(default_codespace='server')
+        );
+
+        assert ir.gen.llvm_ir is not None , "No LLVM IR generated";
+        llvm_ir_str = source_spelled(str(ir.gen.llvm_ir));
+        import re;
+        # Must not have a define (body) for py_double -- it lives in Python
+        assert 'define i64 @"py_double"' not in llvm_ir_str;
+        # The extern is module-qualified, so the native code calls
+        # __jac_na_import_<module>_py_double instead of a bare name resolved
+        # against the process symbol table.
+        symbol = ir.gen.interop_manifest.bindings["py_double"].symbol;
+        assert re.search(r'declare i64 @"?' + symbol + r'"?\(', llvm_ir_str)
+            is not None , (
+            f"expected a qualified interop declare for py_double; IR excerpt: "
+            f"{[
+                ln
+                for ln in llvm_ir_str.split(chr(10))
+                if 'py_double' in ln
+            ]}"
+        );
+        # py_note has no `-> T`: it returns None, so native declares it void
+        note = ir.gen.interop_manifest.bindings["py_note"].symbol;
+        assert re.search(r'declare void @"?' + note + r'"?\(', llvm_ir_str) is not None;
+    }
+
+    def check_py_interop_native_calls_python_function {
+        prog = JacProgram();
+        ir = prog.compile(
+            str(os.path.join(FIXTURES, "na_py_interop.jac")),
+            options=CompileOptions(default_codespace='server')
+        );
+
+        eng = ir.gen.native_engine;
+        assert eng is not None;
+        # Register the Python function in the interop callback table
+        py_func_table = ir.gen.interop_py_funcs;
+        symbol = ir.gen.interop_manifest.bindings["py_double"].symbol;
+        assert symbol.startswith("__jac_na_import_na_py_interop_") , symbol;
+        py_func_table[symbol] = lambda (x: int) { x * 2; };
+        # Now call the native function
+        f = get_func(eng, "native_add_one_to_doubled", ctypes.c_int64, ctypes.c_int64);
+        assert f(5) == 11;  # py_double(5) = 10, + 1 = 11
+        assert f(0) == 1;  # py_double(0) = 0,  + 1 = 1
+        assert f(-3) == -5;  # py_double(-3) = -6, + 1 = -5
+    }
+    run_cases(
+        [
+            (
+                "py interop py functions in python codegen",
+                check_py_interop_py_functions_in_python_codegen
+            ),
+            (
+                "py interop native function has stub in python",
+                check_py_interop_native_function_has_stub_in_python
+            ),
+            (
+                "py interop interop manifest built",
+                check_py_interop_interop_manifest_built
+            ),
+            (
+                "py interop py function not defined in native ir",
+                check_py_interop_py_function_not_defined_in_native_ir
+            ),
+            (
+                "py interop native calls python function",
+                check_py_interop_native_calls_python_function
+            )
+        ]
     );
-    assert ir.gen.llvm_ir is not None , "No LLVM IR generated";
-    llvm_ir_str = source_spelled(str(ir.gen.llvm_ir));
-    import re;
-    # Must not have a define (body) for py_double -- it lives in Python
-    assert 'define i64 @"py_double"' not in llvm_ir_str;
-    # The extern is module-qualified, so the native code calls
-    # __jac_na_import_<module>_py_double instead of a bare name resolved
-    # against the process symbol table.
-    symbol = ir.gen.interop_manifest.bindings["py_double"].symbol;
-    assert re.search(r'declare i64 @"?' + symbol + r'"?\(', llvm_ir_str) is not None , (
-        f"expected a qualified interop declare for py_double; IR excerpt: "
-        f"{[
-            ln
-            for ln in llvm_ir_str.split(chr(10))
-            if 'py_double' in ln
-        ]}"
-    );
-    # py_note has no `-> T`: it returns None, so native declares it void
-    note = ir.gen.interop_manifest.bindings["py_note"].symbol;
-    assert re.search(r'declare void @"?' + note + r'"?\(', llvm_ir_str) is not None;
 }
 
-test "py interop py functions in python codegen" {
-    # py_double and call_native should appear in Python codegen output.
-    prog = JacProgram();
-    ir = prog.compile(
-        str(os.path.join(FIXTURES, "na_py_interop.jac")),
-        options=CompileOptions(default_codespace='server')
-    );
-    py_src = generated_python(ir.gen);
-    assert "py_double" in py_src;
-    assert "call_native" in py_src;
-}
-
-test "py interop native function has stub in python" {
-    # Native function should have a ctypes stub in Python codegen output.
-    prog = JacProgram();
-    ir = prog.compile(
-        str(os.path.join(FIXTURES, "na_py_interop.jac")),
-        options=CompileOptions(default_codespace='server')
-    );
-    py_src = generated_python(ir.gen);
-    # Stub for the native function should exist
-    assert "native_add_one_to_doubled" in py_src;
-    # The native function body should NOT appear as executable code in Python
-    assert "return py_double(x) + 1" not in py_src;
-    # Should reference ctypes for the bridge
-    assert "CFUNCTYPE" in py_src;
-    assert "get_function_address" in py_src;
-}
-
-test "py interop interop manifest built" {
-    # InteropAnalysisPass should detect cross-boundary calls.
-    prog = JacProgram();
-    ir = prog.compile(
-        str(os.path.join(FIXTURES, "na_py_interop.jac")),
-        options=CompileOptions(default_codespace='server')
-    );
-    manifest = ir.gen.interop_manifest;
-    assert manifest is not None;
-    # py_double: defined in SERVER, called from NATIVE
-    assert "py_double" in manifest.bindings;
-    b = manifest.bindings["py_double"];
-    assert b.source_context.value == "server";
-    # native_add_one_to_doubled: defined in NATIVE, called from SERVER
-    assert "native_add_one_to_doubled" in manifest.bindings;
-    b2 = manifest.bindings["native_add_one_to_doubled"];
-    assert b2.source_context.value == "native";
-}
-
-test "py interop native calls python function" {
-    # Native->Python: native_add_one_to_doubled calls py_double.
-    prog = JacProgram();
-    ir = prog.compile(
-        str(os.path.join(FIXTURES, "na_py_interop.jac")),
-        options=CompileOptions(default_codespace='server')
-    );
-    eng = ir.gen.native_engine;
-    assert eng is not None;
-    # Register the Python function in the interop callback table
-    py_func_table = ir.gen.interop_py_funcs;
-    symbol = ir.gen.interop_manifest.bindings["py_double"].symbol;
-    assert symbol.startswith("__jac_na_import_na_py_interop_") , symbol;
-    py_func_table[symbol] = lambda (x: int) { x * 2; };
-    # Now call the native function
-    f = get_func(eng, "native_add_one_to_doubled", ctypes.c_int64, ctypes.c_int64);
-    assert f(5) == 11;  # py_double(5) = 10, + 1 = 11
-    assert f(0) == 1;  # py_double(0) = 0,  + 1 = 1
-    assert f(-3) == -5;  # py_double(-3) = -6, + 1 = -5
-}
 
 test "py interop full entry chain" {
     # Full chain: entry (Py) -> call_native (Py) -> native (na) -> py_double (Py).
@@ -2887,51 +3052,66 @@ test "multi module na module compiles" {
     assert "square" in llvm_ir_str;
 }
 
-test "multi module module level na import" {
-    # Module-level import of .jac file is recognized.
-    prog = JacProgram();
-    ir = prog.compile(
-        str(os.path.join(FIXTURES, "na_py_interop_multi.jac")),
-        options=CompileOptions(default_codespace='server')
+test "multi module cases on na_py_interop_multi.jac" {
+    def check_multi_module_module_level_na_import {
+        prog = JacProgram();
+        ir = prog.compile(
+            str(os.path.join(FIXTURES, "na_py_interop_multi.jac")),
+            options=CompileOptions(default_codespace='server')
+        );
+
+        # Should compile without errors
+        assert ir is not None;
+        assert not prog.errors_had , f"Errors: {prog.errors_had}";
+        # triple should be in manifest as a cross-module import
+        manifest = ir.gen.interop_manifest;
+        assert "triple" in manifest.bindings;
+        assert manifest.bindings["triple"].source_module == "na_math_utils.jac";
+    }
+
+    def check_multi_module_na_scoped_import {
+        prog = JacProgram();
+        ir = prog.compile(
+            str(os.path.join(FIXTURES, "na_py_interop_multi.jac")),
+            options=CompileOptions(default_codespace='server')
+        );
+
+        assert not prog.errors_had , f"Errors: {prog.errors_had}";
+        # The na-scoped import should be tracked in manifest
+        manifest = ir.gen.interop_manifest;
+        # add_ten should be recognized as a NATIVE->NATIVE binding
+        assert "add_ten" in manifest.bindings;
+        assert manifest.bindings["add_ten"].source_module == "na_transformers.jac";
+    }
+    def check_multi_module_native_module_linking {
+        prog = JacProgram();
+        ir = prog.compile(
+            str(os.path.join(FIXTURES, "na_py_interop_multi.jac")),
+            options=CompileOptions(default_codespace='server')
+        );
+
+        assert not prog.errors_had , f"Errors: {prog.errors_had}";
+        eng = ir.gen.native_engine;
+        assert eng is not None , "No native engine created";
+        # Imported native functions should be resolvable
+        triple_addr = native_address(eng, "triple");
+        assert triple_addr != 0 , "triple not linked into engine";
+    }
+    run_cases(
+        [
+            (
+                "multi module module level na import",
+                check_multi_module_module_level_na_import
+            ),
+            ("multi module na scoped import", check_multi_module_na_scoped_import),
+            (
+                "multi module native module linking",
+                check_multi_module_native_module_linking
+            )
+        ]
     );
-    # Should compile without errors
-    assert ir is not None;
-    assert not prog.errors_had , f"Errors: {prog.errors_had}";
-    # triple should be in manifest as a cross-module import
-    manifest = ir.gen.interop_manifest;
-    assert "triple" in manifest.bindings;
-    assert manifest.bindings["triple"].source_module == "na_math_utils.jac";
 }
 
-test "multi module na scoped import" {
-    # Import inside na {} block is recognized.
-    prog = JacProgram();
-    ir = prog.compile(
-        str(os.path.join(FIXTURES, "na_py_interop_multi.jac")),
-        options=CompileOptions(default_codespace='server')
-    );
-    assert not prog.errors_had , f"Errors: {prog.errors_had}";
-    # The na-scoped import should be tracked in manifest
-    manifest = ir.gen.interop_manifest;
-    # add_ten should be recognized as a NATIVE->NATIVE binding
-    assert "add_ten" in manifest.bindings;
-    assert manifest.bindings["add_ten"].source_module == "na_transformers.jac";
-}
-
-test "multi module native module linking" {
-    # Functions from imported .jac modules are callable.
-    prog = JacProgram();
-    ir = prog.compile(
-        str(os.path.join(FIXTURES, "na_py_interop_multi.jac")),
-        options=CompileOptions(default_codespace='server')
-    );
-    assert not prog.errors_had , f"Errors: {prog.errors_had}";
-    eng = ir.gen.native_engine;
-    assert eng is not None , "No native engine created";
-    # Imported native functions should be resolvable
-    triple_addr = native_address(eng, "triple");
-    assert triple_addr != 0 , "triple not linked into engine";
-}
 
 test "multi module full multi module chain" {
     # Full call chain with multi-module native imports works.
@@ -2963,67 +3143,151 @@ test "multi module full multi module chain" {
     assert output == "35";
 }
 
-# --- TestCrossModuleStructTypes ---
-test "cross module struct compile" {
-    # Importing a struct type from another .jac module compiles without errors.
-    prog = JacProgram();
-    ir = prog.compile(
-        str(os.path.join(FIXTURES, "na_struct_import.jac")), options=native_force_opts()
+test "cross module struct compile, and related cases" {
+    # --- TestCrossModuleStructTypes ---
+    def check_cross_module_struct_compile {
+        # Importing a struct type from another .jac module compiles without errors.
+        prog = JacProgram();
+        ir = prog.compile(
+            str(os.path.join(FIXTURES, "na_struct_import.jac")),
+            options=native_force_opts()
+        );
+        assert not prog.errors_had , f"Errors: {prog.errors_had}";
+        assert ir is not None;
+        assert ir.gen.native_engine is not None , "No native engine created";
+    }
+
+    def check_unstamped_imported_struct_return_entry_module_co {
+        # An UNANNOTATED local bound to an imported factory (`p = make_point(...)`)
+        # gets its type from the imported `-> Point` return annotation alone. When
+        # this module is the entry, that annotation can be unstamped, so the field
+        # accesses `p.x`/`p.y` used to E5090 ("attribute access not supported")
+        # because the return lowered to the i64 fallback instead of `Point*`.
+        prog = JacProgram();
+        ir = prog.compile(
+            str(os.path.join(FIXTURES, "fix_unstamped_struct_ret.jac")),
+            options=native_force_opts()
+        );
+        assert not prog.errors_had , f"Errors: {prog.errors_had}";
+        assert ir is not None;
+        assert ir.gen.native_engine is not None , "No native engine created";
+    }
+
+    # --- TestCrossModuleGlobalLinkage ---
+    # Regression tests for: global-internal-linkage-breaks-cross-module
+    # Before fix: module globals were emitted with LLVM `internal` linkage. The
+    # linker renamed the definition (e.g. @MAGIC -> @MAGIC.467) when another module
+    # declared it as `external`, leaving the external reference permanently null.
+    # Any read then caused a null-pointer segfault (exit 134).
+    # After fix: globals use default (public) linkage; the symbol resolves correctly.
+    def check_cross_module_global_linkage_compile {
+        # Importing a module that directly reads globals from another .jac module
+        # must compile and JIT without errors.
+        prog = JacProgram();
+        ir = prog.compile(
+            str(os.path.join(FIXTURES, "na_glob_import.jac")),
+            options=native_force_opts()
+        );
+        assert not prog.errors_had , f"Errors: {prog.errors_had}";
+        assert ir is not None;
+        assert ir.gen.native_engine is not None , "No native engine created";
+    }
+
+    # --- TestCrossModuleGlobInit ---
+    def check_cross_module_glob_init_compiles_without_errors {
+        # Importing a module with a glob list initializer must compile cleanly.
+        prog = JacProgram();
+        ir = prog.compile(
+            str(os.path.join(FIXTURES, "cross_module_glob_init.jac")),
+            options=native_force_opts()
+        );
+        assert not prog.errors_had , f"Errors: {prog.errors_had}";
+        assert ir is not None;
+        assert ir.gen.native_engine is not None , "No native engine created";
+    }
+
+    def check_transitive_glob_init_compiles_without_errors {
+        # fix_transitive_glob_entry → fix_transitive_glob_mid → fix_transitive_glob_deep
+        # deep has a glob list; its init must be called even though entry only imports mid.
+        prog = JacProgram();
+        ir = prog.compile(
+            str(os.path.join(FIXTURES, "fix_transitive_glob_entry.jac")),
+            options=native_force_opts()
+        );
+        assert not prog.errors_had , f"Errors: {prog.errors_had}";
+        assert ir is not None;
+        assert ir.gen.native_engine is not None , "No native engine created";
+    }
+    run_cases(
+        [
+            ("cross module struct compile", check_cross_module_struct_compile),
+            (
+                "unstamped imported struct return: entry module compiles without errors (issue #6822)",
+                check_unstamped_imported_struct_return_entry_module_co
+            ),
+            (
+                "cross module global linkage compile",
+                check_cross_module_global_linkage_compile
+            ),
+            (
+                "cross module glob init compiles without errors",
+                check_cross_module_glob_init_compiles_without_errors
+            ),
+            (
+                "transitive glob init: compiles without errors",
+                check_transitive_glob_init_compiles_without_errors
+            )
+        ]
     );
-    assert not prog.errors_had , f"Errors: {prog.errors_had}";
-    assert ir is not None;
-    assert ir.gen.native_engine is not None , "No native engine created";
 }
 
-test "cross module struct function call" {
-    # Imported function returning a struct and function accepting a struct work correctly.
-    prog = JacProgram();
-    ir = prog.compile(
-        str(os.path.join(FIXTURES, "na_struct_import.jac")), options=native_force_opts()
+test "cross module struct cases on na_struct_import.jac" {
+    def check_cross_module_struct_function_call {
+        prog = JacProgram();
+        ir = prog.compile(
+            str(os.path.join(FIXTURES, "na_struct_import.jac")),
+            options=native_force_opts()
+        );
+
+        assert not prog.errors_had , f"Errors: {prog.errors_had}";
+        eng = ir.gen.native_engine;
+        assert eng is not None;
+        # make_point and get_x should be linked
+        make_point_addr = native_address(eng, "make_point");
+        assert make_point_addr != 0 , "make_point not linked into engine";
+        get_x_addr = native_address(eng, "get_x");
+        assert get_x_addr != 0 , "get_x not linked into engine";
+    }
+
+    def check_cross_module_struct_execution {
+        prog = JacProgram();
+        ir = prog.compile(
+            str(os.path.join(FIXTURES, "na_struct_import.jac")),
+            options=native_force_opts()
+        );
+
+        assert not prog.errors_had , f"Errors: {prog.errors_had}";
+        eng = ir.gen.native_engine;
+        assert eng is not None;
+        use_imported_point = get_func(
+            eng, "use_imported_point", ctypes.c_int64, ctypes.c_int64, ctypes.c_int64
+        );
+        result = use_imported_point(3, 4);
+        assert result == 3 , f"Expected 3, got {result}";
+        result2 = use_imported_point(7, 9);
+        assert result2 == 7 , f"Expected 7, got {result2}";
+    }
+    run_cases(
+        [
+            (
+                "cross module struct function call",
+                check_cross_module_struct_function_call
+            ),
+            ("cross module struct execution", check_cross_module_struct_execution)
+        ]
     );
-    assert not prog.errors_had , f"Errors: {prog.errors_had}";
-    eng = ir.gen.native_engine;
-    assert eng is not None;
-    # make_point and get_x should be linked
-    make_point_addr = native_address(eng, "make_point");
-    assert make_point_addr != 0 , "make_point not linked into engine";
-    get_x_addr = native_address(eng, "get_x");
-    assert get_x_addr != 0 , "get_x not linked into engine";
 }
 
-test "cross module struct execution" {
-    # Call use_imported_point via ctypes to verify cross-module struct passing works.
-    prog = JacProgram();
-    ir = prog.compile(
-        str(os.path.join(FIXTURES, "na_struct_import.jac")), options=native_force_opts()
-    );
-    assert not prog.errors_had , f"Errors: {prog.errors_had}";
-    eng = ir.gen.native_engine;
-    assert eng is not None;
-    use_imported_point = get_func(
-        eng, "use_imported_point", ctypes.c_int64, ctypes.c_int64, ctypes.c_int64
-    );
-    result = use_imported_point(3, 4);
-    assert result == 3 , f"Expected 3, got {result}";
-    result2 = use_imported_point(7, 9);
-    assert result2 == 7 , f"Expected 7, got {result2}";
-}
-
-test "unstamped imported struct return: entry module compiles without errors (issue #6822)" {
-    # An UNANNOTATED local bound to an imported factory (`p = make_point(...)`)
-    # gets its type from the imported `-> Point` return annotation alone. When
-    # this module is the entry, that annotation can be unstamped, so the field
-    # accesses `p.x`/`p.y` used to E5090 ("attribute access not supported")
-    # because the return lowered to the i64 fallback instead of `Point*`.
-    prog = JacProgram();
-    ir = prog.compile(
-        str(os.path.join(FIXTURES, "fix_unstamped_struct_ret.jac")),
-        options=native_force_opts()
-    );
-    assert not prog.errors_had , f"Errors: {prog.errors_had}";
-    assert ir is not None;
-    assert ir.gen.native_engine is not None , "No native engine created";
-}
 
 test "unstamped imported struct return: field sum is correct (issue #6822)" {
     # compute(5) = make_point(5, 6).x + make_point(5, 6).y = 5 + 6 = 11.
@@ -3034,71 +3298,67 @@ test "unstamped imported struct return: field sum is correct (issue #6822)" {
     assert compute(0) == 1 , f"Expected 1, got {compute(0)}";
 }
 
-# --- TestCrossModuleGlobalLinkage ---
-# Regression tests for: global-internal-linkage-breaks-cross-module
-# Before fix: module globals were emitted with LLVM `internal` linkage. The
-# linker renamed the definition (e.g. @MAGIC -> @MAGIC.467) when another module
-# declared it as `external`, leaving the external reference permanently null.
-# Any read then caused a null-pointer segfault (exit 134).
-# After fix: globals use default (public) linkage; the symbol resolves correctly.
-test "cross module global linkage compile" {
-    # Importing a module that directly reads globals from another .jac module
-    # must compile and JIT without errors.
-    prog = JacProgram();
-    ir = prog.compile(
-        str(os.path.join(FIXTURES, "na_glob_import.jac")), options=native_force_opts()
+
+test "cross module global cases on na_glob_import.jac" {
+    def check_cross_module_global_direct_read {
+        prog = JacProgram();
+        ir = prog.compile(
+            str(os.path.join(FIXTURES, "na_glob_import.jac")),
+            options=native_force_opts()
+        );
+
+        assert not prog.errors_had , f"Errors: {prog.errors_had}";
+        eng = ir.gen.native_engine;
+        assert eng is not None;
+        read_magic = get_func(eng, "read_magic", ctypes.c_int64);
+        result = read_magic();
+        assert result == 42 , f"Expected MAGIC==42, got {result}";
+    }
+
+    def check_cross_module_global_via_function {
+        prog = JacProgram();
+        ir = prog.compile(
+            str(os.path.join(FIXTURES, "na_glob_import.jac")),
+            options=native_force_opts()
+        );
+
+        assert not prog.errors_had;
+        eng = ir.gen.native_engine;
+        assert eng is not None;
+        read_via_func = get_func(eng, "read_magic_via_func", ctypes.c_int64);
+        result = read_via_func();
+        assert result == 42 , f"Expected 42 via get_magic(), got {result}";
+    }
+
+    def check_cross_module_global_arithmetic {
+        prog = JacProgram();
+        ir = prog.compile(
+            str(os.path.join(FIXTURES, "na_glob_import.jac")),
+            options=native_force_opts()
+        );
+
+        assert not prog.errors_had;
+        eng = ir.gen.native_engine;
+        assert eng is not None;
+        sum_g = get_func(eng, "sum_globals", ctypes.c_int64);
+        result = sum_g();
+        assert result == 142 , f"Expected MAGIC+BASE==142, got {result}";
+        add_b = get_func(eng, "read_base_plus", ctypes.c_int64, ctypes.c_int64);
+        result2 = add_b(5);
+        assert result2 == 105 , f"Expected BASE+5==105, got {result2}";
+    }
+    run_cases(
+        [
+            ("cross module global direct read", check_cross_module_global_direct_read),
+            (
+                "cross module global via function",
+                check_cross_module_global_via_function
+            ),
+            ("cross module global arithmetic", check_cross_module_global_arithmetic)
+        ]
     );
-    assert not prog.errors_had , f"Errors: {prog.errors_had}";
-    assert ir is not None;
-    assert ir.gen.native_engine is not None , "No native engine created";
 }
 
-test "cross module global direct read" {
-    # read_magic() directly accesses the imported MAGIC global.
-    # With internal linkage this segfaulted; with public linkage it must return 42.
-    prog = JacProgram();
-    ir = prog.compile(
-        str(os.path.join(FIXTURES, "na_glob_import.jac")), options=native_force_opts()
-    );
-    assert not prog.errors_had , f"Errors: {prog.errors_had}";
-    eng = ir.gen.native_engine;
-    assert eng is not None;
-    read_magic = get_func(eng, "read_magic", ctypes.c_int64);
-    result = read_magic();
-    assert result == 42 , f"Expected MAGIC==42, got {result}";
-}
-
-test "cross module global via function" {
-    # read_magic_via_func() delegates to get_magic() from the exporting module.
-    prog = JacProgram();
-    ir = prog.compile(
-        str(os.path.join(FIXTURES, "na_glob_import.jac")), options=native_force_opts()
-    );
-    assert not prog.errors_had;
-    eng = ir.gen.native_engine;
-    assert eng is not None;
-    read_via_func = get_func(eng, "read_magic_via_func", ctypes.c_int64);
-    result = read_via_func();
-    assert result == 42 , f"Expected 42 via get_magic(), got {result}";
-}
-
-test "cross module global arithmetic" {
-    # sum_globals() reads both MAGIC and BASE from the exporting module and adds
-    # them; read_base_plus(n) delegates to add_base(n).
-    prog = JacProgram();
-    ir = prog.compile(
-        str(os.path.join(FIXTURES, "na_glob_import.jac")), options=native_force_opts()
-    );
-    assert not prog.errors_had;
-    eng = ir.gen.native_engine;
-    assert eng is not None;
-    sum_g = get_func(eng, "sum_globals", ctypes.c_int64);
-    result = sum_g();
-    assert result == 142 , f"Expected MAGIC+BASE==142, got {result}";
-    add_b = get_func(eng, "read_base_plus", ctypes.c_int64, ctypes.c_int64);
-    result2 = add_b(5);
-    assert result2 == 105 , f"Expected BASE+5==105, got {result2}";
-}
 
 # --- TestNativeCacheMarker ---
 test "cache marker: a module that stays in Python has no native section in jir" {
@@ -3167,50 +3427,61 @@ test "llvmir ir has function definitions" {
     assert f'define double @"{unit_sym(ir, "float_add")}"' in llvm_ir_str;
 }
 
-# --- TestCLibImportSyntax ---
-test "clib import produces extern declares" {
-    prog = JacProgram();
-    ir = prog.compile(
-        str(os.path.join(FIXTURES, "clib_import.jac")), options=native_force_opts()
+test "clib_import.jac cases" {
+    # --- TestCLibImportSyntax ---
+    def check_clib_import_produces_extern_declares {
+        prog = JacProgram();
+        ir = prog.compile(
+            str(os.path.join(FIXTURES, "clib_import.jac")), options=native_force_opts()
+        );
+
+        assert not prog.errors_had , f"Errors: {prog.errors_had}";
+        assert ir.gen.llvm_ir is not None , "No LLVM IR generated";
+        llvm_ir_str = source_spelled(str(ir.gen.llvm_ir));
+        # Extern C functions should be 'declare' (no body), not 'define'
+        assert 'declare double @"sqrt"' in llvm_ir_str;
+        assert 'declare double @"pow"' in llvm_ir_str;
+        assert 'define double @"sqrt"' not in llvm_ir_str;
+        assert 'define double @"pow"' not in llvm_ir_str;
+        # Native Jac function should be 'define' (has body), under the unit prefix
+        assert f'define double @"{unit_sym(ir, "hypotenuse")}"' in llvm_ir_str;
+        # Library path should be stored for the compile pass
+        assert ir.gen._clib_paths is not None;
+        assert "/usr/lib/libm.so.6" in ir.gen._clib_paths;
+    }
+
+    def check_single_file_clib_clib_symbol_lib_attributes_each {
+        prog = JacProgram();
+        ir = prog.compile(
+            str(os.path.join(FIXTURES, "clib_import.jac")), options=native_force_opts()
+        );
+
+        assert not prog.errors_had , f"Errors: {prog.errors_had}";
+        sym_lib = ir.gen._clib_symbol_lib;
+        assert sym_lib , "_clib_symbol_lib not set on single-file module IR";
+        assert "sqrt" in sym_lib , f"'sqrt' missing from _clib_symbol_lib: {sym_lib}";
+        assert "pow" in sym_lib , f"'pow' missing from _clib_symbol_lib: {sym_lib}";
+        assert "libm" in sym_lib["sqrt"] , f"sqrt attributed to wrong lib: {sym_lib[
+            'sqrt'
+        ]}";
+        assert "libm" in sym_lib["pow"] , f"pow attributed to wrong lib: {sym_lib[
+            'pow'
+        ]}";
+    }
+    run_cases(
+        [
+            (
+                "clib import produces extern declares",
+                check_clib_import_produces_extern_declares
+            ),
+            (
+                "single-file clib: _clib_symbol_lib attributes each symbol to its source lib",
+                check_single_file_clib_clib_symbol_lib_attributes_each
+            )
+        ]
     );
-    assert not prog.errors_had , f"Errors: {prog.errors_had}";
-    assert ir.gen.llvm_ir is not None , "No LLVM IR generated";
-    llvm_ir_str = source_spelled(str(ir.gen.llvm_ir));
-    # Extern C functions should be 'declare' (no body), not 'define'
-    assert 'declare double @"sqrt"' in llvm_ir_str;
-    assert 'declare double @"pow"' in llvm_ir_str;
-    assert 'define double @"sqrt"' not in llvm_ir_str;
-    assert 'define double @"pow"' not in llvm_ir_str;
-    # Native Jac function should be 'define' (has body), under the unit prefix
-    assert f'define double @"{unit_sym(ir, "hypotenuse")}"' in llvm_ir_str;
-    # Library path should be stored for the compile pass
-    assert ir.gen._clib_paths is not None;
-    assert "/usr/lib/libm.so.6" in ir.gen._clib_paths;
 }
 
-test "single-file clib: _clib_symbol_lib attributes each symbol to its source lib" {
-    # The PE linker attributes each extern import to a DLL via symbol_lib_map
-    # (defaulting every unmapped symbol to needed_libs[0] = msvcrt.dll →
-    # WinError 127). For a single-file program the symbol→DLL map is built
-    # directly on the entry module during IR gen (NaIRGenPass sets
-    # _cur_lib = _clib_paths[-1] and writes _clib_symbol_lib[fn] = _cur_lib),
-    # so it needs no cross-module propagation. This test pins that path so a
-    # future regression in single-file clib attribution can't hide behind the
-    # multi-module propagation tests (PR #6828 review).
-    prog = JacProgram();
-    ir = prog.compile(
-        str(os.path.join(FIXTURES, "clib_import.jac")), options=native_force_opts()
-    );
-    assert not prog.errors_had , f"Errors: {prog.errors_had}";
-    sym_lib = ir.gen._clib_symbol_lib;
-    assert sym_lib , "_clib_symbol_lib not set on single-file module IR";
-    assert "sqrt" in sym_lib , f"'sqrt' missing from _clib_symbol_lib: {sym_lib}";
-    assert "pow" in sym_lib , f"'pow' missing from _clib_symbol_lib: {sym_lib}";
-    assert "libm" in sym_lib["sqrt"] , f"sqrt attributed to wrong lib: {sym_lib[
-        'sqrt'
-    ]}";
-    assert "libm" in sym_lib["pow"] , f"pow attributed to wrong lib: {sym_lib['pow']}";
-}
 
 test "clib decl with no return arrow lowers to void, not i64" {
     prog = JacProgram();
@@ -4059,156 +4330,194 @@ test "sys stdout/stderr streams via nacompile" {
     }
 }
 
-test "native osp kernel links transitively through an imported module (issue #6669)" {
-    # A thin entry that uses no OSP itself but imports a module whose `run_it`
-    # does the `spawn`. Only the imported unit records a native edge to the
-    # OSP kernel unit (`runtime/osp_kernel.jac`), so the entry's own interface
-    # names no kernel. The link plan (`link_plan.build_link_plan`) walks the
-    # dep edges transitively and must still pull the kernel unit and its
-    # initializer in. Before the fix the binary built cleanly but failed at
-    # load with an undefined kernel glob-init symbol.
-    import tempfile;
-    fixture = str(os.path.join(FIXTURES, "osp_kernel_transitive_main.jac"));
-    with tempfile.TemporaryDirectory() as tmpdir {
-        out_bin = os.path.join(tmpdir, "osp_kernel_transitive");
-        comp = subprocess.run(
-            jac_command("build", "--native", fixture, "-o", out_bin),
-            capture_output=True,
-            text=True,
-            timeout=120
-        );
-        assert comp.returncode == 0 , (
-            f"nacompile failed: exit={comp.returncode}\n"
-            f"stderr: {comp.stderr[-500:] if comp.stderr else '(empty)'}"
-        );
-        assert os.path.exists(out_bin) , f"Binary not created at {out_bin}";
-        result = subprocess.run([out_bin], capture_output=True, text=True, timeout=10);
-        assert result.returncode == 0 , (
-            f"Native binary crashed at load: exit={result.returncode}\n"
-            f"stderr: {result.stderr[-500:] if result.stderr else '(empty)'}"
-        );
-        assert result.stdout.strip() == "7" , (
-            f"Expected '7', got stdout={result.stdout!r} stderr={result.stderr!r}"
-        );
+test "native osp cases" {
+    def check_native_osp_kernel_links_transitively_through_an {
+        # A thin entry that uses no OSP itself but imports a module whose `run_it`
+        # does the `spawn`. Only the imported unit records a native edge to the
+        # OSP kernel unit (`runtime/osp_kernel.jac`), so the entry's own interface
+        # names no kernel. The link plan (`link_plan.build_link_plan`) walks the
+        # dep edges transitively and must still pull the kernel unit and its
+        # initializer in. Before the fix the binary built cleanly but failed at
+        # load with an undefined kernel glob-init symbol.
+        import tempfile;
+        fixture = str(os.path.join(FIXTURES, "osp_kernel_transitive_main.jac"));
+        with tempfile.TemporaryDirectory() as tmpdir {
+            out_bin = os.path.join(tmpdir, "osp_kernel_transitive");
+            comp = subprocess.run(
+                jac_command("build", "--native", fixture, "-o", out_bin),
+                capture_output=True,
+                text=True,
+                timeout=120
+            );
+            assert comp.returncode == 0 , (
+                f"nacompile failed: exit={comp.returncode}\n"
+                f"stderr: {comp.stderr[-500:] if comp.stderr else '(empty)'}"
+            );
+            assert os.path.exists(out_bin) , f"Binary not created at {out_bin}";
+            result = subprocess.run(
+                [out_bin], capture_output=True, text=True, timeout=10
+            );
+            assert result.returncode == 0 , (
+                f"Native binary crashed at load: exit={result.returncode}\n"
+                f"stderr: {result.stderr[-500:] if result.stderr else '(empty)'}"
+            );
+            assert result.stdout.strip() == "7" , (
+                f"Expected '7', got stdout={result.stdout!r} stderr={result.stderr!r}"
+            );
+        }
     }
+
+    def check_native_osp_graph_survives_a_cross_module_spawn_k {
+        # The graph is BUILT in an imported module (`build`) and SPAWNED in the entry
+        # module. The OSP kernel's adjacency globals (`_e_src`/`_walk_stack`) are
+        # link-merged singletons, but `__osp_setup` + its `__osp_inited` guard are
+        # per-module (internal). The entry module's first `spawn` therefore hit its
+        # OWN (unset) guard and re-ran the SHARED kernel glob-init via
+        # `__osp_ensure_init`, re-initializing `_e_src = []` and wiping the graph the
+        # imported module had built -- so `[root -->]` collapsed from 2 to 0 after a
+        # single spawn. The kernel glob-init must run exactly once program-wide.
+        import tempfile;
+        fixture = str(os.path.join(FIXTURES, "osp_xmod_buildsplit_main.jac"));
+        with tempfile.TemporaryDirectory() as tmpdir {
+            out_bin = os.path.join(tmpdir, "osp_xmod_buildsplit");
+            comp = subprocess.run(
+                jac_command("build", "--native", fixture, "-o", out_bin),
+                capture_output=True,
+                text=True,
+                timeout=120
+            );
+            assert comp.returncode == 0 , (
+                f"nacompile failed: exit={comp.returncode}\n"
+                f"stderr: {comp.stderr[-500:] if comp.stderr else '(empty)'}"
+            );
+            assert os.path.exists(out_bin) , f"Binary not created at {out_bin}";
+            result = subprocess.run(
+                [out_bin], capture_output=True, text=True, timeout=10
+            );
+            assert result.returncode == 0 , (
+                f"Native binary crashed: exit={result.returncode}\n"
+                f"stderr: {result.stderr[-500:] if result.stderr else '(empty)'}"
+            );
+            # before=2, after=2 (graph survives the spawn), seen=1+2=3.
+            assert result.stdout.strip() == "2 2 3" , (
+                f"Expected '2 2 3', got stdout={result.stdout!r} stderr={result.stderr!r}"
+            );
+        }
+    }
+    run_cases(
+        [
+            (
+                "native osp kernel links transitively through an imported module (issue #6669)",
+                check_native_osp_kernel_links_transitively_through_an
+            ),
+            (
+                "native osp graph survives a cross-module spawn (kernel glob-init runs once)",
+                check_native_osp_graph_survives_a_cross_module_spawn_k
+            )
+        ]
+    );
 }
 
-test "native osp graph survives a cross-module spawn (kernel glob-init runs once)" {
-    # The graph is BUILT in an imported module (`build`) and SPAWNED in the entry
-    # module. The OSP kernel's adjacency globals (`_e_src`/`_walk_stack`) are
-    # link-merged singletons, but `__osp_setup` + its `__osp_inited` guard are
-    # per-module (internal). The entry module's first `spawn` therefore hit its
-    # OWN (unset) guard and re-ran the SHARED kernel glob-init via
-    # `__osp_ensure_init`, re-initializing `_e_src = []` and wiping the graph the
-    # imported module had built -- so `[root -->]` collapsed from 2 to 0 after a
-    # single spawn. The kernel glob-init must run exactly once program-wide.
-    import tempfile;
-    fixture = str(os.path.join(FIXTURES, "osp_xmod_buildsplit_main.jac"));
-    with tempfile.TemporaryDirectory() as tmpdir {
-        out_bin = os.path.join(tmpdir, "osp_xmod_buildsplit");
-        comp = subprocess.run(
-            jac_command("build", "--native", fixture, "-o", out_bin),
-            capture_output=True,
-            text=True,
-            timeout=120
-        );
-        assert comp.returncode == 0 , (
-            f"nacompile failed: exit={comp.returncode}\n"
-            f"stderr: {comp.stderr[-500:] if comp.stderr else '(empty)'}"
-        );
-        assert os.path.exists(out_bin) , f"Binary not created at {out_bin}";
-        result = subprocess.run([out_bin], capture_output=True, text=True, timeout=10);
-        assert result.returncode == 0 , (
-            f"Native binary crashed: exit={result.returncode}\n"
-            f"stderr: {result.stderr[-500:] if result.stderr else '(empty)'}"
-        );
-        # before=2, after=2 (graph survives the spawn), seen=1+2=3.
-        assert result.stdout.strip() == "2 2 3" , (
-            f"Expected '2 2 3', got stdout={result.stdout!r} stderr={result.stderr!r}"
-        );
+
+test "native osp cross-module construction cases" {
+    def check_native_osp_node_constructed_in_a_non_osp_module {
+        # The entry module CONSTRUCTS an OSP node (`Hub`) but uses no OSP construct
+        # of its own; the spawn happens inside the imported `run_probe`. Tag-table
+        # population is gated on a module actually using OSP, so the construct-only
+        # entry assigned the node NO tag -- its reserved `__type_tag` field stayed 0.
+        # When `run_probe` spawned on it, the kernel's `tag_of` read 0 and
+        # `node_desc(0)` returned a null descriptor, aborting the walk
+        # (`Aborted (core dumped)`, exit 134). The construction site must write the
+        # node's globally-stable tag regardless of whether the constructing module
+        # uses OSP. The byte-identical program with the spawn in the entry module
+        # always ran clean. Fixed: prints `7`.
+        import tempfile;
+        fixture = str(os.path.join(FIXTURES, "osp_ctor_only_main.jac"));
+        with tempfile.TemporaryDirectory() as tmpdir {
+            out_bin = os.path.join(tmpdir, "osp_ctor_only");
+            comp = subprocess.run(
+                jac_command("build", "--native", fixture, "-o", out_bin),
+                capture_output=True,
+                text=True,
+                timeout=120
+            );
+            assert comp.returncode == 0 , (
+                f"nacompile failed: exit={comp.returncode}\n"
+                f"stderr: {comp.stderr[-500:] if comp.stderr else '(empty)'}"
+            );
+            assert os.path.exists(out_bin) , f"Binary not created at {out_bin}";
+            result = subprocess.run(
+                [out_bin], capture_output=True, text=True, timeout=10
+            );
+            assert result.returncode == 0 , (
+                f"Native binary aborted mid-walk (null dispatch descriptor): "
+                f"exit={result.returncode}\n"
+                f"stderr: {result.stderr[-500:] if result.stderr else '(empty)'}"
+            );
+            assert result.stdout.strip() == "7" , (
+                f"Expected '7', got stdout={result.stdout!r} stderr={result.stderr!r}"
+            );
+        }
     }
+
+    def check_native_osp_construct_living_only_in_an_impl_anne {
+        # A builder module IMPORTS OSP archetypes (`Hub`/`Area`) from another native
+        # module and wires them (`++>`) from an IMPL ANNEX (`.impl.jac`), not its
+        # head file. The annex body is woven into the head module's tree as the
+        # module is produced, while keeping its own `loc.mod_path`, so the OSP
+        # construct lives off the head but originates in the annex file.
+        # The OSP construct scan (now `OspAnalysis._uses_construct`) historically
+        # swept just the head file's own statements, classified the builder as a
+        # non-OSP user, and never gave the imported archetypes their stable type-tag
+        # -- the annexed `++>` then failed with
+        # E5090 ("not materialized") at nacompile (or mis-codegen SIGSEGV in a fuller
+        # graph). The byte-identical program with `build`'s body INLINE in the head
+        # file always compiled. Fixed: prints `2 2 3` (graph built, walker sums 1+2).
+        import tempfile;
+        fixture = str(os.path.join(FIXTURES, "osp_xmod_annexbuild_main.jac"));
+        with tempfile.TemporaryDirectory() as tmpdir {
+            out_bin = os.path.join(tmpdir, "osp_xmod_annexbuild");
+            comp = subprocess.run(
+                jac_command("build", "--native", fixture, "-o", out_bin),
+                capture_output=True,
+                text=True,
+                timeout=120
+            );
+            assert comp.returncode == 0 , (
+                f"nacompile failed (annexed OSP construct not materialized): "
+                f"exit={comp.returncode}\n"
+                f"stderr: {comp.stderr[-500:] if comp.stderr else '(empty)'}"
+            );
+            assert os.path.exists(out_bin) , f"Binary not created at {out_bin}";
+            result = subprocess.run(
+                [out_bin], capture_output=True, text=True, timeout=10
+            );
+            assert result.returncode == 0 , (
+                f"Native binary crashed (imported archetype tag not materialized): "
+                f"exit={result.returncode}\n"
+                f"stderr: {result.stderr[-500:] if result.stderr else '(empty)'}"
+            );
+            # before=2 (graph built via annexed `build`), after=2 (survives spawn),
+            # seen=1+2=3 (walker reaches both Area nodes and sums their tags).
+            assert result.stdout.strip() == "2 2 3" , (
+                f"Expected '2 2 3', got stdout={result.stdout!r} stderr={result.stderr!r}"
+            );
+        }
+    }
+    run_cases(
+        [
+            (
+                "native osp node constructed in a non-OSP module carries its dispatch tag (issue #6683)",
+                check_native_osp_node_constructed_in_a_non_osp_module
+            ),
+            (
+                "native osp construct living only in an impl annex materializes imported archetypes",
+                check_native_osp_construct_living_only_in_an_impl_anne
+            )
+        ]
+    );
 }
 
-test "native osp node constructed in a non-OSP module carries its dispatch tag (issue #6683)" {
-    # The entry module CONSTRUCTS an OSP node (`Hub`) but uses no OSP construct
-    # of its own; the spawn happens inside the imported `run_probe`. Tag-table
-    # population is gated on a module actually using OSP, so the construct-only
-    # entry assigned the node NO tag -- its reserved `__type_tag` field stayed 0.
-    # When `run_probe` spawned on it, the kernel's `tag_of` read 0 and
-    # `node_desc(0)` returned a null descriptor, aborting the walk
-    # (`Aborted (core dumped)`, exit 134). The construction site must write the
-    # node's globally-stable tag regardless of whether the constructing module
-    # uses OSP. The byte-identical program with the spawn in the entry module
-    # always ran clean. Fixed: prints `7`.
-    import tempfile;
-    fixture = str(os.path.join(FIXTURES, "osp_ctor_only_main.jac"));
-    with tempfile.TemporaryDirectory() as tmpdir {
-        out_bin = os.path.join(tmpdir, "osp_ctor_only");
-        comp = subprocess.run(
-            jac_command("build", "--native", fixture, "-o", out_bin),
-            capture_output=True,
-            text=True,
-            timeout=120
-        );
-        assert comp.returncode == 0 , (
-            f"nacompile failed: exit={comp.returncode}\n"
-            f"stderr: {comp.stderr[-500:] if comp.stderr else '(empty)'}"
-        );
-        assert os.path.exists(out_bin) , f"Binary not created at {out_bin}";
-        result = subprocess.run([out_bin], capture_output=True, text=True, timeout=10);
-        assert result.returncode == 0 , (
-            f"Native binary aborted mid-walk (null dispatch descriptor): "
-            f"exit={result.returncode}\n"
-            f"stderr: {result.stderr[-500:] if result.stderr else '(empty)'}"
-        );
-        assert result.stdout.strip() == "7" , (
-            f"Expected '7', got stdout={result.stdout!r} stderr={result.stderr!r}"
-        );
-    }
-}
-
-test "native osp construct living only in an impl annex materializes imported archetypes" {
-    # A builder module IMPORTS OSP archetypes (`Hub`/`Area`) from another native
-    # module and wires them (`++>`) from an IMPL ANNEX (`.impl.jac`), not its
-    # head file. The annex body is woven into the head module's tree as the
-    # module is produced, while keeping its own `loc.mod_path`, so the OSP
-    # construct lives off the head but originates in the annex file.
-    # The OSP construct scan (now `OspAnalysis._uses_construct`) historically
-    # swept just the head file's own statements, classified the builder as a
-    # non-OSP user, and never gave the imported archetypes their stable type-tag
-    # -- the annexed `++>` then failed with
-    # E5090 ("not materialized") at nacompile (or mis-codegen SIGSEGV in a fuller
-    # graph). The byte-identical program with `build`'s body INLINE in the head
-    # file always compiled. Fixed: prints `2 2 3` (graph built, walker sums 1+2).
-    import tempfile;
-    fixture = str(os.path.join(FIXTURES, "osp_xmod_annexbuild_main.jac"));
-    with tempfile.TemporaryDirectory() as tmpdir {
-        out_bin = os.path.join(tmpdir, "osp_xmod_annexbuild");
-        comp = subprocess.run(
-            jac_command("build", "--native", fixture, "-o", out_bin),
-            capture_output=True,
-            text=True,
-            timeout=120
-        );
-        assert comp.returncode == 0 , (
-            f"nacompile failed (annexed OSP construct not materialized): "
-            f"exit={comp.returncode}\n"
-            f"stderr: {comp.stderr[-500:] if comp.stderr else '(empty)'}"
-        );
-        assert os.path.exists(out_bin) , f"Binary not created at {out_bin}";
-        result = subprocess.run([out_bin], capture_output=True, text=True, timeout=10);
-        assert result.returncode == 0 , (
-            f"Native binary crashed (imported archetype tag not materialized): "
-            f"exit={result.returncode}\n"
-            f"stderr: {result.stderr[-500:] if result.stderr else '(empty)'}"
-        );
-        # before=2 (graph built via annexed `build`), after=2 (survives spawn),
-        # seen=1+2=3 (walker reaches both Area nodes and sums their tags).
-        assert result.stdout.strip() == "2 2 3" , (
-            f"Expected '2 2 3', got stdout={result.stdout!r} stderr={result.stderr!r}"
-        );
-    }
-}
 
 # --- TestNativeAArch64Linker ---
 test "aarch64 standalone binary runs (issue #6366)" {
@@ -4360,67 +4669,107 @@ test "an ELF executable carries DT_RUNPATH=$ORIGIN (issue #6353 gap 4)" {
     assert b"libfoo.so\x00" in out , "DT_NEEDED libfoo.so not recorded";
 }
 
-test "list_bugs pop local removes element" {
-    (eng, _ir) = compile_native("list_bugs.jac");
-    f = get_func(eng, "pop_and_len", ctypes.c_int64);
-    assert f() == 2;
+test "list_bugs.jac cases" {
+    def check_list_bugs_pop_local_removes_element {
+        (eng, _ir) = compile_native("list_bugs.jac");
+
+        f = get_func(eng, "pop_and_len", ctypes.c_int64);
+        assert f() == 2;
+    }
+
+    def check_list_bugs_pop_local_returns_last_value {
+        (eng, _ir) = compile_native("list_bugs.jac");
+
+        f = get_func(eng, "pop_value", ctypes.c_int64);
+        assert f() == 30;
+    }
+
+    def check_list_bugs_pop_loop_drains_list {
+        (eng, _ir) = compile_native("list_bugs.jac");
+
+        f = get_func(eng, "pop_loop", ctypes.c_int64);
+        assert f() == 3;
+    }
+
+    def check_list_bugs_pop_global_removes_element {
+        (eng, _ir) = compile_native("list_bugs.jac");
+
+        entry_fn = get_func(eng, "jac_entry", None);
+        entry_fn();
+        f = get_func(eng, "pop_global_len", ctypes.c_int64);
+        assert f() == 2;
+    }
+
+    def check_list_bugs_obj_list_field_access {
+        (eng, _ir) = compile_native("list_bugs.jac");
+
+        f = get_func(eng, "obj_list_field", ctypes.c_int64);
+        assert f() == 42;
+    }
+
+    def check_list_bugs_obj_list_two_items {
+        (eng, _ir) = compile_native("list_bugs.jac");
+
+        f = get_func(eng, "obj_list_two_items", ctypes.c_int64);
+        assert f() == 40;
+    }
+
+    def check_list_bugs_obj_global_list {
+        (eng, _ir) = compile_native("list_bugs.jac");
+
+        entry_fn = get_func(eng, "jac_entry", None);
+        entry_fn();
+        f = get_func(eng, "obj_global_list", ctypes.c_int64);
+        assert f() == 100;
+    }
+
+    def check_list_bugs_reassign_int_list_with_empty_literal {
+        (eng, _ir) = compile_native("list_bugs.jac");
+
+        entry_fn = get_func(eng, "jac_entry", None);
+        entry_fn();
+        f = get_func(eng, "reassign_int_list", ctypes.c_int64);
+        assert f() == 99;
+    }
+
+    def check_list_bugs_reassign_str_list_with_empty_literal {
+        (eng, _ir) = compile_native("list_bugs.jac");
+
+        entry_fn = get_func(eng, "jac_entry", None);
+        entry_fn();
+        f = get_func(eng, "reassign_str_list", ctypes.c_int64);
+        assert f() == 1;
+    }
+    run_cases(
+        [
+            (
+                "list_bugs pop local removes element",
+                check_list_bugs_pop_local_removes_element
+            ),
+            (
+                "list_bugs pop local returns last value",
+                check_list_bugs_pop_local_returns_last_value
+            ),
+            ("list_bugs pop loop drains list", check_list_bugs_pop_loop_drains_list),
+            (
+                "list_bugs pop global removes element",
+                check_list_bugs_pop_global_removes_element
+            ),
+            ("list_bugs obj list field access", check_list_bugs_obj_list_field_access),
+            ("list_bugs obj list two items", check_list_bugs_obj_list_two_items),
+            ("list_bugs obj global list", check_list_bugs_obj_global_list),
+            (
+                "list_bugs reassign int list with empty literal",
+                check_list_bugs_reassign_int_list_with_empty_literal
+            ),
+            (
+                "list_bugs reassign str list with empty literal",
+                check_list_bugs_reassign_str_list_with_empty_literal
+            )
+        ]
+    );
 }
 
-test "list_bugs pop local returns last value" {
-    (eng, _ir) = compile_native("list_bugs.jac");
-    f = get_func(eng, "pop_value", ctypes.c_int64);
-    assert f() == 30;
-}
-
-test "list_bugs pop loop drains list" {
-    (eng, _ir) = compile_native("list_bugs.jac");
-    f = get_func(eng, "pop_loop", ctypes.c_int64);
-    assert f() == 3;
-}
-
-test "list_bugs pop global removes element" {
-    (eng, _ir) = compile_native("list_bugs.jac");
-    entry_fn = get_func(eng, "jac_entry", None);
-    entry_fn();
-    f = get_func(eng, "pop_global_len", ctypes.c_int64);
-    assert f() == 2;
-}
-
-test "list_bugs obj list field access" {
-    (eng, _ir) = compile_native("list_bugs.jac");
-    f = get_func(eng, "obj_list_field", ctypes.c_int64);
-    assert f() == 42;
-}
-
-test "list_bugs obj list two items" {
-    (eng, _ir) = compile_native("list_bugs.jac");
-    f = get_func(eng, "obj_list_two_items", ctypes.c_int64);
-    assert f() == 40;
-}
-
-test "list_bugs obj global list" {
-    (eng, _ir) = compile_native("list_bugs.jac");
-    entry_fn = get_func(eng, "jac_entry", None);
-    entry_fn();
-    f = get_func(eng, "obj_global_list", ctypes.c_int64);
-    assert f() == 100;
-}
-
-test "list_bugs reassign int list with empty literal" {
-    (eng, _ir) = compile_native("list_bugs.jac");
-    entry_fn = get_func(eng, "jac_entry", None);
-    entry_fn();
-    f = get_func(eng, "reassign_int_list", ctypes.c_int64);
-    assert f() == 99;
-}
-
-test "list_bugs reassign str list with empty literal" {
-    (eng, _ir) = compile_native("list_bugs.jac");
-    entry_fn = get_func(eng, "jac_entry", None);
-    entry_fn();
-    f = get_func(eng, "reassign_str_list", ctypes.c_int64);
-    assert f() == 1;
-}
 
 # --- String Enum Tests ---
 """string_enums comparison"""
@@ -5018,47 +5367,52 @@ test "clib vtable: C invokes Jac callback through trampoline (issue #6570)" {
     assert invoke_later(5, 6) == 56;
 }
 
-# --- TestCrossModuleGlobInit ---
-test "cross module glob init compiles without errors" {
-    # Importing a module with a glob list initializer must compile cleanly.
-    prog = JacProgram();
-    ir = prog.compile(
-        str(os.path.join(FIXTURES, "cross_module_glob_init.jac")),
-        options=native_force_opts()
+
+test "cross module glob init: cases on cross_module_glob_init.jac" {
+    def check_cross_module_glob_init_imported_glob_is_non_null {
+        (eng, _ir) = compile_native("cross_module_glob_init.jac");
+
+        # Before the fix, _TABLE in the library module stayed null after import,
+        # causing table_len() to return garbage and table_push() to segfault.
+        # After the fix, the synthesized jac_entry calls the imported unit's
+        # initializer (`native_glob_init_name(lib_path)`) before this unit's own,
+        # so the list is properly allocated before any code touches it.
+        # Call jac_entry to trigger the initializers of both this module and the import.
+        entry_fn = get_func(eng, "jac_entry", None);
+        entry_fn();
+        run_test = get_func(eng, "run_glob_init_test", ctypes.c_int64);
+        result = run_test();
+        # Encoded: initial_len*10000 + after_one*100 + after_two = 0*10000 + 1*100 + 2 = 102
+        assert result == 102 , f"Expected 102 (0 items, then 1, then 2), got {result}";
+    }
+
+    def check_cross_module_glob_init_pushed_values_are_readabl {
+        (eng, _ir) = compile_native("cross_module_glob_init.jac");
+
+        # Verify table_get(0) and table_get(1) return the values pushed by run_test.
+        entry_fn = get_func(eng, "jac_entry", None);
+        entry_fn();
+        run_test = get_func(eng, "run_glob_init_test", ctypes.c_int64);
+        run_test();  # populate: push(42), push(99)
+        get_first = get_func(eng, "get_first", ctypes.c_int64);
+        get_second = get_func(eng, "get_second", ctypes.c_int64);
+        assert get_first() == 42 , f"Expected 42, got {get_first()}";
+        assert get_second() == 99 , f"Expected 99, got {get_second()}";
+    }
+    run_cases(
+        [
+            (
+                "cross module glob init: imported glob is non-null on first access",
+                check_cross_module_glob_init_imported_glob_is_non_null
+            ),
+            (
+                "cross module glob init: pushed values are readable",
+                check_cross_module_glob_init_pushed_values_are_readabl
+            )
+        ]
     );
-    assert not prog.errors_had , f"Errors: {prog.errors_had}";
-    assert ir is not None;
-    assert ir.gen.native_engine is not None , "No native engine created";
 }
 
-test "cross module glob init: imported glob is non-null on first access" {
-    (eng, _ir) = compile_native("cross_module_glob_init.jac");
-    # Before the fix, _TABLE in the library module stayed null after import,
-    # causing table_len() to return garbage and table_push() to segfault.
-    # After the fix, the synthesized jac_entry calls the imported unit's
-    # initializer (`native_glob_init_name(lib_path)`) before this unit's own,
-    # so the list is properly allocated before any code touches it.
-    # Call jac_entry to trigger the initializers of both this module and the import.
-    entry_fn = get_func(eng, "jac_entry", None);
-    entry_fn();
-    run_test = get_func(eng, "run_glob_init_test", ctypes.c_int64);
-    result = run_test();
-    # Encoded: initial_len*10000 + after_one*100 + after_two = 0*10000 + 1*100 + 2 = 102
-    assert result == 102 , f"Expected 102 (0 items, then 1, then 2), got {result}";
-}
-
-test "cross module glob init: pushed values are readable" {
-    (eng, _ir) = compile_native("cross_module_glob_init.jac");
-    # Verify table_get(0) and table_get(1) return the values pushed by run_test.
-    entry_fn = get_func(eng, "jac_entry", None);
-    entry_fn();
-    run_test = get_func(eng, "run_glob_init_test", ctypes.c_int64);
-    run_test();  # populate: push(42), push(99)
-    get_first = get_func(eng, "get_first", ctypes.c_int64);
-    get_second = get_func(eng, "get_second", ctypes.c_int64);
-    assert get_first() == 42 , f"Expected 42, got {get_first()}";
-    assert get_second() == 99 , f"Expected 99, got {get_second()}";
-}
 
 """transitive import: function call through two import hops returns correct value"""
 def _fix_transitive_entry__transitive_import_function_call_through_two_import_hops_returns_correc(
@@ -5293,15 +5647,105 @@ test "fix_method_entry" {
     );
 }
 
-test "third module struct: compiles without type errors" {
-    # fix_third_entry imports from fix_third_a and fix_third_b.
-    # fix_third_b's read_value takes a DataA from fix_third_a — third-module struct.
-    prog = JacProgram();
-    ir = prog.compile(
-        str(os.path.join(FIXTURES, "fix_third_entry.jac")), options=native_force_opts()
+test "third module struct: compiles without type errors, and related cases" {
+    def check_third_module_struct_compiles_without_type_errors {
+        # fix_third_entry imports from fix_third_a and fix_third_b.
+        # fix_third_b's read_value takes a DataA from fix_third_a — third-module struct.
+        prog = JacProgram();
+        ir = prog.compile(
+            str(os.path.join(FIXTURES, "fix_third_entry.jac")),
+            options=native_force_opts()
+        );
+        assert not prog.errors_had , f"Compilation errors: {prog.errors_had}";
+        assert ir.gen.native_engine is not None , "No native engine";
+    }
+
+    def check_cross_module_subscript_compiles_without_errors {
+        prog = JacProgram();
+        ir = prog.compile(
+            str(os.path.join(FIXTURES, "fix_subscript_entry.jac")),
+            options=native_force_opts()
+        );
+        assert not prog.errors_had , f"Compilation errors: {prog.errors_had}";
+        assert ir.gen.native_engine is not None , "No native engine";
+    }
+
+    # ─── FIX: Transitive C-library dependency loading ────────────────────────────
+    # When module A imports module B which in turn imports a .so (e.g. libm), the
+    # .so was only loaded during B's compilation. When A linked B's bitcode, MCJIT
+    # could not resolve the extern symbols from B's clib import, causing a segfault.
+    # Today every unit's interface (`NativeIface.clib_paths` /
+    # `clib_symbol_lib`, served by the program's `NativeUnitRegistry`) records the
+    # libraries it declares, and the link plan (`link_plan.build_link_plan`)
+    # collects them across the whole closure (`plan.clib_paths()`,
+    # `plan.clib_symbol_lib()`); `jit_engine` loads each one permanently before
+    # the engine is created.
+    def check_transitive_clib_compiles_without_errors_when_dep {
+        prog = JacProgram();
+        ir = prog.compile(
+            str(os.path.join(FIXTURES, "fix_clib_transitive_entry.jac")),
+            options=native_force_opts()
+        );
+        assert not prog.errors_had , f"Errors: {prog.errors_had}";
+        assert ir.gen.native_engine is not None , "No native engine created";
+    }
+
+    # ─── FIX: Duplicate C-symbol declaration (DuplicatedNameError) ───────────────
+    # When user code imported a C function the compiler also uses internally
+    # (strlen, memcpy, calloc, free …), llvmlite raised DuplicatedNameError because
+    # two ir.Function objects with the same name were created in the same module.
+    # Fix: _get_or_declare_extern now scans global_values for an existing declaration
+    # before calling ir.Function(); _emit_rc_helpers pre-declares all internal libc
+    # symbols so user imports always find an existing entry.
+    def check_dup_clib_importing_compiler_internal_symbols_com {
+        # Imports strlen, memcpy, calloc, free — all pre-declared by the compiler.
+        prog = JacProgram();
+        ir = prog.compile(
+            str(os.path.join(FIXTURES, "fix_dup_clib.jac")), options=native_force_opts()
+        );
+        assert not prog.errors_had , f"Errors (expected none, DuplicatedNameError before fix): {prog.errors_had}";
+        assert ir.gen.native_engine is not None , "No native engine created";
+    }
+
+    # ─── FIX: Argument type coercion at C call boundaries ────────────────────────
+    # C functions declared with 'int' params could not receive str (i8*) args and
+    # vice versa. Fix: _coerce_type now has a generic PointerType→IntType fallback
+    # (ptrtoint) and IntType→PointerType fallback (inttoptr).
+    def check_ptr_to_int_coerce_compiles_without_ir_type_misma {
+        # strlen declared with int param, called with str — triggers ptrtoint.
+        # Before the fix this crashed at IR verification time.
+        prog = JacProgram();
+        ir = prog.compile(
+            str(os.path.join(FIXTURES, "fix_ptr_int_coerce.jac")),
+            options=native_force_opts()
+        );
+        assert not prog.errors_had , f"Errors: {prog.errors_had}";
+        assert ir.gen.native_engine is not None , "No native engine created";
+    }
+    run_cases(
+        [
+            (
+                "third module struct: compiles without type errors",
+                check_third_module_struct_compiles_without_type_errors
+            ),
+            (
+                "cross-module subscript: compiles without errors",
+                check_cross_module_subscript_compiles_without_errors
+            ),
+            (
+                "transitive clib: compiles without errors when dep imports a .so",
+                check_transitive_clib_compiles_without_errors_when_dep
+            ),
+            (
+                "dup clib: importing compiler-internal symbols compiles without DuplicatedNameError",
+                check_dup_clib_importing_compiler_internal_symbols_com
+            ),
+            (
+                "ptr-to-int coerce: compiles without IR type mismatch",
+                check_ptr_to_int_coerce_compiles_without_ir_type_misma
+            )
+        ]
     );
-    assert not prog.errors_had , f"Compilation errors: {prog.errors_had}";
-    assert ir.gen.native_engine is not None , "No native engine";
 }
 
 """third module struct: value field survives cross-module round-trip"""
@@ -5338,98 +5782,95 @@ test "fix_third_entry" {
     );
 }
 
-test "cross-module subscript: compiles without errors" {
-    prog = JacProgram();
-    ir = prog.compile(
-        str(os.path.join(FIXTURES, "fix_subscript_entry.jac")),
-        options=native_force_opts()
+
+test "cross-module subscript: inline cases on fix_subscript_entry.jac" {
+    def check_cross_module_subscript_inline_items_0_value_retu {
+        (eng, _ir) = compile_native("fix_subscript_entry.jac");
+
+        # push_item(42, 7) then ITEMS[0].value inline (no typed local); expect 42.
+        entry_fn = get_func(eng, "jac_entry", None);
+        entry_fn();  # initialises ITEMS glob in fix_subscript_outer
+        f = get_func(eng, "test_subscript_value", ctypes.c_int64);
+        result = f();
+        assert result == 42 , f"Expected 42, got {result}";
+    }
+
+    def check_cross_module_subscript_inline_items_0_extra_retu {
+        (eng, _ir) = compile_native("fix_subscript_entry.jac");
+
+        # push_item(42, 7) then ITEMS[0].extra inline; expect 7.
+        entry_fn = get_func(eng, "jac_entry", None);
+        entry_fn();
+        f = get_func(eng, "test_subscript_extra", ctypes.c_int64);
+        result = f();
+        assert result == 7 , f"Expected 7, got {result}";
+    }
+
+    def check_cross_module_subscript_inline_access_to_second_i {
+        (eng, _ir) = compile_native("fix_subscript_entry.jac");
+
+        # push (42,7) then (99,3); ITEMS[1].value inline; expect 99.
+        entry_fn = get_func(eng, "jac_entry", None);
+        entry_fn();
+        f = get_func(eng, "test_subscript_second_item", ctypes.c_int64);
+        result = f();
+        assert result == 99 , f"Expected 99, got {result}";
+    }
+    run_cases(
+        [
+            (
+                "cross-module subscript: inline ITEMS[0].value returns correct value",
+                check_cross_module_subscript_inline_items_0_value_retu
+            ),
+            (
+                "cross-module subscript: inline ITEMS[0].extra returns correct value",
+                check_cross_module_subscript_inline_items_0_extra_retu
+            ),
+            (
+                "cross-module subscript: inline access to second item returns correct value",
+                check_cross_module_subscript_inline_access_to_second_i
+            )
+        ]
     );
-    assert not prog.errors_had , f"Compilation errors: {prog.errors_had}";
-    assert ir.gen.native_engine is not None , "No native engine";
 }
 
-test "cross-module subscript: inline ITEMS[0].value returns correct value" {
-    (eng, _ir) = compile_native("fix_subscript_entry.jac");
-    # push_item(42, 7) then ITEMS[0].value inline (no typed local); expect 42.
-    entry_fn = get_func(eng, "jac_entry", None);
-    entry_fn();  # initialises ITEMS glob in fix_subscript_outer
-    f = get_func(eng, "test_subscript_value", ctypes.c_int64);
-    result = f();
-    assert result == 42 , f"Expected 42, got {result}";
-}
 
-test "cross-module subscript: inline ITEMS[0].extra returns correct value" {
-    (eng, _ir) = compile_native("fix_subscript_entry.jac");
-    # push_item(42, 7) then ITEMS[0].extra inline; expect 7.
-    entry_fn = get_func(eng, "jac_entry", None);
-    entry_fn();
-    f = get_func(eng, "test_subscript_extra", ctypes.c_int64);
-    result = f();
-    assert result == 7 , f"Expected 7, got {result}";
-}
+test "transitive glob init: cases on fix_transitive_glob_entry.jac" {
+    def check_transitive_glob_init_glob_list_in_deep_module_is {
+        (eng, _ir) = compile_native("fix_transitive_glob_entry.jac");
 
-test "cross-module subscript: inline access to second item returns correct value" {
-    (eng, _ir) = compile_native("fix_subscript_entry.jac");
-    # push (42,7) then (99,3); ITEMS[1].value inline; expect 99.
-    entry_fn = get_func(eng, "jac_entry", None);
-    entry_fn();
-    f = get_func(eng, "test_subscript_second_item", ctypes.c_int64);
-    result = f();
-    assert result == 99 , f"Expected 99, got {result}";
-}
+        # Before the fix this would SIGSEGV because _TABLE in deep was never initialised.
+        entry_fn = get_func(eng, "jac_entry", None);
+        entry_fn();
+        run_fn = get_func(eng, "run_transitive_glob_len", ctypes.c_int64);
+        result = run_fn();
+        assert result == 0 , f"Expected initial list length 0, got {result}";
+    }
 
-test "transitive glob init: compiles without errors" {
-    # fix_transitive_glob_entry → fix_transitive_glob_mid → fix_transitive_glob_deep
-    # deep has a glob list; its init must be called even though entry only imports mid.
-    prog = JacProgram();
-    ir = prog.compile(
-        str(os.path.join(FIXTURES, "fix_transitive_glob_entry.jac")),
-        options=native_force_opts()
+    def check_transitive_glob_init_push_through_mid_updates_de {
+        (eng, _ir) = compile_native("fix_transitive_glob_entry.jac");
+
+        # Verifies the glob list in the transitive module is live and mutable.
+        entry_fn = get_func(eng, "jac_entry", None);
+        entry_fn();
+        push_fn = get_func(eng, "run_transitive_glob_push_and_len", ctypes.c_int64);
+        result = push_fn();
+        assert result == 1 , f"Expected list length 1 after push, got {result}";
+    }
+    run_cases(
+        [
+            (
+                "transitive glob init: glob list in deep module is not null (no segfault)",
+                check_transitive_glob_init_glob_list_in_deep_module_is
+            ),
+            (
+                "transitive glob init: push through mid updates deep glob list",
+                check_transitive_glob_init_push_through_mid_updates_de
+            )
+        ]
     );
-    assert not prog.errors_had , f"Errors: {prog.errors_had}";
-    assert ir is not None;
-    assert ir.gen.native_engine is not None , "No native engine created";
 }
 
-test "transitive glob init: glob list in deep module is not null (no segfault)" {
-    (eng, _ir) = compile_native("fix_transitive_glob_entry.jac");
-    # Before the fix this would SIGSEGV because _TABLE in deep was never initialised.
-    entry_fn = get_func(eng, "jac_entry", None);
-    entry_fn();
-    run_fn = get_func(eng, "run_transitive_glob_len", ctypes.c_int64);
-    result = run_fn();
-    assert result == 0 , f"Expected initial list length 0, got {result}";
-}
-
-test "transitive glob init: push through mid updates deep glob list" {
-    (eng, _ir) = compile_native("fix_transitive_glob_entry.jac");
-    # Verifies the glob list in the transitive module is live and mutable.
-    entry_fn = get_func(eng, "jac_entry", None);
-    entry_fn();
-    push_fn = get_func(eng, "run_transitive_glob_push_and_len", ctypes.c_int64);
-    result = push_fn();
-    assert result == 1 , f"Expected list length 1 after push, got {result}";
-}
-
-# ─── FIX: Transitive C-library dependency loading ────────────────────────────
-# When module A imports module B which in turn imports a .so (e.g. libm), the
-# .so was only loaded during B's compilation. When A linked B's bitcode, MCJIT
-# could not resolve the extern symbols from B's clib import, causing a segfault.
-# Today every unit's interface (`NativeIface.clib_paths` /
-# `clib_symbol_lib`, served by the program's `NativeUnitRegistry`) records the
-# libraries it declares, and the link plan (`link_plan.build_link_plan`)
-# collects them across the whole closure (`plan.clib_paths()`,
-# `plan.clib_symbol_lib()`); `jit_engine` loads each one permanently before
-# the engine is created.
-test "transitive clib: compiles without errors when dep imports a .so" {
-    prog = JacProgram();
-    ir = prog.compile(
-        str(os.path.join(FIXTURES, "fix_clib_transitive_entry.jac")),
-        options=native_force_opts()
-    );
-    assert not prog.errors_had , f"Errors: {prog.errors_had}";
-    assert ir.gen.native_engine is not None , "No native engine created";
-}
 
 test "transitive clib: clib paths of dep module reach the entry's link plan" {
     # The plan's clib paths must include libm even though only the lib module
@@ -5493,22 +5934,6 @@ test "transitive clib: JIT call through dep-module extern returns correct value"
     assert abs(result - 3.0) < 1e-9 , f"Expected sqrt(9.0)=3.0, got {result}";
 }
 
-# ─── FIX: Duplicate C-symbol declaration (DuplicatedNameError) ───────────────
-# When user code imported a C function the compiler also uses internally
-# (strlen, memcpy, calloc, free …), llvmlite raised DuplicatedNameError because
-# two ir.Function objects with the same name were created in the same module.
-# Fix: _get_or_declare_extern now scans global_values for an existing declaration
-# before calling ir.Function(); _emit_rc_helpers pre-declares all internal libc
-# symbols so user imports always find an existing entry.
-test "dup clib: importing compiler-internal symbols compiles without DuplicatedNameError" {
-    # Imports strlen, memcpy, calloc, free — all pre-declared by the compiler.
-    prog = JacProgram();
-    ir = prog.compile(
-        str(os.path.join(FIXTURES, "fix_dup_clib.jac")), options=native_force_opts()
-    );
-    assert not prog.errors_had , f"Errors (expected none, DuplicatedNameError before fix): {prog.errors_had}";
-    assert ir.gen.native_engine is not None , "No native engine created";
-}
 
 """dup clib: user-declared strlen returns correct length for 'hello'"""
 def _fix_dup_clib__dup_clib_user_declared_strlen_returns_correct_length_for_hello(
@@ -5541,21 +5966,6 @@ test "fix_dup_clib" {
     _fix_dup_clib__dup_clib_user_declared_strlen_returns_0_for_empty_string(_eng, _ir);
 }
 
-# ─── FIX: Argument type coercion at C call boundaries ────────────────────────
-# C functions declared with 'int' params could not receive str (i8*) args and
-# vice versa. Fix: _coerce_type now has a generic PointerType→IntType fallback
-# (ptrtoint) and IntType→PointerType fallback (inttoptr).
-test "ptr-to-int coerce: compiles without IR type mismatch" {
-    # strlen declared with int param, called with str — triggers ptrtoint.
-    # Before the fix this crashed at IR verification time.
-    prog = JacProgram();
-    ir = prog.compile(
-        str(os.path.join(FIXTURES, "fix_ptr_int_coerce.jac")),
-        options=native_force_opts()
-    );
-    assert not prog.errors_had , f"Errors: {prog.errors_had}";
-    assert ir.gen.native_engine is not None , "No native engine created";
-}
 
 """ptr-to-int coerce: strlen(int-param) called with str returns correct length"""
 def _fix_ptr_int_coerce__ptr_to_int_coerce_strlen_int_param_called_with_str_returns_correct_len(
@@ -5772,67 +6182,84 @@ test "lambda_multi_stmt_callback" {
     );
 }
 
-# ─── Symbol Collision Detection ───────────────────────────────────────────────
-# Before the fix, when two imported native modules both exported a symbol with
-# the same name, link_in() would silently merge them and produce a binary that
-# crashed with SIGSEGV at runtime. W5024/W5025 were mere warnings, so nacompile
-# wrote a corrupt binary without aborting.
-#
-# After the fix:
-#  - The compiler tracks exported symbols in a symbol_origins dict.
-#  - When a collision is detected before link_in(), E5026 is emitted and
-#    compilation is aborted (errors_had is non-empty).
-#  - Import compile/link failures (W5024/W5025) are now errors (E5024/E5025).
-test "symbol collision: importing two modules with the same exported symbol emits E5026" {
-    # sym_collision_lib_a and sym_collision_lib_b both export `shared_fn`.
-    # Compiling the entry that imports both must emit at least one error.
-    prog = JacProgram();
-    prog.compile(
-        str(os.path.join(FIXTURES, "sym_collision_entry.jac")),
-        options=native_force_opts()
+test "symbol collision: cases on sym_collision_entry.jac" {
+    # ─── Symbol Collision Detection ───────────────────────────────────────────────
+    # Before the fix, when two imported native modules both exported a symbol with
+    # the same name, link_in() would silently merge them and produce a binary that
+    # crashed with SIGSEGV at runtime. W5024/W5025 were mere warnings, so nacompile
+    # wrote a corrupt binary without aborting.
+    #
+    # After the fix:
+    #  - The compiler tracks exported symbols in a symbol_origins dict.
+    #  - When a collision is detected before link_in(), E5026 is emitted and
+    #    compilation is aborted (errors_had is non-empty).
+    #  - Import compile/link failures (W5024/W5025) are now errors (E5024/E5025).
+    def check_symbol_collision_importing_two_modules_with_the {
+        prog = JacProgram();
+        prog.compile(
+            str(os.path.join(FIXTURES, "sym_collision_entry.jac")),
+            options=native_force_opts()
+        );
+
+        assert prog.errors_had , (
+            "Expected E5026 symbol collision error, but errors_had is empty"
+        );
+        error_strs = [str(e) for e in prog.errors_had];
+        found_e5026 = any(
+            "E5026" in e or "Symbol collision" in e or "symbol collision" in e
+            for e in error_strs
+        );
+        assert found_e5026 , (f"Expected E5026 in errors, got: {error_strs}");
+    }
+
+    def check_symbol_collision_both_conflicting_module_names_a {
+        prog = JacProgram();
+        prog.compile(
+            str(os.path.join(FIXTURES, "sym_collision_entry.jac")),
+            options=native_force_opts()
+        );
+
+        assert prog.errors_had , "Expected collision error";
+        combined = " ".join(str(e) for e in prog.errors_had);
+        assert "sym_collision_lib_a" in combined or "lib_a" in combined , (
+            f"Expected lib_a module name in error. Got: {combined}"
+        );
+        assert "sym_collision_lib_b" in combined or "lib_b" in combined , (
+            f"Expected lib_b module name in error. Got: {combined}"
+        );
+    }
+
+    def check_symbol_collision_the_colliding_symbol_name_is_re {
+        prog = JacProgram();
+        prog.compile(
+            str(os.path.join(FIXTURES, "sym_collision_entry.jac")),
+            options=native_force_opts()
+        );
+
+        assert prog.errors_had , "Expected collision error";
+        combined = " ".join(str(e) for e in prog.errors_had);
+        assert "collision_fn" in combined , (
+            f"Expected 'collision_fn' in error message. Got: {combined}"
+        );
+    }
+    run_cases(
+        [
+            (
+                "symbol collision: importing two modules with the same exported symbol emits E5026",
+                check_symbol_collision_importing_two_modules_with_the
+            ),
+            (
+                "symbol collision: both conflicting module names appear in the error",
+                check_symbol_collision_both_conflicting_module_names_a
+            ),
+            (
+                "symbol collision: the colliding symbol name is reported",
+                check_symbol_collision_the_colliding_symbol_name_is_re
+            )
+        ]
     );
-    assert prog.errors_had , (
-        "Expected E5026 symbol collision error, but errors_had is empty"
-    );
-    error_strs = [str(e) for e in prog.errors_had];
-    found_e5026 = any(
-        "E5026" in e or "Symbol collision" in e or "symbol collision" in e
-        for e in error_strs
-    );
-    assert found_e5026 , (f"Expected E5026 in errors, got: {error_strs}");
 }
 
-test "symbol collision: both conflicting module names appear in the error" {
-    # The error message must name both source files so the developer knows which
-    # modules need to be fixed.
-    prog = JacProgram();
-    prog.compile(
-        str(os.path.join(FIXTURES, "sym_collision_entry.jac")),
-        options=native_force_opts()
-    );
-    assert prog.errors_had , "Expected collision error";
-    combined = " ".join(str(e) for e in prog.errors_had);
-    assert "sym_collision_lib_a" in combined or "lib_a" in combined , (
-        f"Expected lib_a module name in error. Got: {combined}"
-    );
-    assert "sym_collision_lib_b" in combined or "lib_b" in combined , (
-        f"Expected lib_b module name in error. Got: {combined}"
-    );
-}
-
-test "symbol collision: the colliding symbol name is reported" {
-    # E5026 message must include the name of the duplicated symbol.
-    prog = JacProgram();
-    prog.compile(
-        str(os.path.join(FIXTURES, "sym_collision_entry.jac")),
-        options=native_force_opts()
-    );
-    assert prog.errors_had , "Expected collision error";
-    combined = " ".join(str(e) for e in prog.errors_had);
-    assert "collision_fn" in combined , (
-        f"Expected 'collision_fn' in error message. Got: {combined}"
-    );
-}
 
 # ─── Variable Re-Declaration Type Fix ────────────────────────────────────────
 # Before the fix, when a variable was re-declared with a different type
@@ -5930,32 +6357,49 @@ def run_sv_source(code: str) -> str {
     return buf.getvalue();
 }
 
-test "glob scoping: bare function-scope assignment does not touch the module global" {
-    (eng, _ir) = compile_native("glob_scoping.jac");
-    # bump_local() does `counter = 5;` with no `global` declaration — Python
-    # semantics make this a function-local, so the module global stays 0.
-    entry_fn = get_func(eng, "jac_entry", None);
-    entry_fn();
-    bump_local = get_func(eng, "bump_local", ctypes.c_int64);
-    read_global = get_func(eng, "read_global", ctypes.c_int64);
-    assert bump_local() == 5 , "bare local assignment should evaluate to 5";
-    assert read_global() == 0 , (
-        "module global must be untouched by a bare function-scope assignment "
-        "(before the fix this returned 5 — the native pathway rebound the global)"
+test "glob scoping: cases on glob_scoping.jac" {
+    def check_glob_scoping_bare_function_scope_assignment_does {
+        (eng, _ir) = compile_native("glob_scoping.jac");
+
+        # bump_local() does `counter = 5;` with no `global` declaration — Python
+        # semantics make this a function-local, so the module global stays 0.
+        entry_fn = get_func(eng, "jac_entry", None);
+        entry_fn();
+        bump_local = get_func(eng, "bump_local", ctypes.c_int64);
+        read_global = get_func(eng, "read_global", ctypes.c_int64);
+        assert bump_local() == 5 , "bare local assignment should evaluate to 5";
+        assert read_global() == 0 , (
+            "module global must be untouched by a bare function-scope assignment "
+            "(before the fix this returned 5 — the native pathway rebound the global)"
+        );
+    }
+
+    def check_glob_scoping_explicit_global_still_rebinds_the_m {
+        (eng, _ir) = compile_native("glob_scoping.jac");
+
+        # bump_global() declares `global counter;` first, so `counter = 99;` is a
+        # genuine global store — this must keep working.
+        entry_fn = get_func(eng, "jac_entry", None);
+        entry_fn();
+        bump_global = get_func(eng, "bump_global", ctypes.c_int64);
+        read_global = get_func(eng, "read_global", ctypes.c_int64);
+        assert bump_global() == 99;
+        assert read_global() == 99 , "explicit `global x;` must rebind the global";
+    }
+    run_cases(
+        [
+            (
+                "glob scoping: bare function-scope assignment does not touch the module global",
+                check_glob_scoping_bare_function_scope_assignment_does
+            ),
+            (
+                "glob scoping: explicit `global` still rebinds the module global",
+                check_glob_scoping_explicit_global_still_rebinds_the_m
+            )
+        ]
     );
 }
 
-test "glob scoping: explicit `global` still rebinds the module global" {
-    (eng, _ir) = compile_native("glob_scoping.jac");
-    # bump_global() declares `global counter;` first, so `counter = 99;` is a
-    # genuine global store — this must keep working.
-    entry_fn = get_func(eng, "jac_entry", None);
-    entry_fn();
-    bump_global = get_func(eng, "bump_global", ctypes.c_int64);
-    read_global = get_func(eng, "read_global", ctypes.c_int64);
-    assert bump_global() == 99;
-    assert read_global() == 99 , "explicit `global x;` must rebind the global";
-}
 
 test "cross-pathway: glob scoping is identical in the na and sv pathways" {
     # The SAME source is run through both pathways and the observable results
@@ -6233,12 +6677,6 @@ test "walrus" {
     _walrus__walrus_expression_evaluates_to_the_assigned_value(_eng, _ir);
 }
 
-test "user function shadowing a builtin name is called instead of the builtin" {
-    (eng, _) = compile_native("shadow_builtin.jac");
-    f = get_func(eng, "call_shadowed_len", ctypes.c_int64);
-    # User `def len(x) { return x + 99; }` must win over the `len` builtin.
-    assert f() == 100;
-}
 
 # Primitive method dispatch now keys off the emitter contract (no hardcoded
 # method-name tuples); exercise int/float methods to lock that in.

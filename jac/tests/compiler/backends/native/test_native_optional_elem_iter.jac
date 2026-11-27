@@ -22,7 +22,7 @@ Two properties are pinned:
 import from jaclang.compiler.backends.py.codegen_shim { generated_python }
 import ctypes;
 import os;
-import from tests.support { TESTS_DIR, native_address, native_force_opts }
+import from tests.support { TESTS_DIR, native_address, native_force_opts, run_cases }
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.driver.compile_options { CompileOptions }
 
@@ -99,49 +99,62 @@ test "every optional-container walk reaches the native layout" {
 }
 
 
-test "optional-container walks answer the same on both pathways" {
-    (prog, ir) = native_build();
-    eng = ir.gen.native_engine;
-    assert eng is not None , "no native engine produced";
-    sv = sv_funcs();
-    for fn in CASES {
-        na_v = native_call(eng, fn);
-        sv_v = int(sv[fn]());
-        assert na_v == sv_v , f"native {fn}() == {na_v} but sv gives {sv_v}";
+test "optional-container walks answer the same on both pathways, and related cases" {
+    def check_optional_container_walks_answer_the_same_on_both {
+        (prog, ir) = native_build();
+        eng = ir.gen.native_engine;
+        assert eng is not None , "no native engine produced";
+        sv = sv_funcs();
+        for fn in CASES {
+            na_v = native_call(eng, fn);
+            sv_v = int(sv[fn]());
+            assert na_v == sv_v , f"native {fn}() == {na_v} but sv gives {sv_v}";
+        }
     }
-}
 
-
-test "the answers are the fixture's, not a shared wrong answer" {
-    (prog, ir) = native_build();
-    eng = ir.gen.native_engine;
-    assert eng is not None , "no native engine produced";
-    # 1 + 2 + 4 over the three items, every spelling of the walk.
-    for fn in [
-        "opt_list_direct_loop",
-        "opt_list_or_loop",
-        "opt_list_direct_compr",
-        "opt_list_or_compr",
-        "annotated_local_loop"
-    ] {
-        assert native_call(eng, fn) == 7 , f"{fn}() must sum the three items";
+    def check_the_answers_are_the_fixture_s_not_a_shared_wrong {
+        (prog, ir) = native_build();
+        eng = ir.gen.native_engine;
+        assert eng is not None , "no native engine produced";
+        # 1 + 2 + 4 over the three items, every spelling of the walk.
+        for fn in [
+            "opt_list_direct_loop",
+            "opt_list_or_loop",
+            "opt_list_direct_compr",
+            "opt_list_or_compr",
+            "annotated_local_loop"
+        ] {
+            assert native_call(eng, fn) == 7 , f"{fn}() must sum the three items";
+        }
+        assert native_call(eng, "opt_list_filtered_compr") == 6 , "2 + 4 past the filter";
+        assert native_call(eng, "opt_str_list_loop") == 5 , "len('ab') + len('cde')";
+        assert native_call(eng, "opt_dict_direct_loop") == 3 , "len('a') + len('bb')";
+        assert native_call(eng, "opt_dict_or_loop") == 3 , "len('a') + len('bb')";
+        assert native_call(eng, "empty_optional_or_loop") == 7 , "an absent list adds 0";
+        assert native_call(eng, "empty_optional_or_compr") == 5 , "an absent list adds 0";
+        assert native_call(eng, "optional_local_loop") == 8 , "3 + 5";
+        # The `None` arm is the one a silent empty-walk would get wrong: CPython
+        # raises TypeError, so the fixture's `except` arm has to be the one that
+        # runs on the native pathway too.
+        assert native_call(eng, "none_direct_loop_raises") == -1 , (
+            "iterating an absent optional must raise TypeError, not walk nothing"
+        );
+        assert native_call(eng, "opt_list_slice_len") == 7 , "a slice keeps the elements";
+        assert native_call(eng, "opt_list_index") == 2 , "the second item";
+        assert native_call(eng, "none_slice_raises") == -1 , (
+            "slicing an absent optional must raise TypeError, not read a null"
+        );
     }
-    assert native_call(eng, "opt_list_filtered_compr") == 6 , "2 + 4 past the filter";
-    assert native_call(eng, "opt_str_list_loop") == 5 , "len('ab') + len('cde')";
-    assert native_call(eng, "opt_dict_direct_loop") == 3 , "len('a') + len('bb')";
-    assert native_call(eng, "opt_dict_or_loop") == 3 , "len('a') + len('bb')";
-    assert native_call(eng, "empty_optional_or_loop") == 7 , "an absent list adds 0";
-    assert native_call(eng, "empty_optional_or_compr") == 5 , "an absent list adds 0";
-    assert native_call(eng, "optional_local_loop") == 8 , "3 + 5";
-    # The `None` arm is the one a silent empty-walk would get wrong: CPython
-    # raises TypeError, so the fixture's `except` arm has to be the one that
-    # runs on the native pathway too.
-    assert native_call(eng, "none_direct_loop_raises") == -1 , (
-        "iterating an absent optional must raise TypeError, not walk nothing"
-    );
-    assert native_call(eng, "opt_list_slice_len") == 7 , "a slice keeps the elements";
-    assert native_call(eng, "opt_list_index") == 2 , "the second item";
-    assert native_call(eng, "none_slice_raises") == -1 , (
-        "slicing an absent optional must raise TypeError, not read a null"
+    run_cases(
+        [
+            (
+                "optional-container walks answer the same on both pathways",
+                check_optional_container_walks_answer_the_same_on_both
+            ),
+            (
+                "the answers are the fixture's, not a shared wrong answer",
+                check_the_answers_are_the_fixture_s_not_a_shared_wrong
+            )
+        ]
     );
 }

@@ -1,7 +1,7 @@
 """TypeVar validation tests for the type checker."""
 
 import os;
-import from tests.support { JAC_ROOT }
+import from tests.support { JAC_ROOT, run_cases }
 import jaclang;
 import from jaclang.compiler.passes.type_checker_pass { TypeCheckPass }
 import from jaclang.compiler.driver.program { JacProgram }
@@ -46,41 +46,52 @@ test "typevar1_validation_errors" {
 }
 
 
-"""Test TypeVar scope validation errors (Pyright: typeVar3.py)."""
-test "typevar3_scope_errors" {
-    program = JacProgram();
-    mod = program.compile(os.path.join(TYPEVAR_FIXTURES, "typeVar3.jac"));
+test "typevar3_scope_errors, and related cases" {
+    # Test TypeVar scope validation errors (Pyright: typeVar3.py).
+    def check_typevar3_scope_errors {
+        program = JacProgram();
+        mod = program.compile(os.path.join(TYPEVAR_FIXTURES, "typeVar3.jac"));
 
-    assert len(program.errors_had) == 12 , f"Expected 12 TypeVar scope errors, got {len(
-        program.errors_had
-    )}";
+        assert len(program.errors_had) == 12 , f"Expected 12 TypeVar scope errors, got {len(
+            program.errors_had
+        )}";
 
-    error_messages = [e.pretty_print() for e in program.errors_had];
-    all_errors = "\n".join(error_messages);
+        error_messages = [e.pretty_print() for e in program.errors_had];
+        all_errors = "\n".join(error_messages);
 
-    assert 'is already in use by an outer scope' in all_errors , "Expected error for nested class reusing outer TypeVar (e.g. InnerClass1 reuses _T)";
-    assert 'has no meaning in this context' in all_errors , "Expected error for TypeVar used outside its valid scope";
+        assert 'is already in use by an outer scope' in all_errors , "Expected error for nested class reusing outer TypeVar (e.g. InnerClass1 reuses _T)";
+        assert 'has no meaning in this context' in all_errors , "Expected error for TypeVar used outside its valid scope";
+    }
+
+    # Test TypeVar variance validation (Pyright: covariant/contravariant checks).
+    def check_typevar4_variance_validation {
+        program = JacProgram();
+        mod = program.compile(os.path.join(TYPEVAR_FIXTURES, "typeVar4.jac"));
+
+        # 5 errors: covariant in param, contravariant in returns (explicit + inferred)
+        assert len(program.errors_had) == 5 , f"Expected 5 errors, got {len(
+            program.errors_had
+        )}";
+
+        error_messages = [e.pretty_print() for e in program.errors_had];
+        all_errors = "\n".join(error_messages);
+
+        # Covariant in parameter error
+        assert "Covariant type variable cannot be used in parameter type"
+            in all_errors , "Expected covariant param error for func2(a: _T_co)";
+
+        # Contravariant in return errors
+        assert "Contravariant type variable cannot be used in return type"
+            in all_errors , "Expected contravariant return error";
+    }
+    run_cases(
+        [
+            ("typevar3_scope_errors", check_typevar3_scope_errors),
+            ("typevar4_variance_validation", check_typevar4_variance_validation)
+        ]
+    );
 }
 
-"""Test TypeVar variance validation (Pyright: covariant/contravariant checks)."""
-test "typevar4_variance_validation" {
-    program = JacProgram();
-    mod = program.compile(os.path.join(TYPEVAR_FIXTURES, "typeVar4.jac"));
-
-    # 5 errors: covariant in param, contravariant in returns (explicit + inferred)
-    assert len(program.errors_had) == 5 , f"Expected 5 errors, got {len(
-        program.errors_had
-    )}";
-
-    error_messages = [e.pretty_print() for e in program.errors_had];
-    all_errors = "\n".join(error_messages);
-
-    # Covariant in parameter error
-    assert "Covariant type variable cannot be used in parameter type" in all_errors , "Expected covariant param error for func2(a: _T_co)";
-
-    # Contravariant in return errors
-    assert "Contravariant type variable cannot be used in return type" in all_errors , "Expected contravariant return error";
-}
 
 """Test unbounded TypeVar operation validation (Pyright: typeVar5)."""
 test "typevar5_unbounded_operations" {
@@ -210,59 +221,68 @@ test "module_dunders_no_errors" {
     assert len(program.errors_had) == 0 , f"Expected no errors for module dunder variables, got:\n{all_errors}";
 }
 
-test "isinstance narrows a class or variadic tuple of generic classes" {
-    program = JacProgram();
-    program.compile(
-        file_path="generic_class_guard.jac",
-        use_str="def select[T: object](value: object, kinds: type[T] | tuple[type[T], ...]) -> list[T] { result: list[T] = []; if isinstance(value, kinds) { result.append(value); } return result; }",
-        options=CompileOptions(no_cgen=True, no_ir_cache=True, force_codespace="server")
-    );
-    assert not program.errors_had , "\n".join(
-        error.pretty_print() for error in program.errors_had
-    );
-}
+test "isinstance narrows a class or variadic tuple of generic classes, and related cases" {
+    def check_isinstance_narrows_a_class_or_variadic_tuple_of {
+        program = JacProgram();
+        program.compile(
+            file_path="generic_class_guard.jac",
+            use_str="def select[T: object](value: object, kinds: type[T] | tuple[type[T], ...]) -> list[T] { result: list[T] = []; if isinstance(value, kinds) { result.append(value); } return result; }",
+            options=CompileOptions(
+                no_cgen=True, no_ir_cache=True, force_codespace="server"
+            )
+        );
+        assert not program.errors_had , "\n".join(
+            error.pretty_print() for error in program.errors_had
+        );
+    }
 
-test "bounded generic union branches accept containers and None" {
-    program = JacProgram();
-    program.compile(
-        file_path="generic_optional_branch.jac",
-        use_str="node Part {} def consume[T: Node](value: T | list[T] | None) -> None {} with entry { consume(Part()); consume([Part()]); consume(None); }",
-        options=CompileOptions(no_cgen=True, no_ir_cache=True, force_codespace="server")
-    );
-    assert not program.errors_had , "\n".join(
-        error.pretty_print() for error in program.errors_had
-    );
-}
+    def check_bounded_generic_union_branches_accept_containers {
+        program = JacProgram();
+        program.compile(
+            file_path="generic_optional_branch.jac",
+            use_str="node Part {} def consume[T: Node](value: T | list[T] | None) -> None {} with entry { consume(Part()); consume([Part()]); consume(None); }",
+            options=CompileOptions(
+                no_cgen=True, no_ir_cache=True, force_codespace="server"
+            )
+        );
+        assert not program.errors_had , "\n".join(
+            error.pretty_print() for error in program.errors_had
+        );
+    }
 
-test "opaque iterable alternatives preserve gradual generic arguments" {
-    program = JacProgram();
-    program.compile(
-        file_path="generic_opaque_iterable.jac",
-        use_str="def consume(values: list[str]) -> None {} def forward(value: any) -> None { consume(list(value or [])); }",
-        options=CompileOptions(no_cgen=True, no_ir_cache=True, force_codespace="server")
-    );
-    assert not program.errors_had , "\n".join(
-        error.pretty_print() for error in program.errors_had
-    );
-}
+    def check_opaque_iterable_alternatives_preserve_gradual_ge {
+        program = JacProgram();
+        program.compile(
+            file_path="generic_opaque_iterable.jac",
+            use_str="def consume(values: list[str]) -> None {} def forward(value: any) -> None { consume(list(value or [])); }",
+            options=CompileOptions(
+                no_cgen=True, no_ir_cache=True, force_codespace="server"
+            )
+        );
+        assert not program.errors_had , "\n".join(
+            error.pretty_print() for error in program.errors_had
+        );
+    }
 
-test "generic method specialization preserves asynchronous call results" {
-    program = JacProgram();
-    program.compile(
-        file_path="generic_async_method.jac",
-        use_str="import asyncio; obj Service[T] { async def fetch(value: T) -> T { return value; } } def schedule(service: Service[int]) -> None { asyncio.ensure_future(service.fetch(1)); }",
-        options=CompileOptions(no_cgen=True, no_ir_cache=True, force_codespace="server")
-    );
-    assert not program.errors_had , "\n".join(
-        error.pretty_print() for error in program.errors_had
-    );
-}
+    def check_generic_method_specialization_preserves_asynchro {
+        program = JacProgram();
+        program.compile(
+            file_path="generic_async_method.jac",
+            use_str="import asyncio; obj Service[T] { async def fetch(value: T) -> T { return value; } } def schedule(service: Service[int]) -> None { asyncio.ensure_future(service.fetch(1)); }",
+            options=CompileOptions(
+                no_cgen=True, no_ir_cache=True, force_codespace="server"
+            )
+        );
+        assert not program.errors_had , "\n".join(
+            error.pretty_print() for error in program.errors_had
+        );
+    }
 
-test "async generator methods retain their iterator result after specialization" {
-    program = JacProgram();
-    program.compile(
-        file_path="generic_async_generator.jac",
-        use_str="""
+    def check_async_generator_methods_retain_their_iterator_re {
+        program = JacProgram();
+        program.compile(
+            file_path="generic_async_generator.jac",
+            use_str="""
 obj Source[T] {
     async def values(value: T) -> AsyncIterator[T];
     async def opaque(value: T) -> any { yield value; }
@@ -275,50 +295,20 @@ async def consume(source: Source[int]) -> None {
     async for value in await source.factory(3) { result: int = value; }
 }
 """,
-        options=CompileOptions(no_cgen=True, no_ir_cache=True, force_codespace="server")
-    );
-    assert not program.errors_had , "\n".join(
-        error.pretty_print() for error in program.errors_had
-    );
-}
+            options=CompileOptions(
+                no_cgen=True, no_ir_cache=True, force_codespace="server"
+            )
+        );
+        assert not program.errors_had , "\n".join(
+            error.pretty_print() for error in program.errors_had
+        );
+    }
 
-test "an async function returning an iterator still requires awaiting" {
-    program = JacProgram();
-    program.compile(
-        file_path="async_iterator_factory.jac",
-        use_str="""
-async def values -> AsyncIterator[int] { yield 1; }
-async def factory -> AsyncIterator[int] { return values(); }
-async def wrong -> None { async for value in factory() { print(value); } }
-""",
-        options=CompileOptions(no_cgen=True, no_ir_cache=True, force_codespace="server")
-    );
-    assert any(error.code?.code == "E1022" for error in program.errors_had);
-}
-
-test "a nested generator does not change the enclosing function return contract" {
-    program = JacProgram();
-    program.compile(
-        file_path="nested_generator_return.jac",
-        use_str="""
-import from typing { Generator }
-def outer -> Generator {
-    def inner -> Generator { yield 1; }
-    report inner();
-}
-""",
-        options=CompileOptions(no_cgen=True, no_ir_cache=True, force_codespace="server")
-    );
-    assert any(error.code?.code == "E1004" for error in program.errors_had) , [
-        str(error) for error in program.errors_had
-    ];
-}
-
-test "runtime class guards refine class objects and callable instances" {
-    program = JacProgram();
-    program.compile(
-        file_path="runtime_class_guards.jac",
-        use_str="""
+    def check_runtime_class_guards_refine_class_objects_and_ca {
+        program = JacProgram();
+        program.compile(
+            file_path="runtime_class_guards.jac",
+            use_str="""
 import from enum { Enum }
 import from types { MethodType }
 def names(ty: object) -> list[str] {
@@ -377,18 +367,93 @@ def collected_class_names(values: list[object]) -> list[str] {
     return names;
 }
 """,
-        options=CompileOptions(no_cgen=True, no_ir_cache=True, force_codespace="server")
-    );
-    assert not program.errors_had , "\n".join(
-        error.pretty_print() for error in program.errors_had
+            options=CompileOptions(
+                no_cgen=True, no_ir_cache=True, force_codespace="server"
+            )
+        );
+        assert not program.errors_had , "\n".join(
+            error.pretty_print() for error in program.errors_had
+        );
+    }
+
+    def check_class_unions_retain_classmethod_lookup {
+        program = JacProgram();
+        program.compile(
+            file_path="union_classmethods.jac",
+            use_str="""
+obj Base {
+    @classmethod
+    def make(cls: type[Base]) -> Base { return cls(); }
+}
+obj First(Base) {}
+obj Second(Base) {}
+def build -> list[Base] { return [cls.make() for cls in (First, Second)]; }
+""",
+            options=CompileOptions(
+                no_cgen=True, no_ir_cache=True, force_codespace="server"
+            )
+        );
+        assert not program.errors_had , "\n".join(
+            error.pretty_print() for error in program.errors_had
+        );
+    }
+    run_cases(
+        [
+            (
+                "isinstance narrows a class or variadic tuple of generic classes",
+                check_isinstance_narrows_a_class_or_variadic_tuple_of
+            ),
+            (
+                "bounded generic union branches accept containers and None",
+                check_bounded_generic_union_branches_accept_containers
+            ),
+            (
+                "opaque iterable alternatives preserve gradual generic arguments",
+                check_opaque_iterable_alternatives_preserve_gradual_ge
+            ),
+            (
+                "generic method specialization preserves asynchronous call results",
+                check_generic_method_specialization_preserves_asynchro
+            ),
+            (
+                "async generator methods retain their iterator result after specialization",
+                check_async_generator_methods_retain_their_iterator_re
+            ),
+            (
+                "runtime class guards refine class objects and callable instances",
+                check_runtime_class_guards_refine_class_objects_and_ca
+            ),
+            (
+                "class unions retain classmethod lookup",
+                check_class_unions_retain_classmethod_lookup
+            )
+        ]
     );
 }
 
-test "a union constructor call must satisfy every possible constructor" {
-    program = JacProgram();
-    program.compile(
-        file_path="union_constructor_args.jac",
-        use_str="""
+
+test "an async function returning an iterator still requires awaiting, and related cases" {
+    def check_an_async_function_returning_an_iterator_still_re {
+        program = JacProgram();
+        program.compile(
+            file_path="async_iterator_factory.jac",
+            use_str="""
+async def values -> AsyncIterator[int] { yield 1; }
+async def factory -> AsyncIterator[int] { return values(); }
+async def wrong -> None { async for value in factory() { print(value); } }
+""",
+            options=CompileOptions(
+                no_cgen=True, no_ir_cache=True, force_codespace="server"
+            )
+        );
+        assert any(error.code?.code == "E1022" for error in program.errors_had);
+    }
+
+    def check_a_union_constructor_call_must_satisfy_every_poss {
+        program = JacProgram();
+        program.compile(
+            file_path="union_constructor_args.jac",
+            use_str="""
 obj Number { has value: int; }
 obj Text { has value: str; }
 def wrong(flag: bool) -> None {
@@ -396,10 +461,44 @@ def wrong(flag: bool) -> None {
     kind(1);
 }
 """,
+            options=CompileOptions(
+                no_cgen=True, no_ir_cache=True, force_codespace="server"
+            )
+        );
+        assert any(error.code?.code == "E1053" for error in program.errors_had);
+    }
+    run_cases(
+        [
+            (
+                "an async function returning an iterator still requires awaiting",
+                check_an_async_function_returning_an_iterator_still_re
+            ),
+            (
+                "a union constructor call must satisfy every possible constructor",
+                check_a_union_constructor_call_must_satisfy_every_poss
+            )
+        ]
+    );
+}
+
+test "a nested generator does not change the enclosing function return contract" {
+    program = JacProgram();
+    program.compile(
+        file_path="nested_generator_return.jac",
+        use_str="""
+import from typing { Generator }
+def outer -> Generator {
+    def inner -> Generator { yield 1; }
+    report inner();
+}
+""",
         options=CompileOptions(no_cgen=True, no_ir_cache=True, force_codespace="server")
     );
-    assert any(error.code?.code == "E1053" for error in program.errors_had);
+    assert any(error.code?.code == "E1004" for error in program.errors_had) , [
+        str(error) for error in program.errors_had
+    ];
 }
+
 
 test "dynamic class guards keep the negative branch reachable" {
     for annotation in ["type[Item]", "tuple[type[Item], ...]"] {
@@ -451,24 +550,4 @@ def wrong(stream: TextIO | StringIO) -> None {
         options=CompileOptions(no_cgen=True, no_ir_cache=True, force_codespace="server")
     );
     assert any(error.code?.code in ("E1049", "E1053") for error in bad.errors_had);
-}
-
-test "class unions retain classmethod lookup" {
-    program = JacProgram();
-    program.compile(
-        file_path="union_classmethods.jac",
-        use_str="""
-obj Base {
-    @classmethod
-    def make(cls: type[Base]) -> Base { return cls(); }
-}
-obj First(Base) {}
-obj Second(Base) {}
-def build -> list[Base] { return [cls.make() for cls in (First, Second)]; }
-""",
-        options=CompileOptions(no_cgen=True, no_ir_cache=True, force_codespace="server")
-    );
-    assert not program.errors_had , "\n".join(
-        error.pretty_print() for error in program.errors_had
-    );
 }

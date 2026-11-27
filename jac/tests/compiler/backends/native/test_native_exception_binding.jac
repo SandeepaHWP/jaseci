@@ -10,7 +10,7 @@ binding rebuilt the raise from it and lost the raised subclass and message.
 """
 
 import ctypes;
-import from tests.support { compile_native, get_func }
+import from tests.support { compile_native, get_func, run_cases }
 
 def call_str(eng: any, name: str) -> bytes {
     return get_func(eng, name, ctypes.c_char_p)();
@@ -20,23 +20,49 @@ def call_int(eng: any, name: str) -> int {
     return get_func(eng, name, ctypes.c_int64)();
 }
 
-test "a field-less local exception binds its message" {
-    (eng, _) = compile_native("exc_binding_main.jac");
-    assert call_str(eng, "local_message") == b"local 3";
-}
+test "exc_binding_main.jac cases" {
+    def check_a_field_less_local_exception_binds_its_message {
+        (eng, _) = compile_native("exc_binding_main.jac");
 
-test "a field-less imported exception binds its message" {
-    (eng, _) = compile_native("exc_binding_main.jac");
-    assert call_str(eng, "imported_message") == b"cannot bind 0";
-}
+        assert call_str(eng, "local_message") == b"local 3";
+    }
 
-test "an exception class with fields binds its struct" {
-    (eng, _) = compile_native("exc_binding_main.jac");
-    assert call_int(eng, "struct_code") == 404;
-}
+    def check_a_field_less_imported_exception_binds_its_messag {
+        (eng, _) = compile_native("exc_binding_main.jac");
 
-test "raise of a bound exception re-raises the caught one" {
-    (eng, _) = compile_native("exc_binding_main.jac");
-    assert call_str(eng, "reraised_message") == b"cannot bind 0";
-    assert call_int(eng, "reraised_code") == 404;
+        assert call_str(eng, "imported_message") == b"cannot bind 0";
+    }
+
+    def check_an_exception_class_with_fields_binds_its_struct {
+        (eng, _) = compile_native("exc_binding_main.jac");
+
+        assert call_int(eng, "struct_code") == 404;
+    }
+
+    def check_raise_of_a_bound_exception_re_raises_the_caught {
+        (eng, _) = compile_native("exc_binding_main.jac");
+
+        assert call_str(eng, "reraised_message") == b"cannot bind 0";
+        assert call_int(eng, "reraised_code") == 404;
+    }
+    run_cases(
+        [
+            (
+                "a field-less local exception binds its message",
+                check_a_field_less_local_exception_binds_its_message
+            ),
+            (
+                "a field-less imported exception binds its message",
+                check_a_field_less_imported_exception_binds_its_messag
+            ),
+            (
+                "an exception class with fields binds its struct",
+                check_an_exception_class_with_fields_binds_its_struct
+            ),
+            (
+                "raise of a bound exception re-raises the caught one",
+                check_raise_of_a_bound_exception_re_raises_the_caught
+            )
+        ]
+    );
 }

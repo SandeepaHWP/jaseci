@@ -10,7 +10,7 @@ server signals and closure poison opt modules back out).
 import from jaclang.compiler.backends.py.codegen_shim { generated_python }
 import os;
 import re;
-import from tests.support { JAC_ROOT }
+import from tests.support { JAC_ROOT, run_cases }
 import jaclang;
 import jaclang.compiler.frontend.unitree as uni;
 import from jaclang.compiler.driver.program { JacProgram }
@@ -76,12 +76,32 @@ def stamp_of(mod: uni.Module, name: str) -> str {
     return 'missing';
 }
 
-test "markerless client module seeds and pulls" {
-    mod = compile_fixture("infer_client_app.jac");
-    assert stamp_of(mod, "clsx") == 'client' , "npm import should seed client";
-    assert stamp_of(mod, "app") == 'client' , "JSX def should seed client";
-    assert stamp_of(mod, "css_helper") == 'client' , "helper using npm import should be pulled client";
-    assert stamp_of(mod, "click_count") == 'client' , "glob referenced from client should be pulled client";
+test "markerless client module seeds and pulls, and related cases" {
+    def check_markerless_client_module_seeds_and_pulls {
+        mod = compile_fixture("infer_client_app.jac");
+        assert stamp_of(mod, "clsx") == 'client' , "npm import should seed client";
+        assert stamp_of(mod, "app") == 'client' , "JSX def should seed client";
+        assert stamp_of(mod, "css_helper") == 'client' , "helper using npm import should be pulled client";
+        assert stamp_of(mod, "click_count") == 'client' , "glob referenced from client should be pulled client";
+    }
+
+    def check_locals_shadowing_client_names_do_not_pull {
+        mod = compile_fixture("infer_shadowing.jac");
+        assert stamp_of(mod, "styled") == 'client' , "real use of npm import pulls client";
+        assert stamp_of(mod, "server_side") == 'server' , "shadowed names resolve to locals - no pull";
+    }
+    run_cases(
+        [
+            (
+                "markerless client module seeds and pulls",
+                check_markerless_client_module_seeds_and_pulls
+            ),
+            (
+                "locals shadowing client names do not pull",
+                check_locals_shadowing_client_names_do_not_pull
+            )
+        ]
+    );
 }
 
 test "three codespaces in one markerless module" {
@@ -204,11 +224,6 @@ test "jac check flags a dead client import without codegen" {
     );
 }
 
-test "locals shadowing client names do not pull" {
-    mod = compile_fixture("infer_shadowing.jac");
-    assert stamp_of(mod, "styled") == 'client' , "real use of npm import pulls client";
-    assert stamp_of(mod, "server_side") == 'server' , "shadowed names resolve to locals - no pull";
-}
 
 test "member names spelled like browser globals do not seed client" {
     mod = compile_fixture("infer_member_names.jac");
@@ -298,9 +313,30 @@ test "pure modules infer native under an explicit native default" {
     assert stamp_of(mod, "mul_add") == 'native';
 }
 
-test "module-level pub endpoints keep a module server under native default" {
-    mod = compile_with_default("infer_native_ffi.jac", "native");
-    assert mod.decided_codespace == '' , "def:pub is a serve endpoint, a server signal";
+test "module-level pub endpoints keep a module server under native default, and related cases" {
+    def check_module_level_pub_endpoints_keep_a_module_server {
+        mod = compile_with_default("infer_native_ffi.jac", "native");
+        assert mod.decided_codespace == '' , "def:pub is a serve endpoint, a server signal";
+    }
+
+    def check_include_chain_stays_server_under_server_default {
+        mod = compile_with_default("nadefault_star_main.jac", "server");
+        assert mod.decided_codespace == '' , (
+            "server default keeps include chains undecided"
+        );
+    }
+    run_cases(
+        [
+            (
+                "module-level pub endpoints keep a module server under native default",
+                check_module_level_pub_endpoints_keep_a_module_server
+            ),
+            (
+                "include chain stays server under server default",
+                check_include_chain_stays_server_under_server_default
+            )
+        ]
+    );
 }
 
 test "extern decl imports seed native and pull the module" {
@@ -346,18 +382,72 @@ def compile_with_default(name: str, dcs: str, cgen: bool = False) -> any {
     return mod;
 }
 
-test "pure markerless module infers native under native default" {
-    mod = compile_with_default("nadefault_pure.jac", "native", cgen=True);
-    assert mod.decided_codespace == 'native' , "pure module should coerce whole-module native";
-    assert stamp_of(mod, "add") == 'native';
+test "pure markerless module infers native under native default, and related cases" {
+    def check_pure_markerless_module_infers_native_under_nativ {
+        mod = compile_with_default("nadefault_pure.jac", "native", cgen=True);
+        assert mod.decided_codespace == 'native' , "pure module should coerce whole-module native";
+        assert stamp_of(mod, "add") == 'native';
+    }
+
+    def check_non_lowerable_pure_module_demotes_to_server_unde {
+        mod = compile_with_default("nadefault_nolower.jac", "native", cgen=True);
+        assert mod.decided_codespace == '' , "demotion recompiles in the server codespace";
+        assert stamp_of(mod, "build") == 'server';
+    }
+    run_cases(
+        [
+            (
+                "pure markerless module infers native under native default",
+                check_pure_markerless_module_infers_native_under_nativ
+            ),
+            (
+                "non-lowerable pure module demotes to server under native default",
+                check_non_lowerable_pure_module_demotes_to_server_unde
+            )
+        ]
+    );
 }
 
-test "generator module infers native under native default" {
-    mod = compile_with_default("nadefault_generator.jac", "native", cgen=True);
-    assert mod.decided_codespace == 'native' , (
-        "generators lower natively (state machines incl. yield from) and are not server signals"
+test "generator module infers native under native default, and related cases" {
+    def check_generator_module_infers_native_under_native_defa {
+        mod = compile_with_default("nadefault_generator.jac", "native", cgen=True);
+        assert mod.decided_codespace == 'native' , (
+            "generators lower natively (state machines incl. yield from) and are not server signals"
+        );
+        assert stamp_of(mod, "evens") == 'native';
+    }
+
+    def check_lambda_module_infers_native_under_native_default {
+        mod = compile_with_default("nadefault_lambda.jac", "native", cgen=True);
+        assert mod.decided_codespace == 'native' , (
+            "closures lower natively (escaping pairs, adapter callbacks) and are not server signals"
+        );
+        assert stamp_of(mod, "scale_all") == 'native';
+    }
+
+    def check_osp_with_root_access_keeps_module_server_under_n {
+        mod = compile_with_default("nadefault_root_osp.jac", "native", cgen=True);
+        assert mod.decided_codespace == '' , (
+            "root is the persistent graph; OSP with a persistence surface stays server"
+        );
+        assert stamp_of(mod, "Task") == 'server';
+    }
+    run_cases(
+        [
+            (
+                "generator module infers native under native default",
+                check_generator_module_infers_native_under_native_defa
+            ),
+            (
+                "lambda module infers native under native default",
+                check_lambda_module_infers_native_under_native_default
+            ),
+            (
+                "osp with root access keeps module server under native default",
+                check_osp_with_root_access_keeps_module_server_under_n
+            )
+        ]
     );
-    assert stamp_of(mod, "evens") == 'native';
 }
 
 test "local-graph OSP module infers native under native default" {
@@ -377,13 +467,6 @@ test "root access keeps a module server under native default" {
     assert stamp_of(mod, "add_task") == 'server';
 }
 
-test "lambda module infers native under native default" {
-    mod = compile_with_default("nadefault_lambda.jac", "native", cgen=True);
-    assert mod.decided_codespace == 'native' , (
-        "closures lower natively (escaping pairs, adapter callbacks) and are not server signals"
-    );
-    assert stamp_of(mod, "scale_all") == 'native';
-}
 
 test "structural match no longer forces server under native default" {
     mod = compile_with_default("nadefault_match.jac", "native", cgen=True);
@@ -392,28 +475,67 @@ test "structural match no longer forces server under native default" {
     );
 }
 
-test "pure markerless module stays server under server default" {
-    mod = compile_with_default("nadefault_pure.jac", "server");
-    assert mod.decided_codespace == '' , "server default keeps markerless modules undecided";
-    assert stamp_of(mod, "add") == 'server';
+test "pure markerless module stays server under server default, and related cases" {
+    def check_pure_markerless_module_stays_server_under_server {
+        mod = compile_with_default("nadefault_pure.jac", "server");
+        assert mod.decided_codespace == '' , "server default keeps markerless modules undecided";
+        assert stamp_of(mod, "add") == 'server';
+    }
+
+    def check_python_import_keeps_module_server_under_native_d {
+        mod = compile_with_default("nadefault_pyimport.jac", "native");
+        assert mod.decided_codespace == '' , "python import is a server signal";
+        assert stamp_of(mod, "helper") == 'server';
+    }
+
+    def check_server_signal_poisons_the_import_closure {
+        mod = compile_with_default("nadefault_uses_sv.jac", "native");
+        assert mod.decided_codespace == '' , "importing a server-classified module keeps the importer server";
+        assert stamp_of(mod, "helper") == 'server';
+    }
+    run_cases(
+        [
+            (
+                "pure markerless module stays server under server default",
+                check_pure_markerless_module_stays_server_under_server
+            ),
+            (
+                "python import keeps module server under native default",
+                check_python_import_keeps_module_server_under_native_d
+            ),
+            (
+                "server signal poisons the import closure",
+                check_server_signal_poisons_the_import_closure
+            )
+        ]
+    );
 }
 
-test "python import keeps module server under native default" {
-    mod = compile_with_default("nadefault_pyimport.jac", "native");
-    assert mod.decided_codespace == '' , "python import is a server signal";
-    assert stamp_of(mod, "helper") == 'server';
+
+test "pure import chain infers native under native default, and related cases" {
+    def check_pure_import_chain_infers_native_under_native_def {
+        mod = compile_with_default("nadefault_chain.jac", "native", cgen=True);
+        assert mod.decided_codespace == 'native' , "closure of pure plain modules is native";
+    }
+
+    def check_cascade_importer_of_a_demoted_module_demotes_wit {
+        mod = compile_with_default("nadefault_uses_nolower.jac", "native", cgen=True);
+        assert mod.decided_codespace == '' , "importer of a demoted dep must demote too";
+    }
+    run_cases(
+        [
+            (
+                "pure import chain infers native under native default",
+                check_pure_import_chain_infers_native_under_native_def
+            ),
+            (
+                "cascade: importer of a demoted module demotes with it",
+                check_cascade_importer_of_a_demoted_module_demotes_wit
+            )
+        ]
+    );
 }
 
-test "pure import chain infers native under native default" {
-    mod = compile_with_default("nadefault_chain.jac", "native", cgen=True);
-    assert mod.decided_codespace == 'native' , "closure of pure plain modules is native";
-}
-
-test "server signal poisons the import closure" {
-    mod = compile_with_default("nadefault_uses_sv.jac", "native");
-    assert mod.decided_codespace == '' , "importing a server-classified module keeps the importer server";
-    assert stamp_of(mod, "helper") == 'server';
-}
 
 test "import cycles infer native under native default" {
     mod = compile_with_default("nadefault_cyc_a.jac", "native", cgen=True);
@@ -424,13 +546,6 @@ test "import cycles infer native under native default" {
     );
 }
 
-test "osp with root access keeps module server under native default" {
-    mod = compile_with_default("nadefault_root_osp.jac", "native", cgen=True);
-    assert mod.decided_codespace == '' , (
-        "root is the persistent graph; OSP with a persistence surface stays server"
-    );
-    assert stamp_of(mod, "Task") == 'server';
-}
 
 test "native default produces a native engine for pure modules" {
     mod = compile_with_default("nadefault_pure.jac", "native", cgen=True);
@@ -445,11 +560,6 @@ test "variadic defs infer native under native default" {
     assert stamp_of(mod, "pack_sum") == 'native';
 }
 
-test "non-lowerable pure module demotes to server under native default" {
-    mod = compile_with_default("nadefault_nolower.jac", "native", cgen=True);
-    assert mod.decided_codespace == '' , "demotion recompiles in the server codespace";
-    assert stamp_of(mod, "build") == 'server';
-}
 
 test "implicit-ctor positional args lower natively under native default" {
     mod = compile_with_default("nadefault_posctor.jac", "native", cgen=True);
@@ -460,10 +570,6 @@ test "implicit-ctor positional args lower natively under native default" {
     assert stamp_of(mod, "make") == 'native';
 }
 
-test "cascade: importer of a demoted module demotes with it" {
-    mod = compile_with_default("nadefault_uses_nolower.jac", "native", cgen=True);
-    assert mod.decided_codespace == '' , "importer of a demoted dep must demote too";
-}
 
 test "an import closure of any size can be native when every module can be" {
     import tempfile;
@@ -499,18 +605,63 @@ test "an import closure of any size can be native when every module can be" {
     }
 }
 
-test "a short pure import chain infers native" {
-    mod = compile_with_default("nadefault_capchain_a.jac", "native", cgen=True);
-    assert mod.decided_codespace == 'native' , "3-module pure chain lowers native";
-    assert mod.gen.native_engine is not None;
+test "a short pure import chain infers native, and related cases" {
+    def check_a_short_pure_import_chain_infers_native {
+        mod = compile_with_default("nadefault_capchain_a.jac", "native", cgen=True);
+        assert mod.decided_codespace == 'native' , "3-module pure chain lowers native";
+        assert mod.gen.native_engine is not None;
+    }
+
+    def check_bare_jac_import_infers_native_under_native_defau {
+        mod = compile_with_default("nadefault_bare.jac", "native", cgen=True);
+        assert mod.decided_codespace == 'native' , (
+            "bare import of a resolvable plain .jac module is a dep edge, not a "
+            "server signal"
+        );
+        assert mod.gen.native_engine is not None;
+    }
+    run_cases(
+        [
+            (
+                "a short pure import chain infers native",
+                check_a_short_pure_import_chain_infers_native
+            ),
+            (
+                "bare jac import infers native under native default",
+                check_bare_jac_import_infers_native_under_native_defau
+            )
+        ]
+    );
 }
 
-test "transitive import chain infers native under native default" {
-    mod = compile_with_default("nadefault_transchain_a.jac", "native", cgen=True);
-    assert mod.decided_codespace == 'native' , (
-        "a -> b -> c transitive pure chain must lower native"
+test "transitive import chain infers native under native default, and related cases" {
+    def check_transitive_import_chain_infers_native_under_nati {
+        mod = compile_with_default("nadefault_transchain_a.jac", "native", cgen=True);
+        assert mod.decided_codespace == 'native' , (
+            "a -> b -> c transitive pure chain must lower native"
+        );
+        assert mod.gen.native_engine is not None;
+    }
+
+    def check_include_chain_infers_native_under_native_default {
+        mod = compile_with_default("nadefault_star_main.jac", "native", cgen=True);
+        assert mod.decided_codespace == 'native' , (
+            "from-import of an include re-exporter must lower native"
+        );
+        assert mod.gen.native_engine is not None;
+    }
+    run_cases(
+        [
+            (
+                "transitive import chain infers native under native default",
+                check_transitive_import_chain_infers_native_under_nati
+            ),
+            (
+                "include chain infers native under native default",
+                check_include_chain_infers_native_under_native_default
+            )
+        ]
     );
-    assert mod.gen.native_engine is not None;
 }
 
 test "coverage records demotion with first error code" {
@@ -555,45 +706,37 @@ test "coverage records native and server outcomes" {
     assert blocked['detail'] != '' , "server record must carry the classifier reason";
 }
 
-test "include chain infers native under native default" {
-    mod = compile_with_default("nadefault_star_main.jac", "native", cgen=True);
-    assert mod.decided_codespace == 'native' , (
-        "from-import of an include re-exporter must lower native"
+
+test "aliased bare jac import stays server under native default, and related cases" {
+    def check_aliased_bare_jac_import_stays_server_under_nativ {
+        mod = compile_with_default("nadefault_bare_alias.jac", "native");
+        assert mod.decided_codespace == '' , (
+            "aliased bare imports are not lowered natively (call sites key on the "
+            "alias, which never matches the module symbol set)"
+        );
+    }
+
+    def check_bare_import_of_a_cl_module_stays_server_under_na {
+        mod = compile_with_default("nadefault_bare_cl.jac", "native");
+        assert mod.decided_codespace == '' , (
+            "a .jac sibling is a cl/sv server signal even when its body has no "
+            "other signals"
+        );
+    }
+    run_cases(
+        [
+            (
+                "aliased bare jac import stays server under native default",
+                check_aliased_bare_jac_import_stays_server_under_nativ
+            ),
+            (
+                "bare import of a cl module stays server under native default",
+                check_bare_import_of_a_cl_module_stays_server_under_na
+            )
+        ]
     );
-    assert mod.gen.native_engine is not None;
 }
 
-test "include chain stays server under server default" {
-    mod = compile_with_default("nadefault_star_main.jac", "server");
-    assert mod.decided_codespace == '' , (
-        "server default keeps include chains undecided"
-    );
-}
-
-test "bare jac import infers native under native default" {
-    mod = compile_with_default("nadefault_bare.jac", "native", cgen=True);
-    assert mod.decided_codespace == 'native' , (
-        "bare import of a resolvable plain .jac module is a dep edge, not a "
-        "server signal"
-    );
-    assert mod.gen.native_engine is not None;
-}
-
-test "aliased bare jac import stays server under native default" {
-    mod = compile_with_default("nadefault_bare_alias.jac", "native");
-    assert mod.decided_codespace == '' , (
-        "aliased bare imports are not lowered natively (call sites key on the "
-        "alias, which never matches the module symbol set)"
-    );
-}
-
-test "bare import of a cl module stays server under native default" {
-    mod = compile_with_default("nadefault_bare_cl.jac", "native");
-    assert mod.decided_codespace == '' , (
-        "a .jac sibling is a cl/sv server signal even when its body has no "
-        "other signals"
-    );
-}
 
 """Find a module in a program hub by filename suffix."""
 def hub_module(prog: JacProgram, name_suffix: str) -> any {
@@ -793,75 +936,96 @@ test "client value use of a bare python import is E5084" {
     assert 'textwrap' in str(bare_errs[0]) , "E5084 must name the bare module";
 }
 
-test "annotation-only use of a bare python import stays silent" {
-    import from jaclang.compiler.driver.compile_options { CompileOptions }
-    prog = JacProgram();
-    prog.compile(
-        os.path.join(FIXTURE_DIR, "infer_import_bare_py_annotation.jac"),
-        options=CompileOptions(no_cgen=True)
-    );
-    bare_errs = [
-        e
-        for e in prog.errors_had
-        if e.code is not None and e.code.code == 'E5084'
-    ];
-    assert not bare_errs , (
-        f"annotations are erased in ES output and must not fire E5084, got "
-        f"{[str(e) for e in bare_errs]}"
-    );
-}
+test "annotation-only use of a bare python import stays silent, and related cases" {
+    def check_annotation_only_use_of_a_bare_python_import_stay {
+        import from jaclang.compiler.driver.compile_options { CompileOptions }
+        prog = JacProgram();
+        prog.compile(
+            os.path.join(FIXTURE_DIR, "infer_import_bare_py_annotation.jac"),
+            options=CompileOptions(no_cgen=True)
+        );
+        bare_errs = [
+            e
+            for e in prog.errors_had
+            if e.code is not None and e.code.code == 'E5084'
+        ];
+        assert not bare_errs , (
+            f"annotations are erased in ES output and must not fire E5084, got "
+            f"{[str(e) for e in bare_errs]}"
+        );
+    }
 
-test "cast-only use of a bare python import stays silent" {
-    import from jaclang.compiler.driver.compile_options { CompileOptions }
-    prog = JacProgram();
-    prog.compile(
-        os.path.join(FIXTURE_DIR, "infer_import_bare_py_cast.jac"),
-        options=CompileOptions(no_cgen=True)
-    );
-    bare_errs = [
-        e
-        for e in prog.errors_had
-        if e.code is not None and e.code.code == 'E5084'
-    ];
-    assert not bare_errs , (
-        f"an `as` cast is erased in ES output just like an annotation and "
-        f"must not fire E5084, got {[str(e) for e in bare_errs]}"
-    );
-}
+    def check_cast_only_use_of_a_bare_python_import_stays_sile {
+        import from jaclang.compiler.driver.compile_options { CompileOptions }
+        prog = JacProgram();
+        prog.compile(
+            os.path.join(FIXTURE_DIR, "infer_import_bare_py_cast.jac"),
+            options=CompileOptions(no_cgen=True)
+        );
+        bare_errs = [
+            e
+            for e in prog.errors_had
+            if e.code is not None and e.code.code == 'E5084'
+        ];
+        assert not bare_errs , (
+            f"an `as` cast is erased in ES output just like an annotation and "
+            f"must not fire E5084, got {[str(e) for e in bare_errs]}"
+        );
+    }
 
+    def check_server_side_use_of_a_bare_python_import_stays_si {
+        import from jaclang.compiler.driver.compile_options { CompileOptions }
+        prog = JacProgram();
+        prog.compile(
+            os.path.join(FIXTURE_DIR, "infer_import_bare_py_server_use.jac"),
+            options=CompileOptions(no_cgen=True)
+        );
+        bare_errs = [
+            e
+            for e in prog.errors_had
+            if e.code is not None and e.code.code == 'E5084'
+        ];
+        assert not bare_errs , (
+            f"server-placed python imports are normal and must not fire E5084, got "
+            f"{[str(e) for e in bare_errs]}"
+        );
+    }
 
-test "server-side use of a bare python import stays silent" {
-    import from jaclang.compiler.driver.compile_options { CompileOptions }
-    prog = JacProgram();
-    prog.compile(
-        os.path.join(FIXTURE_DIR, "infer_import_bare_py_server_use.jac"),
-        options=CompileOptions(no_cgen=True)
-    );
-    bare_errs = [
-        e
-        for e in prog.errors_had
-        if e.code is not None and e.code.code == 'E5084'
-    ];
-    assert not bare_errs , (
-        f"server-placed python imports are normal and must not fire E5084, got "
-        f"{[str(e) for e in bare_errs]}"
-    );
-}
-
-test "unresolvable relative bare import stays silent" {
-    import from jaclang.compiler.driver.compile_options { CompileOptions }
-    prog = JacProgram();
-    prog.compile(
-        os.path.join(FIXTURE_DIR, "infer_import_bare_py_relative_template.jac"),
-        options=CompileOptions(no_cgen=True)
-    );
-    bare_errs = [
-        e
-        for e in prog.errors_had
-        if e.code is not None and e.code.code == 'E5084'
-    ];
-    assert not bare_errs , (
-        f"a relative bare import is never npm or installed python; template "
-        f"components must not fire E5084, got {[str(e) for e in bare_errs]}"
+    def check_unresolvable_relative_bare_import_stays_silent {
+        import from jaclang.compiler.driver.compile_options { CompileOptions }
+        prog = JacProgram();
+        prog.compile(
+            os.path.join(FIXTURE_DIR, "infer_import_bare_py_relative_template.jac"),
+            options=CompileOptions(no_cgen=True)
+        );
+        bare_errs = [
+            e
+            for e in prog.errors_had
+            if e.code is not None and e.code.code == 'E5084'
+        ];
+        assert not bare_errs , (
+            f"a relative bare import is never npm or installed python; template "
+            f"components must not fire E5084, got {[str(e) for e in bare_errs]}"
+        );
+    }
+    run_cases(
+        [
+            (
+                "annotation-only use of a bare python import stays silent",
+                check_annotation_only_use_of_a_bare_python_import_stay
+            ),
+            (
+                "cast-only use of a bare python import stays silent",
+                check_cast_only_use_of_a_bare_python_import_stays_sile
+            ),
+            (
+                "server-side use of a bare python import stays silent",
+                check_server_side_use_of_a_bare_python_import_stays_si
+            ),
+            (
+                "unresolvable relative bare import stays silent",
+                check_unresolvable_relative_bare_import_stays_silent
+            )
+        ]
     );
 }

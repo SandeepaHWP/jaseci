@@ -21,7 +21,8 @@ import from tests.support {
     names_function,
     native_address,
     compile_native_ir,
-    native_force_opts
+    native_force_opts,
+    run_cases
 }
 import jaclang;
 
@@ -86,176 +87,284 @@ def _no_narrowing(pass_self: any, nd: any) -> any {
     return None;
 }
 
-test "pointer optional: `is None` early-return guard narrows the fall-through" {
-    (eng, _) = compile_native(FIXTURE);
-    sv = sv_module();
-    vals = congruent(eng, sv, "ptr_guard_is_none", [0, 1, 3]);
-    assert vals == [-1, 1, 3] , f"unexpected ptr_guard_is_none results: {vals}";
-}
+test "pointer optional: `is None` early-return guard narrows the fall-through, and related cases" {
+    def check_pointer_optional_is_none_early_return_guard_narr {
+        (eng, _) = compile_native(FIXTURE);
+        sv = sv_module();
 
-test "pointer optional: `is not None` positive branch narrows the body" {
-    (eng, _) = compile_native(FIXTURE);
-    sv = sv_module();
-    vals = congruent(eng, sv, "ptr_is_not_none", [0, 1, 3]);
-    assert vals == [-1, 1, 3] , f"unexpected ptr_is_not_none results: {vals}";
-}
+        vals = congruent(eng, sv, "ptr_guard_is_none", [0, 1, 3]);
+        assert vals == [-1, 1, 3] , f"unexpected ptr_guard_is_none results: {vals}";
+    }
 
-test "pointer optional: if/else narrows both branches" {
-    (eng, _) = compile_native(FIXTURE);
-    sv = sv_module();
-    vals = congruent(eng, sv, "ptr_if_else", [0, 2, 5]);
-    assert vals == [-1, 20, 50] , f"unexpected ptr_if_else results: {vals}";
-}
+    def check_pointer_optional_is_not_none_positive_branch_nar {
+        (eng, _) = compile_native(FIXTURE);
+        sv = sv_module();
 
-test "pointer optional: plain truthiness narrows the true branch" {
-    (eng, _) = compile_native(FIXTURE);
-    sv = sv_module();
-    vals = congruent(eng, sv, "ptr_truthy", [0, 2, 4]);
-    assert vals == [-1, 102, 104] , f"unexpected ptr_truthy results: {vals}";
-}
+        vals = congruent(eng, sv, "ptr_is_not_none", [0, 1, 3]);
+        assert vals == [-1, 1, 3] , f"unexpected ptr_is_not_none results: {vals}";
+    }
 
-test "pointer optional: `!= None` narrows like `is not None`" {
-    (eng, _) = compile_native(FIXTURE);
-    sv = sv_module();
-    vals = congruent(eng, sv, "ptr_ne_none", [0, 2, 4]);
-    assert vals == [-1, 202, 204] , f"unexpected ptr_ne_none results: {vals}";
-}
+    def check_pointer_optional_if_else_narrows_both_branches {
+        (eng, _) = compile_native(FIXTURE);
+        sv = sv_module();
 
-test "scalar optional: `is None` early-return guard narrows the fall-through" {
-    (eng, _) = compile_native(FIXTURE);
-    sv = sv_module();
-    vals = congruent(eng, sv, "scalar_guard", [0, 1, 4]);
-    assert vals == [-1, 4, 13] , f"unexpected scalar_guard results: {vals}";
-}
+        vals = congruent(eng, sv, "ptr_if_else", [0, 2, 5]);
+        assert vals == [-1, 20, 50] , f"unexpected ptr_if_else results: {vals}";
+    }
 
-test "scalar optional: early `continue` narrows the rest of the loop body" {
-    (eng, _) = compile_native(FIXTURE);
-    sv = sv_module();
-    vals = congruent(eng, sv, "scalar_continue_guard", [0, 3, 5]);
-    assert vals == [0, 3, 18] , f"unexpected scalar_continue_guard results: {vals}";
-}
+    def check_pointer_optional_plain_truthiness_narrows_the_tr {
+        (eng, _) = compile_native(FIXTURE);
+        sv = sv_module();
 
-test "scalar optional: early `raise` narrows the fall-through" {
-    (eng, _) = compile_native(FIXTURE);
-    sv = sv_module();
-    vals = congruent(eng, sv, "scalar_raise_guard", [1, 3]);
-    assert vals == [5, 11] , f"unexpected scalar_raise_guard results: {vals}";
-}
+        vals = congruent(eng, sv, "ptr_truthy", [0, 2, 4]);
+        assert vals == [-1, 102, 104] , f"unexpected ptr_truthy results: {vals}";
+    }
 
-test "isinstance narrows a boxed union to the tested member" {
-    (eng, _) = compile_native(FIXTURE);
-    sv = sv_module();
-    vals = congruent(eng, sv, "iso_any", [0, 2, 5]);
-    assert vals == [-1, 9, 21] , f"unexpected iso_any results: {vals}";
-}
+    def check_pointer_optional_none_narrows_like_is_not_none {
+        (eng, _) = compile_native(FIXTURE);
+        sv = sv_module();
 
-test "a redundant `is None` on a proven value still reads the tag" {
-    (eng, _) = compile_native(FIXTURE);
-    sv = sv_module();
-    vals = congruent(eng, sv, "redundant_guard", [0, 1, 2]);
-    assert vals == [-1, 6, 9] , f"unexpected redundant_guard results: {vals}";
-}
+        vals = congruent(eng, sv, "ptr_ne_none", [0, 2, 4]);
+        assert vals == [-1, 202, 204] , f"unexpected ptr_ne_none results: {vals}";
+    }
 
-test "a redundant `is None` on a proven zero payload is still False" {
-    (eng, _) = compile_native(FIXTURE);
-    sv = sv_module();
-    vals = congruent(eng, sv, "zero_payload_redundant_guard", [0, 1, 5]);
-    assert vals == [-1, 7, 7] , (
-        f"unexpected zero_payload_redundant_guard results: {vals}"
+    def check_scalar_optional_is_none_early_return_guard_narro {
+        (eng, _) = compile_native(FIXTURE);
+        sv = sv_module();
+
+        vals = congruent(eng, sv, "scalar_guard", [0, 1, 4]);
+        assert vals == [-1, 4, 13] , f"unexpected scalar_guard results: {vals}";
+    }
+
+    def check_scalar_optional_early_continue_narrows_the_rest {
+        (eng, _) = compile_native(FIXTURE);
+        sv = sv_module();
+
+        vals = congruent(eng, sv, "scalar_continue_guard", [0, 3, 5]);
+        assert vals == [0, 3, 18] , f"unexpected scalar_continue_guard results: {vals}";
+    }
+
+    def check_scalar_optional_early_raise_narrows_the_fall_thr {
+        (eng, _) = compile_native(FIXTURE);
+        sv = sv_module();
+
+        vals = congruent(eng, sv, "scalar_raise_guard", [1, 3]);
+        assert vals == [5, 11] , f"unexpected scalar_raise_guard results: {vals}";
+    }
+
+    def check_isinstance_narrows_a_boxed_union_to_the_tested_m {
+        (eng, _) = compile_native(FIXTURE);
+        sv = sv_module();
+
+        vals = congruent(eng, sv, "iso_any", [0, 2, 5]);
+        assert vals == [-1, 9, 21] , f"unexpected iso_any results: {vals}";
+    }
+
+    def check_a_redundant_is_none_on_a_proven_value_still_read {
+        (eng, _) = compile_native(FIXTURE);
+        sv = sv_module();
+
+        vals = congruent(eng, sv, "redundant_guard", [0, 1, 2]);
+        assert vals == [-1, 6, 9] , f"unexpected redundant_guard results: {vals}";
+    }
+
+    def check_a_redundant_is_none_on_a_proven_zero_payload_is {
+        (eng, _) = compile_native(FIXTURE);
+        sv = sv_module();
+
+        vals = congruent(eng, sv, "zero_payload_redundant_guard", [0, 1, 5]);
+        assert vals == [-1, 7, 7] , (
+            f"unexpected zero_payload_redundant_guard results: {vals}"
+        );
+    }
+
+    def check_is_none_as_a_value_never_compares_against_a_narr {
+        (eng, _) = compile_native(FIXTURE);
+        sv = sv_module();
+
+        vals = congruent(eng, sv, "zero_payload_none_test_value", [0, 1, 5]);
+        assert vals == [-1, 9, 9] , (
+            f"unexpected zero_payload_none_test_value results: {vals}"
+        );
+        # a float payload is the case that actually miscompiles if the operand of
+        # a None test is narrowed: `x is None` becomes `fcmp une x, 0.0`
+        fvals = congruent(eng, sv, "float_none_test_value", [0, 2, 4]);
+        assert fvals == [-1, 11, 13] , (
+            f"unexpected float_none_test_value results: {fvals}"
+        );
+    }
+
+    def check_truthiness_of_a_proven_container_stays_len_0 {
+        (eng, _) = compile_native(FIXTURE);
+        sv = sv_module();
+
+        vals = congruent(eng, sv, "truthy_after_guard", [0, 1, 3]);
+        assert vals == [-1, 1, 3] , f"unexpected truthy_after_guard results: {vals}";
+    }
+
+    def check_a_rebind_re_widens_the_tag_is_still_read_after_r {
+        (eng, _) = compile_native(FIXTURE);
+        sv = sv_module();
+
+        vals = congruent(eng, sv, "rebind_widens", [0, 2, 6]);
+        assert vals == [-1, 6, 21] , f"unexpected rebind_widens results: {vals}";
+    }
+
+    def check_a_loop_that_rebinds_before_the_use_still_narrows {
+        (eng, _) = compile_native(FIXTURE);
+        sv = sv_module();
+
+        vals = congruent(eng, sv, "loop_fresh_each_iter", [0, 2, 6]);
+        assert vals == [-4, 7, 54] , f"unexpected loop_fresh_each_iter results: {vals}";
+    }
+
+    def check_a_subscript_store_inside_a_loop_keeps_the_narrow {
+        (eng, _) = compile_native(FIXTURE);
+        sv = sv_module();
+
+        vals = congruent(eng, sv, "loop_element_store", [0, 3]);
+        assert vals == [-1, 9] , f"unexpected loop_element_store results: {vals}";
+    }
+
+    def check_case_none_over_a_narrowed_subject_folds_instead {
+        (eng, _) = compile_native(FIXTURE);
+        sv = sv_module();
+
+        vals = congruent(eng, sv, "match_narrowed_subject", [0, 2, 4]);
+        assert vals == [-1, 5, 5] , f"unexpected match_narrowed_subject results: {vals}";
+    }
+    run_cases(
+        [
+            (
+                "pointer optional: `is None` early-return guard narrows the fall-through",
+                check_pointer_optional_is_none_early_return_guard_narr
+            ),
+            (
+                "pointer optional: `is not None` positive branch narrows the body",
+                check_pointer_optional_is_not_none_positive_branch_nar
+            ),
+            (
+                "pointer optional: if/else narrows both branches",
+                check_pointer_optional_if_else_narrows_both_branches
+            ),
+            (
+                "pointer optional: plain truthiness narrows the true branch",
+                check_pointer_optional_plain_truthiness_narrows_the_tr
+            ),
+            (
+                "pointer optional: `!= None` narrows like `is not None`",
+                check_pointer_optional_none_narrows_like_is_not_none
+            ),
+            (
+                "scalar optional: `is None` early-return guard narrows the fall-through",
+                check_scalar_optional_is_none_early_return_guard_narro
+            ),
+            (
+                "scalar optional: early `continue` narrows the rest of the loop body",
+                check_scalar_optional_early_continue_narrows_the_rest
+            ),
+            (
+                "scalar optional: early `raise` narrows the fall-through",
+                check_scalar_optional_early_raise_narrows_the_fall_thr
+            ),
+            (
+                "isinstance narrows a boxed union to the tested member",
+                check_isinstance_narrows_a_boxed_union_to_the_tested_m
+            ),
+            (
+                "a redundant `is None` on a proven value still reads the tag",
+                check_a_redundant_is_none_on_a_proven_value_still_read
+            ),
+            (
+                "a redundant `is None` on a proven zero payload is still False",
+                check_a_redundant_is_none_on_a_proven_zero_payload_is
+            ),
+            (
+                "`is None` as a value never compares against a narrowed payload",
+                check_is_none_as_a_value_never_compares_against_a_narr
+            ),
+            (
+                "truthiness of a proven container stays len > 0",
+                check_truthiness_of_a_proven_container_stays_len_0
+            ),
+            (
+                "a rebind re-widens: the tag is still read after reassignment",
+                check_a_rebind_re_widens_the_tag_is_still_read_after_r
+            ),
+            (
+                "a loop that rebinds before the use still narrows",
+                check_a_loop_that_rebinds_before_the_use_still_narrows
+            ),
+            (
+                "a subscript store inside a loop keeps the narrow at the loop head",
+                check_a_subscript_store_inside_a_loop_keeps_the_narrow
+            ),
+            (
+                "`case None` over a narrowed subject folds instead of comparing to null",
+                check_case_none_over_a_narrowed_subject_folds_instead
+            )
+        ]
     );
 }
 
-test "`is None` as a value never compares against a narrowed payload" {
-    (eng, _) = compile_native(FIXTURE);
-    sv = sv_module();
-    vals = congruent(eng, sv, "zero_payload_none_test_value", [0, 1, 5]);
-    assert vals == [-1, 9, 9] , (
-        f"unexpected zero_payload_none_test_value results: {vals}"
-    );
-    # a float payload is the case that actually miscompiles if the operand of
-    # a None test is narrowed: `x is None` becomes `fcmp une x, 0.0`
-    fvals = congruent(eng, sv, "float_none_test_value", [0, 2, 4]);
-    assert fvals == [-1, 11, 13] , (
-        f"unexpected float_none_test_value results: {fvals}"
-    );
-}
 
-test "truthiness of a proven container stays len > 0" {
-    (eng, _) = compile_native(FIXTURE);
-    sv = sv_module();
-    vals = congruent(eng, sv, "truthy_after_guard", [0, 1, 3]);
-    assert vals == [-1, 1, 3] , f"unexpected truthy_after_guard results: {vals}";
-}
+test "a callee that rebinds the attribute keeps the checked unwrap, and related cases" {
+    def check_a_callee_that_rebinds_the_attribute_keeps_the_ch {
+        (eng, _) = compile_native(FIXTURE);
+        ir = compile_native_ir(FIXTURE);
+        sv = sv_module();
 
-test "a rebind re-widens: the tag is still read after reassignment" {
-    (eng, _) = compile_native(FIXTURE);
-    sv = sv_module();
-    vals = congruent(eng, sv, "rebind_widens", [0, 2, 6]);
-    assert vals == [-1, 6, 21] , f"unexpected rebind_widens results: {vals}";
-}
+        vals = congruent(eng, sv, "callee_rebinds_attr", [0]);
+        assert vals == [1] , f"unexpected callee_rebinds_attr results: {vals}";
+        body = func_ir(str(ir.gen.llvm_ir), "callee_rebinds_attr");
+        assert "opt.isnone" in body , (
+            "an attribute a callee can rebind must keep its checked unwrap"
+        );
+    }
 
-test "a loop that rebinds before the use still narrows" {
-    (eng, _) = compile_native(FIXTURE);
-    sv = sv_module();
-    vals = congruent(eng, sv, "loop_fresh_each_iter", [0, 2, 6]);
-    assert vals == [-4, 7, 54] , f"unexpected loop_fresh_each_iter results: {vals}";
-}
+    def check_a_value_live_across_a_loop_back_edge_keeps_the_c {
+        (eng, _) = compile_native(FIXTURE);
+        ir = compile_native_ir(FIXTURE);
+        sv = sv_module();
 
-test "a callee that rebinds the attribute keeps the checked unwrap" {
-    # k=0 leaves the attribute set, so both backends agree on a value. k=1
-    # routes through `drop_slot`, which the checker's intra-procedural walk
-    # cannot see: sv raises TypeError there, so native must not read a payload.
-    (eng, _) = compile_native(FIXTURE);
-    ir = compile_native_ir(FIXTURE);
-    sv = sv_module();
-    vals = congruent(eng, sv, "callee_rebinds_attr", [0]);
-    assert vals == [1] , f"unexpected callee_rebinds_attr results: {vals}";
-    body = func_ir(str(ir.gen.llvm_ir), "callee_rebinds_attr");
-    assert "opt.isnone" in body , (
-        "an attribute a callee can rebind must keep its checked unwrap"
-    );
-}
+        vals = congruent(eng, sv, "back_edge_rewiden", [0, 6]);
+        assert vals == [-1, 21] , f"unexpected back_edge_rewiden results: {vals}";
+        body = func_ir(str(ir.gen.llvm_ir), "back_edge_rewiden");
+        assert "opt.isnone" in body , (
+            "a use the loop body rebinds after must keep its checked unwrap"
+        );
+    }
 
-test "a value live across a loop back edge keeps the checked unwrap" {
-    # n=6 keeps the rebound value non-None on every iteration, so both
-    # backends agree. n=2 puts None on the back edge and sv raises TypeError,
-    # so the in-loop use must not have been narrowed away.
-    (eng, _) = compile_native(FIXTURE);
-    ir = compile_native_ir(FIXTURE);
-    sv = sv_module();
-    vals = congruent(eng, sv, "back_edge_rewiden", [0, 6]);
-    assert vals == [-1, 21] , f"unexpected back_edge_rewiden results: {vals}";
-    body = func_ir(str(ir.gen.llvm_ir), "back_edge_rewiden");
-    assert "opt.isnone" in body , (
-        "a use the loop body rebinds after must keep its checked unwrap"
+    def check_a_tuple_target_rebind_inside_a_loop_keeps_the_ch {
+        (eng, _) = compile_native(FIXTURE);
+        ir = compile_native_ir(FIXTURE);
+        sv = sv_module();
+
+        vals = congruent(eng, sv, "loop_unpack_rebind", [0, 6]);
+        assert vals == [-1, 21] , f"unexpected loop_unpack_rebind results: {vals}";
+        body = func_ir(str(ir.gen.llvm_ir), "loop_unpack_rebind");
+        assert "opt.isnone" in body , (
+            "a use the loop body rebinds through a tuple target must keep its checked unwrap"
+        );
+    }
+    run_cases(
+        [
+            (
+                "a callee that rebinds the attribute keeps the checked unwrap",
+                check_a_callee_that_rebinds_the_attribute_keeps_the_ch
+            ),
+            (
+                "a value live across a loop back edge keeps the checked unwrap",
+                check_a_value_live_across_a_loop_back_edge_keeps_the_c
+            ),
+            (
+                "a tuple-target rebind inside a loop keeps the checked unwrap",
+                check_a_tuple_target_rebind_inside_a_loop_keeps_the_ch
+            )
+        ]
     );
 }
 
-test "a subscript store inside a loop keeps the narrow at the loop head" {
-    (eng, _) = compile_native(FIXTURE);
-    sv = sv_module();
-    vals = congruent(eng, sv, "loop_element_store", [0, 3]);
-    assert vals == [-1, 9] , f"unexpected loop_element_store results: {vals}";
-}
-
-test "a tuple-target rebind inside a loop keeps the checked unwrap" {
-    (eng, _) = compile_native(FIXTURE);
-    ir = compile_native_ir(FIXTURE);
-    sv = sv_module();
-    vals = congruent(eng, sv, "loop_unpack_rebind", [0, 6]);
-    assert vals == [-1, 21] , f"unexpected loop_unpack_rebind results: {vals}";
-    body = func_ir(str(ir.gen.llvm_ir), "loop_unpack_rebind");
-    assert "opt.isnone" in body , (
-        "a use the loop body rebinds through a tuple target must keep its checked unwrap"
-    );
-}
-
-test "`case None` over a narrowed subject folds instead of comparing to null" {
-    (eng, _) = compile_native(FIXTURE);
-    sv = sv_module();
-    vals = congruent(eng, sv, "match_narrowed_subject", [0, 2, 4]);
-    assert vals == [-1, 5, 5] , f"unexpected match_narrowed_subject results: {vals}";
-}
 
 test "the narrowed in-loop use keeps its tag check elided" {
     # `scalar_continue_guard` assigns at the top of the body, so the guard's

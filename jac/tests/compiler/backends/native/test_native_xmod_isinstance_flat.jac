@@ -23,7 +23,7 @@ import contextlib;
 import ctypes;
 import io;
 import os;
-import from tests.support { TESTS_DIR, get_func, native_force_opts }
+import from tests.support { TESTS_DIR, get_func, native_force_opts, run_cases }
 import jaclang.compiler.frontend.unitree as uni;
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.backends.native.llvm.binding { ExecutionEngine }
@@ -75,65 +75,112 @@ test "isinstance against a vtable-less imported class lowers natively" {
     assert "isinstance" not in seams , f"a flat imported class did not lower: {seams}";
 }
 
-test "a flat imported class matches itself and nothing else" {
-    (eng, _) = compile_native("xmod_isinstance_flat_main.jac");
-    f = get_func(eng, "chk_flat", ctypes.c_int64, ctypes.c_int64);
-    assert f(0) == 1 , "a Point must match the imported Point";
-    assert f(1) == 0 , "an unrelated imported class must not match Point";
-    assert f(2) == 0 , "a same-module class must not match Point";
-    assert f(3) == 0 , "an int must not match an imported archetype";
+test "xmod_isinstance_flat_main.jac cases" {
+    def check_a_flat_imported_class_matches_itself_and_nothing {
+        (eng, _) = compile_native("xmod_isinstance_flat_main.jac");
+
+        f = get_func(eng, "chk_flat", ctypes.c_int64, ctypes.c_int64);
+        assert f(0) == 1 , "a Point must match the imported Point";
+        assert f(1) == 0 , "an unrelated imported class must not match Point";
+        assert f(2) == 0 , "a same-module class must not match Point";
+        assert f(3) == 0 , "an int must not match an imported archetype";
+    }
+
+    def check_a_same_module_flat_class_still_decides {
+        (eng, _) = compile_native("xmod_isinstance_flat_main.jac");
+
+        f = get_func(eng, "chk_local", ctypes.c_int64, ctypes.c_int64);
+        assert f(0) == 1 , "a Local must match Local";
+        assert f(1) == 0 , "an imported Point must not match a same-module Local";
+    }
+
+    def check_a_statically_typed_operand_of_a_flat_imported_cl {
+        (eng, _) = compile_native("xmod_isinstance_flat_main.jac");
+
+        f = get_func(eng, "chk_typed", ctypes.c_int64);
+        assert f() == 1 , "a Point-typed local must match Point";
+    }
+
+    def check_objects_the_defining_module_built_carry_the_same {
+        (eng, _) = compile_native("xmod_isinstance_flat_main.jac");
+
+        f = get_func(eng, "chk_lib_built", ctypes.c_int64);
+        assert f() == 1 , "a Point the library allocated must match Point here";
+    }
+
+    def check_a_consumer_subclass_and_a_plain_instance_both_ma {
+        (eng, _) = compile_native("xmod_isinstance_flat_main.jac");
+
+        f = get_func(eng, "chk_kid", ctypes.c_int64, ctypes.c_int64);
+        assert f(0) == 1 , "MainKid must match its imported base Point";
+        assert f(1) == 1 , "a plain Point must match Point once a subclass exists";
+        assert f(2) == 1 , "a library-built Point must match Point too";
+        assert f(3) == 0 , "an unrelated imported class must not match Point";
+    }
+
+    def check_the_consumer_subclass_does_not_swallow_its_impor {
+        (eng, _) = compile_native("xmod_isinstance_flat_main.jac");
+
+        f = get_func(eng, "chk_kid_leaf", ctypes.c_int64, ctypes.c_int64);
+        assert f(0) == 1 , "MainKid must match MainKid";
+        assert f(1) == 0 , "a plain Point must not match the subclass MainKid";
+    }
+
+    def check_an_imported_hierarchy_still_decides_through_its {
+        (eng, _) = compile_native("xmod_isinstance_flat_main.jac");
+
+        f = get_func(eng, "chk_hier", ctypes.c_int64, ctypes.c_int64);
+        assert f(0) == 1 , "LibKid must match its imported base LibBase";
+        assert f(1) == 1 , "LibBase must match LibBase";
+        assert f(2) == 0 , "an unrelated imported class must not match LibBase";
+    }
+
+    def check_a_tuple_arm_mixes_a_flat_and_a_hierarchical_impo {
+        (eng, _) = compile_native("xmod_isinstance_flat_main.jac");
+
+        f = get_func(eng, "chk_tuple_arm", ctypes.c_int64, ctypes.c_int64);
+        assert f(0) == 1 , "the flat arm must answer for a Point";
+        assert f(1) == 1 , "the hierarchical arm must answer for a LibKid";
+        assert f(2) == 0 , "neither arm may answer for an unrelated class";
+    }
+    run_cases(
+        [
+            (
+                "a flat imported class matches itself and nothing else",
+                check_a_flat_imported_class_matches_itself_and_nothing
+            ),
+            (
+                "a same-module flat class still decides",
+                check_a_same_module_flat_class_still_decides
+            ),
+            (
+                "a statically typed operand of a flat imported class matches",
+                check_a_statically_typed_operand_of_a_flat_imported_cl
+            ),
+            (
+                "objects the defining module built carry the same identity",
+                check_objects_the_defining_module_built_carry_the_same
+            ),
+            (
+                "a consumer subclass and a plain instance both match the imported base",
+                check_a_consumer_subclass_and_a_plain_instance_both_ma
+            ),
+            (
+                "the consumer subclass does not swallow its imported base",
+                check_the_consumer_subclass_does_not_swallow_its_impor
+            ),
+            (
+                "an imported hierarchy still decides through its vtables",
+                check_an_imported_hierarchy_still_decides_through_its
+            ),
+            (
+                "a tuple arm mixes a flat and a hierarchical imported class",
+                check_a_tuple_arm_mixes_a_flat_and_a_hierarchical_impo
+            )
+        ]
+    );
 }
 
-test "a same-module flat class still decides" {
-    (eng, _) = compile_native("xmod_isinstance_flat_main.jac");
-    f = get_func(eng, "chk_local", ctypes.c_int64, ctypes.c_int64);
-    assert f(0) == 1 , "a Local must match Local";
-    assert f(1) == 0 , "an imported Point must not match a same-module Local";
-}
-
-test "a statically typed operand of a flat imported class matches" {
-    (eng, _) = compile_native("xmod_isinstance_flat_main.jac");
-    f = get_func(eng, "chk_typed", ctypes.c_int64);
-    assert f() == 1 , "a Point-typed local must match Point";
-}
-
-test "objects the defining module built carry the same identity" {
-    (eng, _) = compile_native("xmod_isinstance_flat_main.jac");
-    f = get_func(eng, "chk_lib_built", ctypes.c_int64);
-    assert f() == 1 , "a Point the library allocated must match Point here";
-}
-
-test "a consumer subclass and a plain instance both match the imported base" {
-    (eng, _) = compile_native("xmod_isinstance_flat_main.jac");
-    f = get_func(eng, "chk_kid", ctypes.c_int64, ctypes.c_int64);
-    assert f(0) == 1 , "MainKid must match its imported base Point";
-    assert f(1) == 1 , "a plain Point must match Point once a subclass exists";
-    assert f(2) == 1 , "a library-built Point must match Point too";
-    assert f(3) == 0 , "an unrelated imported class must not match Point";
-}
-
-test "the consumer subclass does not swallow its imported base" {
-    (eng, _) = compile_native("xmod_isinstance_flat_main.jac");
-    f = get_func(eng, "chk_kid_leaf", ctypes.c_int64, ctypes.c_int64);
-    assert f(0) == 1 , "MainKid must match MainKid";
-    assert f(1) == 0 , "a plain Point must not match the subclass MainKid";
-}
-
-test "an imported hierarchy still decides through its vtables" {
-    (eng, _) = compile_native("xmod_isinstance_flat_main.jac");
-    f = get_func(eng, "chk_hier", ctypes.c_int64, ctypes.c_int64);
-    assert f(0) == 1 , "LibKid must match its imported base LibBase";
-    assert f(1) == 1 , "LibBase must match LibBase";
-    assert f(2) == 0 , "an unrelated imported class must not match LibBase";
-}
-
-test "a tuple arm mixes a flat and a hierarchical imported class" {
-    (eng, _) = compile_native("xmod_isinstance_flat_main.jac");
-    f = get_func(eng, "chk_tuple_arm", ctypes.c_int64, ctypes.c_int64);
-    assert f(0) == 1 , "the flat arm must answer for a Point";
-    assert f(1) == 1 , "the hierarchical arm must answer for a LibKid";
-    assert f(2) == 0 , "neither arm may answer for an unrelated class";
-}
 
 test "an ancestor chain that leaves the unit is continued, and the check answers" {
     # This test used to pin the refusal: `DeepKid` recorded `[DeepKid,
@@ -155,29 +202,45 @@ test "an ancestor chain that leaves the unit is continued, and the check answers
     assert f(2) == 0 , "an unrelated class must still not match LibBase";
 }
 
-test "a target whose chain was always whole is untouched by the repair" {
-    (eng, _) = compile_native("xmod_isinstance_deep_main.jac");
-    f = get_func(eng, "chk_flat", ctypes.c_int64, ctypes.c_int64);
-    assert f(0) == 1 , "a target whose chain is whole must still lower and match";
-    assert f(1) == 0 , "and must still reject an unrelated class";
-}
+test "xmod_isinstance_deep_main.jac cases" {
+    def check_a_target_whose_chain_was_always_whole_is_untouch {
+        (eng, _) = compile_native("xmod_isinstance_deep_main.jac");
 
-test "an operand that could never hold the deep class still answers" {
-    (eng, _) = compile_native("xmod_isinstance_deep_main.jac");
-    f = get_func(eng, "chk_unrelated_operand", ctypes.c_int64);
-    assert f() == 0 , (
-        "a statically typed operand outside the subtree must decide, not refuse"
+        f = get_func(eng, "chk_flat", ctypes.c_int64, ctypes.c_int64);
+        assert f(0) == 1 , "a target whose chain is whole must still lower and match";
+        assert f(1) == 0 , "and must still reject an unrelated class";
+    }
+
+    def check_an_operand_that_could_never_hold_the_deep_class {
+        (eng, _) = compile_native("xmod_isinstance_deep_main.jac");
+
+        f = get_func(eng, "chk_unrelated_operand", ctypes.c_int64);
+        assert f() == 0 , (
+            "a statically typed operand outside the subtree must decide, not refuse"
+        );
+    }
+
+    def check_an_operand_typed_as_the_once_dropped_ancestor_an {
+        (eng, _) = compile_native("xmod_isinstance_deep_main.jac");
+
+        f = get_func(eng, "chk_base_typed_operand", ctypes.c_int64, ctypes.c_int64);
+        assert f(0) == 1 , "a DeepKid behind a LibBase-typed slot must match";
+        assert f(1) == 1 , "a LibKid behind the same slot must match too";
+    }
+    run_cases(
+        [
+            (
+                "a target whose chain was always whole is untouched by the repair",
+                check_a_target_whose_chain_was_always_whole_is_untouch
+            ),
+            (
+                "an operand that could never hold the deep class still answers",
+                check_an_operand_that_could_never_hold_the_deep_class
+            ),
+            (
+                "an operand typed as the once-dropped ancestor answers correctly",
+                check_an_operand_typed_as_the_once_dropped_ancestor_an
+            )
+        ]
     );
-}
-
-test "an operand typed as the once-dropped ancestor answers correctly" {
-    # The inverse of the old pin: a `LibBase`-typed operand used to look
-    # unrelated to `DeepKid` precisely because `LibBase` was the link the
-    # short chain dropped, and lowering it would have answered `False` for
-    # a `DeepKid` flowing through that slot. With the chain continued, the
-    # table holds (DeepKid, LibBase) and the answer is the true one.
-    (eng, _) = compile_native("xmod_isinstance_deep_main.jac");
-    f = get_func(eng, "chk_base_typed_operand", ctypes.c_int64, ctypes.c_int64);
-    assert f(0) == 1 , "a DeepKid behind a LibBase-typed slot must match";
-    assert f(1) == 1 , "a LibKid behind the same slot must match too";
 }

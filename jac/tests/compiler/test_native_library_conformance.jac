@@ -18,6 +18,8 @@ import from jaclang.compiler.native_bindings {
     typeshed_stub_path,
     variant_mismatches
 }
+import from tests.support { run_cases }
+
 
 def library_modules -> list[tuple[str, str]] {
     found: list[tuple[str, str]] = [];
@@ -34,45 +36,60 @@ def library_modules -> list[tuple[str, str]] {
     return sorted(found);
 }
 
-test "every public native library module conforms to its Python interface" {
-    prog = JacProgram();
-    failures: list[str] = [];
-    checked = 0;
-    for (lib, path) in library_modules() {
-        stub_path = typeshed_stub_path(lib);
-        if stub_path is None {
-            continue;
-        }
-        stub_mod = prog.load_dependency_module(stub_path, need_tree=True);
-        native_mod = prog.load_dependency_module(path, need_tree=True);
-        checked += 1;
-        for (_decl, why) in conformance_mismatches(stub_mod, native_mod, prog) {
-            failures.append(f"{lib}: {why}");
-        }
-    }
-    assert checked > 40 , f"only {checked} library modules were found";
-    assert not failures , "\n".join(failures);
-}
-
-test "platform variants of a library module expose one surface" {
-    prog = JacProgram();
-    failures: list[str] = [];
-    top = native_stdlib_root() or "";
-    for (folder, _dirs, files) in os.walk(top) {
-        for name in sorted(files) {
-            if not name.endswith(".jac") {
+test "every public native library module conforms to its Python interface, and related cases" {
+    def check_every_public_native_library_module_conforms_to_i {
+        prog = JacProgram();
+        failures: list[str] = [];
+        checked = 0;
+        for (lib, path) in library_modules() {
+            stub_path = typeshed_stub_path(lib);
+            if stub_path is None {
                 continue;
             }
-            mod = prog.load_dependency_module(
-                os.path.join(folder, name), need_tree=True
-            );
-            for (_decl, why) in variant_mismatches(mod, prog) {
-                failures.append(f"{name}: {why}");
+            stub_mod = prog.load_dependency_module(stub_path, need_tree=True);
+            native_mod = prog.load_dependency_module(path, need_tree=True);
+            checked += 1;
+            for (_decl, why) in conformance_mismatches(stub_mod, native_mod, prog) {
+                failures.append(f"{lib}: {why}");
             }
         }
+        assert checked > 40 , f"only {checked} library modules were found";
+        assert not failures , "\n".join(failures);
     }
-    assert not failures , "\n".join(failures);
+
+    def check_platform_variants_of_a_library_module_expose_one {
+        prog = JacProgram();
+        failures: list[str] = [];
+        top = native_stdlib_root() or "";
+        for (folder, _dirs, files) in os.walk(top) {
+            for name in sorted(files) {
+                if not name.endswith(".jac") {
+                    continue;
+                }
+                mod = prog.load_dependency_module(
+                    os.path.join(folder, name), need_tree=True
+                );
+                for (_decl, why) in variant_mismatches(mod, prog) {
+                    failures.append(f"{name}: {why}");
+                }
+            }
+        }
+        assert not failures , "\n".join(failures);
+    }
+    run_cases(
+        [
+            (
+                "every public native library module conforms to its Python interface",
+                check_every_public_native_library_module_conforms_to_i
+            ),
+            (
+                "platform variants of a library module expose one surface",
+                check_platform_variants_of_a_library_module_expose_one
+            )
+        ]
+    );
 }
+
 
 test "the interface is read from symbols: branches, re-exports and bases included" {
     import from jaclang.compiler.types.types { ClassType }

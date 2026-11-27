@@ -21,7 +21,7 @@ call, and a nested loop with `break`/`continue` over the tuple.
 Mixed tuples use the union of their element types and the shared tagged-value
 representation, so narrowing in the loop observes the current member.
 """
-import from tests.support { unit_symbol }
+import from tests.support { unit_symbol, run_cases }
 
 import ctypes;
 import os;
@@ -97,27 +97,70 @@ def _sv_module -> any {
 }
 
 
-test "a homogeneous str tuple iterates every element in order" {
-    f = _get("str_tuple");
-    assert f(0) == 11885 , (
-        "31-weighted fold over lengths 12, 11 and 12: a dropped element or a "
-        "reordered one lands somewhere else"
+test "a homogeneous cases" {
+    def check_a_homogeneous_str_tuple_iterates_every_element_i {
+        f = _get("str_tuple");
+        assert f(0) == 11885 , (
+            "31-weighted fold over lengths 12, 11 and 12: a dropped element or a "
+            "reordered one lands somewhere else"
+        );
+        assert _get("str_list")(0) == f(0) , "the list spelling must agree";
+    }
+
+    def check_a_homogeneous_int_tuple_iterates_as_a_raw_intege {
+        f = _get("int_tuple");
+        assert f(0) == 357 , "3, 5 then 7";
+        assert _get("int_list")(0) == f(0) , "the list spelling must agree";
+    }
+    run_cases(
+        [
+            (
+                "a homogeneous str tuple iterates every element in order",
+                check_a_homogeneous_str_tuple_iterates_every_element_i
+            ),
+            (
+                "a homogeneous int tuple iterates as a raw-integer sequence",
+                check_a_homogeneous_int_tuple_iterates_as_a_raw_intege
+            )
+        ]
     );
-    assert _get("str_list")(0) == f(0) , "the list spelling must agree";
 }
 
 
-test "a homogeneous int tuple iterates as a raw-integer sequence" {
-    f = _get("int_tuple");
-    assert f(0) == 357 , "3, 5 then 7";
-    assert _get("int_list")(0) == f(0) , "the list spelling must agree";
-}
+test "a homogeneous float tuple keeps its element width, and related cases" {
+    def check_a_homogeneous_float_tuple_keeps_its_element_widt {
+        assert _get("float_tuple")(0) == 706 , (
+            "1.5, 2.25 and 4.0 scaled by 4: a raw-integer store would read the "
+            "bit pattern instead"
+        );
+    }
 
+    def check_the_mixed_list_twin_still_iterates_boxed_and_rea {
+        assert _get("hetero_list")(0) == 38 , (
+            "1, then len('ab'), then 3, folded by 5"
+        );
+    }
 
-test "a homogeneous float tuple keeps its element width" {
-    assert _get("float_tuple")(0) == 706 , (
-        "1.5, 2.25 and 4.0 scaled by 4: a raw-integer store would read the "
-        "bit pattern instead"
+    def check_break_and_continue_work_over_a_tuple_loop_nested {
+        assert _get("nested_tuple")(0) == 954 , (
+            "'bbb' is skipped, 'cccc' breaks the inner loop, three outer passes"
+        );
+    }
+    run_cases(
+        [
+            (
+                "a homogeneous float tuple keeps its element width",
+                check_a_homogeneous_float_tuple_keeps_its_element_widt
+            ),
+            (
+                "the mixed list twin still iterates boxed and reads the right member",
+                check_the_mixed_list_twin_still_iterates_boxed_and_rea
+            ),
+            (
+                "break and continue work over a tuple loop nested in another loop",
+                check_break_and_continue_work_over_a_tuple_loop_nested
+            )
+        ]
     );
 }
 
@@ -130,18 +173,26 @@ test "the degenerate literals lower: an empty tuple and a single element" {
 }
 
 
-test "a tuple bound to a local iterates the same as one in the header" {
-    assert _get("local_tuple")(0) == 120 , "7-weighted fold over lengths 2, 3 and 1";
-}
+test "a tuple cases" {
+    def check_a_tuple_bound_to_a_local_iterates_the_same_as_on {
+        assert _get("local_tuple")(0) == 120 , "7-weighted fold over lengths 2, 3 and 1";
+    }
 
-
-test "a tuple returned from a call iterates off the call" {
-    assert _get("call_tuple")(0) == 246 , "2, 4 then 6";
-}
-
-
-test "the mixed list twin still iterates boxed and reads the right member" {
-    assert _get("hetero_list")(0) == 38 , ("1, then len('ab'), then 3, folded by 5");
+    def check_a_tuple_returned_from_a_call_iterates_off_the_ca {
+        assert _get("call_tuple")(0) == 246 , "2, 4 then 6";
+    }
+    run_cases(
+        [
+            (
+                "a tuple bound to a local iterates the same as one in the header",
+                check_a_tuple_bound_to_a_local_iterates_the_same_as_on
+            ),
+            (
+                "a tuple returned from a call iterates off the call",
+                check_a_tuple_returned_from_a_call_iterates_off_the_ca
+            )
+        ]
+    );
 }
 
 
@@ -185,13 +236,6 @@ test "mixed tuple iteration agrees with the host" {
         "the tuple must compute 1, len('ab'), 3 folded by 5"
     );
     assert mods[0].mixed_list(0) == 38 , "the list spelling agrees";
-}
-
-
-test "break and continue work over a tuple loop nested in another loop" {
-    assert _get("nested_tuple")(0) == 954 , (
-        "'bbb' is skipped, 'cccc' breaks the inner loop, three outer passes"
-    );
 }
 
 

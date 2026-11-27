@@ -21,7 +21,8 @@ import from tests.support {
     TESTS_DIR,
     native_address,
     native_force_opts,
-    native_str_func
+    native_str_func,
+    run_cases
 }
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.runtime.runtime { JacRuntime }
@@ -82,61 +83,108 @@ def same_int(eng: any, name: str) {
     assert native == sv , f"{name}: native {native!r} != sv {sv!r}";
 }
 
-test "string-valued enum keys: lookup by member and by runtime key" {
-    eng = compile_native(PROG);
-    same_str(eng, "str_by_member");
-    same_str(eng, "str_by_runtime_key");
-}
+test "string-valued enum keys: lookup by member and by runtime key, and related cases" {
+    def check_string_valued_enum_keys_lookup_by_member_and_by {
+        eng = compile_native(PROG);
 
-test "string-valued enum keys: membership, get with and without a default" {
-    eng = compile_native(PROG);
-    same_int(eng, "str_contains");
-    same_str(eng, "str_get_default");
-    same_str(eng, "str_get_no_default");
-}
+        same_str(eng, "str_by_member");
+        same_str(eng, "str_by_runtime_key");
+    }
 
-test "string-valued enum keys: iteration yields keys that read back" {
-    eng = compile_native(PROG);
-    same_str(eng, "str_iter_keys");
-    same_str(eng, "str_iter_names");
-}
+    def check_string_valued_enum_keys_membership_get_with_and {
+        eng = compile_native(PROG);
 
-test "string-valued enum keys: incremental build overwrites in place" {
-    eng = compile_native(PROG);
-    same_str(eng, "str_incremental");
-    same_int(eng, "str_incremental_len");
-}
+        same_int(eng, "str_contains");
+        same_str(eng, "str_get_default");
+        same_str(eng, "str_get_no_default");
+    }
 
-test "int-valued enum keys: lookup by member and by runtime key" {
-    eng = compile_native(PROG);
-    same_str(eng, "int_by_member");
-    same_str(eng, "int_by_runtime_key");
-}
+    def check_string_valued_enum_keys_iteration_yields_keys_th {
+        eng = compile_native(PROG);
 
-test "int-valued enum keys: membership and get with a default" {
-    eng = compile_native(PROG);
-    same_int(eng, "int_contains");
-    same_str(eng, "int_get_default");
-}
+        same_str(eng, "str_iter_keys");
+        same_str(eng, "str_iter_names");
+    }
 
-test "int-valued enum keys: iteration yields keys that read back" {
-    # The key stored for Level.LOW is its declared value 2, which is also
-    # Level.HIGH's ordinal; Level.MID and Level.HIGH store 25 and 40, past
-    # the end of the three-entry member array. Indexing the ordinal arrays
-    # with the raw key named the wrong member and then ran off the array.
-    eng = compile_native(PROG);
-    same_int(eng, "int_iter_values");
-    same_str(eng, "int_iter_names");
-}
+    def check_string_valued_enum_keys_incremental_build_overwr {
+        eng = compile_native(PROG);
 
-test "int-valued enum keys: incremental build" {
-    eng = compile_native(PROG);
-    same_str(eng, "int_incremental");
-}
+        same_str(eng, "str_incremental");
+        same_int(eng, "str_incremental_len");
+    }
 
-test "enum keys: distinct members never collide" {
-    eng = compile_native(PROG);
-    same_str(eng, "distinct_members");
-    same_int(eng, "distinct_members_len");
-    same_str(eng, "mixed_no_collision");
+    def check_int_valued_enum_keys_lookup_by_member_and_by_run {
+        eng = compile_native(PROG);
+
+        same_str(eng, "int_by_member");
+        same_str(eng, "int_by_runtime_key");
+    }
+
+    def check_int_valued_enum_keys_membership_and_get_with_a_d {
+        eng = compile_native(PROG);
+
+        same_int(eng, "int_contains");
+        same_str(eng, "int_get_default");
+    }
+
+    def check_int_valued_enum_keys_iteration_yields_keys_that {
+        eng = compile_native(PROG);
+
+        same_int(eng, "int_iter_values");
+        same_str(eng, "int_iter_names");
+    }
+
+    def check_int_valued_enum_keys_incremental_build {
+        eng = compile_native(PROG);
+
+        same_str(eng, "int_incremental");
+    }
+
+    def check_enum_keys_distinct_members_never_collide {
+        eng = compile_native(PROG);
+
+        same_str(eng, "distinct_members");
+        same_int(eng, "distinct_members_len");
+        same_str(eng, "mixed_no_collision");
+    }
+    run_cases(
+        [
+            (
+                "string-valued enum keys: lookup by member and by runtime key",
+                check_string_valued_enum_keys_lookup_by_member_and_by
+            ),
+            (
+                "string-valued enum keys: membership, get with and without a default",
+                check_string_valued_enum_keys_membership_get_with_and
+            ),
+            (
+                "string-valued enum keys: iteration yields keys that read back",
+                check_string_valued_enum_keys_iteration_yields_keys_th
+            ),
+            (
+                "string-valued enum keys: incremental build overwrites in place",
+                check_string_valued_enum_keys_incremental_build_overwr
+            ),
+            (
+                "int-valued enum keys: lookup by member and by runtime key",
+                check_int_valued_enum_keys_lookup_by_member_and_by_run
+            ),
+            (
+                "int-valued enum keys: membership and get with a default",
+                check_int_valued_enum_keys_membership_and_get_with_a_d
+            ),
+            (
+                "int-valued enum keys: iteration yields keys that read back",
+                check_int_valued_enum_keys_iteration_yields_keys_that
+            ),
+            (
+                "int-valued enum keys: incremental build",
+                check_int_valued_enum_keys_incremental_build
+            ),
+            (
+                "enum keys: distinct members never collide",
+                check_enum_keys_distinct_members_never_collide
+            )
+        ]
+    );
 }

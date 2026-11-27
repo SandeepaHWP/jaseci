@@ -13,6 +13,8 @@ each half looked healthy on its own.
 
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.driver.compile_options { CompileOptions }
+import from tests.support { run_cases }
+
 
 def check_src(src: str) -> list[str] {
     prog = JacProgram();
@@ -22,21 +24,35 @@ def check_src(src: str) -> list[str] {
     return [str(e) for e in prog.errors_had];
 }
 
-test "a subscripted Final is usable as the type it wraps" {
-    src = "import string;\n"
-        + "def probe -> str {\n"
-        + "    return string.ascii_letters + string.digits;\n"
-        + "}\n";
-    errs = check_src(src);
-    assert not errs , f"Final[T] not unwrapped: {errs}";
-}
+test "a subscripted Final is usable as the type it wraps, and related cases" {
+    def check_a_subscripted_final_is_usable_as_the_type_it_wra {
+        src = "import string;\n"
+            + "def probe -> str {\n"
+            + "    return string.ascii_letters + string.digits;\n"
+            + "}\n";
+        errs = check_src(src);
+        assert not errs , f"Final[T] not unwrapped: {errs}";
+    }
 
-test "a bare Final still takes its type from its value" {
-    src = "import logging;\n"
-        + "def probe -> int {\n"
-        + "    level: int = logging.INFO;\n"
-        + "    return level;\n"
-        + "}\n";
-    errs = check_src(src);
-    assert not errs , f"bare Final regressed: {errs}";
+    def check_a_bare_final_still_takes_its_type_from_its_value {
+        src = "import logging;\n"
+            + "def probe -> int {\n"
+            + "    level: int = logging.INFO;\n"
+            + "    return level;\n"
+            + "}\n";
+        errs = check_src(src);
+        assert not errs , f"bare Final regressed: {errs}";
+    }
+    run_cases(
+        [
+            (
+                "a subscripted Final is usable as the type it wraps",
+                check_a_subscripted_final_is_usable_as_the_type_it_wra
+            ),
+            (
+                "a bare Final still takes its type from its value",
+                check_a_bare_final_still_takes_its_type_from_its_value
+            )
+        ]
+    );
 }

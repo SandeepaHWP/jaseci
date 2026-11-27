@@ -17,7 +17,7 @@ tests/compiler/backends/native/test_ownbench_differential.jac.
 import os;
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.driver.compile_options { CompileOptions }
-import from tests.support { JAC_ROOT }
+import from tests.support { JAC_ROOT, run_cases }
 
 glob FIXTURES = os.path.join(
          JAC_ROOT, "tests", "compiler", "passes", "fixtures", "ownership_regress"
@@ -71,18 +71,32 @@ test "E1402 names the sealed value, not the storage container" {
     }
 }
 
-test "scalar reads off an owned root do not consume it" {
-    prog = compile_enforced("scalar_reads_keep_owner.jac");
-    codes = ownership_codes(prog);
-    assert codes == [] , f"expected no ownership diagnostics, got {codes}:\n  {render(
-        prog
-    )}";
-}
+test "scalar reads off an owned root do not consume it, and related cases" {
+    def check_scalar_reads_off_an_owned_root_do_not_consume_it {
+        prog = compile_enforced("scalar_reads_keep_owner.jac");
+        codes = ownership_codes(prog);
+        assert codes == [] , f"expected no ownership diagnostics, got {codes}:\n  {render(
+            prog
+        )}";
+    }
 
-test "scalar-element container shapes pass the enforcement fences" {
-    prog = compile_enforced("scalar_container_shapes.jac");
-    codes = ownership_codes(prog);
-    assert codes == [] , f"expected no ownership diagnostics, got {codes}:\n  {render(
-        prog
-    )}";
+    def check_scalar_element_container_shapes_pass_the_enforce {
+        prog = compile_enforced("scalar_container_shapes.jac");
+        codes = ownership_codes(prog);
+        assert codes == [] , f"expected no ownership diagnostics, got {codes}:\n  {render(
+            prog
+        )}";
+    }
+    run_cases(
+        [
+            (
+                "scalar reads off an owned root do not consume it",
+                check_scalar_reads_off_an_owned_root_do_not_consume_it
+            ),
+            (
+                "scalar-element container shapes pass the enforcement fences",
+                check_scalar_element_container_shapes_pass_the_enforce
+            )
+        ]
+    );
 }

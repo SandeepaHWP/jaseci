@@ -16,7 +16,7 @@ how #8091 surfaced.
 import ctypes;
 import os;
 import jaclang;
-import from tests.support { TESTS_DIR, native_address }
+import from tests.support { TESTS_DIR, native_address, run_cases }
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.driver.compile_options { CompileOptions }
 import jaclang.compiler.frontend.unitree as uni;
@@ -61,40 +61,76 @@ def check(eng: any, name: str, args: list[int], want: int, allocs: int) {
     );
 }
 
-test "a present optional payload in slot 0 survives the subscript read" {
-    (eng, _) = compile_fixture();
-    check(eng, "read_first", [5], 5, 1);
-}
 
-test "a None in slot 0 takes the is-None arm and the flag stays intact" {
-    (eng, _) = compile_fixture();
-    check(eng, "read_first", [-1], -1, 0);
-    check(eng, "read_first_flag", [-1], 0, 0);
-    check(eng, "read_first_flag", [5], 1, 1);
-}
+test "an optional in a later slot keeps both the prim and the payload, and related cases" {
+    def check_an_optional_in_a_later_slot_keeps_both_the_prim {
+        (eng, _) = compile_fixture();
 
-test "an optional in a later slot keeps both the prim and the payload" {
-    (eng, _) = compile_fixture();
-    check(eng, "read_last", [7], 77, 1);
-    check(eng, "read_last", [-3], -30, 0);
-}
+        check(eng, "read_last", [7], 77, 1);
+        check(eng, "read_last", [-3], -30, 0);
+    }
 
-test "two optional slots keep independent payloads across mixed arms" {
-    (eng, _) = compile_fixture();
-    check(eng, "read_pair", [3, 4], 403, 2);
-    check(eng, "read_pair", [-1, 4], -600, 1);
-    check(eng, "read_pair", [3, -1], -99997, 1);
-    check(eng, "read_pair", [-1, -1], -101000, 0);
-}
+    def check_tuple_unpack_binds_the_optional_payload_without {
+        (eng, _) = compile_fixture();
 
-test "tuple unpack binds the optional payload without a truthiness flip" {
-    (eng, _) = compile_fixture();
-    check(eng, "unpack_first", [6], 6, 1);
-    check(eng, "unpack_first", [-1], -1, 0);
-}
+        check(eng, "unpack_first", [6], 6, 1);
+        check(eng, "unpack_first", [-1], -1, 0);
+    }
 
-test "an optional payload flows through a list append (from_loc shape)" {
-    (eng, _) = compile_fixture();
-    check(eng, "append_payload", [9], 9, 1);
-    check(eng, "append_payload", [-1], -1, 0);
+    def check_an_optional_payload_flows_through_a_list_append {
+        (eng, _) = compile_fixture();
+
+        check(eng, "append_payload", [9], 9, 1);
+        check(eng, "append_payload", [-1], -1, 0);
+    }
+    def check_a_present_optional_payload_in_slot_0_survives_th {
+        (eng, _) = compile_fixture();
+
+        check(eng, "read_first", [5], 5, 1);
+    }
+
+    def check_a_none_in_slot_0_takes_the_is_none_arm_and_the_f {
+        (eng, _) = compile_fixture();
+
+        check(eng, "read_first", [-1], -1, 0);
+        check(eng, "read_first_flag", [-1], 0, 0);
+        check(eng, "read_first_flag", [5], 1, 1);
+    }
+
+    def check_two_optional_slots_keep_independent_payloads_acr {
+        (eng, _) = compile_fixture();
+
+        check(eng, "read_pair", [3, 4], 403, 2);
+        check(eng, "read_pair", [-1, 4], -600, 1);
+        check(eng, "read_pair", [3, -1], -99997, 1);
+        check(eng, "read_pair", [-1, -1], -101000, 0);
+    }
+    run_cases(
+        [
+            (
+                "an optional in a later slot keeps both the prim and the payload",
+                check_an_optional_in_a_later_slot_keeps_both_the_prim
+            ),
+            (
+                "tuple unpack binds the optional payload without a truthiness flip",
+                check_tuple_unpack_binds_the_optional_payload_without
+            ),
+            (
+                "an optional payload flows through a list append (from_loc shape)",
+                check_an_optional_payload_flows_through_a_list_append
+            ),
+            (
+                "a present optional payload in slot 0 survives the subscript read",
+                check_a_present_optional_payload_in_slot_0_survives_th
+            ),
+            (
+                "a None in slot 0 takes the is-None arm and the flag stays intact",
+                check_a_none_in_slot_0_takes_the_is_none_arm_and_the_f
+            ),
+            (
+                "two optional slots keep independent payloads across mixed arms",
+                check_two_optional_slots_keep_independent_payloads_acr
+            )
+        ]
+    );
 }

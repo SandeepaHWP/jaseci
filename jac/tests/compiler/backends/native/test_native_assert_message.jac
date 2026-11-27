@@ -12,7 +12,13 @@ import os;
 import re;
 import tempfile;
 import from pathlib { Path }
-import from tests.support { compile_native, get_func, native_build, native_run }
+import from tests.support {
+    compile_native,
+    get_func,
+    native_build,
+    native_run,
+    run_cases
+}
 
 glob RC_FIXTURE = str(
          Path(__file__).resolve().parent / "fixtures" / "rc_assert_message.jac"
@@ -24,42 +30,74 @@ def call_str(eng: any, name: str) -> bytes {
     return get_func(eng, name, ctypes.c_char_p)();
 }
 
-test "a message built by concatenation is carried, with where it failed" {
-    (eng, _) = compile_native("assert_message.jac");
-    text = call_str(eng, "computed_message");
-    assert text.startswith(b"x must be positive: -1 at ") , text;
-    assert text.endswith(b"assert_message.jac:2") , text;
+test "assert_message.jac cases" {
+    def check_a_message_built_by_concatenation_is_carried_with {
+        (eng, _) = compile_native("assert_message.jac");
+
+        text = call_str(eng, "computed_message");
+        assert text.startswith(b"x must be positive: -1 at ") , text;
+        assert text.endswith(b"assert_message.jac:2") , text;
+    }
+
+    def check_a_message_that_is_an_f_string_is_carried_with_wh {
+        (eng, _) = compile_native("assert_message.jac");
+
+        text = call_str(eng, "formatted_message");
+        assert text.startswith(b"too short: ab at ") , text;
+        assert text.endswith(b"assert_message.jac:6") , text;
+    }
+
+    def check_a_literal_message_and_no_message_are_as_they_wer {
+        (eng, _) = compile_native("assert_message.jac");
+
+        literal = call_str(eng, "literal_message");
+        assert literal.startswith(b"a literal at ")
+            and literal.endswith(b"assert_message.jac:10") , literal;
+        bare = call_str(eng, "bare_message");
+        assert bare.startswith(b"assertion failed at ")
+            and bare.endswith(b"assert_message.jac:14") , bare;
+    }
+
+    def check_a_message_is_not_worked_out_while_the_assertion {
+        (eng, _) = compile_native("assert_message.jac");
+
+        assert get_func(eng, "holding", ctypes.c_int64)() == 1;
+        assert get_func(eng, "message_calls", ctypes.c_int64)() == 1;
+    }
+
+    def check_a_message_that_is_none_says_the_assertion_failed {
+        (eng, _) = compile_native("assert_message.jac");
+
+        text = call_str(eng, "none_message");
+        assert text.startswith(b"assertion failed at ") , text;
+        assert text.endswith(b"assert_message.jac:82") , text;
+    }
+    run_cases(
+        [
+            (
+                "a message built by concatenation is carried, with where it failed",
+                check_a_message_built_by_concatenation_is_carried_with
+            ),
+            (
+                "a message that is an f-string is carried, with where it failed",
+                check_a_message_that_is_an_f_string_is_carried_with_wh
+            ),
+            (
+                "a literal message and no message are as they were",
+                check_a_literal_message_and_no_message_are_as_they_wer
+            ),
+            (
+                "a message is not worked out while the assertion holds",
+                check_a_message_is_not_worked_out_while_the_assertion
+            ),
+            (
+                "a message that is None says the assertion failed",
+                check_a_message_that_is_none_says_the_assertion_failed
+            )
+        ]
+    );
 }
 
-test "a message that is an f-string is carried, with where it failed" {
-    (eng, _) = compile_native("assert_message.jac");
-    text = call_str(eng, "formatted_message");
-    assert text.startswith(b"too short: ab at ") , text;
-    assert text.endswith(b"assert_message.jac:6") , text;
-}
-
-test "a literal message and no message are as they were" {
-    (eng, _) = compile_native("assert_message.jac");
-    literal = call_str(eng, "literal_message");
-    assert literal.startswith(b"a literal at ")
-        and literal.endswith(b"assert_message.jac:10") , literal;
-    bare = call_str(eng, "bare_message");
-    assert bare.startswith(b"assertion failed at ")
-        and bare.endswith(b"assert_message.jac:14") , bare;
-}
-
-test "a message is not worked out while the assertion holds" {
-    (eng, _) = compile_native("assert_message.jac");
-    assert get_func(eng, "holding", ctypes.c_int64)() == 1;
-    assert get_func(eng, "message_calls", ctypes.c_int64)() == 1;
-}
-
-test "a message that is None says the assertion failed" {
-    (eng, _) = compile_native("assert_message.jac");
-    text = call_str(eng, "none_message");
-    assert text.startswith(b"assertion failed at ") , text;
-    assert text.endswith(b"assert_message.jac:82") , text;
-}
 
 def check_message_freed(memory: str) {
     with tempfile.TemporaryDirectory() as tmp {
@@ -90,10 +128,24 @@ def check_message_freed(memory: str) {
     assert not leaked , leaked;
 }
 
-test "a caught, sliced, or non-string message is freed with reference counting" {
-    check_message_freed("rc");
-}
+test "a caught, sliced, or non-string message is freed cases" {
+    def check_a_caught_sliced_or_non_string_message_is_freed_w {
+        check_message_freed("rc");
+    }
 
-test "a caught, sliced, or non-string message is freed with cycle collection" {
-    check_message_freed("managed");
+    def check_a_caught_sliced_or_non_string_message_is_freed_w_2 {
+        check_message_freed("managed");
+    }
+    run_cases(
+        [
+            (
+                "a caught, sliced, or non-string message is freed with reference counting",
+                check_a_caught_sliced_or_non_string_message_is_freed_w
+            ),
+            (
+                "a caught, sliced, or non-string message is freed with cycle collection",
+                check_a_caught_sliced_or_non_string_message_is_freed_w_2
+            )
+        ]
+    );
 }

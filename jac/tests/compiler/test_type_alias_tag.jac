@@ -13,6 +13,8 @@ When the tag goes unrecognized the symbol keeps the *annotation's* type instead.
 
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.driver.compile_options { CompileOptions }
+import from tests.support { run_cases }
+
 
 def check_src(src: str) -> list[str] {
     prog = JacProgram();
@@ -22,24 +24,38 @@ def check_src(src: str) -> list[str] {
     return [str(e) for e in prog.errors_had];
 }
 
-test "get_type_hints accepts an argument" {
-    src = "import from typing { get_type_hints }\n"
-        + "def probe(x: object) -> None {\n"
-        + "    hints = get_type_hints(x);\n"
-        + "    assert hints is not None;\n"
-        + "}\n";
-    errs = check_src(src);
-    assert not errs , f"get_type_hints rejected its argument: {errs}";
-}
+test "get_type_hints accepts an argument, and related cases" {
+    def check_get_type_hints_accepts_an_argument {
+        src = "import from typing { get_type_hints }\n"
+            + "def probe(x: object) -> None {\n"
+            + "    hints = get_type_hints(x);\n"
+            + "    assert hints is not None;\n"
+            + "}\n";
+        errs = check_src(src);
+        assert not errs , f"get_type_hints rejected its argument: {errs}";
+    }
 
-test "a dotted TypeAlias tag resolves to the aliased type" {
-    src = "import from typing { ByteString }\n"
-        + "def probe(b: ByteString) -> None {\n"
-        + "    assert b is not None;\n"
-        + "}\n"
-        + "with entry {\n"
-        + "    probe(b'x');\n"
-        + "}\n";
-    errs = check_src(src);
-    assert not errs , f"dotted TypeAlias tag not honored: {errs}";
+    def check_a_dotted_typealias_tag_resolves_to_the_aliased_t {
+        src = "import from typing { ByteString }\n"
+            + "def probe(b: ByteString) -> None {\n"
+            + "    assert b is not None;\n"
+            + "}\n"
+            + "with entry {\n"
+            + "    probe(b'x');\n"
+            + "}\n";
+        errs = check_src(src);
+        assert not errs , f"dotted TypeAlias tag not honored: {errs}";
+    }
+    run_cases(
+        [
+            (
+                "get_type_hints accepts an argument",
+                check_get_type_hints_accepts_an_argument
+            ),
+            (
+                "a dotted TypeAlias tag resolves to the aliased type",
+                check_a_dotted_typealias_tag_resolves_to_the_aliased_t
+            )
+        ]
+    );
 }

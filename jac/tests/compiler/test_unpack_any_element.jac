@@ -31,7 +31,7 @@ Refs #8039
 """
 
 import os;
-import from tests.support { TESTS_DIR }
+import from tests.support { TESTS_DIR, run_cases }
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.driver.compile_options { CompileOptions }
 
@@ -54,40 +54,68 @@ test "unpacking elements of an Any-erased container type-checks clean" {
     assert not errs , f"expected no type errors, got {errs}";
 }
 
-test "a destructured Any target is usable where its type is constrained" {
-    errs = check_errors("unpack_any_element.jac");
-    # `takes_type(ty)` constrains a destructured target to `type`, and
-    # `nm + ...` constrains the other to `str`. Both were E1053/E1055 before.
-    joined = " ".join(errs);
-    assert "E1053" not in joined , f"Unknown leaked into a parameter: {errs}";
-    assert "E1055" not in joined , f"Unknown leaked into an operator: {errs}";
+test "a destructured Any target is usable where its type is constrained, and related cases" {
+    def check_a_destructured_any_target_is_usable_where_its_ty {
+        errs = check_errors("unpack_any_element.jac");
+        # `takes_type(ty)` constrains a destructured target to `type`, and
+        # `nm + ...` constrains the other to `str`. Both were E1053/E1055 before.
+        joined = " ".join(errs);
+        assert "E1053" not in joined , f"Unknown leaked into a parameter: {errs}";
+        assert "E1055" not in joined , f"Unknown leaked into an operator: {errs}";
+    }
+
+    def check_unpacking_through_an_any_valued_chain_binds_any {
+        errs = check_errors("unpack_any_element.jac");
+        # `ctx: dict[str, any]` indexed twice yields builtin `Any`; each target
+        # must bind `Any` so `takes_type(ty)` stays clean. This is the compiler's
+        # own `_gc["slots"][-1]` shape from na_ir_gen_pass closures.
+        joined = " ".join(errs);
+        assert "E1020" not in joined , f"any-valued chain unpack errored: {errs}";
+        assert "E1053" not in joined , f"Unknown leaked out of the chain: {errs}";
+    }
+    run_cases(
+        [
+            (
+                "a destructured Any target is usable where its type is constrained",
+                check_a_destructured_any_target_is_usable_where_its_ty
+            ),
+            (
+                "unpacking through an any-valued chain binds Any, not Unknown",
+                check_unpacking_through_an_any_valued_chain_binds_any
+            )
+        ]
+    );
 }
 
-test "unpacking an explicitly `any`-annotated value is not E1020" {
-    errs = check_errors("unpack_any_element.jac");
-    # `pair: any = (...); (nm, ty) = pair;` -- an explicit `any` is a ClassType
-    # for builtin `Any`, which the old `isinstance(.., types.AnyType)` guard
-    # missed, so the unpack was reported as non-iterable.
-    joined = " ".join(errs);
-    assert "E1020" not in joined , f"explicit `any` reported non-iterable: {errs}";
-}
+test "unpacking an explicitly `any`-annotated value is not E1020, and related cases" {
+    def check_unpacking_an_explicitly_any_annotated_value_is_n {
+        errs = check_errors("unpack_any_element.jac");
+        # `pair: any = (...); (nm, ty) = pair;` -- an explicit `any` is a ClassType
+        # for builtin `Any`, which the old `isinstance(.., types.AnyType)` guard
+        # missed, so the unpack was reported as non-iterable.
+        joined = " ".join(errs);
+        assert "E1020" not in joined , f"explicit `any` reported non-iterable: {errs}";
+    }
 
-test "unpacking through an any-valued chain binds Any, not Unknown" {
-    errs = check_errors("unpack_any_element.jac");
-    # `ctx: dict[str, any]` indexed twice yields builtin `Any`; each target
-    # must bind `Any` so `takes_type(ty)` stays clean. This is the compiler's
-    # own `_gc["slots"][-1]` shape from na_ir_gen_pass closures.
-    joined = " ".join(errs);
-    assert "E1020" not in joined , f"any-valued chain unpack errored: {errs}";
-    assert "E1053" not in joined , f"Unknown leaked out of the chain: {errs}";
-}
-
-test "destructuring over an explicitly `any` iterable binds `any`, not Unknown" {
-    # #8982 item 11: `for (k, v) in cfg.apps.items()` with `cfg: any` bound
-    # Unknown to both targets, so `v.kind` was E1032 while `a: any = cfg.apps;
-    # a.kind` on the same value was accepted. `_get_iterable_element_type`
-    # knew `types.AnyType` and `UnknownType` but not the explicit spelling.
-    errs = check_errors("unpack_any_element.jac");
-    joined = " ".join(errs);
-    assert "E1032" not in joined , f"Unknown leaked out of an `any` iterable: {errs}";
+    def check_destructuring_over_an_explicitly_any_iterable_bi {
+        # #8982 item 11: `for (k, v) in cfg.apps.items()` with `cfg: any` bound
+        # Unknown to both targets, so `v.kind` was E1032 while `a: any = cfg.apps;
+        # a.kind` on the same value was accepted. `_get_iterable_element_type`
+        # knew `types.AnyType` and `UnknownType` but not the explicit spelling.
+        errs = check_errors("unpack_any_element.jac");
+        joined = " ".join(errs);
+        assert "E1032" not in joined , f"Unknown leaked out of an `any` iterable: {errs}";
+    }
+    run_cases(
+        [
+            (
+                "unpacking an explicitly `any`-annotated value is not E1020",
+                check_unpacking_an_explicitly_any_annotated_value_is_n
+            ),
+            (
+                "destructuring over an explicitly `any` iterable binds `any`, not Unknown",
+                check_destructuring_over_an_explicitly_any_iterable_bi
+            )
+        ]
+    );
 }

@@ -17,7 +17,7 @@ boundary that `type_keyed_dict_lib` puts between two of the key classes.
 
 import ctypes;
 import os;
-import from tests.support { TESTS_DIR, native_address, native_force_opts }
+import from tests.support { TESTS_DIR, native_address, native_force_opts, run_cases }
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.runtime.runtime { JacRuntime }
 import from jaclang.compiler.frontend.codeinfo {
@@ -110,68 +110,125 @@ test "an obj field of type dict[type, V] is layout-compatible" {
 }
 
 
-test "one bucket per runtime class, keyed off a base-typed receiver" {
-    assert _same_int("key_count") == 4 , (
-        "six nodes over four classes must produce four buckets"
+test "one bucket per runtime class, keyed off a base-typed receiver, and related cases" {
+    def check_one_bucket_per_runtime_class_keyed_off_a_base_ty {
+        assert _same_int("key_count") == 4 , (
+            "six nodes over four classes must produce four buckets"
+        );
+    }
+
+    def check_isinstance_against_a_class_value_keeps_subclass {
+        assert _same_int("runtime_isinstance") == 111001 , (
+            "a runtime class value must answer isinstance by the hierarchy, not "
+            "by class identity"
+        );
+    }
+    run_cases(
+        [
+            (
+                "one bucket per runtime class, keyed off a base-typed receiver",
+                check_one_bucket_per_runtime_class_keyed_off_a_base_ty
+            ),
+            (
+                "isinstance against a class value keeps subclass semantics",
+                check_isinstance_against_a_class_value_keeps_subclass
+            )
+        ]
     );
 }
 
 
-test "class literals probe the buckets `type(x)` built" {
-    _same_int("literal_key_sums");
+test "class literals probe the buckets `type(x)` built, and related cases" {
+    def check_class_literals_probe_the_buckets_type_x_built {
+        _same_int("literal_key_sums");
+    }
+
+    def check_a_key_computed_at_runtime_finds_the_bucket_a_lit {
+        _same_int("runtime_key_sums");
+    }
+
+    def check_a_subclass_key_does_not_collapse_into_its_parent {
+        _same_int("subclass_keys_distinct");
+    }
+
+    def check_a_type_held_in_a_local_is_still_a_usable_key {
+        _same_int("key_in_local");
+    }
+
+    def check_class_literals_work_as_the_keys_of_a_dict_litera {
+        _same_int("dict_literal_keys");
+    }
+
+    def check_the_table_survives_as_an_object_field {
+        _same_int("registry_field");
+    }
+
+    def check_a_class_that_was_never_inserted_misses_and_alias {
+        _same_int("absent_key");
+    }
+
+    def check_a_type_t_parameter_carries_a_class_through_a_gen {
+        _same_int("generic_collect");
+    }
+    run_cases(
+        [
+            (
+                "class literals probe the buckets `type(x)` built",
+                check_class_literals_probe_the_buckets_type_x_built
+            ),
+            (
+                "a key computed at runtime finds the bucket a literal key names",
+                check_a_key_computed_at_runtime_finds_the_bucket_a_lit
+            ),
+            (
+                "a subclass key does not collapse into its parent's bucket",
+                check_a_subclass_key_does_not_collapse_into_its_parent
+            ),
+            (
+                "a type held in a local is still a usable key",
+                check_a_type_held_in_a_local_is_still_a_usable_key
+            ),
+            (
+                "class literals work as the keys of a dict literal",
+                check_class_literals_work_as_the_keys_of_a_dict_litera
+            ),
+            (
+                "the table survives as an object field",
+                check_the_table_survives_as_an_object_field
+            ),
+            (
+                "a class that was never inserted misses, and aliases nothing",
+                check_a_class_that_was_never_inserted_misses_and_alias
+            ),
+            (
+                "a `type[T]` parameter carries a class through a generic call",
+                check_a_type_t_parameter_carries_a_class_through_a_gen
+            )
+        ]
+    );
 }
 
 
-test "a key computed at runtime finds the bucket a literal key names" {
-    _same_int("runtime_key_sums");
-}
+test "a key minted in another module matches a literal written here, and related cases" {
+    def check_a_key_minted_in_another_module_matches_a_literal {
+        _same_int("cross_module_key");
+        _same_int("cross_module_key_reverse");
+    }
 
-
-test "a subclass key does not collapse into its parent's bucket" {
-    _same_int("subclass_keys_distinct");
-}
-
-
-test "a key minted in another module matches a literal written here" {
-    _same_int("cross_module_key");
-    _same_int("cross_module_key_reverse");
-}
-
-
-test "a type held in a local is still a usable key" {
-    _same_int("key_in_local");
-}
-
-
-test "class literals work as the keys of a dict literal" {
-    _same_int("dict_literal_keys");
-}
-
-
-test "keys read out of one table re-key another (the sub-node-tab merge)" {
-    _same_int("merge_tables");
-    _same_int("key_roundtrip");
-}
-
-
-test "the table survives as an object field" {
-    _same_int("registry_field");
-}
-
-
-test "a class that was never inserted misses, and aliases nothing" {
-    _same_int("absent_key");
-}
-
-
-test "a `type[T]` parameter carries a class through a generic call" {
-    _same_int("generic_collect");
-}
-
-
-test "isinstance against a class value keeps subclass semantics" {
-    assert _same_int("runtime_isinstance") == 111001 , (
-        "a runtime class value must answer isinstance by the hierarchy, not "
-        "by class identity"
+    def check_keys_read_out_of_one_table_re_key_another_the_su {
+        _same_int("merge_tables");
+        _same_int("key_roundtrip");
+    }
+    run_cases(
+        [
+            (
+                "a key minted in another module matches a literal written here",
+                check_a_key_minted_in_another_module_matches_a_literal
+            ),
+            (
+                "keys read out of one table re-key another (the sub-node-tab merge)",
+                check_keys_read_out_of_one_table_re_key_another_the_su
+            )
+        ]
     );
 }

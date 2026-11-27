@@ -4,7 +4,7 @@ instead of lowering as the cast. Fixture: fixtures/sized_name_shadowed.jac."""
 
 import ctypes;
 import os;
-import from tests.support { TESTS_DIR, native_address, native_force_opts }
+import from tests.support { TESTS_DIR, native_address, native_force_opts, run_cases }
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.backends.native.llvm.binding { ExecutionEngine }
 
@@ -29,13 +29,28 @@ def probe(name: str) -> int {
     return ctypes.CFUNCTYPE(ctypes.c_int64)(addr)();
 }
 
-test "a module function named u16 is called, not taken for the cast" {
-    assert probe("shadowed_u16_reads_bytes") == 513;
+test "a module function named cases" {
+    def check_a_module_function_named_u16_is_called_not_taken {
+        assert probe("shadowed_u16_reads_bytes") == 513;
+    }
+
+    def check_a_module_function_named_like_a_wrapping_builtin {
+        assert probe("shadowed_wrapping_is_the_module_function") == 1003;
+    }
+    run_cases(
+        [
+            (
+                "a module function named u16 is called, not taken for the cast",
+                check_a_module_function_named_u16_is_called_not_taken
+            ),
+            (
+                "a module function named like a wrapping builtin is called",
+                check_a_module_function_named_like_a_wrapping_builtin
+            )
+        ]
+    );
 }
 
-test "a module function named like a wrapping builtin is called" {
-    assert probe("shadowed_wrapping_is_the_module_function") == 1003;
-}
 
 test "fixed-width casts the module does not shadow still lower as casts" {
     assert probe("unshadowed_cast_still_casts") == 7 + 44;

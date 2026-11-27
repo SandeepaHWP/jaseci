@@ -16,7 +16,7 @@ carries the decorator in the decl file with the body in an impl annex;
 manager object, and the last test pins that it is refused naming it.
 """
 
-import from tests.support { jac_command, python_run }
+import from tests.support { jac_command, python_run, run_cases }
 
 import os;
 import subprocess;
@@ -69,15 +69,30 @@ def _same_lines(py_text: str, na_text: str, what: str) {
     }
 }
 
-test "native @contextmanager on functions and an annex method answers like contextlib" {
-    py_out = python_run(os.path.join(FIXTURES, "contextmanager_probe.jac"));
-    _same_lines(py_out, _na_run("contextmanager_probe.jac"), "contextmanager");
+test "native @contextmanager on functions and an annex method answers like contextlib, and related cases" {
+    def check_native_contextmanager_on_functions_and_an_annex {
+        py_out = python_run(os.path.join(FIXTURES, "contextmanager_probe.jac"));
+        _same_lines(py_out, _na_run("contextmanager_probe.jac"), "contextmanager");
+    }
+
+    def check_native_contextvar_backed_contextmanager_scopes_a {
+        py_out = python_run(os.path.join(FIXTURES, "contextmanager_scopes.jac"));
+        _same_lines(py_out, _na_run("contextmanager_scopes.jac"), "scopes");
+    }
+    run_cases(
+        [
+            (
+                "native @contextmanager on functions and an annex method answers like contextlib",
+                check_native_contextmanager_on_functions_and_an_annex
+            ),
+            (
+                "native ContextVar-backed @contextmanager scopes answer like CPython",
+                check_native_contextvar_backed_contextmanager_scopes_a
+            )
+        ]
+    );
 }
 
-test "native ContextVar-backed @contextmanager scopes answer like CPython" {
-    py_out = python_run(os.path.join(FIXTURES, "contextmanager_scopes.jac"));
-    _same_lines(py_out, _na_run("contextmanager_scopes.jac"), "scopes");
-}
 
 test "a @contextmanager call outside a with item is refused, not lowered" {
     (comp, _out_bin) = _native_build("contextmanager_bare_call.jac");

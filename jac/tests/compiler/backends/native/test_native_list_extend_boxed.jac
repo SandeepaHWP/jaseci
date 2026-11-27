@@ -27,7 +27,7 @@ through the box and must not start now.
 import ctypes;
 import os;
 import from jaclang.compiler.driver.program { JacProgram }
-import from tests.support { JAC_ROOT, native_address, native_force_opts }
+import from tests.support { JAC_ROOT, native_address, native_force_opts, run_cases }
 
 glob FIXTURES = os.path.join(
          JAC_ROOT, "tests", "compiler", "backends", "native", "fixtures"
@@ -61,10 +61,40 @@ def flag_fn(name: str) -> any {
 }
 
 
-test "extending from a dict's list values lands every element" {
-    fn = flag_fn("count_str_lists");
-    assert fn(True) == 3 , f"expected 3 elements, got {fn(True)}";
-    assert fn(False) == 0 , f"the un-extended arm gave {fn(False)}, expected 0";
+test "extending from a dict's list values lands every element, and related cases" {
+    def check_extending_from_a_dict_s_list_values_lands_every {
+        fn = flag_fn("count_str_lists");
+        assert fn(True) == 3 , f"expected 3 elements, got {fn(True)}";
+        assert fn(False) == 0 , f"the un-extended arm gave {fn(False)}, expected 0";
+    }
+
+    def check_a_list_of_tuples_extends_through_the_same_erased {
+        fn = flag_fn("count_tuple_lists");
+        assert fn(True) == 3 , f"expected 3 tuples, got {fn(True)}";
+        assert fn(False) == 0 , f"the un-extended arm gave {fn(False)}, expected 0";
+    }
+
+    def check_an_already_typed_source_still_extends_without_th {
+        fn = flag_fn("extend_plain_list");
+        assert fn(True) == 16 , f"expected 1+4+5+6, got {fn(True)}";
+        assert fn(False) == 1 , f"the un-extended arm gave {fn(False)}, expected 1";
+    }
+    run_cases(
+        [
+            (
+                "extending from a dict's list values lands every element",
+                check_extending_from_a_dict_s_list_values_lands_every
+            ),
+            (
+                "a list of tuples extends through the same erased slot",
+                check_a_list_of_tuples_extends_through_the_same_erased
+            ),
+            (
+                "an already-typed source still extends without the coercion",
+                check_an_already_typed_source_still_extends_without_th
+            )
+        ]
+    );
 }
 
 
@@ -75,18 +105,4 @@ test "the elements pulled through the box are usable" {
         "the slots do not hold usable strings"
     );
     assert fn(False) == 0 , f"the un-extended arm gave {fn(False)}, expected 0";
-}
-
-
-test "a list of tuples extends through the same erased slot" {
-    fn = flag_fn("count_tuple_lists");
-    assert fn(True) == 3 , f"expected 3 tuples, got {fn(True)}";
-    assert fn(False) == 0 , f"the un-extended arm gave {fn(False)}, expected 0";
-}
-
-
-test "an already-typed source still extends without the coercion" {
-    fn = flag_fn("extend_plain_list");
-    assert fn(True) == 16 , f"expected 1+4+5+6, got {fn(True)}";
-    assert fn(False) == 1 , f"the un-extended arm gave {fn(False)}, expected 1";
 }

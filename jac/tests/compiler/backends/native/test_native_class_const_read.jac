@@ -42,7 +42,8 @@ import from tests.support {
     names_global,
     native_force_opts,
     source_spelled,
-    unit_symbol
+    unit_symbol,
+    run_cases
 }
 import jaclang.compiler.frontend.unitree as uni;
 import from jaclang.compiler.driver.compile_options { CompileOptions }
@@ -123,64 +124,91 @@ test "the class-constant fixture lowers with no seam" {
 }
 
 
-test "each declaring class gets its own constant" {
-    (_prog, ir) = compile_native("class_const_read.jac");
-    text = source_spelled(str(ir.gen.llvm_ir));
-    for name in ("Node.CATEGORY", "Leaf.CATEGORY", "Branch.CATEGORY") {
-        assert names_global(text, name) , (
-            f"{name} was folded away instead of getting its own storage"
+test "class_const_read.jac cases" {
+    def check_each_declaring_class_gets_its_own_constant {
+        (_prog, ir) = compile_native("class_const_read.jac");
+
+        text = source_spelled(str(ir.gen.llvm_ir));
+        for name in ("Node.CATEGORY", "Leaf.CATEGORY", "Branch.CATEGORY") {
+            assert names_global(text, name) , (
+                f"{name} was folded away instead of getting its own storage"
+            );
+        }
+    }
+
+    def check_a_redefined_constant_is_picked_on_the_receiver_s {
+        (_prog, ir) = compile_native("class_const_read.jac");
+
+        text = source_spelled(str(ir.gen.llvm_ir));
+        assert "cc.CATEGORY.Leaf" in text and "cc.CATEGORY.Branch" in text , (
+            "the per-class read did not dispatch; a single load here would give "
+            "every subclass the base's value"
         );
     }
-}
 
+    def check_a_constant_no_subclass_redefines_stays_a_plain_l {
+        (_prog, ir) = compile_native("class_const_read.jac");
 
-test "a redefined constant is picked on the receiver's vtable" {
-    (_prog, ir) = compile_native("class_const_read.jac");
-    text = source_spelled(str(ir.gen.llvm_ir));
-    assert "cc.CATEGORY.Leaf" in text and "cc.CATEGORY.Branch" in text , (
-        "the per-class read did not dispatch; a single load here would give "
-        "every subclass the base's value"
-    );
-}
+        text = source_spelled(str(ir.gen.llvm_ir));
+        assert "cconst.WIDTH" in text , "the uniform read lost its direct load";
+        assert "cc.WIDTH." not in text , (
+            "a constant with no disagreeing subclass paid for a dispatch chain"
+        );
+    }
 
+    def check_the_annotation_decides_the_constant_s_shape_not {
+        (_prog, ir) = compile_native("class_const_read.jac");
 
-test "a constant no subclass redefines stays a plain load" {
-    (_prog, ir) = compile_native("class_const_read.jac");
-    text = source_spelled(str(ir.gen.llvm_ir));
-    assert "cconst.WIDTH" in text , "the uniform read lost its direct load";
-    assert "cc.WIDTH." not in text , (
-        "a constant with no disagreeing subclass paid for a dispatch chain"
-    );
-}
+        text = source_spelled(str(ir.gen.llvm_ir));
+        assert f'@"{source_spelled(unit_symbol(ir, "Metered.RATE"))}" = global double'
+            in text , (
+            "`RATE: ClassVar[float] = 0` took its shape from the integer literal, "
+            "so every read of it answers with an integer and the subclass's "
+            "double-valued global cannot be dispatched against it"
+        );
+        assert f'@"{source_spelled(unit_symbol(ir, "Fast.RATE"))}" = global double'
+            in text , "the override lost its shape";
+        assert "cc.RATE.Fast" in text , (
+            "the float constant did not dispatch, which is what a shape "
+            "disagreement between base and subclass looks like"
+        );
+    }
 
+    def check_a_declaration_with_no_value_raises_instead_of_de {
+        (_prog, ir) = compile_native("class_const_read.jac");
 
-test "the annotation decides the constant's shape, not the literal" {
-    (_prog, ir) = compile_native("class_const_read.jac");
-    text = source_spelled(str(ir.gen.llvm_ir));
-    assert f'@"{source_spelled(unit_symbol(ir, "Metered.RATE"))}" = global double'
-        in text , (
-        "`RATE: ClassVar[float] = 0` took its shape from the integer literal, "
-        "so every read of it answers with an integer and the subclass's "
-        "double-valued global cannot be dispatched against it"
-    );
-    assert f'@"{source_spelled(unit_symbol(ir, "Fast.RATE"))}" = global double'
-        in text , "the override lost its shape";
-    assert "cc.RATE.Fast" in text , (
-        "the float constant did not dispatch, which is what a shape "
-        "disagreement between base and subclass looks like"
-    );
-}
-
-
-test "a declaration with no value raises instead of defaulting" {
-    (_prog, ir) = compile_native("class_const_read.jac");
-    text = source_spelled(str(ir.gen.llvm_ir));
-    assert "cc.SIDES.Tri" in text and "cc.SIDES.Quad" in text , (
-        "the abstract base's read did not dispatch to its subclasses"
-    );
-    assert "raise.AttributeError" in text , (
-        "the fallback arm handed back a zero for a class that declares no "
-        "value, which is the silent default this change removes"
+        text = source_spelled(str(ir.gen.llvm_ir));
+        assert "cc.SIDES.Tri" in text and "cc.SIDES.Quad" in text , (
+            "the abstract base's read did not dispatch to its subclasses"
+        );
+        assert "raise.AttributeError" in text , (
+            "the fallback arm handed back a zero for a class that declares no "
+            "value, which is the silent default this change removes"
+        );
+    }
+    run_cases(
+        [
+            (
+                "each declaring class gets its own constant",
+                check_each_declaring_class_gets_its_own_constant
+            ),
+            (
+                "a redefined constant is picked on the receiver's vtable",
+                check_a_redefined_constant_is_picked_on_the_receiver_s
+            ),
+            (
+                "a constant no subclass redefines stays a plain load",
+                check_a_constant_no_subclass_redefines_stays_a_plain_l
+            ),
+            (
+                "the annotation decides the constant's shape, not the literal",
+                check_the_annotation_decides_the_constant_s_shape_not
+            ),
+            (
+                "a declaration with no value raises instead of defaulting",
+                check_a_declaration_with_no_value_raises_instead_of_de
+            )
+        ]
     );
 }
 

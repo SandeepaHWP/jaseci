@@ -25,7 +25,7 @@ takes the opposite direction through the same code.
 import ctypes;
 import os;
 import from jaclang.compiler.driver.program { JacProgram }
-import from tests.support { JAC_ROOT, native_address, native_force_opts }
+import from tests.support { JAC_ROOT, native_address, native_force_opts, run_cases }
 
 glob FIXTURES = os.path.join(
          JAC_ROOT, "tests", "compiler", "backends", "native", "fixtures"
@@ -59,10 +59,40 @@ def flag_fn(name: str) -> any {
 }
 
 
-test "the rebuilt list has the right length" {
-    fn = flag_fn("count_ptr_elems");
-    assert fn(True) == 3 , f"expected 3 elements, got {fn(True)}";
-    assert fn(False) == 2 , f"expected 2 elements, got {fn(False)}";
+test "the rebuilt list has the right length, and related cases" {
+    def check_the_rebuilt_list_has_the_right_length {
+        fn = flag_fn("count_ptr_elems");
+        assert fn(True) == 3 , f"expected 3 elements, got {fn(True)}";
+        assert fn(False) == 2 , f"expected 2 elements, got {fn(False)}";
+    }
+
+    def check_string_elements_survive_the_reflavor {
+        fn = flag_fn("join_str_elems");
+        assert fn(True) == 6 , f"total string length {fn(True)}, expected 6";
+        assert fn(False) == 3 , f"total string length {fn(False)}, expected 3";
+    }
+
+    def check_scalar_elements_take_the_opposite_direction_clea {
+        fn = flag_fn("sum_scalar_elems");
+        assert fn(True) == 17 , f"scalar sum {fn(True)}, expected 17";
+        assert fn(False) == 7 , f"scalar sum {fn(False)}, expected 7";
+    }
+    run_cases(
+        [
+            (
+                "the rebuilt list has the right length",
+                check_the_rebuilt_list_has_the_right_length
+            ),
+            (
+                "string elements survive the reflavor",
+                check_string_elements_survive_the_reflavor
+            ),
+            (
+                "scalar elements take the opposite direction cleanly",
+                check_scalar_elements_take_the_opposite_direction_clea
+            )
+        ]
+    );
 }
 
 
@@ -73,20 +103,6 @@ test "archetype elements survive the reflavor" {
         "the pointer slots do not hold usable pointers"
     );
     assert fn(False) == 7 , f"empty-arm case gave {fn(False)}, expected 7";
-}
-
-
-test "string elements survive the reflavor" {
-    fn = flag_fn("join_str_elems");
-    assert fn(True) == 6 , f"total string length {fn(True)}, expected 6";
-    assert fn(False) == 3 , f"total string length {fn(False)}, expected 3";
-}
-
-
-test "scalar elements take the opposite direction cleanly" {
-    fn = flag_fn("sum_scalar_elems");
-    assert fn(True) == 17 , f"scalar sum {fn(True)}, expected 17";
-    assert fn(False) == 7 , f"scalar sum {fn(False)}, expected 7";
 }
 
 

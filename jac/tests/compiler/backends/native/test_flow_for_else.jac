@@ -9,7 +9,7 @@ when the parallel path consumes an else-bearing loop again."""
 
 import os;
 import ctypes;
-import from tests.support { NATIVE_FIXTURES, get_func }
+import from tests.support { NATIVE_FIXTURES, get_func, run_cases }
 import from jaclang.compiler.driver.compile_options { CompileOptions }
 import from jaclang.compiler.driver.program { JacProgram }
 
@@ -30,23 +30,37 @@ def compile_with_profile(memory: str) -> tuple[any, any] {
     return (eng, ir);
 }
 
-test "flow for else runs in the parallel-eligible rc profile" {
-    (eng, _ir) = compile_with_profile("rc");
-    for (name, want) in PROBES {
-        f = get_func(eng, name, ctypes.c_bool);
-        got = f();
-        assert got is want , (
-            f"{name}: rc profile returned {got} -- the parallel path "
-            f"swallowed the else suite"
-        );
+test "flow for else cases" {
+    def check_flow_for_else_runs_in_the_parallel_eligible_rc_p {
+        (eng, _ir) = compile_with_profile("rc");
+        for (name, want) in PROBES {
+            f = get_func(eng, name, ctypes.c_bool);
+            got = f();
+            assert got is want , (
+                f"{name}: rc profile returned {got} -- the parallel path "
+                f"swallowed the else suite"
+            );
+        }
     }
-}
 
-test "flow for else agrees in the sequential managed profile" {
-    (eng, _ir) = compile_with_profile("managed");
-    for (name, want) in PROBES {
-        f = get_func(eng, name, ctypes.c_bool);
-        got = f();
-        assert got is want , f"{name}: managed profile lost the else suite";
+    def check_flow_for_else_agrees_in_the_sequential_managed_p {
+        (eng, _ir) = compile_with_profile("managed");
+        for (name, want) in PROBES {
+            f = get_func(eng, name, ctypes.c_bool);
+            got = f();
+            assert got is want , f"{name}: managed profile lost the else suite";
+        }
     }
+    run_cases(
+        [
+            (
+                "flow for else runs in the parallel-eligible rc profile",
+                check_flow_for_else_runs_in_the_parallel_eligible_rc_p
+            ),
+            (
+                "flow for else agrees in the sequential managed profile",
+                check_flow_for_else_agrees_in_the_sequential_managed_p
+            )
+        ]
+    );
 }

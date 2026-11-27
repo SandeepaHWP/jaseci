@@ -25,7 +25,7 @@ adding to it proves the two arms really do share a representation.
 import ctypes;
 import os;
 import from jaclang.compiler.driver.program { JacProgram }
-import from tests.support { JAC_ROOT, native_address, native_force_opts }
+import from tests.support { JAC_ROOT, native_address, native_force_opts, run_cases }
 
 glob FIXTURES = os.path.join(
          JAC_ROOT, "tests", "compiler", "backends", "native", "fixtures"
@@ -59,24 +59,40 @@ def flag_fn(name: str) -> any {
 }
 
 
-test "an empty set arm lowers when inference types the sibling" {
-    fn = flag_fn("typed_arm");
-    assert fn(True) == 2 , f"populated arm returned {fn(True)}, expected 2";
-    assert fn(False) == 0 , f"empty arm returned {fn(False)}, expected 0";
-}
+test "an empty cases" {
+    def check_an_empty_set_arm_lowers_when_inference_types_the {
+        fn = flag_fn("typed_arm");
+        assert fn(True) == 2 , f"populated arm returned {fn(True)}, expected 2";
+        assert fn(False) == 0 , f"empty arm returned {fn(False)}, expected 0";
+    }
 
+    def check_an_empty_set_arm_lowers_when_the_sibling_is_decl {
+        fn = flag_fn("bare_arm");
+        assert fn(True) == 3 , f"populated arm returned {fn(True)}, expected 3";
+        assert fn(False) == 0 , f"empty arm returned {fn(False)}, expected 0";
+    }
 
-test "an empty set arm lowers when the sibling is declared bare" {
-    fn = flag_fn("bare_arm");
-    assert fn(True) == 3 , f"populated arm returned {fn(True)}, expected 3";
-    assert fn(False) == 0 , f"empty arm returned {fn(False)}, expected 0";
-}
-
-
-test "an empty list arm lowers the same way" {
-    fn = flag_fn("bare_list_arm");
-    assert fn(True) == 4 , f"populated arm returned {fn(True)}, expected 4";
-    assert fn(False) == 0 , f"empty arm returned {fn(False)}, expected 0";
+    def check_an_empty_list_arm_lowers_the_same_way {
+        fn = flag_fn("bare_list_arm");
+        assert fn(True) == 4 , f"populated arm returned {fn(True)}, expected 4";
+        assert fn(False) == 0 , f"empty arm returned {fn(False)}, expected 0";
+    }
+    run_cases(
+        [
+            (
+                "an empty set arm lowers when inference types the sibling",
+                check_an_empty_set_arm_lowers_when_inference_types_the
+            ),
+            (
+                "an empty set arm lowers when the sibling is declared bare",
+                check_an_empty_set_arm_lowers_when_the_sibling_is_decl
+            ),
+            (
+                "an empty list arm lowers the same way",
+                check_an_empty_list_arm_lowers_the_same_way
+            )
+        ]
+    );
 }
 
 

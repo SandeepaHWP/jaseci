@@ -13,23 +13,49 @@ enum's defining module is walked after the module referencing it.
 import ctypes;
 import os;
 import from pathlib { Path }
-import from tests.support { compile_native, get_func, native_force_opts }
+import from tests.support { compile_native, get_func, native_force_opts, run_cases }
 import from jaclang.compiler.driver.program { JacProgram }
 
 glob FIXTURES = str(Path(__file__).resolve().parent / "fixtures");
-test "optional string equality is tag arithmetic, matching Python" {
-    (eng, _) = compile_native("nullsafe_strcmp_enum.jac");
-    # b.label is unset (None); comparing it must be safe, and None == "" is
-    # False just like Python.
-    assert get_func(eng, "null_eq_empty", ctypes.c_int64)() == 0;
-    # None == None is True.
-    assert get_func(eng, "null_eq_null", ctypes.c_int64)() == 1;
-    # None != "" is True.
-    assert get_func(eng, "null_ne_empty", ctypes.c_int64)() == 1;
-    # None == "hi" is False.
-    assert get_func(eng, "null_ne_word", ctypes.c_int64)() == 0;
-    # A set string still compares by value.
-    assert get_func(eng, "set_then_eq", ctypes.c_int64)() == 1;
+test "nullsafe_strcmp_enum.jac cases" {
+    def check_optional_string_equality_is_tag_arithmetic_match {
+        (eng, _) = compile_native("nullsafe_strcmp_enum.jac");
+
+        # b.label is unset (None); comparing it must be safe, and None == "" is
+        # False just like Python.
+        assert get_func(eng, "null_eq_empty", ctypes.c_int64)() == 0;
+        # None == None is True.
+        assert get_func(eng, "null_eq_null", ctypes.c_int64)() == 1;
+        # None != "" is True.
+        assert get_func(eng, "null_ne_empty", ctypes.c_int64)() == 1;
+        # None == "hi" is False.
+        assert get_func(eng, "null_ne_word", ctypes.c_int64)() == 0;
+        # A set string still compares by value.
+        assert get_func(eng, "set_then_eq", ctypes.c_int64)() == 1;
+    }
+
+    def check_enum_class_parameter_and_return_type_lower_clean {
+        (eng, _) = compile_native("nullsafe_strcmp_enum.jac");
+
+        flip = get_func(eng, "flip", ctypes.c_int64, ctypes.c_int64);
+        assert flip(0) == 1;
+        assert flip(1) == 0;
+        mode_is_on = get_func(eng, "mode_is_on", ctypes.c_int64, ctypes.c_int64);
+        assert mode_is_on(1) == 1;
+        assert mode_is_on(0) == 0;
+    }
+    run_cases(
+        [
+            (
+                "optional string equality is tag arithmetic, matching Python",
+                check_optional_string_equality_is_tag_arithmetic_match
+            ),
+            (
+                "enum-class parameter and return type lower cleanly",
+                check_enum_class_parameter_and_return_type_lower_clean
+            )
+        ]
+    );
 }
 
 test "un-narrowed optional ordering is rejected at check time" {
@@ -44,15 +70,6 @@ test "un-narrowed optional ordering is rejected at check time" {
     );
 }
 
-test "enum-class parameter and return type lower cleanly" {
-    (eng, _) = compile_native("nullsafe_strcmp_enum.jac");
-    flip = get_func(eng, "flip", ctypes.c_int64, ctypes.c_int64);
-    assert flip(0) == 1;
-    assert flip(1) == 0;
-    mode_is_on = get_func(eng, "mode_is_on", ctypes.c_int64, ctypes.c_int64);
-    assert mode_is_on(1) == 1;
-    assert mode_is_on(0) == 0;
-}
 
 test "imported enum in container types survives module walk order" {
     # opcodes_entry imports opcodes_use_mid (a glob and an obj field typed

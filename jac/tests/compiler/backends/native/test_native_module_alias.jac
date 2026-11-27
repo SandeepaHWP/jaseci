@@ -4,7 +4,7 @@ import re;
 import tempfile;
 import from pathlib { Path }
 import from jaclang.compiler.driver.program { JacProgram }
-import from tests.support { compile_native, get_func, native_force_opts }
+import from tests.support { compile_native, get_func, native_force_opts, run_cases }
 import from jaclang.compiler.backends.native.lowering { native_lowering_issues }
 
 test "private helpers in modules with the same basename remain distinct" {
@@ -33,12 +33,51 @@ test "an imported module's private global does not shadow an imported public one
     assert probe() == 21;
 }
 
-test "module aliases resolve native functions and globals" {
-    (engine, module) = compile_native("native_module_alias.jac");
-    issues = native_lowering_issues(str(module.gen.llvm_ir));
-    assert not issues , "\n".join(issue.detail for issue in issues);
-    probe = get_func(engine, "module_alias_probe", ctypes.c_int64);
-    assert probe() == 52;
+test "native_module_alias.jac cases" {
+    def check_module_aliases_resolve_native_functions_and_glob {
+        (engine, module) = compile_native("native_module_alias.jac");
+
+        issues = native_lowering_issues(str(module.gen.llvm_ir));
+        assert not issues , "\n".join(issue.detail for issue in issues);
+        probe = get_func(engine, "module_alias_probe", ctypes.c_int64);
+        assert probe() == 52;
+    }
+
+    def check_module_aliases_preserve_lexical_shadowing_and_st {
+        (engine, module) = compile_native("native_module_alias.jac");
+
+        issues = native_lowering_issues(str(module.gen.llvm_ir));
+        assert not issues , "\n".join(issue.detail for issue in issues);
+        shadowed = get_func(engine, "module_alias_shadow_probe", ctypes.c_int64);
+        standard = get_func(engine, "standard_module_alias_probe", ctypes.c_int64);
+        assert shadowed() == 9;
+        assert standard() == 13;
+    }
+
+    def check_qualified_module_members_do_not_resolve_a_same_n {
+        (engine, module) = compile_native("native_module_alias.jac");
+
+        issues = native_lowering_issues(str(module.gen.llvm_ir));
+        assert not issues , "\n".join(issue.detail for issue in issues);
+        probe = get_func(engine, "module_member_shadow_probe", ctypes.c_int64);
+        assert probe() == 140;
+    }
+    run_cases(
+        [
+            (
+                "module aliases resolve native functions and globals",
+                check_module_aliases_resolve_native_functions_and_glob
+            ),
+            (
+                "module aliases preserve lexical shadowing and standard library dispatch",
+                check_module_aliases_preserve_lexical_shadowing_and_st
+            ),
+            (
+                "qualified module members do not resolve a same-named local callable",
+                check_qualified_module_members_do_not_resolve_a_same_n
+            )
+        ]
+    );
 }
 
 test "a class-form archetype is constructed through a module alias" {
@@ -49,15 +88,6 @@ test "a class-form archetype is constructed through a module alias" {
     assert probe() == 16 + 32 + 1 + 8;
 }
 
-test "module aliases preserve lexical shadowing and standard library dispatch" {
-    (engine, module) = compile_native("native_module_alias.jac");
-    issues = native_lowering_issues(str(module.gen.llvm_ir));
-    assert not issues , "\n".join(issue.detail for issue in issues);
-    shadowed = get_func(engine, "module_alias_shadow_probe", ctypes.c_int64);
-    standard = get_func(engine, "standard_module_alias_probe", ctypes.c_int64);
-    assert shadowed() == 9;
-    assert standard() == 13;
-}
 
 test "dotted native module references preserve module identity" {
     (engine, module) = compile_native("native_dotted_module_alias.jac");
@@ -79,13 +109,6 @@ test "module aliases resolve bundled native library implementations" {
     assert mixed_path();
 }
 
-test "qualified module members do not resolve a same-named local callable" {
-    (engine, module) = compile_native("native_module_alias.jac");
-    issues = native_lowering_issues(str(module.gen.llvm_ir));
-    assert not issues , "\n".join(issue.detail for issue in issues);
-    probe = get_func(engine, "module_member_shadow_probe", ctypes.c_int64);
-    assert probe() == 140;
-}
 
 test "module dispatch respects the binding rather than the source module spelling" {
     (engine, module) = compile_native("native_module_alias_shadowing.jac");

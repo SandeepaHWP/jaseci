@@ -8,7 +8,7 @@ with a structured error — never dropped.
 """
 
 import os;
-import from tests.support { TESTS_DIR, native_address, native_force_opts }
+import from tests.support { TESTS_DIR, native_address, native_force_opts, run_cases }
 import jaclang;
 import from jaclang.compiler.driver.program { JacProgram }
 
@@ -77,42 +77,95 @@ def get_func(eng: any, name: str, restype: any, *argtypes: any) -> any {
     return functype(addr);
 }
 
-# Static decoration on module-level functions: the decorator chain is
-# applied at glob-init to the raw function, calls go through the slot.
-test "decorator: registration decorator runs at glob-init, calls pass through" {
-    import ctypes;
-    eng = compile_fixture("decorators.jac");
-    f = get_func(eng, "use_val", ctypes.c_int64);
-    # val(4) = 5 through the identity-decorated slot; marks counted 3
-    # glob-init applications module-wide (val once, stacked twice).
-    assert f() == 503 , "expected val(4)*100 + marks == 503";
-}
+test "decorators.jac cases" {
+    # Static decoration on module-level functions: the decorator chain is
+    # applied at glob-init to the raw function, calls go through the slot.
+    def check_decorator_registration_decorator_runs_at_glob_in {
+        import ctypes;
+        eng = compile_fixture("decorators.jac");
 
-test "decorator: a decorator returning another function redirects calls" {
-    import ctypes;
-    eng = compile_fixture("decorators.jac");
-    f = get_func(eng, "use_val2", ctypes.c_int64);
-    assert f() == 42 , "val2 must route to alt via the slot, not the raw body";
-}
+        f = get_func(eng, "use_val", ctypes.c_int64);
+        # val(4) = 5 through the identity-decorated slot; marks counted 3
+        # glob-init applications module-wide (val once, stacked twice).
+        assert f() == 503 , "expected val(4)*100 + marks == 503";
+    }
 
-test "decorator: stacked decorators apply and calls still resolve" {
-    import ctypes;
-    eng = compile_fixture("decorators.jac");
-    f = get_func(eng, "use_stacked", ctypes.c_int64);
-    assert f() == 93 , "stacked(10)=9 through slot; marks==3 at call time";
-}
+    def check_decorator_a_decorator_returning_another_function {
+        import ctypes;
+        eng = compile_fixture("decorators.jac");
 
-# A decorator whose native signature does not take exactly one argument
-# would emit a malformed call at glob-init; it must be a structured error.
-test "guardrail: multi-argument decorator is rejected at apply time" {
-    prog = compile_na_inline(
-        "arity_dec",
-        "def two(fn: any, extra: int) -> any { return fn; }\n"
-        "@ two\n"
-        "def val(x: int) -> int { return x; }\n"
+        f = get_func(eng, "use_val2", ctypes.c_int64);
+        assert f() == 42 , "val2 must route to alt via the slot, not the raw body";
+    }
+
+    def check_decorator_stacked_decorators_apply_and_calls_sti {
+        import ctypes;
+        eng = compile_fixture("decorators.jac");
+
+        f = get_func(eng, "use_stacked", ctypes.c_int64);
+        assert f() == 93 , "stacked(10)=9 through slot; marks==3 at call time";
+    }
+    run_cases(
+        [
+            (
+                "decorator: registration decorator runs at glob-init, calls pass through",
+                check_decorator_registration_decorator_runs_at_glob_in
+            ),
+            (
+                "decorator: a decorator returning another function redirects calls",
+                check_decorator_a_decorator_returning_another_function
+            ),
+            (
+                "decorator: stacked decorators apply and calls still resolve",
+                check_decorator_stacked_decorators_apply_and_calls_sti
+            )
+        ]
     );
-    assert has_error_code(prog, "E5092") , (
-        f"Expected E5092 for a 2-arg decorator, got: {fmt_errors(prog)}"
+}
+
+
+test "guardrail: multi-argument decorator is rejected at apply time, and related cases" {
+    # A decorator whose native signature does not take exactly one argument
+    # would emit a malformed call at glob-init; it must be a structured error.
+    def check_guardrail_multi_argument_decorator_is_rejected_a {
+        prog = compile_na_inline(
+            "arity_dec",
+            "def two(fn: any, extra: int) -> any { return fn; }\n"
+            "@ two\n"
+            "def val(x: int) -> int { return x; }\n"
+        );
+        assert has_error_code(prog, "E5092") , (
+            f"Expected E5092 for a 2-arg decorator, got: {fmt_errors(prog)}"
+        );
+    }
+
+    # Decorated archetypes (class decorators) are equally silently dropped today
+    # and must be gated.
+    def check_guardrail_decorated_archetype_is_rejected {
+        prog = compile_na_inline(
+            "arch",
+            "def tag(cls: any) -> any { return cls; }\n"
+            "@ tag\n"
+            "obj Marked {\n"
+            "    has v: int = 0;\n"
+            "}\n"
+            "def mk -> int { m = Marked(v=1); return m.v; }\n"
+        );
+        assert has_error_code(prog, "E5090") , (
+            f"Expected E5090 for a decorated native archetype, got: {fmt_errors(prog)}"
+        );
+    }
+    run_cases(
+        [
+            (
+                "guardrail: multi-argument decorator is rejected at apply time",
+                check_guardrail_multi_argument_decorator_is_rejected_a
+            ),
+            (
+                "guardrail: decorated archetype is rejected",
+                check_guardrail_decorated_archetype_is_rejected
+            )
+        ]
     );
 }
 
@@ -164,22 +217,5 @@ test "guardrail: decorated method demotes, native callers demote with it" {
     );
     assert "use_box" not in layout.functions , (
         "a native caller of the demoted method must demote with it"
-    );
-}
-
-# Decorated archetypes (class decorators) are equally silently dropped today
-# and must be gated.
-test "guardrail: decorated archetype is rejected" {
-    prog = compile_na_inline(
-        "arch",
-        "def tag(cls: any) -> any { return cls; }\n"
-        "@ tag\n"
-        "obj Marked {\n"
-        "    has v: int = 0;\n"
-        "}\n"
-        "def mk -> int { m = Marked(v=1); return m.v; }\n"
-    );
-    assert has_error_code(prog, "E5090") , (
-        f"Expected E5090 for a decorated native archetype, got: {fmt_errors(prog)}"
     );
 }

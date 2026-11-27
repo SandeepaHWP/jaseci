@@ -14,7 +14,7 @@ import ctypes;
 import os;
 import from jaclang.compiler.driver.na_coverage { na_coverage_begin, na_coverage_end }
 import from jaclang.compiler.driver.program { JacProgram }
-import from tests.support { TESTS_DIR, native_address, native_force_opts }
+import from tests.support { TESTS_DIR, native_address, native_force_opts, run_cases }
 
 glob FIXTURES = os.path.join(
          TESTS_DIR, "compiler", "backends", "native", "fixtures"
@@ -62,9 +62,37 @@ test "the typed-adjacency fixture lowers natively" {
     assert eng is not None , "no JIT engine was produced for the fixture";
 }
 
-test "a base edge type gathers its subtypes in connect order" {
-    (_rec, _errors, eng) = measured();
-    assert answer(eng, "base_hop_merges_subtypes") == 1345;
+test "a base edge type gathers its subtypes in connect order, and related cases" {
+    def check_a_base_edge_type_gathers_its_subtypes_in_connect {
+        (_rec, _errors, eng) = measured();
+        assert answer(eng, "base_hop_merges_subtypes") == 1345;
+    }
+
+    def check_undirected_edges_answer_typed_hops_in_both_direc {
+        (_rec, _errors, eng) = measured();
+        assert answer(eng, "undirected_both_ways") == 2334101;
+    }
+
+    def check_a_walker_visits_a_typed_hop_in_connect_order {
+        (_rec, _errors, eng) = measured();
+        assert answer(eng, "visit_order") == 1345;
+    }
+    run_cases(
+        [
+            (
+                "a base edge type gathers its subtypes in connect order",
+                check_a_base_edge_type_gathers_its_subtypes_in_connect
+            ),
+            (
+                "undirected edges answer typed hops in both directions",
+                check_undirected_edges_answer_typed_hops_in_both_direc
+            ),
+            (
+                "a walker visits a typed hop in connect order",
+                check_a_walker_visits_a_typed_hop_in_connect_order
+            )
+        ]
+    );
 }
 
 test "exact and untyped hops keep connect order" {
@@ -79,14 +107,4 @@ test "removals keep survivors in order and new edges follow them" {
     for _ in range(3) {
         assert answer(eng, "many_edges_one_rare") == 123206;
     }
-}
-
-test "undirected edges answer typed hops in both directions" {
-    (_rec, _errors, eng) = measured();
-    assert answer(eng, "undirected_both_ways") == 2334101;
-}
-
-test "a walker visits a typed hop in connect order" {
-    (_rec, _errors, eng) = measured();
-    assert answer(eng, "visit_order") == 1345;
 }

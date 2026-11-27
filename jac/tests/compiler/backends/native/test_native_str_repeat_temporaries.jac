@@ -9,7 +9,7 @@ import os;
 import re;
 import tempfile;
 import from pathlib { Path }
-import from tests.support { native_build, native_run }
+import from tests.support { native_build, native_run, run_cases }
 
 glob FIXTURE = str(
          Path(__file__).resolve().parent / "fixtures" / "rc_str_repeat_temporaries.jac"
@@ -47,10 +47,24 @@ def check_repeat_temporaries(memory: str) {
     assert not leaked , leaked;
 }
 
-test "string repeat frees its result and owned operand with reference counting" {
-    check_repeat_temporaries("rc");
-}
+test "string repeat frees its result and owned operand cases" {
+    def check_string_repeat_frees_its_result_and_owned_operand {
+        check_repeat_temporaries("rc");
+    }
 
-test "string repeat frees its result and owned operand with cycle collection" {
-    check_repeat_temporaries("managed");
+    def check_string_repeat_frees_its_result_and_owned_operand_2 {
+        check_repeat_temporaries("managed");
+    }
+    run_cases(
+        [
+            (
+                "string repeat frees its result and owned operand with reference counting",
+                check_string_repeat_frees_its_result_and_owned_operand
+            ),
+            (
+                "string repeat frees its result and owned operand with cycle collection",
+                check_string_repeat_frees_its_result_and_owned_operand_2
+            )
+        ]
+    );
 }

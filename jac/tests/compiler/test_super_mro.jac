@@ -14,6 +14,8 @@ Terminator's three-parameter one, not Instruction's five.
 
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.driver.compile_options { CompileOptions }
+import from tests.support { run_cases }
+
 
 def check_src(src: str) -> list[str] {
     prog = JacProgram();
@@ -23,34 +25,49 @@ def check_src(src: str) -> list[str] {
     return [str(e) for e in prog.errors_had];
 }
 
-test "super reaches a member declared on a later base" {
-    src = "obj A { def hello -> str { return 'a'; } }\n"
-        + "obj B { def bye -> str { return 'b'; } }\n"
-        + "obj C(A, B) { def bye -> str { return super.bye(); } }\n";
-    errs = check_src(src);
-    assert not errs , f"super missed a later base: {errs}";
+test "super reaches a member declared on a later base, and related cases" {
+    def check_super_reaches_a_member_declared_on_a_later_base {
+        src = "obj A { def hello -> str { return 'a'; } }\n"
+            + "obj B { def bye -> str { return 'b'; } }\n"
+            + "obj C(A, B) { def bye -> str { return super.bye(); } }\n";
+        errs = check_src(src);
+        assert not errs , f"super missed a later base: {errs}";
+    }
+
+    def check_super_init_picks_the_next_class_that_declares_it {
+        src = "class P {\n"
+            + "    def init(self: P, x: int, y: int, z: int, w: int) -> None {\n"
+            + "        self.x = x;\n"
+            + "    }\n"
+            + "}\n"
+            + "class Q(P) {\n"
+            + "    def init(self: Q, p: int, q: int, r: int) -> None {\n"
+            + "        super.init(p, q, r, 0);\n"
+            + "    }\n"
+            + "}\n"
+            + "class R(P) {}\n"
+            + "class S(R, Q) {\n"
+            + "    def init(self: S) -> None {\n"
+            + "        super.init(1, 2, 3);\n"
+            + "    }\n"
+            + "}\n";
+        errs = check_src(src);
+        assert not errs , f"super init resolved to the wrong class: {errs}";
+    }
+    run_cases(
+        [
+            (
+                "super reaches a member declared on a later base",
+                check_super_reaches_a_member_declared_on_a_later_base
+            ),
+            (
+                "super init picks the next class that declares it",
+                check_super_init_picks_the_next_class_that_declares_it
+            )
+        ]
+    );
 }
 
-test "super init picks the next class that declares it" {
-    src = "class P {\n"
-        + "    def init(self: P, x: int, y: int, z: int, w: int) -> None {\n"
-        + "        self.x = x;\n"
-        + "    }\n"
-        + "}\n"
-        + "class Q(P) {\n"
-        + "    def init(self: Q, p: int, q: int, r: int) -> None {\n"
-        + "        super.init(p, q, r, 0);\n"
-        + "    }\n"
-        + "}\n"
-        + "class R(P) {}\n"
-        + "class S(R, Q) {\n"
-        + "    def init(self: S) -> None {\n"
-        + "        super.init(1, 2, 3);\n"
-        + "    }\n"
-        + "}\n";
-    errs = check_src(src);
-    assert not errs , f"super init resolved to the wrong class: {errs}";
-}
 
 test "C3 compares class identity across independently hydrated type wrappers" {
     import from jaclang.compiler.types.types { ClassDetailsShared, ClassType }

@@ -1,7 +1,7 @@
 import os;
 import subprocess;
 import jaclang;
-import from tests.support { TESTS_DIR, compiler_python_command }
+import from tests.support { TESTS_DIR, compiler_python_command, run_cases }
 
 glob FIXTURES = os.path.join(
          TESTS_DIR, "compiler", "backends", "native", "fixtures"
@@ -76,11 +76,24 @@ def _assert_answers_one(fixture: str, spelling: str) {
 }
 
 
-test "a from-imported shim's table is live when a JIT'd unit reads it" {
-    _assert_answers_one("from_import_shimmed_stdlib.jac", "from-import");
-}
+test "a from-imported shim's table is live when a JIT'd unit reads it, and related cases" {
+    def check_a_from_imported_shim_s_table_is_live_when_a_jit {
+        _assert_answers_one("from_import_shimmed_stdlib.jac", "from-import");
+    }
 
-
-test "a bare-imported shim's table is live when a JIT'd unit reads it" {
-    _assert_answers_one("bare_import_shimmed_stdlib.jac", "bare import");
+    def check_a_bare_imported_shim_s_table_is_live_when_a_jit {
+        _assert_answers_one("bare_import_shimmed_stdlib.jac", "bare import");
+    }
+    run_cases(
+        [
+            (
+                "a from-imported shim's table is live when a JIT'd unit reads it",
+                check_a_from_imported_shim_s_table_is_live_when_a_jit
+            ),
+            (
+                "a bare-imported shim's table is live when a JIT'd unit reads it",
+                check_a_bare_imported_shim_s_table_is_live_when_a_jit
+            )
+        ]
+    );
 }

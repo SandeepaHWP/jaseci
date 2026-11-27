@@ -3,7 +3,7 @@
 import os;
 import tempfile;
 import from unittest.mock { patch }
-import from tests.support { JAC_ROOT }
+import from tests.support { JAC_ROOT, run_cases }
 import jaclang.compiler.frontend.unitree as uni;
 import jaclang.compiler.placement.placement_solver as solver;
 import from jaclang.compiler.driver.program { JacProgram }
@@ -19,89 +19,117 @@ def _compile -> tuple[JacProgram, uni.Module] {
     return (prog, mod);
 }
 
-test "unchanged and unrelated modules do not rescan the solved import graph" {
-    (prog, mod) = _compile();
-    solver.solve_program_placement(mod, prog);
-    with patch.object(
-        solver, "_pull_boundary_import", wraps=solver._pull_boundary_import
-    ) as pulls {
-        with patch.object(solver, "_ref_top_ids", wraps=solver._ref_top_ids) as refs {
-            solver.solve_program_placement(mod, prog);
-            solver.solve_program_placement(mod, prog);
-            other = prog.parse_str(
-                "def unrelated -> int { return 1; }", "/tmp/placement-unrelated.jac"
-            );
-            solver.solve_program_placement(other, prog);
-            assert pulls.call_count == 0 , pulls.call_count;
-            assert refs.call_count == 0 , refs.call_count;
+test "unchanged and unrelated modules do not rescan the solved import graph, and related cases" {
+    def check_unchanged_and_unrelated_modules_do_not_rescan_th {
+        (prog, mod) = _compile();
+
+        solver.solve_program_placement(mod, prog);
+        with patch.object(
+            solver, "_pull_boundary_import", wraps=solver._pull_boundary_import
+        ) as pulls {
+            with patch.object(
+                solver, "_ref_top_ids", wraps=solver._ref_top_ids
+            ) as refs {
+                solver.solve_program_placement(mod, prog);
+                solver.solve_program_placement(mod, prog);
+                other = prog.parse_str(
+                    "def unrelated -> int { return 1; }", "/tmp/placement-unrelated.jac"
+                );
+                solver.solve_program_placement(other, prog);
+                assert pulls.call_count == 0 , pulls.call_count;
+                assert refs.call_count == 0 , refs.call_count;
+            }
         }
     }
-}
 
-test "symbol refresh invalidates references while placement changes reuse them" {
-    (prog, mod) = _compile();
-    work = solver.placement_work(prog);
-    with patch.object(solver, "_ref_top_ids", wraps=solver._ref_top_ids) as refs {
-        work.refresh(mod);
-        before = work.refs(mod);
-        assert refs.call_count == len(mod.body);
+    def check_symbol_refresh_invalidates_references_while_plac {
+        (prog, mod) = _compile();
+
+        work = solver.placement_work(prog);
+        with patch.object(solver, "_ref_top_ids", wraps=solver._ref_top_ids) as refs {
+            work.refresh(mod);
+            before = work.refs(mod);
+            assert refs.call_count == len(mod.body);
+            work.changed(mod);
+            assert work.refs(mod) is before;
+            assert refs.call_count == len(mod.body);
+            work.refresh(mod);
+            assert work.refs(mod) == before;
+            assert refs.call_count == 2 * len(mod.body);
+        }
+    }
+
+    def check_an_interrupted_solve_retains_its_pending_import {
+        (prog, mod) = _compile();
+
+        work = solver.placement_work(prog);
         work.changed(mod);
-        assert work.refs(mod) is before;
-        assert refs.call_count == len(mod.body);
-        work.refresh(mod);
-        assert work.refs(mod) == before;
-        assert refs.call_count == 2 * len(mod.body);
-    }
-}
-
-test "an interrupted solve retains its pending import for the next attempt" {
-    (prog, mod) = _compile();
-    work = solver.placement_work(prog);
-    work.changed(mod);
-    with patch.object(
-        solver, "_pull_boundary_import", side_effect=RuntimeError("interrupted")
-    ) {
-        try {
-            solver.solve_program_placement(mod, prog);
-            assert False , "the interrupted solve must propagate its exception";
-        } except RuntimeError {}
-    }
-    assert work.pending;
-    assert not work.solving;
-    solver.solve_program_placement(mod, prog);
-    assert not work.pending;
-    with patch.object(
-        solver, "_pull_boundary_import", wraps=solver._pull_boundary_import
-    ) as pulls {
+        with patch.object(
+            solver, "_pull_boundary_import", side_effect=RuntimeError("interrupted")
+        ) {
+            try {
+                solver.solve_program_placement(mod, prog);
+                assert False , "the interrupted solve must propagate its exception";
+            } except RuntimeError {}
+        }
+        assert work.pending;
+        assert not work.solving;
         solver.solve_program_placement(mod, prog);
-        assert pulls.call_count == 0;
+        assert not work.pending;
+        with patch.object(
+            solver, "_pull_boundary_import", wraps=solver._pull_boundary_import
+        ) as pulls {
+            solver.solve_program_placement(mod, prog);
+            assert pulls.call_count == 0;
+        }
     }
+    def check_replacement_during_solving_preserves_the_active {
+        (prog, mod) = _compile();
+
+        work = solver.placement_work(prog);
+        target = next(
+            m
+            for m in work.modules.values()
+            if m.name == "infer_xmod_util"
+        );
+        dependent_edges = set(work.readers.get(id(target), set()));
+        assert dependent_edges;
+        work.solving = True;
+        try {
+            replacement = JacProgram().parse_str(
+                "def helper -> int { return 1; }", target.loc.mod_path
+            );
+            prog.install_module(target.loc.mod_path, replacement);
+            assert solver.placement_work(prog) is work;
+            assert dependent_edges <= work.pending;
+            assert id(target) not in work.modules;
+            assert id(target) not in work.references;
+        } finally {
+            work.solving = False;
+        }
+    }
+    run_cases(
+        [
+            (
+                "unchanged and unrelated modules do not rescan the solved import graph",
+                check_unchanged_and_unrelated_modules_do_not_rescan_th
+            ),
+            (
+                "symbol refresh invalidates references while placement changes reuse them",
+                check_symbol_refresh_invalidates_references_while_plac
+            ),
+            (
+                "an interrupted solve retains its pending import for the next attempt",
+                check_an_interrupted_solve_retains_its_pending_import
+            ),
+            (
+                "replacement during solving preserves the active queue and wakes importers",
+                check_replacement_during_solving_preserves_the_active
+            )
+        ]
+    );
 }
 
-test "replacement during solving preserves the active queue and wakes importers" {
-    (prog, mod) = _compile();
-    work = solver.placement_work(prog);
-    target = next(
-        m
-        for m in work.modules.values()
-        if m.name == "infer_xmod_util"
-    );
-    dependent_edges = set(work.readers.get(id(target), set()));
-    assert dependent_edges;
-    work.solving = True;
-    try {
-        replacement = JacProgram().parse_str(
-            "def helper -> int { return 1; }", target.loc.mod_path
-        );
-        prog.install_module(target.loc.mod_path, replacement);
-        assert solver.placement_work(prog) is work;
-        assert dependent_edges <= work.pending;
-        assert id(target) not in work.modules;
-        assert id(target) not in work.references;
-    } finally {
-        work.solving = False;
-    }
-}
 
 test "invalidating a module removes its reference graph and closure release drops all work" {
     (prog, mod) = _compile();

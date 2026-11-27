@@ -13,7 +13,7 @@ resolve the repo's own manifest instead.
 import os;
 import shutil;
 import tempfile;
-import from tests.support { JAC_ROOT }
+import from tests.support { JAC_ROOT, run_cases }
 import from jaclang.compiler.placement.placement_pins { config_kind_space }
 import from jaclang.compiler.driver.program { JacProgram }
 
@@ -144,24 +144,37 @@ test "the same server evidence is fine for a kind that has a server" {
 }
 
 
-test "a nested manifest inherits the enclosing project kind" {
-    with tempfile.TemporaryDirectory() as tmpdir {
-        lib = _nested_project(tmpdir, "js-package", "");
-        assert config_kind_space(lib) == "client" , (
-            "a nested jac.toml without a kind must not shadow the kind of "
-            "the project that contains it"
-        );
+test "a nested manifest cases" {
+    def check_a_nested_manifest_inherits_the_enclosing_project {
+        with tempfile.TemporaryDirectory() as tmpdir {
+            lib = _nested_project(tmpdir, "js-package", "");
+            assert config_kind_space(lib) == "client" , (
+                "a nested jac.toml without a kind must not shadow the kind of "
+                "the project that contains it"
+            );
+        }
     }
-}
 
-
-test "a nested manifest with its own kind keeps it" {
-    with tempfile.TemporaryDirectory() as tmpdir {
-        lib = _nested_project(tmpdir, "js-package", "web-app");
-        assert config_kind_space(lib) == "" , (
-            "an explicit nested kind is a deliberate override"
-        );
+    def check_a_nested_manifest_with_its_own_kind_keeps_it {
+        with tempfile.TemporaryDirectory() as tmpdir {
+            lib = _nested_project(tmpdir, "js-package", "web-app");
+            assert config_kind_space(lib) == "" , (
+                "an explicit nested kind is a deliberate override"
+            );
+        }
     }
+    run_cases(
+        [
+            (
+                "a nested manifest inherits the enclosing project kind",
+                check_a_nested_manifest_inherits_the_enclosing_project
+            ),
+            (
+                "a nested manifest with its own kind keeps it",
+                check_a_nested_manifest_with_its_own_kind_keeps_it
+            )
+        ]
+    );
 }
 
 

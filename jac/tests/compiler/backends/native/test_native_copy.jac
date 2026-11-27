@@ -23,7 +23,7 @@ module the copying unit does not import, which raises `TypeError` at run time
 rather than copying the wrong class.
 """
 
-import from tests.support { assert_native_identity, jac_command, python_run }
+import from tests.support { assert_native_identity, jac_command, python_run, run_cases }
 
 import os;
 import subprocess;
@@ -54,9 +54,29 @@ def _refusal(fixture: str) -> str {
     return combined;
 }
 
-test "native copy.copy of archetypes, containers and atomics answers like CPython" {
-    assert_native_identity(
-        os.path.join(FIXTURES, "copy_shallow.jac"), profiles=PROFILES
+test "native copy.copy cases" {
+    def check_native_copy_copy_of_archetypes_containers_and_at {
+        assert_native_identity(
+            os.path.join(FIXTURES, "copy_shallow.jac"), profiles=PROFILES
+        );
+    }
+
+    def check_native_copy_copy_of_a_compileoptions_shaped_obj {
+        assert_native_identity(
+            os.path.join(FIXTURES, "copy_options_shape.jac"), profiles=PROFILES
+        );
+    }
+    run_cases(
+        [
+            (
+                "native copy.copy of archetypes, containers and atomics answers like CPython",
+                check_native_copy_copy_of_archetypes_containers_and_at
+            ),
+            (
+                "native copy.copy of a CompileOptions-shaped obj answers like CPython",
+                check_native_copy_copy_of_a_compileoptions_shaped_obj
+            )
+        ]
     );
 }
 
@@ -64,11 +84,6 @@ test "native copy.deepcopy keeps shared references and cycles like CPython" {
     assert_native_identity(os.path.join(FIXTURES, "copy_deep.jac"), profiles=PROFILES);
 }
 
-test "native copy.copy of a CompileOptions-shaped obj answers like CPython" {
-    assert_native_identity(
-        os.path.join(FIXTURES, "copy_options_shape.jac"), profiles=PROFILES
-    );
-}
 
 test "native copies are all released" {
     (comp, out_bin) = _build("copy_leaks.jac", ["--debug"]);
@@ -90,15 +105,30 @@ test "native copies are all released" {
     assert not leaks , f"copies leaked: {leaks}";
 }
 
-test "copy of a node archetype is refused naming it" {
-    combined = _refusal("copy_refused_node.jac");
-    assert "copy.copy of `Station`, a node archetype" in combined , combined[-800:];
+test "copy of a node archetype is refused naming it, and related cases" {
+    def check_copy_of_a_node_archetype_is_refused_naming_it {
+        combined = _refusal("copy_refused_node.jac");
+        assert "copy.copy of `Station`, a node archetype" in combined , combined[-800:];
+    }
+
+    def check_deepcopy_through_an_any_field_is_refused_naming {
+        combined = _refusal("copy_refused_any.jac");
+        assert "copy.deepcopy of `Slot`, whose field `payload`" in combined , combined[-800:];
+    }
+    run_cases(
+        [
+            (
+                "copy of a node archetype is refused naming it",
+                check_copy_of_a_node_archetype_is_refused_naming_it
+            ),
+            (
+                "deepcopy through an any field is refused naming the field",
+                check_deepcopy_through_an_any_field_is_refused_naming
+            )
+        ]
+    );
 }
 
-test "deepcopy through an any field is refused naming the field" {
-    combined = _refusal("copy_refused_any.jac");
-    assert "copy.deepcopy of `Slot`, whose field `payload`" in combined , combined[-800:];
-}
 
 test "a subclass from a module the copying unit does not import raises TypeError" {
     src = os.path.join(FIXTURES, "copy_xmod_main.jac");

@@ -28,7 +28,7 @@ carries the coverage.
 import ctypes;
 import os;
 import sys;
-import from tests.support { TESTS_DIR, native_address, native_force_opts }
+import from tests.support { TESTS_DIR, native_address, native_force_opts, run_cases }
 import jaclang;
 import from jaclang.compiler.driver.program { JacProgram }
 
@@ -142,18 +142,40 @@ def _assert_reclaims(fixture: str, leak_floor: int = 2 * 1024 * 1024) {
 }
 
 
-test "cycle collector reclaims two-node struct cycles (JIT, in-use heap)" {
-    _assert_reclaims("cycle_collect_storm.jac");
-}
+test "cycle collector reclaims cases" {
+    def check_cycle_collector_reclaims_two_node_struct_cycles {
+        _assert_reclaims("cycle_collect_storm.jac");
+    }
 
-test "cycle collector reclaims cycles routed through a container (JIT, in-use heap)" {
-    _assert_reclaims("cycle_collect_container.jac");
-}
+    def check_cycle_collector_reclaims_cycles_routed_through_a {
+        _assert_reclaims("cycle_collect_container.jac");
+    }
 
-test "cycle collector reclaims cycles routed through a dict (JIT, in-use heap)" {
-    _assert_reclaims("cycle_collect_dict.jac");
-}
+    def check_cycle_collector_reclaims_cycles_routed_through_a_2 {
+        _assert_reclaims("cycle_collect_dict.jac");
+    }
 
-test "cycle collector reclaims cycles routed through a hetero container (JIT, in-use heap)" {
-    _assert_reclaims("cycle_collect_hetero.jac");
+    def check_cycle_collector_reclaims_cycles_routed_through_a_3 {
+        _assert_reclaims("cycle_collect_hetero.jac");
+    }
+    run_cases(
+        [
+            (
+                "cycle collector reclaims two-node struct cycles (JIT, in-use heap)",
+                check_cycle_collector_reclaims_two_node_struct_cycles
+            ),
+            (
+                "cycle collector reclaims cycles routed through a container (JIT, in-use heap)",
+                check_cycle_collector_reclaims_cycles_routed_through_a
+            ),
+            (
+                "cycle collector reclaims cycles routed through a dict (JIT, in-use heap)",
+                check_cycle_collector_reclaims_cycles_routed_through_a_2
+            ),
+            (
+                "cycle collector reclaims cycles routed through a hetero container (JIT, in-use heap)",
+                check_cycle_collector_reclaims_cycles_routed_through_a_3
+            )
+        ]
+    );
 }

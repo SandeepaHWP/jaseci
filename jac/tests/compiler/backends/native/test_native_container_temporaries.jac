@@ -1,7 +1,7 @@
 """Native container calls release temporaries while preserving returned elements."""
 
 import ctypes;
-import from tests.support { native_address }
+import from tests.support { native_address, run_cases }
 import from pathlib { Path }
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.driver.compile_options { CompileOptions }
@@ -62,10 +62,24 @@ def check_containers(profile: str) {
     }
 }
 
-test "container methods free temporaries and preserve borrowed inputs with reference counting" {
-    check_containers("rc");
-}
+test "container methods free temporaries and preserve borrowed inputs cases" {
+    def check_container_methods_free_temporaries_and_preserve {
+        check_containers("rc");
+    }
 
-test "container methods free temporaries and preserve borrowed inputs with cycle collection" {
-    check_containers("managed");
+    def check_container_methods_free_temporaries_and_preserve_2 {
+        check_containers("managed");
+    }
+    run_cases(
+        [
+            (
+                "container methods free temporaries and preserve borrowed inputs with reference counting",
+                check_container_methods_free_temporaries_and_preserve
+            ),
+            (
+                "container methods free temporaries and preserve borrowed inputs with cycle collection",
+                check_container_methods_free_temporaries_and_preserve_2
+            )
+        ]
+    );
 }

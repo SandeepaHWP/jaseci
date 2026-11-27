@@ -1,23 +1,40 @@
 import ctypes;
 import os;
-import from tests.support { TESTS_DIR, compile_native, get_func }
+import from tests.support { TESTS_DIR, compile_native, get_func, run_cases }
 
 glob FIXTURES = os.path.join(
          TESTS_DIR, "compiler", "backends", "native", "fixtures"
      );
 
-test "cyclic import: mandated two-file cycle compiles" {
-    (eng, _) = compile_native("cycle_ping.jac");
-    assert eng is not None;
+test "cyclic import: cases on cycle_ping.jac" {
+    def check_cyclic_import_mandated_two_file_cycle_compiles {
+        (eng, _) = compile_native("cycle_ping.jac");
+
+        assert eng is not None;
+    }
+
+    def check_cyclic_import_mutual_recursion_computes_across_m {
+        (eng, _) = compile_native("cycle_ping.jac");
+
+        get_func(eng, "jac_entry", None)();
+        f = get_func(eng, "ping", ctypes.c_int64, ctypes.c_int64);
+        assert f(7) == 7 , f"ping(7) expected 7, got {f(7)}";
+        assert f(0) == 0 , f"ping(0) expected 0, got {f(0)}";
+    }
+    run_cases(
+        [
+            (
+                "cyclic import: mandated two-file cycle compiles",
+                check_cyclic_import_mandated_two_file_cycle_compiles
+            ),
+            (
+                "cyclic import: mutual recursion computes across modules",
+                check_cyclic_import_mutual_recursion_computes_across_m
+            )
+        ]
+    );
 }
 
-test "cyclic import: mutual recursion computes across modules" {
-    (eng, _) = compile_native("cycle_ping.jac");
-    get_func(eng, "jac_entry", None)();
-    f = get_func(eng, "ping", ctypes.c_int64, ctypes.c_int64);
-    assert f(7) == 7 , f"ping(7) expected 7, got {f(7)}";
-    assert f(0) == 0 , f"ping(0) expected 0, got {f(0)}";
-}
 
 test "glob init: transitive runtime initializer runs dependencies first" {
     (eng, _) = compile_native("glob_chain_entry.jac");

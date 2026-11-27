@@ -8,7 +8,7 @@ fixtures/fixed_width_unsigned.jac and is JIT-compiled once.
 
 import ctypes;
 import os;
-import from tests.support { TESTS_DIR, native_address, native_force_opts }
+import from tests.support { TESTS_DIR, native_address, native_force_opts, run_cases }
 import from jaclang.compiler.driver.program { JacProgram }
 import jaclang.compiler.frontend.unitree as uni;
 import from jaclang.compiler.backends.native.llvm.binding { ExecutionEngine }
@@ -50,18 +50,65 @@ def probe_f(name: str) -> float {
     return ctypes.CFUNCTYPE(ctypes.c_double)(addr)();
 }
 
-test "unsigned arithmetic traps on overflow instead of wrapping" {
-    assert probe("u8_add_traps") == 1;
-    assert probe("u8_sub_traps") == 1;
-    assert probe("i32_max_plus_one_traps") == 1;
-    assert probe("i32_aug_traps") == 1;
+test "unsigned arithmetic traps on overflow instead of wrapping, and related cases" {
+    def check_unsigned_arithmetic_traps_on_overflow_instead_of {
+        assert probe("u8_add_traps") == 1;
+        assert probe("u8_sub_traps") == 1;
+        assert probe("i32_max_plus_one_traps") == 1;
+        assert probe("i32_aug_traps") == 1;
+    }
+
+    def check_negation_and_abs_trap_at_the_signed_minimum {
+        assert probe("i8_neg_min_traps") == 1;
+        assert probe("i8_abs_min_traps") == 1;
+    }
+
+    def check_shifts_and_powers_range_check {
+        assert probe("u8_shl_overflow_traps") == 1;
+        assert probe("u8_shift_count_traps") == 1;
+        assert probe("u8_pow_traps") == 1;
+        assert probe("u8_pow_fits") == 128;
+    }
+    run_cases(
+        [
+            (
+                "unsigned arithmetic traps on overflow instead of wrapping",
+                check_unsigned_arithmetic_traps_on_overflow_instead_of
+            ),
+            (
+                "negation and abs trap at the signed minimum",
+                check_negation_and_abs_trap_at_the_signed_minimum
+            ),
+            ("shifts and powers range-check", check_shifts_and_powers_range_check)
+        ]
+    );
 }
 
-test "unsigned values compare and shift as unsigned" {
-    assert probe("u64_compares_unsigned") == 1;
-    assert probe("u64_max_above_zero") == 1;
-    assert probe("u8_logical_shift") == 100;
-    assert probe("i8_arith_shift") == -1;
+test "unsigned values compare and shift as unsigned, and related cases" {
+    def check_unsigned_values_compare_and_shift_as_unsigned {
+        assert probe("u64_compares_unsigned") == 1;
+        assert probe("u64_max_above_zero") == 1;
+        assert probe("u8_logical_shift") == 100;
+        assert probe("i8_arith_shift") == -1;
+    }
+
+    def check_sized_list_reads_restore_declared_width_and_sign {
+        assert probe("u32_list_read_preserves_width") == 5;
+        assert probe("u32_field_list_read_preserves_width") == 22;
+        assert probe("i8_list_read_preserves_sign") == -63;
+    }
+    run_cases(
+        [
+            (
+                "unsigned values compare and shift as unsigned",
+                check_unsigned_values_compare_and_shift_as_unsigned
+            ),
+            (
+                "sized list reads restore declared width and signedness",
+                check_sized_list_reads_restore_declared_width_and_sign
+            )
+        ]
+    );
 }
 
 test "division and modulo use the operand's signedness" {
@@ -72,17 +119,6 @@ test "division and modulo use the operand's signedness" {
     assert probe("i8_min_mod_m1") == 7;
 }
 
-test "negation and abs trap at the signed minimum" {
-    assert probe("i8_neg_min_traps") == 1;
-    assert probe("i8_abs_min_traps") == 1;
-}
-
-test "shifts and powers range-check" {
-    assert probe("u8_shl_overflow_traps") == 1;
-    assert probe("u8_shift_count_traps") == 1;
-    assert probe("u8_pow_traps") == 1;
-    assert probe("u8_pow_fits") == 128;
-}
 
 test "T(x) is a checked cast and T.wrap is modular" {
     assert probe("cast_u8_300_traps") == 1;
@@ -131,11 +167,4 @@ test "sized casts unwrap narrowed optional fields" {
     (eng, _) = compile_native("fixed_width_optional_fields.jac");
     assert get_func(eng, "present_end", ctypes.c_int64)() == 42;
     assert get_func(eng, "absent_end", ctypes.c_int64)() == -1;
-}
-
-
-test "sized list reads restore declared width and signedness" {
-    assert probe("u32_list_read_preserves_width") == 5;
-    assert probe("u32_field_list_read_preserves_width") == 22;
-    assert probe("i8_list_read_preserves_sign") == -63;
 }

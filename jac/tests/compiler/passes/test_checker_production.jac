@@ -18,7 +18,7 @@ covered in test_checker_gaps.jac and test_checker_shortcomings.jac.
 """
 
 import os;
-import from tests.support { JAC_ROOT }
+import from tests.support { JAC_ROOT, run_cases }
 import jaclang;
 import from jaclang.compiler.passes.type_checker_pass { TypeCheckPass }
 import from jaclang.compiler.driver.program { JacProgram }
@@ -44,29 +44,116 @@ def compile_and_check(fixture_name: str) -> JacProgram {
 #  not just the base container type.
 # =========================================================================
 
-# -------------------------------------------------------------------------
-# A1: Dict comprehension parameterized type inference
-# -------------------------------------------------------------------------
-test "prod a1 dict compr type" {
-    program = compile_and_check("checker_prod_dict_compr_type.jac");
+test "prod a1 dict compr type, and related cases" {
+    # -------------------------------------------------------------------------
+    # A1: Dict comprehension parameterized type inference
+    # -------------------------------------------------------------------------
+    def check_prod_a1_dict_compr_type {
+        program = compile_and_check("checker_prod_dict_compr_type.jac");
 
-    # {k: v for ...} must infer as dict[K, V], not just dict
-    assert len(program.errors_had) >= 3 , "A1: Dict comprehension type inference failed. "
-    f"Expected >= 3 errors but got {len(program.errors_had)}. "
-    "Dict comprehensions must infer key/value types, not Unknown.";
+        # {k: v for ...} must infer as dict[K, V], not just dict
+        assert len(program.errors_had) >= 3 , "A1: Dict comprehension type inference failed. "
+        f"Expected >= 3 errors but got {len(program.errors_had)}. "
+        "Dict comprehensions must infer key/value types, not Unknown.";
+    }
+
+    # -------------------------------------------------------------------------
+    # A2: Set comprehension parameterized type inference
+    # -------------------------------------------------------------------------
+    def check_prod_a2_set_compr_type {
+        program = compile_and_check("checker_prod_set_compr_type.jac");
+
+        # {x * 2 for x in nums} must infer as set[int], not just set
+        assert len(program.errors_had) >= 2 , "A2: Set comprehension type inference failed. "
+        f"Expected >= 2 errors but got {len(program.errors_had)}. "
+        "Set comprehensions must infer element type, not Unknown.";
+    }
+
+    # -------------------------------------------------------------------------
+    # B1: Unknown must not silently assign to typed variables
+    # -------------------------------------------------------------------------
+    def check_prod_b1_unknown_assign {
+        program = compile_and_check("checker_prod_unknown_assign.jac");
+
+        # Assigning Unknown to int, str, list, bool, float should warn/error
+        assert len(program.errors_had) >= 3 , "B1: Unknown silently assigned to typed variables. "
+        f"Expected >= 3 errors/warnings but got {len(program.errors_had)}. "
+        "Unknown must not be a universal 'any' type that accepts all assignments.";
+    }
+
+    # -------------------------------------------------------------------------
+    # B2: Method calls on Unknown must not silently pass
+    # -------------------------------------------------------------------------
+    def check_prod_b2_unknown_method_call {
+        program = compile_and_check("checker_prod_unknown_method_call.jac");
+
+        # .nonexistent(), .append(), .upper(), [0] on Unknown should error
+        assert len(program.errors_had) >= 3 , "B2: Method calls on Unknown silently pass. "
+        f"Expected >= 3 errors but got {len(program.errors_had)}. "
+        "Calling .nonexistent() on Unknown must not silently succeed.";
+    }
+
+    # -------------------------------------------------------------------------
+    # B3: Unknown must not propagate silently through expressions
+    # -------------------------------------------------------------------------
+    def check_prod_b3_unknown_propagation {
+        program = compile_and_check("checker_prod_unknown_propagation.jac");
+
+        # Unknown + 1, Unknown + "hello", -Unknown should not silently produce Unknown
+        assert len(program.errors_had) >= 3 , "B3: Unknown propagates silently through expressions. "
+        f"Expected >= 3 errors but got {len(program.errors_had)}. "
+        "Arithmetic/string ops on Unknown must not silently produce more Unknown.";
+    }
+
+    # -------------------------------------------------------------------------
+    # B4: Unknown passed to typed function parameters must be flagged
+    # -------------------------------------------------------------------------
+    def check_prod_b4_unknown_function_arg {
+        program = compile_and_check("checker_prod_unknown_function_arg.jac");
+
+        # Passing Unknown to int, str, list[int] params should error
+        assert len(program.errors_had) >= 3 , "B4: Unknown passed to typed function params silently. "
+        f"Expected >= 3 errors but got {len(program.errors_had)}. "
+        "Unknown must not be silently accepted as int, str, or list[int] argument.";
+    }
+
+    # -------------------------------------------------------------------------
+    # B5: Functions returning Unknown where typed return is declared
+    # -------------------------------------------------------------------------
+    def check_prod_b5_unknown_return {
+        program = compile_and_check("checker_prod_unknown_return.jac");
+
+        # Returning Unknown where int or str is declared should error
+        assert len(program.errors_had) >= 3 , "B5: Unknown returned where typed return is declared. "
+        f"Expected >= 3 errors but got {len(program.errors_had)}. "
+        "Returning Unknown for declared -> int or -> str must produce a diagnostic.";
+    }
+
+    # -------------------------------------------------------------------------
+    # B6: Unknown in conditionals must not bypass narrowing
+    # -------------------------------------------------------------------------
+    def check_prod_b6_unknown_conditional {
+        program = compile_and_check("checker_prod_unknown_conditional.jac");
+
+        # isinstance on Unknown, ternary with Unknown must produce errors
+        assert len(program.errors_had) >= 2 , "B6: Unknown bypasses conditional type narrowing. "
+        f"Expected >= 2 errors but got {len(program.errors_had)}. "
+        "isinstance() on Unknown must narrow or flag, not silently accept.";
+    }
+    run_cases(
+        [
+            ("prod a1 dict compr type", check_prod_a1_dict_compr_type),
+            ("prod a2 set compr type", check_prod_a2_set_compr_type),
+            ("prod b1 unknown assign", check_prod_b1_unknown_assign),
+            ("prod b2 unknown method call", check_prod_b2_unknown_method_call),
+            ("prod b3 unknown propagation", check_prod_b3_unknown_propagation),
+            ("prod b4 unknown function arg", check_prod_b4_unknown_function_arg),
+            ("prod b5 unknown return", check_prod_b5_unknown_return),
+            ("prod b6 unknown conditional", check_prod_b6_unknown_conditional)
+        ]
+    );
 }
 
-# -------------------------------------------------------------------------
-# A2: Set comprehension parameterized type inference
-# -------------------------------------------------------------------------
-test "prod a2 set compr type" {
-    program = compile_and_check("checker_prod_set_compr_type.jac");
-
-    # {x * 2 for x in nums} must infer as set[int], not just set
-    assert len(program.errors_had) >= 2 , "A2: Set comprehension type inference failed. "
-    f"Expected >= 2 errors but got {len(program.errors_had)}. "
-    "Set comprehensions must infer element type, not Unknown.";
-}
 
 # =========================================================================
 #  B. UNKNOWNTYPE DISCIPLINE
@@ -79,78 +166,6 @@ test "prod a2 set compr type" {
 #
 #  These tests verify that Unknown does not create silent type holes.
 # =========================================================================
-
-# -------------------------------------------------------------------------
-# B1: Unknown must not silently assign to typed variables
-# -------------------------------------------------------------------------
-test "prod b1 unknown assign" {
-    program = compile_and_check("checker_prod_unknown_assign.jac");
-
-    # Assigning Unknown to int, str, list, bool, float should warn/error
-    assert len(program.errors_had) >= 3 , "B1: Unknown silently assigned to typed variables. "
-    f"Expected >= 3 errors/warnings but got {len(program.errors_had)}. "
-    "Unknown must not be a universal 'any' type that accepts all assignments.";
-}
-
-# -------------------------------------------------------------------------
-# B2: Method calls on Unknown must not silently pass
-# -------------------------------------------------------------------------
-test "prod b2 unknown method call" {
-    program = compile_and_check("checker_prod_unknown_method_call.jac");
-
-    # .nonexistent(), .append(), .upper(), [0] on Unknown should error
-    assert len(program.errors_had) >= 3 , "B2: Method calls on Unknown silently pass. "
-    f"Expected >= 3 errors but got {len(program.errors_had)}. "
-    "Calling .nonexistent() on Unknown must not silently succeed.";
-}
-
-# -------------------------------------------------------------------------
-# B3: Unknown must not propagate silently through expressions
-# -------------------------------------------------------------------------
-test "prod b3 unknown propagation" {
-    program = compile_and_check("checker_prod_unknown_propagation.jac");
-
-    # Unknown + 1, Unknown + "hello", -Unknown should not silently produce Unknown
-    assert len(program.errors_had) >= 3 , "B3: Unknown propagates silently through expressions. "
-    f"Expected >= 3 errors but got {len(program.errors_had)}. "
-    "Arithmetic/string ops on Unknown must not silently produce more Unknown.";
-}
-
-# -------------------------------------------------------------------------
-# B4: Unknown passed to typed function parameters must be flagged
-# -------------------------------------------------------------------------
-test "prod b4 unknown function arg" {
-    program = compile_and_check("checker_prod_unknown_function_arg.jac");
-
-    # Passing Unknown to int, str, list[int] params should error
-    assert len(program.errors_had) >= 3 , "B4: Unknown passed to typed function params silently. "
-    f"Expected >= 3 errors but got {len(program.errors_had)}. "
-    "Unknown must not be silently accepted as int, str, or list[int] argument.";
-}
-
-# -------------------------------------------------------------------------
-# B5: Functions returning Unknown where typed return is declared
-# -------------------------------------------------------------------------
-test "prod b5 unknown return" {
-    program = compile_and_check("checker_prod_unknown_return.jac");
-
-    # Returning Unknown where int or str is declared should error
-    assert len(program.errors_had) >= 3 , "B5: Unknown returned where typed return is declared. "
-    f"Expected >= 3 errors but got {len(program.errors_had)}. "
-    "Returning Unknown for declared -> int or -> str must produce a diagnostic.";
-}
-
-# -------------------------------------------------------------------------
-# B6: Unknown in conditionals must not bypass narrowing
-# -------------------------------------------------------------------------
-test "prod b6 unknown conditional" {
-    program = compile_and_check("checker_prod_unknown_conditional.jac");
-
-    # isinstance on Unknown, ternary with Unknown must produce errors
-    assert len(program.errors_had) >= 2 , "B6: Unknown bypasses conditional type narrowing. "
-    f"Expected >= 2 errors but got {len(program.errors_had)}. "
-    "isinstance() on Unknown must narrow or flag, not silently accept.";
-}
 
 # -------------------------------------------------------------------------
 # B7: Omitted return annotation must infer None, not Unknown

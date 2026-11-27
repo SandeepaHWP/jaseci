@@ -52,7 +52,7 @@ between this file costing one native compile and costing four.
 """
 
 import os;
-import from tests.support { TESTS_DIR, sv_run, na_run }
+import from tests.support { TESTS_DIR, sv_run, na_run, run_cases }
 
 glob FIXTURES = os.path.join(
          TESTS_DIR, "compiler", "backends", "native", "fixtures"
@@ -89,13 +89,33 @@ def sv_lines(fixture: str) -> list[str] {
     return kept_lines(_RUN_MEMO[key]);
 }
 
-test "an imported base's own call reaches the importer's override" {
-    na = na_lines(MAIN_FIXTURE);
-    assert "consumer_mark=7" in na , (
-        f"Driver.drive() did not reach Consumer.hook natively; got {na}"
-    );
-    assert "consumer_tick=0" in na , (
-        f"Driver.hook ran in place of the override; got {na}"
+test "an imported base's own call reaches the importer's override, and related cases" {
+    def check_an_imported_base_s_own_call_reaches_the_importer {
+        na = na_lines(MAIN_FIXTURE);
+        assert "consumer_mark=7" in na , (
+            f"Driver.drive() did not reach Consumer.hook natively; got {na}"
+        );
+        assert "consumer_tick=0" in na , (
+            f"Driver.hook ran in place of the override; got {na}"
+        );
+    }
+
+    def check_an_unsubclassed_base_instance_still_runs_the_bas {
+        na = na_lines(MAIN_FIXTURE);
+        assert "base_tick=1" in na , f"Driver.hook did not run for a Driver; got {na}";
+        assert "base_label=base" in na , f"Driver.label did not run for a Driver; got {na}";
+    }
+    run_cases(
+        [
+            (
+                "an imported base's own call reaches the importer's override",
+                check_an_imported_base_s_own_call_reaches_the_importer
+            ),
+            (
+                "an unsubclassed base instance still runs the base body",
+                check_an_unsubclassed_base_instance_still_runs_the_bas
+            )
+        ]
     );
 }
 
@@ -106,11 +126,6 @@ test "the importing module's own call site keeps dispatching" {
     );
 }
 
-test "an unsubclassed base instance still runs the base body" {
-    na = na_lines(MAIN_FIXTURE);
-    assert "base_tick=1" in na , f"Driver.hook did not run for a Driver; got {na}";
-    assert "base_label=base" in na , f"Driver.label did not run for a Driver; got {na}";
-}
 
 test "the native binary and the server pathway agree line for line" {
     sv = sv_lines(MAIN_FIXTURE);

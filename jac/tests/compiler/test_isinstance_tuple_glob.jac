@@ -27,7 +27,7 @@ must stay silent, because there is no honest answer to give.
 """
 
 import os;
-import from tests.support { TESTS_DIR }
+import from tests.support { TESTS_DIR, run_cases }
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.driver.compile_options { CompileOptions }
 
@@ -44,9 +44,34 @@ def check_errors(fixture: str) -> list[any] {
 }
 
 
-test "a named tuple-of-types guard type-checks clean" {
-    errs = check_errors("isinstance_tuple_glob.jac");
-    assert not errs , f"expected no type errors, got {errs}";
+test "a named tuple-of-types guard type-checks clean, and related cases" {
+    def check_a_named_tuple_of_types_guard_type_checks_clean {
+        errs = check_errors("isinstance_tuple_glob.jac");
+        assert not errs , f"expected no type errors, got {errs}";
+    }
+
+    def check_the_bare_tuple_class_narrows_like_any_other_clas {
+        # `isinstance(x, tuple)` is not a table: the class shares the table
+        # type's `shared` but is class-form, not a tuple value. Misreading it as
+        # an empty table dropped the guard entirely, so neither branch narrowed
+        # (#8330). The fixture's `bare_class_positive` needs the true branch
+        # narrowed to `tuple`, `bare_class_negative` needs `tuple` subtracted in
+        # the elif.
+        errs = check_errors("isinstance_tuple_glob.jac");
+        assert not errs , f"bare tuple guard left its subject unnarrowed: {errs}";
+    }
+    run_cases(
+        [
+            (
+                "a named tuple-of-types guard type-checks clean",
+                check_a_named_tuple_of_types_guard_type_checks_clean
+            ),
+            (
+                "the bare tuple class narrows like any other class",
+                check_the_bare_tuple_class_narrows_like_any_other_clas
+            )
+        ]
+    );
 }
 
 
@@ -61,16 +86,4 @@ test "the guarded subject keeps its own identity, not the table's" {
     assert "tuple" not in joined , (
         "the table's own type leaked into the narrowed subject: " + joined
     );
-}
-
-
-test "the bare tuple class narrows like any other class" {
-    # `isinstance(x, tuple)` is not a table: the class shares the table
-    # type's `shared` but is class-form, not a tuple value. Misreading it as
-    # an empty table dropped the guard entirely, so neither branch narrowed
-    # (#8330). The fixture's `bare_class_positive` needs the true branch
-    # narrowed to `tuple`, `bare_class_negative` needs `tuple` subtracted in
-    # the elif.
-    errs = check_errors("isinstance_tuple_glob.jac");
-    assert not errs , f"bare tuple guard left its subject unnarrowed: {errs}";
 }

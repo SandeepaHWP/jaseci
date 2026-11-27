@@ -2,7 +2,7 @@
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.driver.compile_options { CompileOptions }
 import ctypes;
-import from tests.support { get_func, native_force_opts }
+import from tests.support { get_func, native_force_opts, run_cases }
 
 test "a field does not shadow its own annotated type in native construction" {
     program = JacProgram();
@@ -25,34 +25,66 @@ def:pub read_child() -> int {
     assert get_func(module.gen.native_engine, "read_child", ctypes.c_int64)() == 42;
 }
 
-test "mapping spreads in generic annotations report a type diagnostic" {
-    program = JacProgram();
-    program.compile(
-        file_path="annotation_spread.jac",
-        use_str="def probe(value: dict[(str, **int)]) -> None {}",
-        options=CompileOptions(no_cgen=True, no_ir_cache=True, force_codespace="server")
+test "mapping spreads in generic annotations report a type diagnostic, and related cases" {
+    def check_mapping_spreads_in_generic_annotations_report_a {
+        program = JacProgram();
+        program.compile(
+            file_path="annotation_spread.jac",
+            use_str="def probe(value: dict[(str, **int)]) -> None {}",
+            options=CompileOptions(
+                no_cgen=True, no_ir_cache=True, force_codespace="server"
+            )
+        );
+        messages = "\n".join(error.pretty_print() for error in program.errors_had);
+        assert "E1038" in messages , messages;
+    }
+
+    def check_a_parenthesized_tuple_in_a_union_annotation_stil {
+        program = JacProgram();
+        program.compile(
+            file_path="paren_tuple_union_mismatch.jac",
+            use_str="def probe() -> (str, int) | None { return (1, 2); }",
+            options=CompileOptions(
+                no_cgen=True, no_ir_cache=True, force_codespace="server"
+            )
+        );
+        messages = "\n".join(error.pretty_print() for error in program.errors_had);
+        assert "E1002" in messages , messages;
+    }
+    run_cases(
+        [
+            (
+                "mapping spreads in generic annotations report a type diagnostic",
+                check_mapping_spreads_in_generic_annotations_report_a
+            ),
+            (
+                "a parenthesized tuple in a union annotation still checks its elements",
+                check_a_parenthesized_tuple_in_a_union_annotation_stil
+            )
+        ]
     );
-    messages = "\n".join(error.pretty_print() for error in program.errors_had);
-    assert "E1038" in messages , messages;
 }
 
-test "valid tuple and callable annotation arguments retain their types" {
-    program = JacProgram();
-    program.compile(
-        file_path="annotation_arguments.jac",
-        use_str="def probe(callback: Callable[[int, str], str], value: tuple[int, str]) -> str { return callback(value[0], value[1]); }",
-        options=CompileOptions(no_cgen=True, no_ir_cache=True, force_codespace="server")
-    );
-    assert not program.errors_had , "\n".join(
-        error.pretty_print() for error in program.errors_had
-    );
-}
+test "valid tuple and callable annotation arguments retain their types, and related cases" {
+    def check_valid_tuple_and_callable_annotation_arguments_re {
+        program = JacProgram();
+        program.compile(
+            file_path="annotation_arguments.jac",
+            use_str="def probe(callback: Callable[[int, str], str], value: tuple[int, str]) -> str { return callback(value[0], value[1]); }",
+            options=CompileOptions(
+                no_cgen=True, no_ir_cache=True, force_codespace="server"
+            )
+        );
+        assert not program.errors_had , "\n".join(
+            error.pretty_print() for error in program.errors_had
+        );
+    }
 
-test "a parenthesized tuple annotation unions with None on either side" {
-    program = JacProgram();
-    program.compile(
-        file_path="paren_tuple_union.jac",
-        use_str="""
+    def check_a_parenthesized_tuple_annotation_unions_with_non {
+        program = JacProgram();
+        program.compile(
+            file_path="paren_tuple_union.jac",
+            use_str="""
 def first(text: str) -> (str, int) | None {
     if not text { return None; }
     return (text[0], 0);
@@ -80,20 +112,24 @@ def count(pair: (str, int) | None, pairs: list[(str, int) | None]) -> int {
     return n + total;
 }
 """,
-        options=CompileOptions(no_cgen=True, no_ir_cache=True, force_codespace="server")
+            options=CompileOptions(
+                no_cgen=True, no_ir_cache=True, force_codespace="server"
+            )
+        );
+        assert not program.errors_had , "\n".join(
+            error.pretty_print() for error in program.errors_had
+        );
+    }
+    run_cases(
+        [
+            (
+                "valid tuple and callable annotation arguments retain their types",
+                check_valid_tuple_and_callable_annotation_arguments_re
+            ),
+            (
+                "a parenthesized tuple annotation unions with None on either side",
+                check_a_parenthesized_tuple_annotation_unions_with_non
+            )
+        ]
     );
-    assert not program.errors_had , "\n".join(
-        error.pretty_print() for error in program.errors_had
-    );
-}
-
-test "a parenthesized tuple in a union annotation still checks its elements" {
-    program = JacProgram();
-    program.compile(
-        file_path="paren_tuple_union_mismatch.jac",
-        use_str="def probe() -> (str, int) | None { return (1, 2); }",
-        options=CompileOptions(no_cgen=True, no_ir_cache=True, force_codespace="server")
-    );
-    messages = "\n".join(error.pretty_print() for error in program.errors_had);
-    assert "E1002" in messages , messages;
 }

@@ -21,7 +21,7 @@ Refs #8070
 
 import ctypes;
 import os;
-import from tests.support { TESTS_DIR, native_address, native_force_opts }
+import from tests.support { TESTS_DIR, native_address, native_force_opts, run_cases }
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.runtime.runtime { JacRuntime }
 import from jaclang.compiler.frontend.codeinfo {
@@ -133,118 +133,156 @@ def _has_code(prog: JacProgram, code: str) -> bool {
 }
 
 
-test "a spread anywhere in a list display contributes all of its elements" {
-    eng = _compile();
-    expect = {
-        "tail_spread": 1123,
-        "mid_spread": 11239,
-        "head_spread": 1239,
-        "multi_spread": 11236457,
-        "only_spread": 123,
-        "only_two_spreads": 12345
-    };
-    for (name, want) in expect.items() {
-        got = _get(eng, name)(0);
-        assert got == want , (
-            f"{name}: got {got}, want {want} -- a shorter fold means elements "
-            f"were dropped from the display"
+test "a spread lowers wherever a display can appear, and related cases" {
+    def check_a_spread_lowers_wherever_a_display_can_appear {
+        eng = _compile();
+
+        assert _get(eng, "glob_spread")(0) == 11234 , (
+            "a module-level initializer, whose copy loop lands in glob init"
+        );
+        assert _get(eng, "call_arg_spread")(0) == 11234 , (
+            "a display passed straight to a call"
+        );
+        assert _get(eng, "compr_spread")(0) == 133 , (
+            "a display as a comprehension's output expression"
         );
     }
-}
 
+    def check_the_spread_copies_its_source_rather_than_aliasin {
+        eng = _compile();
 
-test "an empty spread contributes nothing and disturbs nothing" {
-    eng = _compile();
-    assert _get(eng, "empty_spread")(0) == 112 , "an empty middle spread";
-    assert _get(eng, "empty_head_spread")(0) == 14 , (
-        "an empty leading spread leaves no element to seed storage from"
-    );
-    assert _get(eng, "set_empty_spread")(0) == 1064 , "an empty spread into a set";
-}
-
-
-test "a spread source that is a literal, a spread result, or runtime-sized" {
-    eng = _compile();
-    assert _get(eng, "literal_spread")(0) == 11234 , "the operand is itself a display";
-    assert _get(eng, "nested_spread")(0) == 1023 , "spreading a spread's result";
-    dyn = _get(eng, "dynamic_spread");
-    assert dyn(0) == 178 , "an empty runtime source";
-    assert dyn(1) == 1718 , "a one-element runtime source";
-    assert dyn(3) == 171238 , "a three-element runtime source";
-}
-
-
-test "a spread lowers wherever a display can appear" {
-    eng = _compile();
-    assert _get(eng, "glob_spread")(0) == 11234 , (
-        "a module-level initializer, whose copy loop lands in glob init"
-    );
-    assert _get(eng, "call_arg_spread")(0) == 11234 , (
-        "a display passed straight to a call"
-    );
-    assert _get(eng, "compr_spread")(0) == 133 , (
-        "a display as a comprehension's output expression"
-    );
-}
-
-
-test "spread elements agree with the display's element storage" {
-    eng = _compile();
-    assert _get(eng, "declared_spread")(0) == 11234 , (
-        "a declared list[int] element type"
-    );
-    assert _get(eng, "str_spread")(0) == 11234 , (
-        "pointer-flavoured elements must survive the copy"
-    );
-    assert _get(eng, "float_spread")(0) == 175 , "float-flavoured elements";
-}
-
-
-test "the spread copies its source rather than aliasing it" {
-    eng = _compile();
-    assert _get(eng, "spread_then_mutate")(0) == 11234 , (
-        "appending after the display must not disturb the copied elements"
-    );
-    assert _get(eng, "source_survives")(0) == 1124023 , (
-        "mutating the result must leave the spread source intact"
-    );
-}
-
-
-test "a spread anywhere in a set display contributes all of its elements" {
-    eng = _compile();
-    expect = {
-        "set_tail": 3014,
-        "set_head": 3028,
-        "set_mid": 4046,
-        "set_multi": 5062,
-        "set_only": 2012,
-        "set_dedup": 2006,
-        "set_from_set": 3014,
-        "list_from_set": 2013
-    };
-    for (name, want) in expect.items() {
-        got = _get(eng, name)(0);
-        assert got == want , (
-            f"{name}: got {got}, want {want} -- the low digits are a membership "
-            f"mask and the high digits the length"
+        assert _get(eng, "spread_then_mutate")(0) == 11234 , (
+            "appending after the display must not disturb the copied elements"
+        );
+        assert _get(eng, "source_survives")(0) == 1124023 , (
+            "mutating the result must leave the spread source intact"
         );
     }
-}
+    def check_a_spread_anywhere_in_a_list_display_contributes {
+        eng = _compile();
 
-
-test "every spread form agrees with the sv result" {
-    eng = _compile();
-    sv = _sv_module();
-    for name in LIST_FNS + SET_FNS {
-        na_fn = _get(eng, name);
-        sv_fn = getattr(sv, name);
-        for flag in FLAGS {
-            assert na_fn(flag) == sv_fn(flag) , (
-                f"{name}({flag}): native {na_fn(flag)} != sv {sv_fn(flag)}"
+        expect = {
+            "tail_spread": 1123,
+            "mid_spread": 11239,
+            "head_spread": 1239,
+            "multi_spread": 11236457,
+            "only_spread": 123,
+            "only_two_spreads": 12345
+        };
+        for (name, want) in expect.items() {
+            got = _get(eng, name)(0);
+            assert got == want , (
+                f"{name}: got {got}, want {want} -- a shorter fold means elements "
+                f"were dropped from the display"
             );
         }
     }
+
+    def check_an_empty_spread_contributes_nothing_and_disturbs {
+        eng = _compile();
+
+        assert _get(eng, "empty_spread")(0) == 112 , "an empty middle spread";
+        assert _get(eng, "empty_head_spread")(0) == 14 , (
+            "an empty leading spread leaves no element to seed storage from"
+        );
+        assert _get(eng, "set_empty_spread")(0) == 1064 , "an empty spread into a set";
+    }
+
+    def check_a_spread_source_that_is_a_literal_a_spread_resul {
+        eng = _compile();
+
+        assert _get(eng, "literal_spread")(0) == 11234 , "the operand is itself a display";
+        assert _get(eng, "nested_spread")(0) == 1023 , "spreading a spread's result";
+        dyn = _get(eng, "dynamic_spread");
+        assert dyn(0) == 178 , "an empty runtime source";
+        assert dyn(1) == 1718 , "a one-element runtime source";
+        assert dyn(3) == 171238 , "a three-element runtime source";
+    }
+
+    def check_spread_elements_agree_with_the_display_s_element {
+        eng = _compile();
+
+        assert _get(eng, "declared_spread")(0) == 11234 , (
+            "a declared list[int] element type"
+        );
+        assert _get(eng, "str_spread")(0) == 11234 , (
+            "pointer-flavoured elements must survive the copy"
+        );
+        assert _get(eng, "float_spread")(0) == 175 , "float-flavoured elements";
+    }
+
+    def check_a_spread_anywhere_in_a_set_display_contributes_a {
+        eng = _compile();
+
+        expect = {
+            "set_tail": 3014,
+            "set_head": 3028,
+            "set_mid": 4046,
+            "set_multi": 5062,
+            "set_only": 2012,
+            "set_dedup": 2006,
+            "set_from_set": 3014,
+            "list_from_set": 2013
+        };
+        for (name, want) in expect.items() {
+            got = _get(eng, name)(0);
+            assert got == want , (
+                f"{name}: got {got}, want {want} -- the low digits are a membership "
+                f"mask and the high digits the length"
+            );
+        }
+    }
+
+    def check_every_spread_form_agrees_with_the_sv_result {
+        eng = _compile();
+
+        sv = _sv_module();
+        for name in LIST_FNS + SET_FNS {
+            na_fn = _get(eng, name);
+            sv_fn = getattr(sv, name);
+            for flag in FLAGS {
+                assert na_fn(flag) == sv_fn(flag) , (
+                    f"{name}({flag}): native {na_fn(flag)} != sv {sv_fn(flag)}"
+                );
+            }
+        }
+    }
+    run_cases(
+        [
+            (
+                "a spread lowers wherever a display can appear",
+                check_a_spread_lowers_wherever_a_display_can_appear
+            ),
+            (
+                "the spread copies its source rather than aliasing it",
+                check_the_spread_copies_its_source_rather_than_aliasin
+            ),
+            (
+                "a spread anywhere in a list display contributes all of its elements",
+                check_a_spread_anywhere_in_a_list_display_contributes
+            ),
+            (
+                "an empty spread contributes nothing and disturbs nothing",
+                check_an_empty_spread_contributes_nothing_and_disturbs
+            ),
+            (
+                "a spread source that is a literal, a spread result, or runtime-sized",
+                check_a_spread_source_that_is_a_literal_a_spread_resul
+            ),
+            (
+                "spread elements agree with the display's element storage",
+                check_spread_elements_agree_with_the_display_s_element
+            ),
+            (
+                "a spread anywhere in a set display contributes all of its elements",
+                check_a_spread_anywhere_in_a_set_display_contributes_a
+            ),
+            (
+                "every spread form agrees with the sv result",
+                check_every_spread_form_agrees_with_the_sv_result
+            )
+        ]
+    );
 }
 
 

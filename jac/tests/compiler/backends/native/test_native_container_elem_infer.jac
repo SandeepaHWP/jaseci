@@ -26,7 +26,7 @@ the checker's `float`.
 import from jaclang.compiler.backends.py.codegen_shim { generated_python }
 import ctypes;
 import os;
-import from tests.support { TESTS_DIR, native_address, native_force_opts }
+import from tests.support { TESTS_DIR, native_address, native_force_opts, run_cases }
 import jaclang;
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.driver.compile_options { CompileOptions }
@@ -112,22 +112,43 @@ glob PAIRS: list[tuple[str, str]] = [
          ("untyped_float_from_float_literal", "typed_float_from_int_literal")
      ];
 
-test "container elem inference: the annotation cannot change the answer" {
-    eng = native_engine("container_elem_infer.jac");
-    sv = sv_funcs("container_elem_infer.jac");
-    for (untyped, typed) in PAIRS {
-        na_u = native_call(eng, untyped);
-        na_t = native_call(eng, typed);
-        assert na_u == na_t , (
-            f"native {untyped}() == {na_u} but {typed}() == {na_t}: "
-            + "omitting the element annotation changed the lowering"
-        );
-        sv_u = int(sv[untyped]());
-        sv_t = int(sv[typed]());
-        assert sv_u == sv_t , f"sv {untyped}() == {sv_u} but {typed}() == {sv_t}";
-        assert na_u == sv_u , (f"native {untyped}() == {na_u} but sv gives {sv_u}");
-        assert na_t == sv_t , f"native {typed}() == {na_t} but sv gives {sv_t}";
+test "container elem inference: cases" {
+    def check_container_elem_inference_the_annotation_cannot_c {
+        eng = native_engine("container_elem_infer.jac");
+        sv = sv_funcs("container_elem_infer.jac");
+        for (untyped, typed) in PAIRS {
+            na_u = native_call(eng, untyped);
+            na_t = native_call(eng, typed);
+            assert na_u == na_t , (
+                f"native {untyped}() == {na_u} but {typed}() == {na_t}: "
+                + "omitting the element annotation changed the lowering"
+            );
+            sv_u = int(sv[untyped]());
+            sv_t = int(sv[typed]());
+            assert sv_u == sv_t , f"sv {untyped}() == {sv_u} but {typed}() == {sv_t}";
+            assert na_u == sv_u , (f"native {untyped}() == {na_u} but sv gives {sv_u}");
+            assert na_t == sv_t , f"native {typed}() == {na_t} but sv gives {sv_t}";
+        }
     }
+
+    def check_container_elem_inference_list_float_keeps_f64_st {
+        eng = native_engine("container_elem_infer.jac");
+        assert native_call(eng, "typed_float_from_int_literal") == 250 , (
+            "`list[float] = [1, 2.5]` must store 2.5, not truncate to i64 storage"
+        );
+    }
+    run_cases(
+        [
+            (
+                "container elem inference: the annotation cannot change the answer",
+                check_container_elem_inference_the_annotation_cannot_c
+            ),
+            (
+                "container elem inference: list[float] keeps f64 storage past an int literal",
+                check_container_elem_inference_list_float_keeps_f64_st
+            )
+        ]
+    );
 }
 
 test "container elem inference: untyped enum list is not boxed away from congruence" {
@@ -148,119 +169,143 @@ test "container elem inference: untyped enum list is not boxed away from congrue
     assert "List.f64" in llvm , "list[float] must keep unboxed f64 storage";
 }
 
-test "container elem inference: list[float] keeps f64 storage past an int literal" {
-    eng = native_engine("container_elem_infer.jac");
-    assert native_call(eng, "typed_float_from_int_literal") == 250 , (
-        "`list[float] = [1, 2.5]` must store 2.5, not truncate to i64 storage"
-    );
-}
 
-test "un-inferable elem type: tagged elements still compare congruently" {
-    eng = native_engine("container_elem_unknown.jac");
-    sv = sv_funcs("container_elem_unknown.jac");
-    for fn in [
-        "mixed_elem_eq",
-        "mixed_elem_eq_miss",
-        "mixed_elem_ne",
-        "mixed_elem_lt",
-        "mixed_elem_str_eq"
-    ] {
-        na_v = native_call(eng, fn);
-        sv_v = int(sv[fn]());
-        assert na_v == sv_v , f"native {fn}() == {na_v} but sv gives {sv_v}";
+test "un-inferable elem type: cases" {
+    def check_un_inferable_elem_type_tagged_elements_still_com {
+        eng = native_engine("container_elem_unknown.jac");
+        sv = sv_funcs("container_elem_unknown.jac");
+        for fn in [
+            "mixed_elem_eq",
+            "mixed_elem_eq_miss",
+            "mixed_elem_ne",
+            "mixed_elem_lt",
+            "mixed_elem_str_eq"
+        ] {
+            na_v = native_call(eng, fn);
+            sv_v = int(sv[fn]());
+            assert na_v == sv_v , f"native {fn}() == {na_v} but sv gives {sv_v}";
+        }
     }
-}
 
-test "un-inferable elem type: ordering a tagged element checks its tag at runtime" {
-    eng = native_engine("container_elem_unknown.jac");
-    sv = sv_funcs("container_elem_unknown.jac");
-    # Ordering has no congruent answer the way equality does: boxing both sides
-    # makes a tag mismatch compare unequal, which is what sv does for `==`, but
-    # `"seven" < 9` has no order at all. CPython raises TypeError, so native
-    # must raise TypeError too rather than ordering on the payload bits.
-    for fn in [
-        "mixed_ord_str_vs_int",
-        "mixed_ord_str_vs_float",
-        "mixed_ord_int_vs_int",
-        "mixed_ord_int_vs_float",
-        "mixed_ord_float_vs_int",
-        "mixed_ord_float_vs_int_false"
-    ] {
-        na_v = native_call(eng, fn);
-        sv_v = int(sv[fn]());
-        assert na_v == sv_v , f"native {fn}() == {na_v} but sv gives {sv_v}";
+    def check_un_inferable_elem_type_ordering_a_tagged_element {
+        eng = native_engine("container_elem_unknown.jac");
+        sv = sv_funcs("container_elem_unknown.jac");
+        # Ordering has no congruent answer the way equality does: boxing both sides
+        # makes a tag mismatch compare unequal, which is what sv does for `==`, but
+        # `"seven" < 9` has no order at all. CPython raises TypeError, so native
+        # must raise TypeError too rather than ordering on the payload bits.
+        for fn in [
+            "mixed_ord_str_vs_int",
+            "mixed_ord_str_vs_float",
+            "mixed_ord_int_vs_int",
+            "mixed_ord_int_vs_float",
+            "mixed_ord_float_vs_int",
+            "mixed_ord_float_vs_int_false"
+        ] {
+            na_v = native_call(eng, fn);
+            sv_v = int(sv[fn]());
+            assert na_v == sv_v , f"native {fn}() == {na_v} but sv gives {sv_v}";
+        }
+        # -1 is the `except TypeError` arm of the fixture, so agreeing on -1 pins
+        # the exception TYPE on both pathways, not merely that something raised.
+        assert native_call(eng, "mixed_ord_str_vs_int") == -1 , (
+            "ordering a str-tagged element against an int must raise TypeError"
+        );
+        assert native_call(eng, "mixed_ord_str_vs_float") == -1 , (
+            "ordering a str-tagged element against a float must raise TypeError"
+        );
+        # The numerically-tagged cases must stay green: the tag check may not tax
+        # the ordering that legitimately works.
+        assert native_call(eng, "mixed_ord_int_vs_int") == 1 , "7 < 9";
+        assert native_call(eng, "mixed_ord_int_vs_float") == 1 , "7 < 9.5";
+        # A float-tagged payload must be read as a double, not as its raw bits.
+        assert native_call(eng, "mixed_ord_float_vs_int") == 1 , "2.5 < 9";
+        assert native_call(eng, "mixed_ord_float_vs_int_false") == 0 , "not 20.5 < 9";
     }
-    # -1 is the `except TypeError` arm of the fixture, so agreeing on -1 pins
-    # the exception TYPE on both pathways, not merely that something raised.
-    assert native_call(eng, "mixed_ord_str_vs_int") == -1 , (
-        "ordering a str-tagged element against an int must raise TypeError"
-    );
-    assert native_call(eng, "mixed_ord_str_vs_float") == -1 , (
-        "ordering a str-tagged element against a float must raise TypeError"
-    );
-    # The numerically-tagged cases must stay green: the tag check may not tax
-    # the ordering that legitimately works.
-    assert native_call(eng, "mixed_ord_int_vs_int") == 1 , "7 < 9";
-    assert native_call(eng, "mixed_ord_int_vs_float") == 1 , "7 < 9.5";
-    # A float-tagged payload must be read as a double, not as its raw bits.
-    assert native_call(eng, "mixed_ord_float_vs_int") == 1 , "2.5 < 9";
-    assert native_call(eng, "mixed_ord_float_vs_int_false") == 0 , "not 20.5 < 9";
-}
-
-test "un-inferable elem type: equality against an unboxable peer is refused" {
-    # The equality branch boxes the unboxed peer, but _box_to_jacval only
-    # represents scalars and pointers. An aggregate peer -- here a by-value
-    # tuple literal -- has no tagged representation, and its old catch-all
-    # stored tag=0/payload=0, so `x[0] == (1, 2)` compared a real element
-    # against a null-ish tagged value and could answer True for `0 == (0, 0)`.
-    # The guard is now symmetric with the ordering branch: unboxable peers
-    # refuse to lower, and the refusal demotes the owning function to a seam.
-    (prog, ir) = compile_na_inline_ir(
-        "eq_tuple",
-        "def f -> int {\n"
-            + "    x = [];\n"
-            + "    x.append(7);\n"
-            + "    x.append(\"seven\");\n"
-            + "    if x[0] == (1, 2) {\n"
-            + "        return 1;\n"
-            + "    }\n"
-            + "    return 0;\n"
-            + "}\n"
-    );
-    assert not prog.errors_had , (
-        "the unboxable-peer refusal is owned by f(), which must demote, got "
-        + f"{[str(e) for e in prog.errors_had]}"
-    );
-    assert ir.gen.native_layout is not None , "whole-module native compile aborted";
-    assert "f" not in ir.gen.native_layout.functions , (
-        "the refused comparison's function must be demoted out of the layout, "
-        + "never answer True for 0 == (0, 0)"
+    run_cases(
+        [
+            (
+                "un-inferable elem type: tagged elements still compare congruently",
+                check_un_inferable_elem_type_tagged_elements_still_com
+            ),
+            (
+                "un-inferable elem type: ordering a tagged element checks its tag at runtime",
+                check_un_inferable_elem_type_ordering_a_tagged_element
+            )
+        ]
     );
 }
 
-test "un-inferable elem type: an unorderable mixed comparison is refused, not guessed" {
-    (prog, ir) = compile_na_inline_ir(
-        "order_str",
-        "def f() -> int {\n"
-            + "    x = [];\n"
-            + "    x.append(7);\n"
-            + "    x.append(\"seven\");\n"
-            + "    if x[1] < \"zebra\" {\n"
-            + "        return 1;\n"
-            + "    }\n"
-            + "    return 0;\n"
-            + "}\n"
-    );
-    assert not prog.errors_had , (
-        "the unorderable-comparison refusal is owned by f(), which must "
-        + f"demote, got {[str(e) for e in prog.errors_had]}"
-    );
-    assert ir.gen.native_layout is not None , "whole-module native compile aborted";
-    assert "f" not in ir.gen.native_layout.functions , (
-        "the refused comparison's function must be demoted out of the layout, "
-        + "never guessed"
+
+test "un-inferable elem type: refused comparison cases" {
+    def check_un_inferable_elem_type_equality_against_an_unbox {
+        # The equality branch boxes the unboxed peer, but _box_to_jacval only
+        # represents scalars and pointers. An aggregate peer -- here a by-value
+        # tuple literal -- has no tagged representation, and its old catch-all
+        # stored tag=0/payload=0, so `x[0] == (1, 2)` compared a real element
+        # against a null-ish tagged value and could answer True for `0 == (0, 0)`.
+        # The guard is now symmetric with the ordering branch: unboxable peers
+        # refuse to lower, and the refusal demotes the owning function to a seam.
+        (prog, ir) = compile_na_inline_ir(
+            "eq_tuple",
+            "def f -> int {\n"
+                + "    x = [];\n"
+                + "    x.append(7);\n"
+                + "    x.append(\"seven\");\n"
+                + "    if x[0] == (1, 2) {\n"
+                + "        return 1;\n"
+                + "    }\n"
+                + "    return 0;\n"
+                + "}\n"
+        );
+        assert not prog.errors_had , (
+            "the unboxable-peer refusal is owned by f(), which must demote, got "
+            + f"{[str(e) for e in prog.errors_had]}"
+        );
+        assert ir.gen.native_layout is not None , "whole-module native compile aborted";
+        assert "f" not in ir.gen.native_layout.functions , (
+            "the refused comparison's function must be demoted out of the layout, "
+            + "never answer True for 0 == (0, 0)"
+        );
+    }
+
+    def check_un_inferable_elem_type_an_unorderable_mixed_comp {
+        (prog, ir) = compile_na_inline_ir(
+            "order_str",
+            "def f() -> int {\n"
+                + "    x = [];\n"
+                + "    x.append(7);\n"
+                + "    x.append(\"seven\");\n"
+                + "    if x[1] < \"zebra\" {\n"
+                + "        return 1;\n"
+                + "    }\n"
+                + "    return 0;\n"
+                + "}\n"
+        );
+        assert not prog.errors_had , (
+            "the unorderable-comparison refusal is owned by f(), which must "
+            + f"demote, got {[str(e) for e in prog.errors_had]}"
+        );
+        assert ir.gen.native_layout is not None , "whole-module native compile aborted";
+        assert "f" not in ir.gen.native_layout.functions , (
+            "the refused comparison's function must be demoted out of the layout, "
+            + "never guessed"
+        );
+    }
+    run_cases(
+        [
+            (
+                "un-inferable elem type: equality against an unboxable peer is refused",
+                check_un_inferable_elem_type_equality_against_an_unbox
+            ),
+            (
+                "un-inferable elem type: an unorderable mixed comparison is refused, not guessed",
+                check_un_inferable_elem_type_an_unorderable_mixed_comp
+            )
+        ]
     );
 }
+
 
 test "isinstance-narrowed any container unboxes at the boxed-boundary flavor" {
     # jac#8052: `isinstance(x, list)` on an `any` narrows to the BARE `list`,

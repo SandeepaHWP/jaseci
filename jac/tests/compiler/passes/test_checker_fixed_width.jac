@@ -14,7 +14,7 @@ The same program must check identically on the server and native lanes.
 """
 
 import os;
-import from tests.support { TESTS_DIR }
+import from tests.support { TESTS_DIR, run_cases }
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.driver.compile_options { CompileOptions }
 
@@ -66,45 +66,190 @@ test "negative literal into u8 is E1126" {
     assert check(src) == [("E1126", 2, 13)];
 }
 
-test "boundary literals fit: i8 = -128, i8 = 127, u16 = 65535, u64 = 2**64-1" {
-    assert_clean(
-        "with entry {\n"
-        "    a: i8 = -128;\n"
-        "    b: i8 = 127;\n"
-        "    c: u16 = 65535;\n"
-        "    d: u64 = 18446744073709551615;\n"
-        "    e: i64 = -9223372036854775808;\n"
-        "}\n"
+test "boundary literals fit: i8 = -128, i8 = 127, u16 = 65535, u64 = 2**64-1, and related cases" {
+    def check_boundary_literals_fit_i8_128_i8_127_u16_65535_u6 {
+        assert_clean(
+            "with entry {\n"
+            "    a: i8 = -128;\n"
+            "    b: i8 = 127;\n"
+            "    c: u16 = 65535;\n"
+            "    d: u64 = 18446744073709551615;\n"
+            "    e: i64 = -9223372036854775808;\n"
+            "}\n"
+        );
+    }
+
+    def check_the_widening_lattice_is_implicit {
+        assert_clean(
+            "def takes_i64(x: i64) -> int {\n    return 0;\n}\n"
+            "def takes_int(x: int) -> int {\n    return 0;\n}\n"
+            "def takes_f64(x: f64) -> int {\n    return 0;\n}\n"
+            "def takes_i16(x: i16) -> int {\n    return 0;\n}\n"
+            "def takes_float(x: float) -> int {\n    return 0;\n}\n"
+            "def takes_f32(x: f32) -> int {\n    return 0;\n}\n"
+            "with entry {\n"
+            "    a: i8 = 1;\n"
+            "    b: u64 = 1;\n"
+            "    c: f32 = 1.0;\n"
+            "    d: u8 = 1;\n"
+            "    e: u16 = 1;\n"
+            "    f: float = 1.0;\n"
+            "    g: i32 = 1;\n"
+            "    ok: bool = True;\n"
+            "    takes_i64(a);\n"
+            "    takes_f64(c);\n"
+            "    takes_i16(d);\n"
+            "    takes_f32(e);\n"
+            "    takes_f64(g);\n"
+            "    takes_float(c);\n"
+            "    takes_f64(f);\n"
+            "    takes_i16(ok);\n"
+            "    takes_float(a);\n"
+            "    h: f64 = c;\n"
+            "}\n"
+        );
+    }
+
+    def check_explicit_casts_and_wrap_are_accepted_everywhere {
+        assert_clean(
+            "def takes_u8(x: u8) -> int {\n    return 0;\n}\n"
+            "with entry {\n"
+            "    n: int = 300;\n"
+            "    a: i8 = 1;\n"
+            "    b: u8 = u8(n);\n"
+            "    c: u8 = u8.wrap(n);\n"
+            "    d: i8 = i8(a);\n"
+            "    takes_u8(u8(a));\n"
+            "    e: f32 = f32(1.5);\n"
+            "    f: i32 = i32(e);\n"
+            "    g: int = int(b);\n"
+            "    h: float = float(c);\n"
+            "}\n"
+        );
+    }
+
+    def check_division_on_any_int_kind_yields_float_floor_div {
+        assert_clean(
+            "with entry {\n"
+            "    a: u32 = 7;\n"
+            "    b: u32 = 2;\n"
+            "    x: float = a / b;\n"
+            "    y: u32 = a // b;\n"
+            "    z: u32 = a % b;\n"
+            "    p: u32 = a ** 2;\n"
+            "    q: float = a ** -1;\n"
+            "}\n"
+        );
+    }
+    run_cases(
+        [
+            (
+                "boundary literals fit: i8 = -128, i8 = 127, u16 = 65535, u64 = 2**64-1",
+                check_boundary_literals_fit_i8_128_i8_127_u16_65535_u6
+            ),
+            (
+                "the widening lattice is implicit",
+                check_the_widening_lattice_is_implicit
+            ),
+            (
+                "explicit casts and wrap are accepted everywhere narrowing is refused",
+                check_explicit_casts_and_wrap_are_accepted_everywhere
+            ),
+            (
+                "division on any int-kind yields float; floor-div, mod and pow keep the type",
+                check_division_on_any_int_kind_yields_float_floor_div
+            )
+        ]
     );
 }
 
-test "one past the boundary is E1126: i8 = 128, i8 = -129, u64 = 2**64" {
-    src = (
-        "with entry {\n"
-        "    a: i8 = 128;\n"
-        "    b: i8 = -129;\n"
-        "    c: u64 = 18446744073709551616;\n"
-        "}\n"
+test "one past the boundary is E1126: i8 = 128, i8 = -129, u64 = 2**64, and related cases" {
+    def check_one_past_the_boundary_is_e1126_i8_128_i8_129_u64 {
+        src = (
+            "with entry {\n"
+            "    a: i8 = 128;\n"
+            "    b: i8 = -129;\n"
+            "    c: u64 = 18446744073709551616;\n"
+            "}\n"
+        );
+        assert fw_only(check(src))
+            == [("E1126", 2, 13), ("E1126", 3, 13), ("E1126", 4, 14)];
+    }
+
+    def check_literal_range_applies_to_call_arguments_returns {
+        src = (
+            "def takes_u8(x: u8) -> u8 {\n"
+            "    return 256;\n"
+            "}\n"
+            "obj Pixel {\n"
+            "    has r: u8 = 999;\n"
+            "}\n"
+            "with entry {\n"
+            "    takes_u8(300);\n"
+            "}\n"
+        );
+        assert fw_only(check(src))
+            == [("E1126", 2, 12), ("E1126", 5, 17), ("E1126", 8, 14)];
+    }
+
+    # ── narrowing (E1127) ─────────────────────────────────────────────
+    def check_narrowing_a_sized_value_into_a_narrower_paramete {
+        src = (
+            "def takes_u8(x: u8) -> int {\n    return 0;\n}\n"
+            "def takes_i8(x: i8) -> int {\n    return 0;\n}\n"
+            "with entry {\n"
+            "    a: i8 = 1;\n"
+            "    b: i64 = 1;\n"
+            "    n: int = 1;\n"
+            "    takes_u8(a);\n"
+            "    takes_i8(b);\n"
+            "    takes_i8(n);\n"
+            "}\n"
+        );
+        assert fw_only(check(src))
+            == [("E1127", 11, 14), ("E1127", 12, 14), ("E1127", 13, 14)];
+    }
+
+    # ── operands (E1128) ──────────────────────────────────────────────
+    def check_mixing_signedness_at_one_width_in_arithmetic_or {
+        src = (
+            "with entry {\n"
+            "    a: u8 = 1;\n"
+            "    b: i8 = 1;\n"
+            "    c: u64 = 1;\n"
+            "    d: i64 = 1;\n"
+            "    e: i32 = 1;\n"
+            "    f: u32 = 1;\n"
+            "    x = a + b;\n"
+            "    y = c < d;\n"
+            "    z = e == f;\n"
+            "}\n"
+        );
+        assert fw_only(check(src))
+            == [("E1128", 8, 9), ("E1128", 9, 9), ("E1128", 10, 9)];
+    }
+    run_cases(
+        [
+            (
+                "one past the boundary is E1126: i8 = 128, i8 = -129, u64 = 2**64",
+                check_one_past_the_boundary_is_e1126_i8_128_i8_129_u64
+            ),
+            (
+                "literal range applies to call arguments, returns, and has defaults",
+                check_literal_range_applies_to_call_arguments_returns
+            ),
+            (
+                "narrowing a sized value into a narrower parameter is E1127",
+                check_narrowing_a_sized_value_into_a_narrower_paramete
+            ),
+            (
+                "mixing signedness at one width in arithmetic or comparison is E1128",
+                check_mixing_signedness_at_one_width_in_arithmetic_or
+            )
+        ]
     );
-    assert fw_only(check(src))
-        == [("E1126", 2, 13), ("E1126", 3, 13), ("E1126", 4, 14)];
 }
 
-test "literal range applies to call arguments, returns, and has defaults" {
-    src = (
-        "def takes_u8(x: u8) -> u8 {\n"
-        "    return 256;\n"
-        "}\n"
-        "obj Pixel {\n"
-        "    has r: u8 = 999;\n"
-        "}\n"
-        "with entry {\n"
-        "    takes_u8(300);\n"
-        "}\n"
-    );
-    assert fw_only(check(src))
-        == [("E1126", 2, 12), ("E1126", 5, 17), ("E1126", 8, 14)];
-}
 
 test "a float literal is accepted where the type can hold it" {
     assert_clean("with entry {\n    a: f32 = 0.1;\n    b: f64 = 1e300;\n}\n");
@@ -176,90 +321,77 @@ test "literal readers give exact 64-bit values and a once-rounded float" {
     assert int_literal_u64_bits("18446744073709551616") is None;
 }
 
-# ── narrowing (E1127) ─────────────────────────────────────────────
-test "narrowing a sized value into a narrower parameter is E1127" {
-    src = (
-        "def takes_u8(x: u8) -> int {\n    return 0;\n}\n"
-        "def takes_i8(x: i8) -> int {\n    return 0;\n}\n"
-        "with entry {\n"
-        "    a: i8 = 1;\n"
-        "    b: i64 = 1;\n"
-        "    n: int = 1;\n"
-        "    takes_u8(a);\n"
-        "    takes_i8(b);\n"
-        "    takes_i8(n);\n"
-        "}\n"
+
+test "int into a sized annotation is E1127, sized into int is fine, and related cases" {
+    def check_int_into_a_sized_annotation_is_e1127_sized_into {
+        src = (
+            "with entry {\n"
+            "    n: int = 5;\n"
+            "    w: i32 = n;\n"
+            "    m: int = w;\n"
+            "}\n"
+        );
+        assert fw_only(check(src)) == [("E1127", 3, 14)];
+    }
+
+    def check_a_unified_result_wider_than_the_annotation_is_e1 {
+        src = (
+            "with entry {\n"
+            "    a: i8 = 1;\n"
+            "    b: i64 = 2;\n"
+            "    s: i8 = a + b;\n"
+            "}\n"
+        );
+        assert fw_only(check(src)) == [("E1127", 4, 13)];
+    }
+    run_cases(
+        [
+            (
+                "int into a sized annotation is E1127, sized into int is fine",
+                check_int_into_a_sized_annotation_is_e1127_sized_into
+            ),
+            (
+                "a unified result wider than the annotation is E1127",
+                check_a_unified_result_wider_than_the_annotation_is_e1
+            )
+        ]
     );
-    assert fw_only(check(src))
-        == [("E1127", 11, 14), ("E1127", 12, 14), ("E1127", 13, 14)];
 }
 
-test "int into a sized annotation is E1127, sized into int is fine" {
-    src = (
-        "with entry {\n"
-        "    n: int = 5;\n"
-        "    w: i32 = n;\n"
-        "    m: int = w;\n"
-        "}\n"
+
+test "T op int yields int, so w = w + n narrows (E1127) while w = w + 1 is fine, and related cases" {
+    def check_t_op_int_yields_int_so_w_w_n_narrows_e1127_while {
+        src = (
+            "with entry {\n"
+            "    w: i32 = 1;\n"
+            "    n: int = 2;\n"
+            "    w = w + 1;\n"
+            "    w = w + n;\n"
+            "    w += 1;\n"
+            "    w += n;\n"
+            "}\n"
+        );
+        assert fw_only(check(src)) == [("E1127", 5, 9), ("E1127", 7, 10)];
+    }
+
+    def check_a_literal_cast_argument_out_of_range_is_e1126 {
+        src = "with entry {\n    x: u8 = u8(300);\n    y: i8 = i8(-129);\n}\n";
+        assert fw_only(check(src)) == [("E1126", 2, 16), ("E1126", 3, 16)];
+    }
+    run_cases(
+        [
+            (
+                "T op int yields int, so w = w + n narrows (E1127) while w = w + 1 is fine",
+                check_t_op_int_yields_int_so_w_w_n_narrows_e1127_while
+            ),
+            (
+                "a literal cast argument out of range is E1126",
+                check_a_literal_cast_argument_out_of_range_is_e1126
+            )
+        ]
     );
-    assert fw_only(check(src)) == [("E1127", 3, 14)];
 }
 
-test "a unified result wider than the annotation is E1127" {
-    src = (
-        "with entry {\n"
-        "    a: i8 = 1;\n"
-        "    b: i64 = 2;\n"
-        "    s: i8 = a + b;\n"
-        "}\n"
-    );
-    assert fw_only(check(src)) == [("E1127", 4, 13)];
-}
-
-test "T op int yields int, so w = w + n narrows (E1127) while w = w + 1 is fine" {
-    src = (
-        "with entry {\n"
-        "    w: i32 = 1;\n"
-        "    n: int = 2;\n"
-        "    w = w + 1;\n"
-        "    w = w + n;\n"
-        "    w += 1;\n"
-        "    w += n;\n"
-        "}\n"
-    );
-    assert fw_only(check(src)) == [("E1127", 5, 9), ("E1127", 7, 10)];
-}
-
-test "the widening lattice is implicit" {
-    assert_clean(
-        "def takes_i64(x: i64) -> int {\n    return 0;\n}\n"
-        "def takes_int(x: int) -> int {\n    return 0;\n}\n"
-        "def takes_f64(x: f64) -> int {\n    return 0;\n}\n"
-        "def takes_i16(x: i16) -> int {\n    return 0;\n}\n"
-        "def takes_float(x: float) -> int {\n    return 0;\n}\n"
-        "def takes_f32(x: f32) -> int {\n    return 0;\n}\n"
-        "with entry {\n"
-        "    a: i8 = 1;\n"
-        "    b: u64 = 1;\n"
-        "    c: f32 = 1.0;\n"
-        "    d: u8 = 1;\n"
-        "    e: u16 = 1;\n"
-        "    f: float = 1.0;\n"
-        "    g: i32 = 1;\n"
-        "    ok: bool = True;\n"
-        "    takes_i64(a);\n"
-        "    takes_f64(c);\n"
-        "    takes_i16(d);\n"
-        "    takes_f32(e);\n"
-        "    takes_f64(g);\n"
-        "    takes_float(c);\n"
-        "    takes_f64(f);\n"
-        "    takes_i16(ok);\n"
-        "    takes_float(a);\n"
-        "    h: f64 = c;\n"
-        "}\n"
-    );
-}
 
 test "u64 into int is E1127: int is a signed 64-bit machine type" {
     src = (
@@ -278,20 +410,52 @@ test "u64 into int is E1127: int is a signed 64-bit machine type" {
     );
 }
 
-test "int and i64 are interchangeable in the lattice, as are float and f64" {
-    assert_clean(
-        "def takes_i64(x: i64) -> int {\n    return 0;\n}\n"
-        "def takes_f64(x: f64) -> int {\n    return 0;\n}\n"
-        "def takes_float(x: float) -> int {\n    return 0;\n}\n"
-        "with entry {\n"
-        "    n: int = 1;\n"
-        "    w: i64 = 1;\n"
-        "    takes_i64(n);\n"
-        "    takes_f64(n);\n"
-        "    takes_float(n);\n"
-        "    takes_f64(w);\n"
-        "    takes_float(w);\n"
-        "}\n"
+test "int and i64 are interchangeable in the lattice, as are float and f64, and related cases" {
+    def check_int_and_i64_are_interchangeable_in_the_lattice_a {
+        assert_clean(
+            "def takes_i64(x: i64) -> int {\n    return 0;\n}\n"
+            "def takes_f64(x: f64) -> int {\n    return 0;\n}\n"
+            "def takes_float(x: float) -> int {\n    return 0;\n}\n"
+            "with entry {\n"
+            "    n: int = 1;\n"
+            "    w: i64 = 1;\n"
+            "    takes_i64(n);\n"
+            "    takes_f64(n);\n"
+            "    takes_float(n);\n"
+            "    takes_f64(w);\n"
+            "    takes_float(w);\n"
+            "}\n"
+        );
+    }
+
+    # ── type-level surface ───────────────────────────────────────────
+    def check_min_max_wrap_and_the_wrapping_builtins_type_chec {
+        assert_clean(
+            "with entry {\n"
+            "    lo: i8 = i8.MIN;\n"
+            "    hi: u16 = u16.MAX;\n"
+            "    w: u8 = u8.wrap(300);\n"
+            "    a: i8 = 100;\n"
+            "    s: i8 = wrapping_add(a, a);\n"
+            "    d: i8 = wrapping_sub(a, a);\n"
+            "    m: i8 = wrapping_mul(a, 2);\n"
+            "    n: i8 = wrapping_neg(a);\n"
+            "    l: i8 = wrapping_shl(a, 1);\n"
+            "    t: type = i8;\n"
+            "}\n"
+        );
+    }
+    run_cases(
+        [
+            (
+                "int and i64 are interchangeable in the lattice, as are float and f64",
+                check_int_and_i64_are_interchangeable_in_the_lattice_a
+            ),
+            (
+                "MIN, MAX, wrap and the wrapping_* builtins type-check with precise types",
+                check_min_max_wrap_and_the_wrapping_builtins_type_chec
+            )
+        ]
     );
 }
 
@@ -347,108 +511,92 @@ test "a float-kind into an int-kind stays the generic parameter error, not E1127
         == [("E1053", 10, 14), ("E1053", 11, 15)] , diags;
 }
 
-test "explicit casts and wrap are accepted everywhere narrowing is refused" {
-    assert_clean(
-        "def takes_u8(x: u8) -> int {\n    return 0;\n}\n"
-        "with entry {\n"
-        "    n: int = 300;\n"
-        "    a: i8 = 1;\n"
-        "    b: u8 = u8(n);\n"
-        "    c: u8 = u8.wrap(n);\n"
-        "    d: i8 = i8(a);\n"
-        "    takes_u8(u8(a));\n"
-        "    e: f32 = f32(1.5);\n"
-        "    f: i32 = i32(e);\n"
-        "    g: int = int(b);\n"
-        "    h: float = float(c);\n"
-        "}\n"
+
+test "a 64-bit int with f32 needs a cast (E1128); i16 + f32 unifies to f32, and related cases" {
+    def check_a_64_bit_int_with_f32_needs_a_cast_e1128_i16_f32 {
+        src = (
+            "with entry {\n"
+            "    a: i64 = 1;\n"
+            "    b: f32 = 1.0;\n"
+            "    c: i16 = 1;\n"
+            "    x = a + b;\n"
+            "    y: f32 = c + b;\n"
+            "    z: f32 = f32(a) + b;\n"
+            "}\n"
+        );
+        assert fw_only(check(src)) == [("E1128", 5, 9)];
+    }
+
+    def check_an_in_range_literal_adopts_the_sized_operand_out {
+        src = (
+            "with entry {\n"
+            "    a: u8 = 1;\n"
+            "    b: i32 = 1;\n"
+            "    x: u8 = a + 1;\n"
+            "    y: i32 = 1 + b;\n"
+            "    z = a + 300;\n"
+            "    w: u8 = a & 255;\n"
+            "    v: u8 = a >> 1;\n"
+            "    u: i32 = b << 3;\n"
+            "    q: bool = a == 0;\n"
+            "}\n"
+        );
+        assert fw_only(check(src)) == [("E1126", 6, 13)];
+    }
+
+    def check_augmented_assignment_on_a_sized_target_unifies_l {
+        src = (
+            "with entry {\n"
+            "    a: u8 = 1;\n"
+            "    b: i8 = 1;\n"
+            "    a += 1;\n"
+            "    a += b;\n"
+            "}\n"
+        );
+        assert fw_only(check(src)) == [("E1128", 5, 5)];
+    }
+    run_cases(
+        [
+            (
+                "a 64-bit int with f32 needs a cast (E1128); i16 + f32 unifies to f32",
+                check_a_64_bit_int_with_f32_needs_a_cast_e1128_i16_f32
+            ),
+            (
+                "an in-range literal adopts the sized operand; out of range is E1126",
+                check_an_in_range_literal_adopts_the_sized_operand_out
+            ),
+            (
+                "augmented assignment on a sized target unifies like the binary form",
+                check_augmented_assignment_on_a_sized_target_unifies_l
+            )
+        ]
     );
 }
 
-test "a literal cast argument out of range is E1126" {
-    src = "with entry {\n    x: u8 = u8(300);\n    y: i8 = i8(-129);\n}\n";
-    assert fw_only(check(src)) == [("E1126", 2, 16), ("E1126", 3, 16)];
-}
 
-# ── operands (E1128) ──────────────────────────────────────────────
-test "mixing signedness at one width in arithmetic or comparison is E1128" {
-    src = (
-        "with entry {\n"
-        "    a: u8 = 1;\n"
-        "    b: i8 = 1;\n"
-        "    c: u64 = 1;\n"
-        "    d: i64 = 1;\n"
-        "    e: i32 = 1;\n"
-        "    f: u32 = 1;\n"
-        "    x = a + b;\n"
-        "    y = c < d;\n"
-        "    z = e == f;\n"
-        "}\n"
+test "unary minus on an unsigned operand is E1129, and related cases" {
+    # ── unsigned negation (E1129) ─────────────────────────────────────
+    def check_unary_minus_on_an_unsigned_operand_is_e1129 {
+        src = "with entry {\n    a: u32 = 1;\n    b = -a;\n    c: u32 = ~a;\n}\n";
+        assert fw_only(check(src)) == [("E1129", 3, 9)];
+    }
+
+    def check_wrapping_over_mismatched_operands_is_e1128 {
+        src = "with entry {\n    a: i8 = 1;\n    b: u8 = 1;\n    s = wrapping_add(a, b);\n}\n";
+        assert fw_only(check(src)) == [("E1128", 4, 9)];
+    }
+    run_cases(
+        [
+            (
+                "unary minus on an unsigned operand is E1129",
+                check_unary_minus_on_an_unsigned_operand_is_e1129
+            ),
+            (
+                "wrapping_* over mismatched operands is E1128",
+                check_wrapping_over_mismatched_operands_is_e1128
+            )
+        ]
     );
-    assert fw_only(check(src)) == [("E1128", 8, 9), ("E1128", 9, 9), ("E1128", 10, 9)];
-}
-
-test "a 64-bit int with f32 needs a cast (E1128); i16 + f32 unifies to f32" {
-    src = (
-        "with entry {\n"
-        "    a: i64 = 1;\n"
-        "    b: f32 = 1.0;\n"
-        "    c: i16 = 1;\n"
-        "    x = a + b;\n"
-        "    y: f32 = c + b;\n"
-        "    z: f32 = f32(a) + b;\n"
-        "}\n"
-    );
-    assert fw_only(check(src)) == [("E1128", 5, 9)];
-}
-
-test "an in-range literal adopts the sized operand; out of range is E1126" {
-    src = (
-        "with entry {\n"
-        "    a: u8 = 1;\n"
-        "    b: i32 = 1;\n"
-        "    x: u8 = a + 1;\n"
-        "    y: i32 = 1 + b;\n"
-        "    z = a + 300;\n"
-        "    w: u8 = a & 255;\n"
-        "    v: u8 = a >> 1;\n"
-        "    u: i32 = b << 3;\n"
-        "    q: bool = a == 0;\n"
-        "}\n"
-    );
-    assert fw_only(check(src)) == [("E1126", 6, 13)];
-}
-
-test "division on any int-kind yields float; floor-div, mod and pow keep the type" {
-    assert_clean(
-        "with entry {\n"
-        "    a: u32 = 7;\n"
-        "    b: u32 = 2;\n"
-        "    x: float = a / b;\n"
-        "    y: u32 = a // b;\n"
-        "    z: u32 = a % b;\n"
-        "    p: u32 = a ** 2;\n"
-        "    q: float = a ** -1;\n"
-        "}\n"
-    );
-}
-
-test "augmented assignment on a sized target unifies like the binary form" {
-    src = (
-        "with entry {\n"
-        "    a: u8 = 1;\n"
-        "    b: i8 = 1;\n"
-        "    a += 1;\n"
-        "    a += b;\n"
-        "}\n"
-    );
-    assert fw_only(check(src)) == [("E1128", 5, 5)];
-}
-
-# ── unsigned negation (E1129) ─────────────────────────────────────
-test "unary minus on an unsigned operand is E1129" {
-    src = "with entry {\n    a: u32 = 1;\n    b = -a;\n    c: u32 = ~a;\n}\n";
-    assert fw_only(check(src)) == [("E1129", 3, 9)];
 }
 
 # ── bool operands ────────────────────────────────────────────────
@@ -486,28 +634,6 @@ test "bool arithmetic yields int; & | ^ between two bools stay bool" {
     assert check(src) == [("E1001", 4, 5), ("E1001", 5, 5), ("E1001", 6, 5)];
 }
 
-# ── type-level surface ───────────────────────────────────────────
-test "MIN, MAX, wrap and the wrapping_* builtins type-check with precise types" {
-    assert_clean(
-        "with entry {\n"
-        "    lo: i8 = i8.MIN;\n"
-        "    hi: u16 = u16.MAX;\n"
-        "    w: u8 = u8.wrap(300);\n"
-        "    a: i8 = 100;\n"
-        "    s: i8 = wrapping_add(a, a);\n"
-        "    d: i8 = wrapping_sub(a, a);\n"
-        "    m: i8 = wrapping_mul(a, 2);\n"
-        "    n: i8 = wrapping_neg(a);\n"
-        "    l: i8 = wrapping_shl(a, 1);\n"
-        "    t: type = i8;\n"
-        "}\n"
-    );
-}
-
-test "wrapping_* over mismatched operands is E1128" {
-    src = "with entry {\n    a: i8 = 1;\n    b: u8 = 1;\n    s = wrapping_add(a, b);\n}\n";
-    assert fw_only(check(src)) == [("E1128", 4, 9)];
-}
 
 # ── lane parity ───────────────────────────────────────────────────
 test "the native lane reports exactly the diagnostics the server lane reports" {

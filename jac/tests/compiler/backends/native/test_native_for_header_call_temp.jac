@@ -25,7 +25,8 @@ import from tests.support {
     TESTS_DIR,
     names_function,
     native_address,
-    native_force_opts
+    native_force_opts,
+    run_cases
 }
 import jaclang.compiler.frontend.unitree as uni;
 import from jaclang.compiler.driver.program { JacProgram }
@@ -167,43 +168,62 @@ test "a named local and a header temporary account the same on early return" {
 }
 
 
-test "a chained header call gives back both of its temporaries" {
-    # `mk_bag(n).all()` leaves two owned values in registers: the Bag and the
-    # list its accessor built. Releasing the list alone drops the elements to
-    # rc 1 and destroys nothing, so 3 is the count that needs both.
-    assert _account("chained_header_drops", 3) == (3, 2) , (
-        "`a.f().g()` in the header must release the receiver temporary as "
-        "well as the collection"
-    );
-}
+test "a chained header call gives back both of its temporaries, and related cases" {
+    def check_a_chained_header_call_gives_back_both_of_its_tem {
+        # `mk_bag(n).all()` leaves two owned values in registers: the Bag and the
+        # list its accessor built. Releasing the list alone drops the elements to
+        # rc 1 and destroys nothing, so 3 is the count that needs both.
+        assert _account("chained_header_drops", 3) == (3, 2) , (
+            "`a.f().g()` in the header must release the receiver temporary as "
+            "well as the collection"
+        );
+    }
 
+    def check_an_exception_unwinding_past_the_loop_releases_th {
+        assert _account("raise_header_drops", 3) == (3, 5) , (
+            "a `raise` caught outside the loop skips the loop's exit block, so "
+            "the collection has to be reachable from the frame's own cleanup"
+        );
+    }
 
-test "an exception unwinding past the loop releases the collection" {
-    assert _account("raise_header_drops", 3) == (3, 5) , (
-        "a `raise` caught outside the loop skips the loop's exit block, so "
-        "the collection has to be reachable from the frame's own cleanup"
-    );
-}
+    def check_nested_header_calls_each_release_their_own_colle {
+        # The inner loop completes once (a.tag == 1) and returns out of its
+        # second run, so 3 of the 9 were already freed by the exit block: the
+        # discriminator is the outer collection plus the abandoned inner one.
+        assert _account("nested_header_drops", 3) == (9, 22) , (
+            "returning out of the inner loop must free the inner collection and "
+            "the outer one, not just whichever the exit block reached"
+        );
+    }
 
-
-test "nested header calls each release their own collection" {
-    # The inner loop completes once (a.tag == 1) and returns out of its
-    # second run, so 3 of the 9 were already freed by the exit block: the
-    # discriminator is the outer collection plus the abandoned inner one.
-    assert _account("nested_header_drops", 3) == (9, 22) , (
-        "returning out of the inner loop must free the inner collection and "
-        "the outer one, not just whichever the exit block reached"
-    );
-}
-
-
-test "the iterator-protocol loop owns its adapter the same way" {
-    # `for (i, nd) in enumerate(mk_nodes(n))` takes `_try_iter_protocol_for`,
-    # a separate lowering with the identical single-release-after-the-loop
-    # shape.
-    assert _account("adapter_header_drops", 3) == (3, 12) , (
-        "an adapter built over a header call must be released on the early "
-        "`return` path too"
+    def check_the_iterator_protocol_loop_owns_its_adapter_the {
+        # `for (i, nd) in enumerate(mk_nodes(n))` takes `_try_iter_protocol_for`,
+        # a separate lowering with the identical single-release-after-the-loop
+        # shape.
+        assert _account("adapter_header_drops", 3) == (3, 12) , (
+            "an adapter built over a header call must be released on the early "
+            "`return` path too"
+        );
+    }
+    run_cases(
+        [
+            (
+                "a chained header call gives back both of its temporaries",
+                check_a_chained_header_call_gives_back_both_of_its_tem
+            ),
+            (
+                "an exception unwinding past the loop releases the collection",
+                check_an_exception_unwinding_past_the_loop_releases_th
+            ),
+            (
+                "nested header calls each release their own collection",
+                check_nested_header_calls_each_release_their_own_colle
+            ),
+            (
+                "the iterator-protocol loop owns its adapter the same way",
+                check_the_iterator_protocol_loop_owns_its_adapter_the
+            )
+        ]
     );
 }
 

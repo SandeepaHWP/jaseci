@@ -16,6 +16,8 @@ crash the checker: a malformed filter is user input, not an ICE.
 
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.driver.compile_options { CompileOptions }
+import from tests.support { run_cases }
+
 
 glob PRELUDE: str = "node Chan { has name: str = \"\"; }\n"
      "node Msg { has body: str = \"\", at: int = 0, seq: int = 0; }\n"
@@ -134,48 +136,74 @@ test "a malformed filter never raises out of the checker" {
 }
 
 
-test "an unfoldable sort key reports the object-space cost" {
-    out = _cgen_codes(
-        "def go(c: Chan) -> list[Msg] {\n"
-        "    return sorted(\n"
-        "        [c ->:Posted:-> [?:Msg]],\n"
-        "        key=lambda (m: Msg) { -(m.at + m.at); }\n"
-        "    );\n"
-        "}\n"
+test "an unfoldable sort key reports the object-space cost, and related cases" {
+    def check_an_unfoldable_sort_key_reports_the_object_space {
+        out = _cgen_codes(
+            "def go(c: Chan) -> list[Msg] {\n"
+            "    return sorted(\n"
+            "        [c ->:Posted:-> [?:Msg]],\n"
+            "        key=lambda (m: Msg) { -(m.at + m.at); }\n"
+            "    );\n"
+            "}\n"
+        );
+        assert "W5096" in out , out;
+    }
+
+    def check_an_in_place_sort_over_a_bound_traversal_reports {
+        out = _cgen_codes(
+            "def go(c: Chan) -> list[Msg] {\n"
+            "    got = [c ->:Posted:-> [?:Msg]];\n"
+            "    got.sort(key=lambda (m: Msg) { -m.at; });\n"
+            "    return got;\n"
+            "}\n"
+        );
+        assert "W5096" in out , out;
+    }
+    run_cases(
+        [
+            (
+                "an unfoldable sort key reports the object-space cost",
+                check_an_unfoldable_sort_key_reports_the_object_space
+            ),
+            (
+                "an in-place sort over a bound traversal reports",
+                check_an_in_place_sort_over_a_bound_traversal_reports
+            )
+        ]
     );
-    assert "W5096" in out , out;
 }
 
 
-test "a foldable sort key reports nothing" {
-    out = _cgen_codes(
-        "def go(c: Chan) -> list[Msg] {\n"
-        "    return sorted([c ->:Posted:-> [?:Msg]], key=lambda (m: Msg) { -m.at; });\n"
-        "}\n"
+test "a foldable sort key reports nothing, and related cases" {
+    def check_a_foldable_sort_key_reports_nothing {
+        out = _cgen_codes(
+            "def go(c: Chan) -> list[Msg] {\n"
+            "    return sorted([c ->:Posted:-> [?:Msg]], key=lambda (m: Msg) { -m.at; });\n"
+            "}\n"
+        );
+        assert "W5096" not in out , out;
+    }
+
+    def check_an_in_place_sort_over_an_ordinary_list_reports_n {
+        out = _cgen_codes(
+            "def go(c: Chan) -> list[int] {\n"
+            "    got = [3, 1, 2];\n"
+            "    got.sort();\n"
+            "    return got;\n"
+            "}\n"
+        );
+        assert "W5096" not in out , out;
+    }
+    run_cases(
+        [
+            (
+                "a foldable sort key reports nothing",
+                check_a_foldable_sort_key_reports_nothing
+            ),
+            (
+                "an in-place sort over an ordinary list reports nothing",
+                check_an_in_place_sort_over_an_ordinary_list_reports_n
+            )
+        ]
     );
-    assert "W5096" not in out , out;
-}
-
-
-test "an in-place sort over a bound traversal reports" {
-    out = _cgen_codes(
-        "def go(c: Chan) -> list[Msg] {\n"
-        "    got = [c ->:Posted:-> [?:Msg]];\n"
-        "    got.sort(key=lambda (m: Msg) { -m.at; });\n"
-        "    return got;\n"
-        "}\n"
-    );
-    assert "W5096" in out , out;
-}
-
-
-test "an in-place sort over an ordinary list reports nothing" {
-    out = _cgen_codes(
-        "def go(c: Chan) -> list[int] {\n"
-        "    got = [3, 1, 2];\n"
-        "    got.sort();\n"
-        "    return got;\n"
-        "}\n"
-    );
-    assert "W5096" not in out , out;
 }

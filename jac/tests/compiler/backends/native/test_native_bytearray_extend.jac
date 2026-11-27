@@ -1,6 +1,6 @@
 """Regression coverage for checked list-to-bytearray extension."""
 import ctypes;
-import from tests.support { compile_native, get_func }
+import from tests.support { compile_native, get_func, run_cases }
 
 glob _ENGINES: list[any] = [];
 def engine -> any {
@@ -26,16 +26,30 @@ test "bytearray extend checks the entire list before mutation" {
     }
 }
 
-test "bytearray extend evaluates an owned source exactly once" {
-    check = get_func(engine(), "source_once", ctypes.c_bool);
-    for _ in range(100) {
-        assert check();
+test "bytearray extend cases" {
+    def check_bytearray_extend_evaluates_an_owned_source_exact {
+        check = get_func(engine(), "source_once", ctypes.c_bool);
+        for _ in range(100) {
+            assert check();
+        }
     }
-}
 
-test "bytearray extend preserves raw buffers and self aliases" {
-    check = get_func(engine(), "buffers_and_aliases", ctypes.c_bool);
-    for _ in range(100) {
-        assert check();
+    def check_bytearray_extend_preserves_raw_buffers_and_self {
+        check = get_func(engine(), "buffers_and_aliases", ctypes.c_bool);
+        for _ in range(100) {
+            assert check();
+        }
     }
+    run_cases(
+        [
+            (
+                "bytearray extend evaluates an owned source exactly once",
+                check_bytearray_extend_evaluates_an_owned_source_exact
+            ),
+            (
+                "bytearray extend preserves raw buffers and self aliases",
+                check_bytearray_extend_preserves_raw_buffers_and_self
+            )
+        ]
+    );
 }

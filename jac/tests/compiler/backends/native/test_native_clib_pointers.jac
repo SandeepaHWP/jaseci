@@ -26,7 +26,8 @@ import from tests.support {
     compile_native_ir,
     native_build,
     native_force_opts,
-    native_run
+    native_run,
+    run_cases
 }
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.driver.compile_options { CompileOptions }
@@ -236,8 +237,9 @@ def back(p: ptr[i32]) -> ptr[i32] {
     }
 }
 
-test "foreign struct fields must be C plain data" {
-    code = '''import from "CLIB_POINTERS_LIBRARY" {
+test "foreign struct fields must be C plain data, and related cases" {
+    def check_foreign_struct_fields_must_be_c_plain_data {
+        code = '''import from "CLIB_POINTERS_LIBRARY" {
     obj CpVec3 { has x: f32, y: f32, z: f32; }
     obj Named { has name: str; }
     obj Listed { has items: list[int]; }
@@ -246,7 +248,63 @@ test "foreign struct fields must be C plain data" {
     obj Loop2 { has back: Loop; }
 }
 ''';
-    assert checker_codes(code) == ["E1150", "E1150", "E1150", "E1150"];
+        assert checker_codes(code) == ["E1150", "E1150", "E1150", "E1150"];
+    }
+
+    def check_a_jac_function_s_borrowed_scalar_parameter_canno {
+        code = '''import from c {
+    obj pair_record {
+        has a: i32 = 0, b: i32 = 0;
+    }
+    def time(out: &mut i64) -> i64;
+    def pipe(fds: &mut pair_record) -> i32;
+}
+
+def set_scalar(out: &mut f64) {
+    out = 2.5;
+}
+
+def bump(out: &mut i64) {
+    out += 1;
+}
+
+def forward_time(out: &mut i64) -> i64 {
+    return time(out);
+}
+
+def lend_time(out: &mut i64) -> i64 {
+    return time(&mut out);
+}
+
+def record_ok(fds: &mut pair_record) -> i32 {
+    fds.a = 1;
+    return pipe(fds);
+}
+
+def local_ok -> i64 {
+    t = i64(0);
+    time(&mut t);
+    return t;
+}
+
+def read_ok(out: &mut i64) -> i64 {
+    return out + 1;
+}
+''';
+        assert checker_codes(code) == ["E1159", "E1159", "E1159", "E1159"];
+    }
+    run_cases(
+        [
+            (
+                "foreign struct fields must be C plain data",
+                check_foreign_struct_fields_must_be_c_plain_data
+            ),
+            (
+                "a Jac function's borrowed scalar parameter cannot be written through",
+                check_a_jac_function_s_borrowed_scalar_parameter_canno
+            )
+        ]
+    );
 }
 
 test "an opaque C type is only handled by address" {
@@ -301,9 +359,10 @@ def local_use(p: ptr[CpVec3]) -> f32 {
     assert checker_codes(code) == ["E1315", "E1315", "E1315", "E1315"];
 }
 
-test "a Pinned parameter accepts only a pinned value or None" {
-    code = DECLS
-        + '''
+test "a Pinned parameter accepts only a pinned value or None, and related cases" {
+    def check_a_pinned_parameter_accepts_only_a_pinned_value_o {
+        code = DECLS
+            + '''
 with entry {
     pinned = pin(CpBatch());
     cp_batch_set_active(&mut pinned);
@@ -312,19 +371,86 @@ with entry {
     cp_batch_set_active(&mut plain);
 }
 ''';
-    assert checker_codes(code) == ["E1053"];
+        assert checker_codes(code) == ["E1053"];
+    }
+
+    def check_only_final_globs_are_c_constants {
+        code = DECLS
+            + '''
+glob plain_count: i32 = 3;
+glob fixed_count: Final[i32] = 3;
+import from "CLIB_POINTERS_LIBRARY" {
+    glob cp_plain: i32 = plain_count, cp_fixed: i32 = fixed_count + 1;
+}
+''';
+        assert checker_codes(code) == ["E1155"];
+    }
+
+    def check_only_a_named_function_s_address_is_a_c_constant {
+        code = DECLS
+            + '''
+glob plain_address: int = 64;
+import from "CLIB_POINTERS_LIBRARY" {
+    obj FaSlot { has code: ptr; }
+    glob fa_bad: FaSlot = FaSlot(code=ptr(plain_address));
+}
+''';
+        assert checker_codes(code) == ["E1155"];
+    }
+    run_cases(
+        [
+            (
+                "a Pinned parameter accepts only a pinned value or None",
+                check_a_pinned_parameter_accepts_only_a_pinned_value_o
+            ),
+            (
+                "only Final globs are C constants",
+                check_only_final_globs_are_c_constants
+            ),
+            (
+                "only a named function's address is a C constant pointer",
+                check_only_a_named_function_s_address_is_a_c_constant
+            )
+        ]
+    );
 }
 
-test "pointer types match exactly and a bare ptr narrows only by cast" {
-    code = DECLS
-        + '''
+test "pointer types match exactly and a bare ptr narrows only by cast, and related cases" {
+    def check_pointer_types_match_exactly_and_a_bare_ptr_narro {
+        code = DECLS
+            + '''
 def widen(p: ptr[CpVec3]) -> ptr { return p; }
 def narrow(p: ptr) -> ptr[CpVec3] { return p; }
 def cast(p: ptr) -> ptr[CpVec3] { return ptr[CpVec3](p); }
 def mismatch(p: ptr[CpVec3]) -> ptr[CpDb] { return p; }
 def scalar(p: ptr[u8]) -> ptr[i8] { return p; }
 ''';
-    assert checker_codes(code) == ["E1002", "E1002", "E1002"];
+        assert checker_codes(code) == ["E1002", "E1002", "E1002"];
+    }
+
+    def check_pointer_ordering_needs_one_pointee_type {
+        code = DECLS
+            + '''
+def same(p: ptr[CpVec3], q: ptr[CpVec3]) -> bool { return p < q; }
+def widened(p: ptr[CpVec3], q: ptr) -> bool { return p <= q and q >= p; }
+def mismatch(p: ptr[CpVec3], q: ptr[CpDb]) -> bool { return p > q; }
+def scalar(p: ptr[u8], q: ptr[i8]) -> bool { return p >= q; }
+def integer(p: ptr[u8]) -> bool { return p < 16; }
+''';
+        assert checker_codes(code) == ["E1110", "E1110", "E1110"];
+    }
+    run_cases(
+        [
+            (
+                "pointer types match exactly and a bare ptr narrows only by cast",
+                check_pointer_types_match_exactly_and_a_bare_ptr_narro
+            ),
+            (
+                "pointer ordering needs one pointee type",
+                check_pointer_ordering_needs_one_pointee_type
+            )
+        ]
+    );
 }
 
 test "pointers order by unsigned address across memory profiles and the Python backend" {
@@ -364,17 +490,6 @@ with entry {
     }
 }
 
-test "pointer ordering needs one pointee type" {
-    code = DECLS
-        + '''
-def same(p: ptr[CpVec3], q: ptr[CpVec3]) -> bool { return p < q; }
-def widened(p: ptr[CpVec3], q: ptr) -> bool { return p <= q and q >= p; }
-def mismatch(p: ptr[CpVec3], q: ptr[CpDb]) -> bool { return p > q; }
-def scalar(p: ptr[u8], q: ptr[i8]) -> bool { return p >= q; }
-def integer(p: ptr[u8]) -> bool { return p < 16; }
-''';
-    assert checker_codes(code) == ["E1110", "E1110", "E1110"];
-}
 
 test "a function rebinds a C data glob of another module in place" {
     holder = '''import from c {
@@ -521,8 +636,9 @@ with entry {
     }
 }
 
-test "C variadic arguments take the C default promotions on every path" {
-    code = '''import from c {
+test "C variadic arguments take the C default promotions on every path, and related cases" {
+    def check_c_variadic_arguments_take_the_c_default_promotio {
+        code = '''import from c {
     def printf(fmt: str, *args: any) -> i32;
     def fflush(stream: i64) -> i32;
     def snprintf(buf: ptr[u8], n: i64, fmt: ptr[u8], *args: any) -> i32;
@@ -542,13 +658,91 @@ with entry {
     free(buf);
 }
 ''';
-    with tempfile.TemporaryDirectory() as directory {
-        path = str(Path(directory) / "varargs.jac");
-        Path(path).write_text(code);
-        out = assert_native_identity(path);
+        with tempfile.TemporaryDirectory() as directory {
+            path = str(Path(directory) / "varargs.jac");
+            Path(path).write_text(code);
+            out = assert_native_identity(path);
+        }
+        assert "plain -7|1099511627776|1.5|200|-3|jac" in out.splitlines() , out;
+        assert "varargs -7|1099511627776|lit|2.50|1.5|200|-3|jac"
+            in out.splitlines() , out;
     }
-    assert "plain -7|1099511627776|1.5|200|-3|jac" in out.splitlines() , out;
-    assert "varargs -7|1099511627776|lit|2.50|1.5|200|-3|jac" in out.splitlines() , out;
+
+    def check_c_function_definitions_agree_across_backends_and {
+        code = '''import from c {
+    def abs(v: i32) -> i32;
+    def jac_twice(v: i32) -> i32 {
+        return abs(v) * i32(2);
+    }
+    def jac_sum_ints(count: i32, *args: VaList) -> i64 {
+        total: i64 = 0;
+        for i in range(int(count)) {
+            total += args.arg(i64);
+        }
+        return total;
+    }
+}
+with entry {
+    print("twice", jac_twice(i32(-21)));
+    print("variadic", jac_sum_ints(i32(3), i64(1), i64(20), i64(300)));
+}
+''';
+        with tempfile.TemporaryDirectory() as directory {
+            path = str(Path(directory) / "cdef_scalar.jac");
+            Path(path).write_text(code);
+            out = assert_native_identity(path);
+        }
+        assert "twice 42" in out.splitlines() , out;
+        assert "variadic 321" in out.splitlines() , out;
+    }
+
+    def check_a_borrowed_c_variadic_argument_passes_the_variab {
+        code = '''import from c {
+    obj Opaque;
+    def sscanf(text: str, fmt: str, *args: any) -> i32;
+    def printf(fmt: str, *args: any) -> i32;
+    def fflush(stream: i64) -> i32;
+}
+
+def scan_pointer -> ptr[Opaque] {
+    q = ptr[Opaque]();
+    sscanf("0x40", "%p", &mut q);
+    return q;
+}
+
+with entry {
+    x: i32 = 5;
+    wide: i64 = 0;
+    n = sscanf("42 7", "%d %lld", &mut x, &mut wide);
+    printf("scan %d %d %lld\\n", n, x, wide);
+    printf("pointer %lld\\n", int(scan_pointer()));
+    fflush(0);
+}
+''';
+        with tempfile.TemporaryDirectory() as directory {
+            path = str(Path(directory) / "vaborrow.jac");
+            Path(path).write_text(code);
+            out = assert_native_identity(path);
+        }
+        assert "scan 2 42 7" in out.splitlines() , out;
+        assert "pointer 64" in out.splitlines() , out;
+    }
+    run_cases(
+        [
+            (
+                "C variadic arguments take the C default promotions on every path",
+                check_c_variadic_arguments_take_the_c_default_promotio
+            ),
+            (
+                "C function definitions agree across backends and C variadic definitions keep their C name",
+                check_c_function_definitions_agree_across_backends_and
+            ),
+            (
+                "a borrowed C variadic argument passes the variable's address",
+                check_a_borrowed_c_variadic_argument_passes_the_variab
+            )
+        ]
+    );
 }
 
 test "a C variadic function Jac defines reads each argument by its C type" {
@@ -611,18 +805,44 @@ with entry {
     }
 }
 
-test "C variadic functions reject keyword parameters and non-C arguments" {
-    code = DECLS
-        + '''
+test "C variadic functions reject keyword parameters and non-C arguments, and related cases" {
+    def check_c_variadic_functions_reject_keyword_parameters_a {
+        code = DECLS
+            + '''
 def keyed(fmt: ptr[u8], *args: VaList, flag: bool = False) -> None {}
 def plain(fmt: ptr[u8], *args: VaList) -> None {}
 def call_it -> None { plain(ptr[u8](), [1, 2]); }
 ''';
-    assert checker_codes(code) == ["E1157", "E1157"];
+        assert checker_codes(code) == ["E1157", "E1157"];
+    }
+
+    def check_a_bytes_literal_initializes_only_a_sized_integer {
+        code = DECLS
+            + '''
+import from "CLIB_POINTERS_LIBRARY" {
+    glob odd_u16: list[u16] = b"\\x01\\x02\\x03",
+         reals: list[f64] = b"\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00";
+}
+''';
+        assert checker_codes(code) == ["E1155", "E1155"];
+    }
+    run_cases(
+        [
+            (
+                "C variadic functions reject keyword parameters and non-C arguments",
+                check_c_variadic_functions_reject_keyword_parameters_a
+            ),
+            (
+                "a bytes literal initializes only a sized integer array of whole elements",
+                check_a_bytes_literal_initializes_only_a_sized_integer
+            )
+        ]
+    );
 }
 
-test "C data definitions use Final constants and structs another module declares" {
-    decls = '''import from "CLIB_POINTERS_LIBRARY" {
+test "C data definitions use Final constants and structs another module declares, and related cases" {
+    def check_c_data_definitions_use_final_constants_and_struc {
+        decls = '''import from "CLIB_POINTERS_LIBRARY" {
     obj CpVec3 { has x: f32, y: f32, z: f32; }
     obj CpRecipe {
         has count: i32, scale: Callable[[i32], i32], label: ptr[u8], origin: ptr[CpVec3];
@@ -632,7 +852,7 @@ test "C data definitions use Final constants and structs another module declares
 }
 glob CP_COUNT: Final[i32] = 6, CP_LIMIT: Final[i64] = (1 << 40) + 2;
 ''';
-    user = '''import from cdecls { CP_COUNT, CP_LIMIT, CpRecipe, CpVec3, cp_label_len, cp_recipe_run }
+        user = '''import from cdecls { CP_COUNT, CP_LIMIT, CpRecipe, CpVec3, cp_label_len, cp_recipe_run }
 import from "CLIB_POINTERS_LIBRARY" {
     glob user_origin: CpVec3 = CpVec3(x=f32(1.0), y=f32(2.0), z=f32(3.0)),
          user_recipe: CpRecipe = CpRecipe(
@@ -657,11 +877,62 @@ with entry {
     );
 }
 ''';
-    with tempfile.TemporaryDirectory() as directory {
-        stage_source(directory, decls, "cdecls.jac");
-        out = assert_native_identity(stage_source(directory, user, "user.jac"));
+        with tempfile.TemporaryDirectory() as directory {
+            stage_source(directory, decls, "cdecls.jac");
+            out = assert_native_identity(stage_source(directory, user, "user.jac"));
+        }
+        assert "final 17 4 3.0 1099511627778" in out.splitlines() , out;
     }
-    assert "final 17 4 3.0 1099511627778" in out.splitlines() , out;
+
+    def check_callback_fields_and_ptr_f_take_functions_another {
+        decls = '''import from "CLIB_POINTERS_LIBRARY" {
+    obj CpErased { has name: ptr[u8], fn: ptr; }
+    obj CpRecipe {
+        has count: i32, scale: Callable[[i32], i32], label: ptr[u8], origin: ptr;
+    }
+    def cp_erased_call(e: ptr[CpErased], a: i64, b: i64) -> i64;
+    def cp_recipe_run(r: ptr[CpRecipe], v: i32) -> i32;
+}
+def triple(v: i32) -> i32 {
+    return v * i32(3);
+}
+def difference(a: i64, b: i64) -> i64 {
+    return a - b;
+}
+''';
+        user = '''import from cdecls {
+    CpErased, CpRecipe, cp_erased_call, cp_recipe_run, difference, triple
+}
+import from "CLIB_POINTERS_LIBRARY" {
+    glob user_entry: CpErased = CpErased(name=ptr[u8]("difference"), fn=ptr(difference)),
+         user_recipe: CpRecipe = CpRecipe(count=i32(1), scale=triple);
+}
+with entry {
+    print(
+        "imported",
+        cp_erased_call(addressof(user_entry), i64(10), i64(4)),
+        cp_recipe_run(addressof(user_recipe), i32(5))
+    );
+}
+''';
+        with tempfile.TemporaryDirectory() as directory {
+            stage_source(directory, decls, "cdecls.jac");
+            out = assert_native_identity(stage_source(directory, user, "user.jac"));
+        }
+        assert "imported 6 16" in out.splitlines() , out;
+    }
+    run_cases(
+        [
+            (
+                "C data definitions use Final constants and structs another module declares",
+                check_c_data_definitions_use_final_constants_and_struc
+            ),
+            (
+                "callback fields and ptr(f) take functions another module defines",
+                check_callback_fields_and_ptr_f_take_functions_another
+            )
+        ]
+    );
 }
 
 test "a bytes literal lays out a C integer array's little-endian elements" {
@@ -683,16 +954,6 @@ with entry {
     assert "bytes 1 255 65 4660 65535 -2 16777216" in out.splitlines() , out;
 }
 
-test "a bytes literal initializes only a sized integer array of whole elements" {
-    code = DECLS
-        + '''
-import from "CLIB_POINTERS_LIBRARY" {
-    glob odd_u16: list[u16] = b"\\x01\\x02\\x03",
-         reals: list[f64] = b"\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00";
-}
-''';
-    assert checker_codes(code) == ["E1155", "E1155"];
-}
 
 glob C_CALLBACK_ENTRY: str = '''import from "CLIB_POINTERS_LIBRARY" {
     obj CpVec3 { has x: f32, y: f32, z: f32; }
@@ -1020,17 +1281,6 @@ with entry {
         and "different signature" in messages[0] , messages;
 }
 
-test "only Final globs are C constants" {
-    code = DECLS
-        + '''
-glob plain_count: i32 = 3;
-glob fixed_count: Final[i32] = 3;
-import from "CLIB_POINTERS_LIBRARY" {
-    glob cp_plain: i32 = plain_count, cp_fixed: i32 = fixed_count + 1;
-}
-''';
-    assert checker_codes(code) == ["E1155"];
-}
 
 glob C_DEFINITION_LIBRARY: str = '''#include <stdint.h>
 typedef struct { int32_t a; double b; } CdPair;
@@ -1101,33 +1351,6 @@ test "a function a C library block defines has its C name and the C ABI" {
     }
 }
 
-test "C function definitions agree across backends and C variadic definitions keep their C name" {
-    code = '''import from c {
-    def abs(v: i32) -> i32;
-    def jac_twice(v: i32) -> i32 {
-        return abs(v) * i32(2);
-    }
-    def jac_sum_ints(count: i32, *args: VaList) -> i64 {
-        total: i64 = 0;
-        for i in range(int(count)) {
-            total += args.arg(i64);
-        }
-        return total;
-    }
-}
-with entry {
-    print("twice", jac_twice(i32(-21)));
-    print("variadic", jac_sum_ints(i32(3), i64(1), i64(20), i64(300)));
-}
-''';
-    with tempfile.TemporaryDirectory() as directory {
-        path = str(Path(directory) / "cdef_scalar.jac");
-        Path(path).write_text(code);
-        out = assert_native_identity(path);
-    }
-    assert "twice 42" in out.splitlines() , out;
-    assert "variadic 321" in out.splitlines() , out;
-}
 
 glob FUNCTION_ADDRESS_LIBRARY: str = '''#include <stdint.h>
 typedef struct { const char *name; void *code; int32_t arity; } FaEntry;
@@ -1201,17 +1424,6 @@ test "a C data pointer field takes a named function's address" {
     }
 }
 
-test "only a named function's address is a C constant pointer" {
-    code = DECLS
-        + '''
-glob plain_address: int = 64;
-import from "CLIB_POINTERS_LIBRARY" {
-    obj FaSlot { has code: ptr; }
-    glob fa_bad: FaSlot = FaSlot(code=ptr(plain_address));
-}
-''';
-    assert checker_codes(code) == ["E1155"];
-}
 
 test "C function definitions take and return C data" {
     code = DECLS
@@ -1227,40 +1439,10 @@ import from "CLIB_POINTERS_LIBRARY" {
     assert checker_codes(code) == ["E1158", "E1158", "E1158", "E1158", "E1158"];
 }
 
-test "a borrowed C variadic argument passes the variable's address" {
-    code = '''import from c {
-    obj Opaque;
-    def sscanf(text: str, fmt: str, *args: any) -> i32;
-    def printf(fmt: str, *args: any) -> i32;
-    def fflush(stream: i64) -> i32;
-}
 
-def scan_pointer -> ptr[Opaque] {
-    q = ptr[Opaque]();
-    sscanf("0x40", "%p", &mut q);
-    return q;
-}
-
-with entry {
-    x: i32 = 5;
-    wide: i64 = 0;
-    n = sscanf("42 7", "%d %lld", &mut x, &mut wide);
-    printf("scan %d %d %lld\\n", n, x, wide);
-    printf("pointer %lld\\n", int(scan_pointer()));
-    fflush(0);
-}
-''';
-    with tempfile.TemporaryDirectory() as directory {
-        path = str(Path(directory) / "vaborrow.jac");
-        Path(path).write_text(code);
-        out = assert_native_identity(path);
-    }
-    assert "scan 2 42 7" in out.splitlines() , out;
-    assert "pointer 64" in out.splitlines() , out;
-}
-
-test "ptr(f) is the address C calls a named function at" {
-    code = '''import from "CLIB_POINTERS_LIBRARY" {
+test "ptr(f) is the address C calls a named function at, and related cases" {
+    def check_ptr_f_is_the_address_c_calls_a_named_function_at {
+        code = '''import from "CLIB_POINTERS_LIBRARY" {
     obj CpErased { has name: ptr[u8], fn: ptr; }
     def cp_erased_call(e: ptr[CpErased], a: i64, b: i64) -> i64;
     def cp_address_call(fn: ptr, a: i64) -> i64;
@@ -1288,52 +1470,14 @@ with entry {
     );
 }
 ''';
-    with tempfile.TemporaryDirectory() as directory {
-        out = assert_native_identity(stage_source(directory, code, "erased.jac"));
+        with tempfile.TemporaryDirectory() as directory {
+            out = assert_native_identity(stage_source(directory, code, "erased.jac"));
+        }
+        assert "erased 7 12 -9" in out.splitlines() , out;
     }
-    assert "erased 7 12 -9" in out.splitlines() , out;
-}
 
-test "callback fields and ptr(f) take functions another module defines" {
-    decls = '''import from "CLIB_POINTERS_LIBRARY" {
-    obj CpErased { has name: ptr[u8], fn: ptr; }
-    obj CpRecipe {
-        has count: i32, scale: Callable[[i32], i32], label: ptr[u8], origin: ptr;
-    }
-    def cp_erased_call(e: ptr[CpErased], a: i64, b: i64) -> i64;
-    def cp_recipe_run(r: ptr[CpRecipe], v: i32) -> i32;
-}
-def triple(v: i32) -> i32 {
-    return v * i32(3);
-}
-def difference(a: i64, b: i64) -> i64 {
-    return a - b;
-}
-''';
-    user = '''import from cdecls {
-    CpErased, CpRecipe, cp_erased_call, cp_recipe_run, difference, triple
-}
-import from "CLIB_POINTERS_LIBRARY" {
-    glob user_entry: CpErased = CpErased(name=ptr[u8]("difference"), fn=ptr(difference)),
-         user_recipe: CpRecipe = CpRecipe(count=i32(1), scale=triple);
-}
-with entry {
-    print(
-        "imported",
-        cp_erased_call(addressof(user_entry), i64(10), i64(4)),
-        cp_recipe_run(addressof(user_recipe), i32(5))
-    );
-}
-''';
-    with tempfile.TemporaryDirectory() as directory {
-        stage_source(directory, decls, "cdecls.jac");
-        out = assert_native_identity(stage_source(directory, user, "user.jac"));
-    }
-    assert "imported 6 16" in out.splitlines() , out;
-}
-
-test "int() of a callback field is the address C holds there" {
-    code = '''import from "CLIB_POINTERS_LIBRARY" {
+    def check_int_of_a_callback_field_is_the_address_c_holds_t {
+        code = '''import from "CLIB_POINTERS_LIBRARY" {
     obj CpRecipe {
         has count: i32, scale: Callable[[i32], i32], label: ptr[u8], origin: ptr;
     }
@@ -1354,11 +1498,25 @@ with entry {
     );
 }
 ''';
-    with tempfile.TemporaryDirectory() as directory {
-        out = assert_native_identity(stage_source(directory, code, "held.jac"));
+        with tempfile.TemporaryDirectory() as directory {
+            out = assert_native_identity(stage_source(directory, code, "held.jac"));
+        }
+        assert "held 15 True" in out.splitlines() , out;
     }
-    assert "held 15 True" in out.splitlines() , out;
+    run_cases(
+        [
+            (
+                "ptr(f) is the address C calls a named function at",
+                check_ptr_f_is_the_address_c_calls_a_named_function_at
+            ),
+            (
+                "int() of a callback field is the address C holds there",
+                check_int_of_a_callback_field_is_the_address_c_holds_t
+            )
+        ]
+    );
 }
+
 
 glob LEND_LIBRARY: str = '''#include <stdint.h>
 typedef struct { float x, y, z; } LnVec;
@@ -1507,47 +1665,4 @@ with entry {
     assert "pair 1.5 3.0 4.5" in out.splitlines() , out;
     # A struct wider than two registers comes back through sret.
     assert "wide 7 14 21" in out.splitlines() , out;
-}
-
-test "a Jac function's borrowed scalar parameter cannot be written through" {
-    code = '''import from c {
-    obj pair_record {
-        has a: i32 = 0, b: i32 = 0;
-    }
-    def time(out: &mut i64) -> i64;
-    def pipe(fds: &mut pair_record) -> i32;
-}
-
-def set_scalar(out: &mut f64) {
-    out = 2.5;
-}
-
-def bump(out: &mut i64) {
-    out += 1;
-}
-
-def forward_time(out: &mut i64) -> i64 {
-    return time(out);
-}
-
-def lend_time(out: &mut i64) -> i64 {
-    return time(&mut out);
-}
-
-def record_ok(fds: &mut pair_record) -> i32 {
-    fds.a = 1;
-    return pipe(fds);
-}
-
-def local_ok -> i64 {
-    t = i64(0);
-    time(&mut t);
-    return t;
-}
-
-def read_ok(out: &mut i64) -> i64 {
-    return out + 1;
-}
-''';
-    assert checker_codes(code) == ["E1159", "E1159", "E1159", "E1159"];
 }

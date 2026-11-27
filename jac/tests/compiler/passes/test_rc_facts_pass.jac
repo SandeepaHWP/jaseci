@@ -22,7 +22,7 @@ proven.
 """
 
 import os;
-import from tests.support { TESTS_DIR }
+import from tests.support { TESTS_DIR, run_cases }
 import jaclang;
 import from jaclang.compiler.driver.program { JacProgram }
 import jaclang.compiler.frontend.unitree as uni;
@@ -52,36 +52,69 @@ def move_marks(fixture: str) -> dict[str, bool] {
     return out;
 }
 
-test "the proof marks safe local last-use moves" {
-    marks = move_marks("rc_facts_cases.jac");
-    assert marks["b1"] , "straight-line last-use move must be proven safe";
-    assert marks["b9"] , "loop move with per-iteration redefinition must be proven safe";
+test "the proof cases" {
+    def check_the_proof_marks_safe_local_last_use_moves {
+        marks = move_marks("rc_facts_cases.jac");
+        assert marks["b1"] , "straight-line last-use move must be proven safe";
+        assert marks["b9"] , "loop move with per-iteration redefinition must be proven safe";
+    }
+
+    def check_the_proof_moves_a_source_passed_to_a_call_or_sto {
+        marks = move_marks("rc_facts_cases.jac");
+        assert marks["b3"] , "a source dead after the copy moves even after a call-arg use";
+        assert marks["b4"] , "a source dead after the copy moves even after a field store";
+    }
+    run_cases(
+        [
+            (
+                "the proof marks safe local last-use moves",
+                check_the_proof_marks_safe_local_last_use_moves
+            ),
+            (
+                "the proof moves a source passed to a call or stored in a field before the copy",
+                check_the_proof_moves_a_source_passed_to_a_call_or_sto
+            )
+        ]
+    );
 }
 
-test "the proof refuses an own-param source (own-param UAF channel)" {
-    marks = move_marks("rc_facts_cases.jac");
-    assert not marks["b2"] , "a param source is not LOCAL and must never be move-lowered";
+test "the proof refuses cases" {
+    def check_the_proof_refuses_an_own_param_source_own_param {
+        marks = move_marks("rc_facts_cases.jac");
+        assert not marks["b2"] , "a param source is not LOCAL and must never be move-lowered";
+    }
+
+    def check_the_proof_refuses_a_method_receiver_source_it_is {
+        marks = move_marks("rc_facts_cases.jac");
+        assert not marks["b10"] , "`self` is bound by the call like a param and must never be move-lowered";
+    }
+
+    def check_the_proof_refuses_a_loop_carried_source_re_read {
+        marks = move_marks("rc_facts_cases.jac");
+        assert not marks["b8"] , "a source live across the loop back-edge must not be move-lowered";
+    }
+    run_cases(
+        [
+            (
+                "the proof refuses an own-param source (own-param UAF channel)",
+                check_the_proof_refuses_an_own_param_source_own_param
+            ),
+            (
+                "the proof refuses a method receiver source (it is the caller's reference)",
+                check_the_proof_refuses_a_method_receiver_source_it_is
+            ),
+            (
+                "the proof refuses a loop-carried source re-read via the back-edge",
+                check_the_proof_refuses_a_loop_carried_source_re_read
+            )
+        ]
+    );
 }
 
-test "the proof refuses a method receiver source (it is the caller's reference)" {
-    marks = move_marks("rc_facts_cases.jac");
-    assert not marks["b10"] , "`self` is bound by the call like a param and must never be move-lowered";
-}
-
-test "the proof moves a source passed to a call or stored in a field before the copy" {
-    marks = move_marks("rc_facts_cases.jac");
-    assert marks["b3"] , "a source dead after the copy moves even after a call-arg use";
-    assert marks["b4"] , "a source dead after the copy moves even after a field store";
-}
 
 test "the proof refuses sources read through their slot (closure, concurrent, borrow)" {
     marks = move_marks("rc_facts_cases.jac");
     assert not marks["b5"] , "a closure capture must disqualify the source";
     assert not marks["b6"] , "a concurrent capture must disqualify the source";
     assert not marks["b7"] , "a borrow of the source must disqualify it";
-}
-
-test "the proof refuses a loop-carried source re-read via the back-edge" {
-    marks = move_marks("rc_facts_cases.jac");
-    assert not marks["b8"] , "a source live across the loop back-edge must not be move-lowered";
 }

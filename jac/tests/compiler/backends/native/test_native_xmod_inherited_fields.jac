@@ -39,7 +39,8 @@ import from tests.support {
     source_spelled,
     sv_run,
     na_run,
-    same_lines
+    same_lines,
+    run_cases
 }
 import jaclang.compiler.frontend.unitree as uni;
 import from jaclang.compiler.driver.program { JacProgram }
@@ -88,53 +89,102 @@ test "a consumer subclass reads its imported base's fields with no seam" {
     );
 }
 
-test "the subclass adopts the imported base's slot assignment" {
-    (prog, ir) = compile_native("xmod_inherit_main.jac");
-    base = slots_of(ir, prog, "Base");
-    kid = slots_of(ir, prog, "Kid");
-    assert kid["tag"] == base["tag"] , (
-        f"'tag' moved between the two units: base {base} vs kid {kid}"
-    );
-    assert kid["depth"] == base["depth"] , (
-        f"'depth' moved between the two units: base {base} vs kid {kid}"
-    );
-    assert kid["mine"] > max(base.values()) , (
-        f"the subclass's own field must follow the inherited ones: {kid}"
-    );
-}
+test "xmod_inherit_main.jac cases" {
+    def check_the_subclass_adopts_the_imported_base_s_slot_ass {
+        (prog, ir) = compile_native("xmod_inherit_main.jac");
 
-test "a two-link chain adopts the whole flattened ancestor" {
-    (prog, ir) = compile_native("xmod_inherit_main.jac");
-    mid = slots_of(ir, prog, "Mid");
-    deep = slots_of(ir, prog, "Deep");
-    for fname in ["tag", "depth", "mid"] {
-        assert deep[fname] == mid[fname] , (
-            f"'{fname}' moved between Mid and Deep: mid {mid} vs deep {deep}"
+        base = slots_of(ir, prog, "Base");
+        kid = slots_of(ir, prog, "Kid");
+        assert kid["tag"] == base["tag"] , (
+            f"'tag' moved between the two units: base {base} vs kid {kid}"
+        );
+        assert kid["depth"] == base["depth"] , (
+            f"'depth' moved between the two units: base {base} vs kid {kid}"
+        );
+        assert kid["mine"] > max(base.values()) , (
+            f"the subclass's own field must follow the inherited ones: {kid}"
         );
     }
-    assert deep["extra"] > max(mid.values()) , (
-        f"the subclass's own field must follow the inherited ones: {deep}"
+
+    def check_a_two_link_chain_adopts_the_whole_flattened_ance {
+        (prog, ir) = compile_native("xmod_inherit_main.jac");
+
+        mid = slots_of(ir, prog, "Mid");
+        deep = slots_of(ir, prog, "Deep");
+        for fname in ["tag", "depth", "mid"] {
+            assert deep[fname] == mid[fname] , (
+                f"'{fname}' moved between Mid and Deep: mid {mid} vs deep {deep}"
+            );
+        }
+        assert deep["extra"] > max(mid.values()) , (
+            f"the subclass's own field must follow the inherited ones: {deep}"
+        );
+    }
+
+    def check_the_subclass_s_vtable_is_prefix_compatible_with {
+        (prog, ir) = compile_native("xmod_inherit_main.jac");
+
+        reg = get_layout_registry(ir, prog);
+        base = by_source_name(reg.layouts).get("Base");
+        kid = by_source_name(reg.layouts).get("Kid");
+        assert base is not None and kid is not None , "layouts missing";
+        for mslot in base.methods {
+            assert kid.method_index.get(mslot.name) == mslot.index , (
+                f"method '{mslot.name}' sits at a different vtable slot in the "
+                f"subclass: base {base.method_index} vs kid {kid.method_index}"
+            );
+        }
+    }
+    run_cases(
+        [
+            (
+                "the subclass adopts the imported base's slot assignment",
+                check_the_subclass_adopts_the_imported_base_s_slot_ass
+            ),
+            (
+                "a two-link chain adopts the whole flattened ancestor",
+                check_a_two_link_chain_adopts_the_whole_flattened_ance
+            ),
+            (
+                "the subclass's vtable is prefix-compatible with the base's",
+                check_the_subclass_s_vtable_is_prefix_compatible_with
+            )
+        ]
     );
 }
 
-test "the subclass's vtable is prefix-compatible with the base's" {
-    (prog, ir) = compile_native("xmod_inherit_main.jac");
-    reg = get_layout_registry(ir, prog);
-    base = by_source_name(reg.layouts).get("Base");
-    kid = by_source_name(reg.layouts).get("Kid");
-    assert base is not None and kid is not None , "layouts missing";
-    for mslot in base.methods {
-        assert kid.method_index.get(mslot.name) == mslot.index , (
-            f"method '{mslot.name}' sits at a different vtable slot in the "
-            f"subclass: base {base.method_index} vs kid {kid.method_index}"
-        );
-    }
-}
 
-test "inherited fields answer what the server pathway answers" {
-    (sv_out, _sv_err) = sv_run(os.path.join(FIXTURES, "xmod_inherit_main.jac"));
-    (na_out, _na_err) = na_run(os.path.join(FIXTURES, "xmod_inherit_main.jac"));
-    same_lines(sv_out, na_out, "inherited fields");
+test "inherited fields answer what the server pathway answers, and related cases" {
+    def check_inherited_fields_answer_what_the_server_pathway {
+        (sv_out, _sv_err) = sv_run(os.path.join(FIXTURES, "xmod_inherit_main.jac"));
+        (na_out, _na_err) = na_run(os.path.join(FIXTURES, "xmod_inherit_main.jac"));
+        same_lines(sv_out, na_out, "inherited fields");
+    }
+
+    def check_the_flat_pair_answers_what_the_server_pathway_an {
+        # The offsets agreeing is not the same as the values being right: a
+        # header fix that shifted both units consistently but wrongly would
+        # still pass the layout assertions above.
+        (sv_out, _sv_err) = sv_run(
+            os.path.join(FIXTURES, "xmod_inherit_flat_main.jac")
+        );
+        (na_out, _na_err) = na_run(
+            os.path.join(FIXTURES, "xmod_inherit_flat_main.jac")
+        );
+        same_lines(sv_out, na_out, "vtable-less imported base");
+    }
+    run_cases(
+        [
+            (
+                "inherited fields answer what the server pathway answers",
+                check_inherited_fields_answer_what_the_server_pathway
+            ),
+            (
+                "the flat pair answers what the server pathway answers",
+                check_the_flat_pair_answers_what_the_server_pathway_an
+            )
+        ]
+    );
 }
 
 test "a vtable-less imported base and its subclass agree on the header" {
@@ -168,14 +218,4 @@ test "a vtable-less imported base and its subclass agree on the header" {
     assert "read_inherited" not in seams , (
         f"the inherited read must no longer demote: {seams}"
     );
-}
-
-
-test "the flat pair answers what the server pathway answers" {
-    # The offsets agreeing is not the same as the values being right: a
-    # header fix that shifted both units consistently but wrongly would
-    # still pass the layout assertions above.
-    (sv_out, _sv_err) = sv_run(os.path.join(FIXTURES, "xmod_inherit_flat_main.jac"));
-    (na_out, _na_err) = na_run(os.path.join(FIXTURES, "xmod_inherit_flat_main.jac"));
-    same_lines(sv_out, na_out, "vtable-less imported base");
 }

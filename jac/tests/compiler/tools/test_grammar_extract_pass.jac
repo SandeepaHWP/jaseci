@@ -7,7 +7,7 @@ Jac parser module. Also validates grammar matches jac.spec.
 
 import from pathlib { Path }
 import os;
-import from tests.support { JAC_ROOT }
+import from tests.support { JAC_ROOT, run_cases }
 import jaclang;
 import from jaclang.compiler.tools.grammar_extract_pass {
     GAlt,
@@ -369,70 +369,139 @@ def mini_rules -> dict[str, any] {
     return {r.name: r for r in mini_pass().rules};
 }
 
-test "contextual tokens and finally blocks retain their grammar" {
-    rules = mini_rules();
-    assert fmt(rules["contextual"].body) == '"graph" "{" ";"';
+test "contextual tokens and finally blocks retain their grammar, and related cases" {
+    def check_contextual_tokens_and_finally_blocks_retain_thei {
+        rules = mini_rules();
+
+        assert fmt(rules["contextual"].body) == '"graph" "{" ";"';
+    }
+
+    def check_or_merged_match_tok_loop_emits_full_token_set {
+        rules = mini_rules();
+
+        assert fmt(rules["loopy"].body) == '(("." | ".>") NAME)*';
+    }
+
+    def check_or_merged_match_tok_opt_emits_full_token_set {
+        rules = mini_rules();
+
+        assert fmt(rules["optish"].body) == '(("." | "<.") NAME)?';
+    }
+
+    def check_opaque_if_else_becomes_alternation {
+        rules = mini_rules();
+
+        assert fmt(rules["choice"].body) == '";" | ","';
+    }
+
+    def check_guard_suppressed_when_child_rule_consumes_it {
+        rules = mini_rules();
+
+        assert fmt(rules["outer"].body) == "inner_if | fallback";
+    }
+
+    def check_self_recursive_guard_is_kept {
+        rules = mini_rules();
+
+        assert fmt(rules["rec"].body) == '"-" rec | leaf';
+    }
+
+    def check_genuinely_nullable_dispatch_keeps_its_optionalit {
+        rules = mini_rules();
+
+        assert fmt(rules["marker"].body) == '("own" | "imm")?';
+    }
+
+    def check_none_returning_dispatcher_loses_redundant_option {
+        rules = mini_rules();
+
+        assert fmt(rules["marker2"].body) == '"own" | "imm"';
+    }
+
+    def check_ternary_with_none_branch_is_optional {
+        rules = mini_rules();
+
+        assert fmt(rules["maybe"].body) == 'leaf? ";"';
+    }
+
+    def check_mid_loop_separator_break_emits_optional_separato {
+        rules = mini_rules();
+
+        assert fmt(rules["listy"].body) == '(leaf ","?)*';
+    }
+
+    def check_exhaustive_if_else_chain_is_not_optional {
+        rules = mini_rules();
+
+        assert fmt(rules["either"].body) == '"if" | NAME';
+    }
+
+    def check_guard_covered_by_deep_first_set_is_elided {
+        rules = mini_rules();
+
+        assert fmt(rules["covered"].body) == 'wrapped ";" | leaf';
+    }
+
+    def check_try_parse_idiom_becomes_ordered_choice {
+        rules = mini_rules();
+
+        assert fmt(rules["trying"].body) == "marker2 | leaf";
+    }
+    run_cases(
+        [
+            (
+                "contextual tokens and finally blocks retain their grammar",
+                check_contextual_tokens_and_finally_blocks_retain_thei
+            ),
+            (
+                "or merged match_tok loop emits full token set",
+                check_or_merged_match_tok_loop_emits_full_token_set
+            ),
+            (
+                "or merged match_tok opt emits full token set",
+                check_or_merged_match_tok_opt_emits_full_token_set
+            ),
+            (
+                "opaque if else becomes alternation",
+                check_opaque_if_else_becomes_alternation
+            ),
+            (
+                "guard suppressed when child rule consumes it",
+                check_guard_suppressed_when_child_rule_consumes_it
+            ),
+            ("self recursive guard is kept", check_self_recursive_guard_is_kept),
+            (
+                "genuinely nullable dispatch keeps its optionality",
+                check_genuinely_nullable_dispatch_keeps_its_optionalit
+            ),
+            (
+                "none returning dispatcher loses redundant optionality",
+                check_none_returning_dispatcher_loses_redundant_option
+            ),
+            (
+                "ternary with none branch is optional",
+                check_ternary_with_none_branch_is_optional
+            ),
+            (
+                "mid loop separator break emits optional separator",
+                check_mid_loop_separator_break_emits_optional_separato
+            ),
+            (
+                "exhaustive if else chain is not optional",
+                check_exhaustive_if_else_chain_is_not_optional
+            ),
+            (
+                "guard covered by deep first set is elided",
+                check_guard_covered_by_deep_first_set_is_elided
+            ),
+            (
+                "try parse idiom becomes ordered choice",
+                check_try_parse_idiom_becomes_ordered_choice
+            )
+        ]
+    );
 }
 
-test "or merged match_tok loop emits full token set" {
-    rules = mini_rules();
-    assert fmt(rules["loopy"].body) == '(("." | ".>") NAME)*';
-}
-
-test "or merged match_tok opt emits full token set" {
-    rules = mini_rules();
-    assert fmt(rules["optish"].body) == '(("." | "<.") NAME)?';
-}
-
-test "opaque if else becomes alternation" {
-    rules = mini_rules();
-    assert fmt(rules["choice"].body) == '";" | ","';
-}
-
-test "guard suppressed when child rule consumes it" {
-    rules = mini_rules();
-    assert fmt(rules["outer"].body) == "inner_if | fallback";
-}
-
-test "self recursive guard is kept" {
-    rules = mini_rules();
-    assert fmt(rules["rec"].body) == '"-" rec | leaf';
-}
-
-test "genuinely nullable dispatch keeps its optionality" {
-    rules = mini_rules();
-    assert fmt(rules["marker"].body) == '("own" | "imm")?';
-}
-
-test "none returning dispatcher loses redundant optionality" {
-    rules = mini_rules();
-    assert fmt(rules["marker2"].body) == '"own" | "imm"';
-}
-
-test "ternary with none branch is optional" {
-    rules = mini_rules();
-    assert fmt(rules["maybe"].body) == 'leaf? ";"';
-}
-
-test "mid loop separator break emits optional separator" {
-    rules = mini_rules();
-    assert fmt(rules["listy"].body) == '(leaf ","?)*';
-}
-
-test "exhaustive if else chain is not optional" {
-    rules = mini_rules();
-    assert fmt(rules["either"].body) == '"if" | NAME';
-}
-
-test "guard covered by deep first set is elided" {
-    rules = mini_rules();
-    assert fmt(rules["covered"].body) == 'wrapped ";" | leaf';
-}
-
-test "try parse idiom becomes ordered choice" {
-    rules = mini_rules();
-    assert fmt(rules["trying"].body) == "marker2 | leaf";
-}
 
 test "strict diagnostics flag invisible constructs" {
     p = mini_pass();
@@ -444,175 +513,205 @@ test "strict diagnostics flag invisible constructs" {
     assert "flagged" in diag_text;
 }
 
-# ── Integration: extract rules from the real parser ──────────────────────
-test "rules extracted" {
-    prog = JacProgram();
-    mod = prog.compile(PARSER_PATH, no_cgen=True);
-    assert not prog.errors_had , f"Compilation errors: {prog.errors_had}";
-    extracted = run_pass(GrammarExtractPass, mod, prog);
-    assert len(extracted.rules) > 20 , (
-        f"Expected >20 rules, got {len(extracted.rules)}"
+test "rules extracted, and related cases" {
+    # ── Integration: extract rules from the real parser ──────────────────────
+    def check_rules_extracted {
+        prog = JacProgram();
+        mod = prog.compile(PARSER_PATH, no_cgen=True);
+
+        assert not prog.errors_had , f"Compilation errors: {prog.errors_had}";
+        extracted = run_pass(GrammarExtractPass, mod, prog);
+        assert len(extracted.rules) > 20 , (
+            f"Expected >20 rules, got {len(extracted.rules)}"
+        );
+    }
+
+    def check_known_rule_names {
+        prog = JacProgram();
+        mod = prog.compile(PARSER_PATH, no_cgen=True);
+
+        assert not prog.errors_had;
+        extracted = run_pass(GrammarExtractPass, mod, prog);
+        rule_names = {r.name for r in extracted.rules};
+        expected = {
+            "if_stmt",
+            "while_stmt",
+            "expression",
+            "bitwise_or",
+            "bitwise_xor",
+            "bitwise_and",
+            "arithmetic",
+            "term",
+            "power",
+            "factor"
+        };
+        missing = expected - rule_names;
+        assert len(missing) == 0 , f"Missing rules: {missing}";
+    }
+
+    def check_bitwise_or_structure {
+        prog = JacProgram();
+        mod = prog.compile(PARSER_PATH, no_cgen=True);
+
+        assert not prog.errors_had;
+        extracted = run_pass(GrammarExtractPass, mod, prog);
+        rule_map = {r.name: r for r in extracted.rules};
+        assert "bitwise_or" in rule_map;
+        ebnf = fmt(rule_map["bitwise_or"].body);
+        assert "bitwise_xor" in ebnf;
+        assert '"|"' in ebnf;
+    }
+
+    def check_if_stmt_structure {
+        prog = JacProgram();
+        mod = prog.compile(PARSER_PATH, no_cgen=True);
+
+        assert not prog.errors_had;
+        extracted = run_pass(GrammarExtractPass, mod, prog);
+        rule_map = {r.name: r for r in extracted.rules};
+        assert "if_stmt" in rule_map;
+        ebnf = fmt(rule_map["if_stmt"].body);
+        assert '"if"' in ebnf;
+        assert "expression" in ebnf;
+        assert '"{"' in ebnf;
+        assert '"}"' in ebnf;
+    }
+
+    def check_while_stmt_structure {
+        prog = JacProgram();
+        mod = prog.compile(PARSER_PATH, no_cgen=True);
+
+        assert not prog.errors_had;
+        extracted = run_pass(GrammarExtractPass, mod, prog);
+        rule_map = {r.name: r for r in extracted.rules};
+        assert "while_stmt" in rule_map;
+        ebnf = fmt(rule_map["while_stmt"].body);
+        assert '"while"' in ebnf;
+        assert "expression" in ebnf;
+    }
+
+    def check_forever_stmt_structure {
+        prog = JacProgram();
+        mod = prog.compile(PARSER_PATH, no_cgen=True);
+
+        assert not prog.errors_had;
+        extracted = run_pass(GrammarExtractPass, mod, prog);
+        rule_map = {r.name: r for r in extracted.rules};
+        assert "forever_stmt" in rule_map;
+        ebnf = fmt(rule_map["forever_stmt"].body);
+        assert '"forever"' in ebnf;
+        assert "code_block_stmts" in ebnf;
+        # forever has no condition and no else clause
+        assert "expression" not in ebnf;
+        assert "else_stmt" not in ebnf;
+    }
+
+    def check_ebnf_output_nonempty {
+        prog = JacProgram();
+        mod = prog.compile(PARSER_PATH, no_cgen=True);
+
+        assert not prog.errors_had;
+        extracted = run_pass(GrammarExtractPass, mod, prog);
+        ebnf = extracted.emit_ebnf();
+        assert len(ebnf) > 100;
+        assert "::=" in ebnf;
+        for line in ebnf.strip().split("\n") {
+            s = line.strip();
+            if not s {
+                continue;
+            }
+            assert "::=" in line or line.startswith(" ") , f"Malformed line: {line}";
+        }
+    }
+
+    def check_no_duplicate_rules {
+        prog = JacProgram();
+        mod = prog.compile(PARSER_PATH, no_cgen=True);
+
+        assert not prog.errors_had;
+        extracted = run_pass(GrammarExtractPass, mod, prog);
+        names = [r.name for r in extracted.rules];
+        assert len(names) == len(set(names)) , (
+            f"Duplicate rules: {[
+                n
+                for n in names
+                if names.count(n) > 1
+            ]}"
+        );
+    }
+
+    def check_rules_reference_valid_names {
+        prog = JacProgram();
+        mod = prog.compile(PARSER_PATH, no_cgen=True);
+
+        assert not prog.errors_had;
+        extracted = run_pass(GrammarExtractPass, mod, prog);
+        rule_names = {r.name for r in extracted.rules};
+
+        def collect_refs(expr: object) -> set[str] {
+            refs: set[str] = set();
+            if isinstance(expr, GRef) {
+                refs.add(expr.name);
+            } elif isinstance(expr, GSeq) {
+                for item in expr.items {
+                    refs.update(collect_refs(item));
+                }
+            } elif isinstance(expr, GAlt) {
+                for choice in expr.choices {
+                    refs.update(collect_refs(choice));
+                }
+            } elif isinstance(expr, (GOpt, GStar, GPlus)) {
+                refs.update(collect_refs(expr.inner));
+            }
+            return refs;
+        }
+
+        all_refs: set[str] = set();
+        for rule in extracted.rules {
+            all_refs.update(collect_refs(rule.body));
+        }
+        resolved = all_refs & rule_names;
+        assert len(resolved) > 10 , f"Only {len(
+            resolved
+        )} refs resolved to known rules";
+    }
+
+    def check_strict_finding_budget {
+        prog = JacProgram();
+        mod = prog.compile(PARSER_PATH, no_cgen=True);
+
+        assert not prog.errors_had;
+        extracted = run_pass(GrammarExtractPass, mod, prog);
+        count = len(extracted.diagnostics);
+        assert count <= STRICT_FINDING_BUDGET , (
+            f"grammar strict findings grew to {count} (budget {STRICT_FINDING_BUDGET}).\n"
+            "New parser code consumes tokens invisibly to the grammar extractor.\n"
+            "Use expect()/expect_any()/match_tok()/match_any() instead of bare "
+            "advance(), keep TokenKind arguments literal, and put error recovery in "
+            "_-prefixed helpers. Run `jac tool grammar --strict` to see findings.\n"
+            "If you fixed findings, lower STRICT_FINDING_BUDGET to the new count."
+        );
+    }
+    run_cases(
+        [
+            ("rules extracted", check_rules_extracted),
+            ("known rule names", check_known_rule_names),
+            ("bitwise or structure", check_bitwise_or_structure),
+            ("if stmt structure", check_if_stmt_structure),
+            ("while stmt structure", check_while_stmt_structure),
+            ("forever stmt structure", check_forever_stmt_structure),
+            ("ebnf output nonempty", check_ebnf_output_nonempty),
+            ("no duplicate rules", check_no_duplicate_rules),
+            ("rules reference valid names", check_rules_reference_valid_names),
+            ("strict finding budget", check_strict_finding_budget)
+        ]
     );
 }
 
-test "known rule names" {
-    prog = JacProgram();
-    mod = prog.compile(PARSER_PATH, no_cgen=True);
-    assert not prog.errors_had;
-    extracted = run_pass(GrammarExtractPass, mod, prog);
-    rule_names = {r.name for r in extracted.rules};
-    expected = {
-        "if_stmt",
-        "while_stmt",
-        "expression",
-        "bitwise_or",
-        "bitwise_xor",
-        "bitwise_and",
-        "arithmetic",
-        "term",
-        "power",
-        "factor"
-    };
-    missing = expected - rule_names;
-    assert len(missing) == 0 , f"Missing rules: {missing}";
-}
-
-test "bitwise or structure" {
-    prog = JacProgram();
-    mod = prog.compile(PARSER_PATH, no_cgen=True);
-    assert not prog.errors_had;
-    extracted = run_pass(GrammarExtractPass, mod, prog);
-    rule_map = {r.name: r for r in extracted.rules};
-    assert "bitwise_or" in rule_map;
-    ebnf = fmt(rule_map["bitwise_or"].body);
-    assert "bitwise_xor" in ebnf;
-    assert '"|"' in ebnf;
-}
-
-test "if stmt structure" {
-    prog = JacProgram();
-    mod = prog.compile(PARSER_PATH, no_cgen=True);
-    assert not prog.errors_had;
-    extracted = run_pass(GrammarExtractPass, mod, prog);
-    rule_map = {r.name: r for r in extracted.rules};
-    assert "if_stmt" in rule_map;
-    ebnf = fmt(rule_map["if_stmt"].body);
-    assert '"if"' in ebnf;
-    assert "expression" in ebnf;
-    assert '"{"' in ebnf;
-    assert '"}"' in ebnf;
-}
-
-test "while stmt structure" {
-    prog = JacProgram();
-    mod = prog.compile(PARSER_PATH, no_cgen=True);
-    assert not prog.errors_had;
-    extracted = run_pass(GrammarExtractPass, mod, prog);
-    rule_map = {r.name: r for r in extracted.rules};
-    assert "while_stmt" in rule_map;
-    ebnf = fmt(rule_map["while_stmt"].body);
-    assert '"while"' in ebnf;
-    assert "expression" in ebnf;
-}
-
-test "forever stmt structure" {
-    prog = JacProgram();
-    mod = prog.compile(PARSER_PATH, no_cgen=True);
-    assert not prog.errors_had;
-    extracted = run_pass(GrammarExtractPass, mod, prog);
-    rule_map = {r.name: r for r in extracted.rules};
-    assert "forever_stmt" in rule_map;
-    ebnf = fmt(rule_map["forever_stmt"].body);
-    assert '"forever"' in ebnf;
-    assert "code_block_stmts" in ebnf;
-    # forever has no condition and no else clause
-    assert "expression" not in ebnf;
-    assert "else_stmt" not in ebnf;
-}
-
-test "ebnf output nonempty" {
-    prog = JacProgram();
-    mod = prog.compile(PARSER_PATH, no_cgen=True);
-    assert not prog.errors_had;
-    extracted = run_pass(GrammarExtractPass, mod, prog);
-    ebnf = extracted.emit_ebnf();
-    assert len(ebnf) > 100;
-    assert "::=" in ebnf;
-    for line in ebnf.strip().split("\n") {
-        s = line.strip();
-        if not s {
-            continue;
-        }
-        assert "::=" in line or line.startswith(" ") , f"Malformed line: {line}";
-    }
-}
-
-test "no duplicate rules" {
-    prog = JacProgram();
-    mod = prog.compile(PARSER_PATH, no_cgen=True);
-    assert not prog.errors_had;
-    extracted = run_pass(GrammarExtractPass, mod, prog);
-    names = [r.name for r in extracted.rules];
-    assert len(names) == len(set(names)) , (
-        f"Duplicate rules: {[
-            n
-            for n in names
-            if names.count(n) > 1
-        ]}"
-    );
-}
-
-test "rules reference valid names" {
-    prog = JacProgram();
-    mod = prog.compile(PARSER_PATH, no_cgen=True);
-    assert not prog.errors_had;
-    extracted = run_pass(GrammarExtractPass, mod, prog);
-    rule_names = {r.name for r in extracted.rules};
-
-    def collect_refs(expr: object) -> set[str] {
-        refs: set[str] = set();
-        if isinstance(expr, GRef) {
-            refs.add(expr.name);
-        } elif isinstance(expr, GSeq) {
-            for item in expr.items {
-                refs.update(collect_refs(item));
-            }
-        } elif isinstance(expr, GAlt) {
-            for choice in expr.choices {
-                refs.update(collect_refs(choice));
-            }
-        } elif isinstance(expr, (GOpt, GStar, GPlus)) {
-            refs.update(collect_refs(expr.inner));
-        }
-        return refs;
-    }
-
-    all_refs: set[str] = set();
-    for rule in extracted.rules {
-        all_refs.update(collect_refs(rule.body));
-    }
-    resolved = all_refs & rule_names;
-    assert len(resolved) > 10 , f"Only {len(resolved)} refs resolved to known rules";
-}
 
 # ── Ratchet: strict findings may only go down ────────────────────────────
 glob STRICT_FINDING_BUDGET = 37;
 
-test "strict finding budget" {
-    prog = JacProgram();
-    mod = prog.compile(PARSER_PATH, no_cgen=True);
-    assert not prog.errors_had;
-    extracted = run_pass(GrammarExtractPass, mod, prog);
-    count = len(extracted.diagnostics);
-    assert count <= STRICT_FINDING_BUDGET , (
-        f"grammar strict findings grew to {count} (budget {STRICT_FINDING_BUDGET}).\n"
-        "New parser code consumes tokens invisibly to the grammar extractor.\n"
-        "Use expect()/expect_any()/match_tok()/match_any() instead of bare "
-        "advance(), keep TokenKind arguments literal, and put error recovery in "
-        "_-prefixed helpers. Run `jac tool grammar --strict` to see findings.\n"
-        "If you fixed findings, lower STRICT_FINDING_BUDGET to the new count."
-    );
-}
 
 # ── Snapshot test: grammar matches jac.spec ──────────────────────────────
 test "spec file exists" {

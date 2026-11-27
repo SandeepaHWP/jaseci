@@ -15,7 +15,7 @@ import shutil;
 import sys;
 import tempfile;
 import from pathlib { Path }
-import from tests.support { JAC_ROOT }
+import from tests.support { JAC_ROOT, run_cases }
 import jaclang;
 import jaclang.compiler.frontend.unitree as uni;
 import from jaclang { JacRuntime as Jac }
@@ -92,11 +92,32 @@ test "component state written from a lambda compiles in an impl body" {
     assert "function Editor(" in mod.gen.js;
 }
 
-test "a lambda rebinding a local of an impl'd function binds in that function" {
-    path = os.path.join(FIXTURES, "lambda_rebind.jac");
-    (prog, mod) = compile_fixture(path);
-    assert not prog.errors_had , error_texts(prog);
-    assert run_and_capture(path).strip() == "6 6";
+test "a lambda rebinding a local of an impl'd function binds in that function, and related cases" {
+    def check_a_lambda_rebinding_a_local_of_an_impl_d_function {
+        path = os.path.join(FIXTURES, "lambda_rebind.jac");
+        (prog, mod) = compile_fixture(path);
+        assert not prog.errors_had , error_texts(prog);
+        assert run_and_capture(path).strip() == "6 6";
+    }
+
+    def check_a_generic_function_s_impl_restates_its_type_para {
+        path = os.path.join(FIXTURES, "generic_impl.jac");
+        (prog, mod) = compile_fixture(path);
+        assert not prog.errors_had , error_texts(prog);
+        assert run_and_capture(path).strip() == "a 11";
+    }
+    run_cases(
+        [
+            (
+                "a lambda rebinding a local of an impl'd function binds in that function",
+                check_a_lambda_rebinding_a_local_of_an_impl_d_function
+            ),
+            (
+                "a generic function's impl restates its type parameters",
+                check_a_generic_function_s_impl_restates_its_type_para
+            )
+        ]
+    );
 }
 
 test "a client-pinned helper type-checks in the client codespace from an annex" {
@@ -105,41 +126,51 @@ test "a client-pinned helper type-checks in the client codespace from an annex" 
     assert stamp_of(mod, "helper") == "client";
 }
 
-test "an archetype with an impl'd method is pulled to the client like its inline twin" {
-    (prog, mod) = compile_fixture(os.path.join(FIXTURES, "client_archetype.jac"));
-    assert not prog.errors_had , error_texts(prog);
-    assert stamp_of(mod, "Painter") == "client";
-    assert "class Painter" in mod.gen.js;
-}
+test "client_archetype.jac cases" {
+    def check_an_archetype_with_an_impl_d_method_is_pulled_to {
+        (prog, mod) = compile_fixture(os.path.join(FIXTURES, "client_archetype.jac"));
 
-test "a linked impl has no placement or scope of its own" {
-    (prog, mod) = compile_fixture(os.path.join(FIXTURES, "client_archetype.jac"));
-    impls = [
-        stmt
-        for stmt in mod.body
-        if isinstance(stmt, uni.ImplDef)
-    ];
-    assert impls;
-    for impl_def in impls {
-        decl = impl_def.decl_link;
-        assert isinstance(decl, uni.Ability);
-        assert impl_def.top_element is decl.top_element;
-        assert impl_def.code_context == decl.code_context;
-        assert impl_def.folded;
-        for stmt in impl_def.get_all_sub_nodes(uni.ReturnStmt) {
-            assert stmt.enclosing_decl(uni.Ability) is decl;
-            assert stmt.enclosing_decl(uni.Archetype) is decl.method_owner;
-            assert stmt.sym_tab is decl;
+        assert not prog.errors_had , error_texts(prog);
+        assert stamp_of(mod, "Painter") == "client";
+        assert "class Painter" in mod.gen.js;
+    }
+
+    def check_a_linked_impl_has_no_placement_or_scope_of_its_o {
+        (prog, mod) = compile_fixture(os.path.join(FIXTURES, "client_archetype.jac"));
+
+        impls = [
+            stmt
+            for stmt in mod.body
+            if isinstance(stmt, uni.ImplDef)
+        ];
+        assert impls;
+        for impl_def in impls {
+            decl = impl_def.decl_link;
+            assert isinstance(decl, uni.Ability);
+            assert impl_def.top_element is decl.top_element;
+            assert impl_def.code_context == decl.code_context;
+            assert impl_def.folded;
+            for stmt in impl_def.get_all_sub_nodes(uni.ReturnStmt) {
+                assert stmt.enclosing_decl(uni.Ability) is decl;
+                assert stmt.enclosing_decl(uni.Archetype) is decl.method_owner;
+                assert stmt.sym_tab is decl;
+            }
         }
     }
+    run_cases(
+        [
+            (
+                "an archetype with an impl'd method is pulled to the client like its inline twin",
+                check_an_archetype_with_an_impl_d_method_is_pulled_to
+            ),
+            (
+                "a linked impl has no placement or scope of its own",
+                check_a_linked_impl_has_no_placement_or_scope_of_its_o
+            )
+        ]
+    );
 }
 
-test "a generic function's impl restates its type parameters" {
-    path = os.path.join(FIXTURES, "generic_impl.jac");
-    (prog, mod) = compile_fixture(path);
-    assert not prog.errors_had , error_texts(prog);
-    assert run_and_capture(path).strip() == "a 11";
-}
 
 test "an impl whose type parameters differ from its declaration's is an error" {
     (prog, mod) = compile_fixture(os.path.join(FIXTURES, "generic_impl_mismatch.jac"));

@@ -31,7 +31,7 @@ import marshal;
 import os;
 import types;
 import from builtins { compile as pycompile, exec as pyexec }
-import from tests.support { JAC_ROOT }
+import from tests.support { JAC_ROOT, run_cases }
 import jaclang.compiler.frontend.unitree as uni;
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.driver.compile_options { CompileOptions }
@@ -331,8 +331,9 @@ with entry {
     assert dumped.count("field(") == 0;
 }
 
-test "statement forms match" {
-    src = """
+test "statement forms match, and related cases" {
+    def check_statement_forms_match {
+        src = """
 def stmts(n: int) -> list[int] {
     out: list[int] = [];
     i = 0;
@@ -371,13 +372,13 @@ with entry {
     r = stmts(6);
 }
 """;
-    (ref_tree, got_tree, _) = dual_compile(src, "stmts_fixture.jac");
-    assert_dump_equal(ref_tree, got_tree);
-    exec_both(ref_tree, got_tree, "stmts_fixture.jac", ["r"]);
-}
+        (ref_tree, got_tree, _) = dual_compile(src, "stmts_fixture.jac");
+        assert_dump_equal(ref_tree, got_tree);
+        exec_both(ref_tree, got_tree, "stmts_fixture.jac", ["r"]);
+    }
 
-test "with statement and yield match" {
-    src = """
+    def check_with_statement_and_yield_match {
+        src = """
 import io;
 
 def gen(n: int) -> any {
@@ -401,13 +402,13 @@ with entry {
     r = consume();
 }
 """;
-    (ref_tree, got_tree, _) = dual_compile(src, "with_fixture.jac");
-    assert_dump_equal(ref_tree, got_tree);
-    exec_both(ref_tree, got_tree, "with_fixture.jac", ["r"]);
-}
+        (ref_tree, got_tree, _) = dual_compile(src, "with_fixture.jac");
+        assert_dump_equal(ref_tree, got_tree);
+        exec_both(ref_tree, got_tree, "with_fixture.jac", ["r"]);
+    }
 
-test "expression forms match" {
-    src = """
+    def check_expression_forms_match {
+        src = """
 def exprs(a: int, b: int) -> dict[any, any] {
     lst = [a, b, a + b];
     st = {a, b};
@@ -443,10 +444,193 @@ with entry {
     r = exprs(3, 8);
 }
 """;
-    (ref_tree, got_tree, _) = dual_compile(src, "exprs_fixture.jac");
-    assert_dump_equal(ref_tree, got_tree);
-    exec_both(ref_tree, got_tree, "exprs_fixture.jac", ["r"]);
+        (ref_tree, got_tree, _) = dual_compile(src, "exprs_fixture.jac");
+        assert_dump_equal(ref_tree, got_tree);
+        exec_both(ref_tree, got_tree, "exprs_fixture.jac", ["r"]);
+    }
+
+    def check_switch_lowering_duplicates_shared_recipes {
+        src = """
+def pick(v: int) -> str {
+    out = "";
+    switch v {
+        case 1:
+            out = "one";
+            break;
+
+        case 2 | 3:
+            out = "few";
+            break;
+
+        default:
+            out = "many";
+
+    }
+    return out;
 }
+
+with entry {
+    r = [pick(1), pick(2), pick(3), pick(9)];
+}
+""";
+        (ref_tree, got_tree, _) = dual_compile(src, "switch_fixture.jac");
+        assert_dump_equal(ref_tree, got_tree);
+        exec_both(ref_tree, got_tree, "switch_fixture.jac", ["r"]);
+    }
+
+    def check_global_vars_and_module_code_guard_match {
+        src = """
+\"\"\"Doc.\"\"\"
+glob threshold: int = 10,
+     name: str = "mod";
+
+with entry:__main__ {
+    ran_main = True;
+}
+
+with entry {
+    always = threshold + len(name);
+}
+""";
+        (ref_tree, got_tree, _) = dual_compile(src, "globals_fixture.jac");
+        assert_dump_equal(ref_tree, got_tree);
+        exec_both(ref_tree, got_tree, "globals_fixture.jac", ["always"]);
+    }
+
+    def check_match_statements_lower_identically {
+        src = """
+obj Point {
+    has x: int = 0,
+        y: int = 0;
+}
+
+def classify(v: any) -> str {
+    match v {
+        case 1 | 2:
+            return "small";
+
+        case [first, *rest] if first == 9:
+            return f"nine-led {rest}";
+
+        case {"kind": k, **extra}:
+            return f"map {k}/{extra}";
+
+        case Point(x=0, y=0):
+            return "origin";
+
+        case Point(x=xx):
+            return f"x {xx}";
+
+        case str() as sv:
+            return f"str {sv}";
+
+        case None:
+            return "none";
+
+        case _:
+            return "other";
+
+    }
+}
+
+with entry {
+    r = [
+        classify(1),
+        classify([9, 8, 7]),
+        classify({"kind": "z", "extra": 1}),
+        classify(Point()),
+        classify(Point(x=5, y=2)),
+        classify("hi"),
+        classify(None),
+        classify(3.5)
+    ];
+}
+""";
+        (ref_tree, got_tree, _) = dual_compile(src, "match_fixture.jac");
+        assert_dump_equal(ref_tree, got_tree);
+        exec_both(ref_tree, got_tree, "match_fixture.jac", ["r"]);
+    }
+
+    def check_async_constructs_lower_identically {
+        src = """
+import asyncio;
+
+async def worker(n: int) -> int {
+    await asyncio.sleep(0);
+    return n * 2;
+}
+
+async def gather_all -> int {
+    total = 0;
+    a = await worker(2);
+    b = await worker(3);
+    lock = asyncio.Lock();
+    async with lock {
+        total = a + b;
+    }
+    return total;
+}
+
+with entry {
+    r = asyncio.run(gather_all());
+}
+""";
+        (ref_tree, got_tree, _) = dual_compile(src, "async_fixture.jac");
+        assert_dump_equal(ref_tree, got_tree);
+        exec_both(ref_tree, got_tree, "async_fixture.jac", ["r"]);
+    }
+
+    def check_concurrency_flow_and_wait_lower_identically {
+        src = """
+def slow(n: int) -> int {
+    return n + 1;
+}
+
+def run_pair -> int {
+    t1 = flow slow(1);
+    t2 = flow slow(2);
+    a = wait t1;
+    b = wait t2;
+    return int(a) + int(b);
+}
+
+with entry {
+    r = run_pair();
+}
+""";
+        (ref_tree, got_tree, _) = dual_compile(src, "flow_fixture.jac");
+        assert_dump_equal(ref_tree, got_tree);
+        exec_both(ref_tree, got_tree, "flow_fixture.jac", ["r"]);
+    }
+    run_cases(
+        [
+            ("statement forms match", check_statement_forms_match),
+            ("with statement and yield match", check_with_statement_and_yield_match),
+            ("expression forms match", check_expression_forms_match),
+            (
+                "switch lowering duplicates shared recipes",
+                check_switch_lowering_duplicates_shared_recipes
+            ),
+            (
+                "global vars and module code guard match",
+                check_global_vars_and_module_code_guard_match
+            ),
+            (
+                "match statements lower identically",
+                check_match_statements_lower_identically
+            ),
+            (
+                "async constructs lower identically",
+                check_async_constructs_lower_identically
+            ),
+            (
+                "concurrency flow and wait lower identically",
+                check_concurrency_flow_and_wait_lower_identically
+            )
+        ]
+    );
+}
+
 
 test "attribute chains null-ok and multistring match" {
     src = """
@@ -548,37 +732,10 @@ with entry {
     assert missing == [] , str(missing);
 }
 
-test "switch lowering duplicates shared recipes" {
-    src = """
-def pick(v: int) -> str {
-    out = "";
-    switch v {
-        case 1:
-            out = "one";
-            break;
 
-        case 2 | 3:
-            out = "few";
-            break;
-
-        default:
-            out = "many";
-
-    }
-    return out;
-}
-
-with entry {
-    r = [pick(1), pick(2), pick(3), pick(9)];
-}
-""";
-    (ref_tree, got_tree, _) = dual_compile(src, "switch_fixture.jac");
-    assert_dump_equal(ref_tree, got_tree);
-    exec_both(ref_tree, got_tree, "switch_fixture.jac", ["r"]);
-}
-
-test "enums lower with auto and kind imports" {
-    src = """
+test "enums lower with auto and kind imports, and related cases" {
+    def check_enums_lower_with_auto_and_kind_imports {
+        src = """
 enum Color {
     RED,
     GREEN,
@@ -596,32 +753,13 @@ with entry {
     total = Size.S.value + Size.M.value;
 }
 """;
-    (ref_tree, got_tree, _) = dual_compile(src, "enum_fixture.jac");
-    assert_dump_equal(ref_tree, got_tree);
-    exec_both(ref_tree, got_tree, "enum_fixture.jac", ["c", "s", "total"]);
-}
+        (ref_tree, got_tree, _) = dual_compile(src, "enum_fixture.jac");
+        assert_dump_equal(ref_tree, got_tree);
+        exec_both(ref_tree, got_tree, "enum_fixture.jac", ["c", "s", "total"]);
+    }
 
-test "global vars and module code guard match" {
-    src = """
-\"\"\"Doc.\"\"\"
-glob threshold: int = 10,
-     name: str = "mod";
-
-with entry:__main__ {
-    ran_main = True;
-}
-
-with entry {
-    always = threshold + len(name);
-}
-""";
-    (ref_tree, got_tree, _) = dual_compile(src, "globals_fixture.jac");
-    assert_dump_equal(ref_tree, got_tree);
-    exec_both(ref_tree, got_tree, "globals_fixture.jac", ["always"]);
-}
-
-test "super calls type aliases and iter-for continue match" {
-    src = """
+    def check_super_calls_type_aliases_and_iter_for_continue_m {
+        src = """
 type Plain = int;
 type Branded := int;
 
@@ -656,10 +794,24 @@ with entry {
     left = sorted(scratch.keys());
 }
 """;
-    (ref_tree, got_tree, _) = dual_compile(src, "super_fixture.jac");
-    assert_dump_equal(ref_tree, got_tree);
-    exec_both(ref_tree, got_tree, "super_fixture.jac", ["d", "ks", "left"]);
+        (ref_tree, got_tree, _) = dual_compile(src, "super_fixture.jac");
+        assert_dump_equal(ref_tree, got_tree);
+        exec_both(ref_tree, got_tree, "super_fixture.jac", ["d", "ks", "left"]);
+    }
+    run_cases(
+        [
+            (
+                "enums lower with auto and kind imports",
+                check_enums_lower_with_auto_and_kind_imports
+            ),
+            (
+                "super calls type aliases and iter-for continue match",
+                check_super_calls_type_aliases_and_iter_for_continue_m
+            )
+        ]
+    );
 }
+
 
 test "native test shims lower identically via splice" {
     src = """
@@ -805,88 +957,6 @@ def launch -> Traveler {
     assert_bytecode_equal(ref_tree, "walker_fixture.jac", result.modules[0].bytecode);
 }
 
-test "match statements lower identically" {
-    src = """
-obj Point {
-    has x: int = 0,
-        y: int = 0;
-}
-
-def classify(v: any) -> str {
-    match v {
-        case 1 | 2:
-            return "small";
-
-        case [first, *rest] if first == 9:
-            return f"nine-led {rest}";
-
-        case {"kind": k, **extra}:
-            return f"map {k}/{extra}";
-
-        case Point(x=0, y=0):
-            return "origin";
-
-        case Point(x=xx):
-            return f"x {xx}";
-
-        case str() as sv:
-            return f"str {sv}";
-
-        case None:
-            return "none";
-
-        case _:
-            return "other";
-
-    }
-}
-
-with entry {
-    r = [
-        classify(1),
-        classify([9, 8, 7]),
-        classify({"kind": "z", "extra": 1}),
-        classify(Point()),
-        classify(Point(x=5, y=2)),
-        classify("hi"),
-        classify(None),
-        classify(3.5)
-    ];
-}
-""";
-    (ref_tree, got_tree, _) = dual_compile(src, "match_fixture.jac");
-    assert_dump_equal(ref_tree, got_tree);
-    exec_both(ref_tree, got_tree, "match_fixture.jac", ["r"]);
-}
-
-test "async constructs lower identically" {
-    src = """
-import asyncio;
-
-async def worker(n: int) -> int {
-    await asyncio.sleep(0);
-    return n * 2;
-}
-
-async def gather_all -> int {
-    total = 0;
-    a = await worker(2);
-    b = await worker(3);
-    lock = asyncio.Lock();
-    async with lock {
-        total = a + b;
-    }
-    return total;
-}
-
-with entry {
-    r = asyncio.run(gather_all());
-}
-""";
-    (ref_tree, got_tree, _) = dual_compile(src, "async_fixture.jac");
-    assert_dump_equal(ref_tree, got_tree);
-    exec_both(ref_tree, got_tree, "async_fixture.jac", ["r"]);
-}
 
 test "real repo walker file social_graph lowers identically" {
     path = os.path.join(
@@ -999,27 +1069,4 @@ def f -> int {
     assert "genai call expression" in caught_jcir , (
         "a genai call must refuse by name, not lower to something else"
     );
-}
-
-test "concurrency flow and wait lower identically" {
-    src = """
-def slow(n: int) -> int {
-    return n + 1;
-}
-
-def run_pair -> int {
-    t1 = flow slow(1);
-    t2 = flow slow(2);
-    a = wait t1;
-    b = wait t2;
-    return int(a) + int(b);
-}
-
-with entry {
-    r = run_pair();
-}
-""";
-    (ref_tree, got_tree, _) = dual_compile(src, "flow_fixture.jac");
-    assert_dump_equal(ref_tree, got_tree);
-    exec_both(ref_tree, got_tree, "flow_fixture.jac", ["r"]);
 }

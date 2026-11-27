@@ -5,7 +5,7 @@ A piece whose value is a string made for the f-string (`{w[1:]}`,
 a call. The fixture builds three million f-strings in each form; peak RSS has
 to stay flat instead of growing by about 180 MB."""
 
-import from tests.support { jac_command }
+import from tests.support { jac_command, run_cases }
 import os;
 import re;
 import subprocess;
@@ -57,17 +57,32 @@ def _run(mode: str) -> tuple[int, str] {
     return (rss, proc.stdout.strip());
 }
 
-test "an f-string releases a slice made for one of its pieces" {
-    (rss, out) = _run("slice");
-    assert out == "52888890" , out;
-    assert 0 <= rss < 40 , f"peak RSS {rss} MB";
+test "an f-string releases cases" {
+    def check_an_f_string_releases_a_slice_made_for_one_of_its {
+        (rss, out) = _run("slice");
+        assert out == "52888890" , out;
+        assert 0 <= rss < 40 , f"peak RSS {rss} MB";
+    }
+
+    def check_an_f_string_releases_a_string_a_call_made_for_on {
+        (rss, out) = _run("upper");
+        assert out == "39000000" , out;
+        assert 0 <= rss < 40 , f"peak RSS {rss} MB";
+    }
+    run_cases(
+        [
+            (
+                "an f-string releases a slice made for one of its pieces",
+                check_an_f_string_releases_a_slice_made_for_one_of_its
+            ),
+            (
+                "an f-string releases a string a call made for one of its pieces",
+                check_an_f_string_releases_a_string_a_call_made_for_on
+            )
+        ]
+    );
 }
 
-test "an f-string releases a string a call made for one of its pieces" {
-    (rss, out) = _run("upper");
-    assert out == "39000000" , out;
-    assert 0 <= rss < 40 , f"peak RSS {rss} MB";
-}
 
 test "optional, !r and formatted string pieces are released once" {
     fixture = str(

@@ -13,6 +13,8 @@ no missing type because there was none to name.
 
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.driver.compile_options { CompileOptions }
+import from tests.support { run_cases }
+
 
 def check_src(src: str) -> list[str] {
     prog = JacProgram();
@@ -22,64 +24,86 @@ def check_src(src: str) -> list[str] {
     return [str(e) for e in prog.errors_had];
 }
 
-test "a generator expression can be advanced with next" {
-    src = "def probe(items: list[int]) -> (int | None) {\n"
-        + "    return next((i for i in items if i > 2), None);\n"
-        + "}\n";
-    errs = check_src(src);
-    assert not errs , f"generator expression rejected by next: {errs}";
-}
+test "a generator expression can be advanced with next, and related cases" {
+    def check_a_generator_expression_can_be_advanced_with_next {
+        src = "def probe(items: list[int]) -> (int | None) {\n"
+            + "    return next((i for i in items if i > 2), None);\n"
+            + "}\n";
+        errs = check_src(src);
+        assert not errs , f"generator expression rejected by next: {errs}";
+    }
 
-test "a generator expression is still iterable and consumable" {
-    src = "def probe(items: list[int]) -> int {\n"
-        + "    total = 0;\n"
-        + "    for i in (x * 2 for x in items) {\n"
-        + "        total += i;\n"
-        + "    }\n"
-        + "    return total + sum(y for y in items);\n"
-        + "}\n";
-    errs = check_src(src);
-    assert not errs , f"generator expression lost iterability: {errs}";
-}
+    def check_a_generator_expression_is_still_iterable_and_con {
+        src = "def probe(items: list[int]) -> int {\n"
+            + "    total = 0;\n"
+            + "    for i in (x * 2 for x in items) {\n"
+            + "        total += i;\n"
+            + "    }\n"
+            + "    return total + sum(y for y in items);\n"
+            + "}\n";
+        errs = check_src(src);
+        assert not errs , f"generator expression lost iterability: {errs}";
+    }
 
-test "value resolves on a union of enum members" {
-    src = "import from jaclang.compiler.frontend.constant { Tokens as Tok }\n"
-        + "def probe(x: str) -> str {\n"
-        + "    t: (Tok | None) = None;\n"
-        + "    if x == 'a' {\n"
-        + "        t = Tok.KW_INIT;\n"
-        + "    } elif x == 'b' {\n"
-        + "        t = Tok.KW_POST_INIT;\n"
-        + "    }\n"
-        + "    if t is not None {\n"
-        + "        return t.value;\n"
-        + "    }\n"
-        + "    return '';\n"
-        + "}\n";
-    errs = check_src(src);
-    assert not errs , f"enum union lost .value: {errs}";
-}
+    def check_value_resolves_on_a_union_of_enum_members {
+        src = "import from jaclang.compiler.frontend.constant { Tokens as Tok }\n"
+            + "def probe(x: str) -> str {\n"
+            + "    t: (Tok | None) = None;\n"
+            + "    if x == 'a' {\n"
+            + "        t = Tok.KW_INIT;\n"
+            + "    } elif x == 'b' {\n"
+            + "        t = Tok.KW_POST_INIT;\n"
+            + "    }\n"
+            + "    if t is not None {\n"
+            + "        return t.value;\n"
+            + "    }\n"
+            + "    return '';\n"
+            + "}\n";
+        errs = check_src(src);
+        assert not errs , f"enum union lost .value: {errs}";
+    }
 
-test "any member resolves on a union of enum members" {
-    src = "import enum;\n"
-        + "class Color(enum.Enum) {\n"
-        + "    RED = 1;\n"
-        + "    GREEN = 2;\n"
-        + "}\n"
-        + "def probe(x: str) -> int {\n"
-        + "    c: (Color | None) = None;\n"
-        + "    if x == 'a' {\n"
-        + "        c = Color.RED;\n"
-        + "    } elif x == 'b' {\n"
-        + "        c = Color.GREEN;\n"
-        + "    }\n"
-        + "    if c is not None {\n"
-        + "        sibling = c.RED;\n"
-        + "        assert sibling is not None and c.name is not None;\n"
-        + "        return c.value;\n"
-        + "    }\n"
-        + "    return 0;\n"
-        + "}\n";
-    errs = check_src(src);
-    assert not errs , f"enum union lost a member: {errs}";
+    def check_any_member_resolves_on_a_union_of_enum_members {
+        src = "import enum;\n"
+            + "class Color(enum.Enum) {\n"
+            + "    RED = 1;\n"
+            + "    GREEN = 2;\n"
+            + "}\n"
+            + "def probe(x: str) -> int {\n"
+            + "    c: (Color | None) = None;\n"
+            + "    if x == 'a' {\n"
+            + "        c = Color.RED;\n"
+            + "    } elif x == 'b' {\n"
+            + "        c = Color.GREEN;\n"
+            + "    }\n"
+            + "    if c is not None {\n"
+            + "        sibling = c.RED;\n"
+            + "        assert sibling is not None and c.name is not None;\n"
+            + "        return c.value;\n"
+            + "    }\n"
+            + "    return 0;\n"
+            + "}\n";
+        errs = check_src(src);
+        assert not errs , f"enum union lost a member: {errs}";
+    }
+    run_cases(
+        [
+            (
+                "a generator expression can be advanced with next",
+                check_a_generator_expression_can_be_advanced_with_next
+            ),
+            (
+                "a generator expression is still iterable and consumable",
+                check_a_generator_expression_is_still_iterable_and_con
+            ),
+            (
+                "value resolves on a union of enum members",
+                check_value_resolves_on_a_union_of_enum_members
+            ),
+            (
+                "any member resolves on a union of enum members",
+                check_any_member_resolves_on_a_union_of_enum_members
+            )
+        ]
+    );
 }

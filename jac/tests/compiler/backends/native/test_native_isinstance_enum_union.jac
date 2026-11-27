@@ -26,7 +26,8 @@ import from tests.support {
     compile_native,
     get_func,
     has_error_code,
-    native_force_opts
+    native_force_opts,
+    run_cases
 }
 import jaclang;
 
@@ -36,52 +37,80 @@ glob FIXTURES = os.path.join(
          TESTS_DIR, "compiler", "backends", "native", "fixtures"
      );
 
-test "an enum arm over an enum/object/None union answers by tag" {
-    (eng, _) = compile_native("isinstance_enum_union.jac");
-    f = get_func(eng, "chk_enum", ctypes.c_bool, ctypes.c_int64);
-    assert f(1) is True , "an enum member must match its own enum class";
-    assert f(2) is False , "an object must not match the enum class";
-    assert f(0) is False , "None is an instance of nothing";
-}
+test "isinstance_enum_union.jac cases" {
+    def check_an_enum_arm_over_an_enum_object_none_union_answe {
+        (eng, _) = compile_native("isinstance_enum_union.jac");
 
-test "the object arm of the same union is unaffected by the enum member" {
-    (eng, _) = compile_native("isinstance_enum_union.jac");
-    f = get_func(eng, "chk_node", ctypes.c_bool, ctypes.c_int64);
-    assert f(2) is True , "the object must match its own archetype";
-    assert f(1) is False , (
-        "an enum member must not match an archetype -- its payload is an "
-        "ordinal, so a vtable walk over it would read garbage"
+        f = get_func(eng, "chk_enum", ctypes.c_bool, ctypes.c_int64);
+        assert f(1) is True , "an enum member must match its own enum class";
+        assert f(2) is False , "an object must not match the enum class";
+        assert f(0) is False , "None is an instance of nothing";
+    }
+
+    def check_the_object_arm_of_the_same_union_is_unaffected_b {
+        (eng, _) = compile_native("isinstance_enum_union.jac");
+
+        f = get_func(eng, "chk_node", ctypes.c_bool, ctypes.c_int64);
+        assert f(2) is True , "the object must match its own archetype";
+        assert f(1) is False , (
+            "an enum member must not match an archetype -- its payload is an "
+            "ordinal, so a vtable walk over it would read garbage"
+        );
+        assert f(0) is False , "None is an instance of nothing";
+    }
+
+    def check_uniscopenode_insert_s_access_spec_resolution_ans {
+        (eng, _) = compile_native("isinstance_enum_union.jac");
+
+        f = get_func(eng, "resolve_access", ctypes.c_int64, ctypes.c_int64);
+        assert f(1) == 1 , "a bare Access member resolves to itself (PUBLIC)";
+        assert f(2) == 2 , "a node resolves through its access_type (PROTECTED)";
+        assert f(0) == 0 , "an absent spec falls back to the default (PRIVATE)";
+    }
+
+    def check_the_same_resolution_with_the_union_declared_on_t {
+        (eng, _) = compile_native("isinstance_enum_union.jac");
+
+        f = get_func(eng, "resolve_access_param", ctypes.c_int64, ctypes.c_int64);
+        assert f(1) == 1 , "a bare Access member resolves to itself (PUBLIC)";
+        assert f(2) == 2 , "a node resolves through its access_type (PROTECTED)";
+        assert f(0) == 0 , "an absent spec falls back to the default (PRIVATE)";
+    }
+
+    def check_an_enum_against_bool_still_owns_the_int_tag_alon {
+        (eng, _) = compile_native("isinstance_enum_union.jac");
+
+        f = get_func(eng, "chk_enum_over_bool", ctypes.c_bool, ctypes.c_int64);
+        assert f(1) is True , "the enum member matches";
+        assert f(2) is False , "True is tag 7, not the enum's tag 0";
+        assert f(0) is False , "False is tag 7, not the enum's tag 0";
+    }
+    run_cases(
+        [
+            (
+                "an enum arm over an enum/object/None union answers by tag",
+                check_an_enum_arm_over_an_enum_object_none_union_answe
+            ),
+            (
+                "the object arm of the same union is unaffected by the enum member",
+                check_the_object_arm_of_the_same_union_is_unaffected_b
+            ),
+            (
+                "UniScopeNode.insert's access-spec resolution answers correctly",
+                check_uniscopenode_insert_s_access_spec_resolution_ans
+            ),
+            (
+                "the same resolution with the union declared on the parameter",
+                check_the_same_resolution_with_the_union_declared_on_t
+            ),
+            (
+                "an enum against bool still owns the int tag alone",
+                check_an_enum_against_bool_still_owns_the_int_tag_alon
+            )
+        ]
     );
-    assert f(0) is False , "None is an instance of nothing";
 }
 
-test "UniScopeNode.insert's access-spec resolution answers correctly" {
-    (eng, _) = compile_native("isinstance_enum_union.jac");
-    f = get_func(eng, "resolve_access", ctypes.c_int64, ctypes.c_int64);
-    assert f(1) == 1 , "a bare Access member resolves to itself (PUBLIC)";
-    assert f(2) == 2 , "a node resolves through its access_type (PROTECTED)";
-    assert f(0) == 0 , "an absent spec falls back to the default (PRIVATE)";
-}
-
-test "the same resolution with the union declared on the parameter" {
-    # The two union shapes reach `_enum_union_tags` differently: a branch
-    # assigning `Access.PUBLIC` leaves an EnumMemberType in the joined union,
-    # while a declared parameter leaves the enum ClassType. Both have to
-    # classify as the enum that owns the tag.
-    (eng, _) = compile_native("isinstance_enum_union.jac");
-    f = get_func(eng, "resolve_access_param", ctypes.c_int64, ctypes.c_int64);
-    assert f(1) == 1 , "a bare Access member resolves to itself (PUBLIC)";
-    assert f(2) == 2 , "a node resolves through its access_type (PROTECTED)";
-    assert f(0) == 0 , "an absent spec falls back to the default (PRIVATE)";
-}
-
-test "an enum against bool still owns the int tag alone" {
-    (eng, _) = compile_native("isinstance_enum_union.jac");
-    f = get_func(eng, "chk_enum_over_bool", ctypes.c_bool, ctypes.c_int64);
-    assert f(1) is True , "the enum member matches";
-    assert f(2) is False , "True is tag 7, not the enum's tag 0";
-    assert f(0) is False , "False is tag 7, not the enum's tag 0";
-}
 
 test "an enum sharing the int tag is refused, not answered by tag" {
     prog = JacProgram();

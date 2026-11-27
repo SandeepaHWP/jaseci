@@ -58,7 +58,7 @@ identifies a class by its bare name, so the shim's class is
 program's struct, and the compiler's own `unitree.Token` with it.
 """
 
-import from tests.support { jac_command, python_run }
+import from tests.support { jac_command, python_run, run_cases }
 
 import os;
 import subprocess;
@@ -118,17 +118,52 @@ def _same_lines(sv_text: str, na_text: str, what: str) {
     }
 }
 
-test "native os path gaps answer what CPython's os.path answers" {
-    (sv_out, _sv_err) = _sv_run("os_gaps_probe.jac");
-    (na_out, _na_err) = _na_run("os_gaps_probe.jac");
-    _same_lines(sv_out, na_out, "os gaps");
+test "native os path gaps answer what CPython's os.path answers, and related cases" {
+    def check_native_os_path_gaps_answer_what_cpython_s_os_pat {
+        (sv_out, _sv_err) = _sv_run("os_gaps_probe.jac");
+        (na_out, _na_err) = _na_run("os_gaps_probe.jac");
+        _same_lines(sv_out, na_out, "os gaps");
+    }
+
+    def check_native_fnmatch_answers_what_cpython_s_fnmatch_an {
+        (sv_out, _sv_err) = _sv_run("fnmatch_probe.jac");
+        (na_out, _na_err) = _na_run("fnmatch_probe.jac");
+        _same_lines(sv_out, na_out, "fnmatch");
+    }
+
+    def check_native_contextvars_answers_what_cpython_s_contex {
+        (sv_out, _sv_err) = _sv_run("contextvars_probe.jac");
+        (na_out, _na_err) = _na_run("contextvars_probe.jac");
+        _same_lines(sv_out, na_out, "contextvars");
+    }
+
+    def check_native_unicodedata_answers_what_cpython_answers {
+        (sv_out, _sv_err) = _sv_run("unicodedata_probe.jac");
+        (na_out, _na_err) = _na_run("unicodedata_probe.jac");
+        _same_lines(sv_out, na_out, "unicodedata");
+    }
+    run_cases(
+        [
+            (
+                "native os path gaps answer what CPython's os.path answers",
+                check_native_os_path_gaps_answer_what_cpython_s_os_pat
+            ),
+            (
+                "native fnmatch answers what CPython's fnmatch answers",
+                check_native_fnmatch_answers_what_cpython_s_fnmatch_an
+            ),
+            (
+                "native contextvars answers what CPython's contextvars answers",
+                check_native_contextvars_answers_what_cpython_s_contex
+            ),
+            (
+                "native unicodedata answers what CPython answers",
+                check_native_unicodedata_answers_what_cpython_answers
+            )
+        ]
+    );
 }
 
-test "native fnmatch answers what CPython's fnmatch answers" {
-    (sv_out, _sv_err) = _sv_run("fnmatch_probe.jac");
-    (na_out, _na_err) = _na_run("fnmatch_probe.jac");
-    _same_lines(sv_out, na_out, "fnmatch");
-}
 
 """Keep only the shim's own records, so a compiler note on stderr cannot
 turn a congruence failure into a passing (or spuriously failing) diff."""
@@ -148,16 +183,31 @@ test "native logging writes what CPython's logging writes" {
     _same_lines(_log_lines(sv_err), _log_lines(na_err), "logging");
 }
 
-test "native contextvars answers what CPython's contextvars answers" {
-    (sv_out, _sv_err) = _sv_run("contextvars_probe.jac");
-    (na_out, _na_err) = _na_run("contextvars_probe.jac");
-    _same_lines(sv_out, na_out, "contextvars");
-}
 
-test "native ContextVar at scalar and optional type arguments answers like CPython" {
-    py_out = python_run(os.path.join(FIXTURES, "contextvars_scalar.jac"));
-    (na_out, _na_err) = _na_run("contextvars_scalar.jac");
-    _same_lines(py_out, na_out, "contextvars scalar");
+test "native ContextVar at scalar and optional type arguments answers like CPython, and related cases" {
+    def check_native_contextvar_at_scalar_and_optional_type_ar {
+        py_out = python_run(os.path.join(FIXTURES, "contextvars_scalar.jac"));
+        (na_out, _na_err) = _na_run("contextvars_scalar.jac");
+        _same_lines(py_out, na_out, "contextvars scalar");
+    }
+
+    def check_native_contextvar_set_returns_a_token_that_reset {
+        py_out = python_run(os.path.join(FIXTURES, "contextvars_token.jac"));
+        (na_out, _na_err) = _na_run("contextvars_token.jac");
+        _same_lines(py_out, na_out, "contextvars token");
+    }
+    run_cases(
+        [
+            (
+                "native ContextVar at scalar and optional type arguments answers like CPython",
+                check_native_contextvar_at_scalar_and_optional_type_ar
+            ),
+            (
+                "native ContextVar.set returns a Token that reset honors like CPython",
+                check_native_contextvar_set_returns_a_token_that_reset
+            )
+        ]
+    );
 }
 
 test "a ContextVar at a mixed by-value union type argument is refused, not lowered" {
@@ -174,24 +224,12 @@ test "a ContextVar at a mixed by-value union type argument is refused, not lower
     assert "ContextVar[int | str]" in combined , f"diagnostic does not name the instantiation: {combined[-600:]}";
 }
 
-test "native ContextVar.set returns a Token that reset honors like CPython" {
-    py_out = python_run(os.path.join(FIXTURES, "contextvars_token.jac"));
-    (na_out, _na_err) = _na_run("contextvars_token.jac");
-    _same_lines(py_out, na_out, "contextvars token");
-}
 
 test "a program's own Token lives beside the contextvars shim's token" {
     py_out = python_run(os.path.join(FIXTURES, "contextvars_own_token.jac"));
     (na_out, _na_err) = _na_run("contextvars_own_token.jac");
     _same_lines(py_out, na_out, "contextvars own token");
     assert py_out.split() == ["ab=AB!@1", "3", "3", "cd=CD!@7", "3", "9", "0"] , py_out;
-}
-
-
-test "native unicodedata answers what CPython answers" {
-    (sv_out, _sv_err) = _sv_run("unicodedata_probe.jac");
-    (na_out, _na_err) = _na_run("unicodedata_probe.jac");
-    _same_lines(sv_out, na_out, "unicodedata");
 }
 
 

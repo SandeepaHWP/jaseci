@@ -18,7 +18,7 @@ through harness/erase.jac (the executable Theorem-3 eraser) and checks the
 bare build reproduces the annotated digest.
 """
 
-import from tests.support { jac_command }
+import from tests.support { jac_command, run_cases }
 
 import os;
 import subprocess;
@@ -106,41 +106,84 @@ def _assert_differential_identity(kernel: str) {
     }
 }
 
-test "ownbench differential identity: binarytrees (drop-order witness)" {
-    _assert_differential_identity("own_binarytrees");
+test "ownbench differential identity: cases" {
+    def check_ownbench_differential_identity_binarytrees_drop {
+        _assert_differential_identity("own_binarytrees");
+    }
+
+    def check_ownbench_differential_identity_vecdot {
+        _assert_differential_identity("own_vecdot");
+    }
+
+    def check_ownbench_differential_identity_histogram {
+        _assert_differential_identity("own_histogram");
+    }
+
+    def check_ownbench_differential_identity_vm {
+        _assert_differential_identity("own_vm");
+    }
+
+    def check_ownbench_differential_identity_rbtree {
+        _assert_differential_identity("own_rbtree");
+    }
+
+    def check_ownbench_differential_identity_deriv_own_param_t {
+        _assert_differential_identity("own_deriv");
+    }
+
+    def check_ownbench_differential_identity_aos_own_fields_ar {
+        _assert_differential_identity("own_aos");
+    }
+
+    def check_ownbench_differential_identity_strops_string_rep {
+        _assert_differential_identity("own_strops");
+    }
+
+    def check_ownbench_differential_identity_parse_zero_copy_v {
+        _assert_differential_identity("own_parse");
+    }
+    run_cases(
+        [
+            (
+                "ownbench differential identity: binarytrees (drop-order witness)",
+                check_ownbench_differential_identity_binarytrees_drop
+            ),
+            (
+                "ownbench differential identity: vecdot",
+                check_ownbench_differential_identity_vecdot
+            ),
+            (
+                "ownbench differential identity: histogram",
+                check_ownbench_differential_identity_histogram
+            ),
+            (
+                "ownbench differential identity: vm",
+                check_ownbench_differential_identity_vm
+            ),
+            (
+                "ownbench differential identity: rbtree",
+                check_ownbench_differential_identity_rbtree
+            ),
+            (
+                "ownbench differential identity: deriv (own-param transfer stress)",
+                check_ownbench_differential_identity_deriv_own_param_t
+            ),
+            (
+                "ownbench differential identity: aos (own fields + archetype lists)",
+                check_ownbench_differential_identity_aos_own_fields_ar
+            ),
+            (
+                "ownbench differential identity: strops (string-representation oracle)",
+                check_ownbench_differential_identity_strops_string_rep
+            ),
+            (
+                "ownbench differential identity: parse (zero-copy view oracle)",
+                check_ownbench_differential_identity_parse_zero_copy_v
+            )
+        ]
+    );
 }
 
-test "ownbench differential identity: vecdot" {
-    _assert_differential_identity("own_vecdot");
-}
-
-test "ownbench differential identity: histogram" {
-    _assert_differential_identity("own_histogram");
-}
-
-test "ownbench differential identity: vm" {
-    _assert_differential_identity("own_vm");
-}
-
-test "ownbench differential identity: rbtree" {
-    _assert_differential_identity("own_rbtree");
-}
-
-test "ownbench differential identity: deriv (own-param transfer stress)" {
-    _assert_differential_identity("own_deriv");
-}
-
-test "ownbench differential identity: aos (own fields + archetype lists)" {
-    _assert_differential_identity("own_aos");
-}
-
-test "ownbench differential identity: strops (string-representation oracle)" {
-    _assert_differential_identity("own_strops");
-}
-
-test "ownbench differential identity: parse (zero-copy view oracle)" {
-    _assert_differential_identity("own_parse");
-}
 
 test "ownbench erasure round-trip: aos reproduces annotated digest" {
     src = os.path.join(OWNBENCH, "kernels", "own_aos.jac");

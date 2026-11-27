@@ -34,7 +34,7 @@ import io;
 import os;
 import subprocess;
 import tempfile;
-import from tests.support { jac_command, TESTS_DIR, native_force_opts }
+import from tests.support { jac_command, TESTS_DIR, native_force_opts, run_cases }
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.passes.layout_pass { get_layout_registry }
 
@@ -102,51 +102,70 @@ def na_lines(fixture: str) -> list[str] {
 }
 
 
-test "an all-auto enum lowers with no seam" {
-    (prog, ir) = compile_native("enum_auto.jac");
-    assert not prog.errors_had , f"{[str(e) for e in prog.errors_had]}";
-    assert ir is not None and ir.gen.llvm_ir , "no native IR for the fixture";
-    seams = seam_report("enum_auto.jac");
-    assert "attribute access" not in seams , (
-        f"a member read off the class still refused:\n{seams}"
-    );
-}
+test "enum_auto.jac cases" {
+    def check_an_all_auto_enum_lowers_with_no_seam {
+        (prog, ir) = compile_native("enum_auto.jac");
 
-
-test "generated values count from the largest already assigned" {
-    (prog, ir) = compile_native("enum_auto.jac");
-    reg = get_layout_registry(ir, prog);
-    cat = reg.get_enum_layout("Cat");
-    assert cat is not None and cat.all_values_known , (
-        "the all-auto enum's table is still unencodable"
-    );
-    cat_values = [(m.name, m.int_value) for m in cat.members];
-    assert cat_values == [("Positional", 1), ("ArgsList", 2), ("KwargsDict", 3)] , f"Cat generated {cat_values}";
-    mixed = reg.get_enum_layout("Mixed");
-    assert mixed is not None and mixed.all_values_known , (
-        "the mixed enum's table is still unencodable"
-    );
-    mixed_values = [(m.name, m.int_value) for m in mixed.members];
-    assert mixed_values == [("High", 10), ("Low", 3), ("Next", 11), ("After", 12)] , (
-        f"Mixed generated {mixed_values}; counting from the last member "
-        f"rather than the largest would read 4"
-    );
-}
-
-
-test "the declared-enum spelling generates the same way" {
-    (prog, ir) = compile_native("enum_auto.jac");
-    reg = get_layout_registry(ir, prog);
-    cases: list[tuple[str, list[tuple[str, int]]]] = [
-        ("Step", [("First", 1), ("Second", 2), ("Third", 9)]),
-        ("Split", [("Low", 3), ("Next", 4)])
-    ];
-    for (name, expected) in cases {
-        lay = reg.get_enum_layout(name);
-        assert lay is not None , f"the declared enum {name} lost its layout";
-        values = [(m.name, m.int_value) for m in lay.members];
-        assert values == expected , f"{name} generated {values}";
+        assert not prog.errors_had , f"{[str(e) for e in prog.errors_had]}";
+        assert ir is not None and ir.gen.llvm_ir , "no native IR for the fixture";
+        seams = seam_report("enum_auto.jac");
+        assert "attribute access" not in seams , (
+            f"a member read off the class still refused:\n{seams}"
+        );
     }
+
+    def check_generated_values_count_from_the_largest_already {
+        (prog, ir) = compile_native("enum_auto.jac");
+
+        reg = get_layout_registry(ir, prog);
+        cat = reg.get_enum_layout("Cat");
+        assert cat is not None and cat.all_values_known , (
+            "the all-auto enum's table is still unencodable"
+        );
+        cat_values = [(m.name, m.int_value) for m in cat.members];
+        assert cat_values == [("Positional", 1), ("ArgsList", 2), ("KwargsDict", 3)] , f"Cat generated {cat_values}";
+        mixed = reg.get_enum_layout("Mixed");
+        assert mixed is not None and mixed.all_values_known , (
+            "the mixed enum's table is still unencodable"
+        );
+        mixed_values = [(m.name, m.int_value) for m in mixed.members];
+        assert mixed_values
+            == [("High", 10), ("Low", 3), ("Next", 11), ("After", 12)] , (
+            f"Mixed generated {mixed_values}; counting from the last member "
+            f"rather than the largest would read 4"
+        );
+    }
+    def check_the_declared_enum_spelling_generates_the_same_wa {
+        (prog, ir) = compile_native("enum_auto.jac");
+
+        reg = get_layout_registry(ir, prog);
+        cases: list[tuple[str, list[tuple[str, int]]]] = [
+            ("Step", [("First", 1), ("Second", 2), ("Third", 9)]),
+            ("Split", [("Low", 3), ("Next", 4)])
+        ];
+        for (name, expected) in cases {
+            lay = reg.get_enum_layout(name);
+            assert lay is not None , f"the declared enum {name} lost its layout";
+            values = [(m.name, m.int_value) for m in lay.members];
+            assert values == expected , f"{name} generated {values}";
+        }
+    }
+    run_cases(
+        [
+            (
+                "an all-auto enum lowers with no seam",
+                check_an_all_auto_enum_lowers_with_no_seam
+            ),
+            (
+                "generated values count from the largest already assigned",
+                check_generated_values_count_from_the_largest_already
+            ),
+            (
+                "the declared-enum spelling generates the same way",
+                check_the_declared_enum_spelling_generates_the_same_wa
+            )
+        ]
+    );
 }
 
 

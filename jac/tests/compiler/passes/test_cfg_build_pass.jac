@@ -1,7 +1,7 @@
 """CFG build pass tests – migrated from test_cfg_build_pass.py."""
 
 import os;
-import from tests.support { JAC_ROOT }
+import from tests.support { JAC_ROOT, run_cases }
 import jaclang;
 import from jaclang.compiler.tools.cfg_dot { cfg_dot_from_file }
 import from jaclang.compiler.driver.program { JacProgram }
@@ -9,532 +9,657 @@ import jaclang.compiler.frontend.unitree as uni;
 
 glob FIXTURES = os.path.join(JAC_ROOT, "tests", "compiler", "passes", "fixtures");
 
-test "cfg branches and loops" {
-    dot = cfg_dot_from_file(file_name=os.path.join(FIXTURES, "cfg_gen.jac"));
-    expected_dot = (
-        "digraph G {\n"
-        + '  0 [label="BB0\\nx = 5 ;\\ny = 3 ;\\nif x > 3", shape=box];\n'
-        + '  1 [label="BB1\\nz = x + y ;", shape=box];\n'
-        + '  2 [label="BB2\\nelif x == 0", shape=box];\n'
-        + '  3 [label="BB3\\nz = y ;", shape=box];\n'
-        + '  4 [label="BB4\\nz = x - y ;", shape=box];\n'
-        + '  5 [label="BB5\\nfor i in range ( 0 , 10 )", shape=box];\n'
-        + '  6 [label="BB6\\nz = z + 1 ;", shape=box];\n'
-        + '  7 [label="BB7\\nwhile z < 10", shape=box];\n'
-        + '  8 [label="BB8\\nz = z + 2 ;", shape=box];\n'
-        + '  0 -> 1 [label="T"];\n'
-        + '  0 -> 2 [label="F"];\n'
-        + "  1 -> 5;\n"
-        + '  2 -> 3 [label="T"];\n'
-        + '  2 -> 4 [label="F"];\n'
-        + "  3 -> 5;\n"
-        + "  4 -> 5;\n"
-        + "  5 -> 6;\n"
-        + "  5 -> 7;\n"
-        + "  6 -> 5;\n"
-        + '  7 -> 8 [label="T"];\n'
-        + "  8 -> 7;\n"
-        + "}\n"
+test "cfg branches and loops, and related cases" {
+    def check_cfg_branches_and_loops {
+        dot = cfg_dot_from_file(file_name=os.path.join(FIXTURES, "cfg_gen.jac"));
+        expected_dot = (
+            "digraph G {\n"
+            + '  0 [label="BB0\\nx = 5 ;\\ny = 3 ;\\nif x > 3", shape=box];\n'
+            + '  1 [label="BB1\\nz = x + y ;", shape=box];\n'
+            + '  2 [label="BB2\\nelif x == 0", shape=box];\n'
+            + '  3 [label="BB3\\nz = y ;", shape=box];\n'
+            + '  4 [label="BB4\\nz = x - y ;", shape=box];\n'
+            + '  5 [label="BB5\\nfor i in range ( 0 , 10 )", shape=box];\n'
+            + '  6 [label="BB6\\nz = z + 1 ;", shape=box];\n'
+            + '  7 [label="BB7\\nwhile z < 10", shape=box];\n'
+            + '  8 [label="BB8\\nz = z + 2 ;", shape=box];\n'
+            + '  0 -> 1 [label="T"];\n'
+            + '  0 -> 2 [label="F"];\n'
+            + "  1 -> 5;\n"
+            + '  2 -> 3 [label="T"];\n'
+            + '  2 -> 4 [label="F"];\n'
+            + "  3 -> 5;\n"
+            + "  4 -> 5;\n"
+            + "  5 -> 6;\n"
+            + "  5 -> 7;\n"
+            + "  6 -> 5;\n"
+            + '  7 -> 8 [label="T"];\n'
+            + "  8 -> 7;\n"
+            + "}\n"
+        );
+        assert dot == expected_dot;
+    }
+
+    def check_cfg_ability_with_has {
+        dot = cfg_dot_from_file(file_name=os.path.join(FIXTURES, "cfg_has_var.jac"));
+        expected_dot = (
+            "digraph G {\n"
+            + '  0 [label="BB0\\nobj Rock", shape=box];\n'
+            + '  1 [label="BB1\\nhas pellets : list [ int ] ;", shape=box];\n'
+            + '  2 [label="BB2\\ndef count_pellets-> int\\nreturn self . pellets . length ( ) ;", shape=box];\n'
+            + '  3 [label="BB3\\nrock = Rock ( pellets = [ 1 , 2 , 3 ] ) ;\\nprint ( \\"Number of pellets: \\" + rock . count_pellets ( ) . to_string ( ) ) ;", shape=box];\n'
+            + "  0 -> 1;\n"
+            + "  0 -> 2;\n"
+            + "}\n"
+        );
+        assert dot == expected_dot;
+    }
+
+    def check_cfg_return_stmt {
+        dot = cfg_dot_from_file(file_name=os.path.join(FIXTURES, "cfg_return.jac"));
+        expected_dot = (
+            "digraph G {\n"
+            + '  0 [label="BB0\\ndef test_return_direct( )\\nprint ( \\"Before return\\" ) ;\\nreturn ;", shape=box];\n'
+            + '  1 [label="BB1\\nprint ( \\"After return\\" ) ;", shape=box];\n'
+            + '  2 [label="BB2\\ntest_return_direct ( ) ;", shape=box];\n'
+            + "}\n"
+        );
+        assert dot == expected_dot;
+    }
+
+    def check_cfg_while_loop_with_break_continue_and_else {
+        dot = cfg_dot_from_file(file_name=os.path.join(FIXTURES, "cfg_while_stmt.jac"));
+        expected_dot = (
+            "digraph G {\n"
+            + '  0 [label="BB0\\nx = 0 ;", shape=box];\n'
+            + '  1 [label="BB1\\nwhile x < 5", shape=box];\n'
+            + '  2 [label="BB2\\nx = x + 1 ;\\nif x == 2", shape=box];\n'
+            + '  3 [label="BB3\\ncontinue ;", shape=box];\n'
+            + '  4 [label="BB4\\nprint ( x ) ;\\nif x == 4", shape=box];\n'
+            + '  5 [label="BB5\\nbreak ;", shape=box];\n'
+            + '  6 [label="BB6\\nprint ( \\"done\\" ) ;", shape=box];\n'
+            + "  0 -> 1;\n"
+            + '  1 -> 2 [label="T"];\n'
+            + '  1 -> 6 [label="F"];\n'
+            + '  2 -> 3 [label="T"];\n'
+            + "  2 -> 4;\n"
+            + "  3 -> 1;\n"
+            + '  4 -> 5 [label="T"];\n'
+            + "  4 -> 1;\n"
+            + "}\n"
+        );
+        assert dot == expected_dot;
+    }
+
+    def check_cfg_for_loop_with_break_continue_and_else {
+        dot = cfg_dot_from_file(file_name=os.path.join(FIXTURES, "cfg_for_stmt.jac"));
+        expected_dot = (
+            "digraph G {\n"
+            + '  0 [label="BB0\\nfor i in range ( 0 , 5 )", shape=box];\n'
+            + '  1 [label="BB1\\nif i == 1", shape=box];\n'
+            + '  2 [label="BB2\\ncontinue ;", shape=box];\n'
+            + '  3 [label="BB3\\nprint ( i ) ;\\nif i == 3", shape=box];\n'
+            + '  4 [label="BB4\\nbreak ;", shape=box];\n'
+            + '  5 [label="BB5\\nprint ( \\"done\\" ) ;", shape=box];\n'
+            + "  0 -> 1;\n"
+            + "  0 -> 5;\n"
+            + '  1 -> 2 [label="T"];\n'
+            + "  1 -> 3;\n"
+            + "  2 -> 0;\n"
+            + '  3 -> 4 [label="T"];\n'
+            + "  3 -> 0;\n"
+            + "}\n"
+        );
+        assert dot == expected_dot;
+    }
+
+    def check_cfg_try_except_finally {
+        dot = cfg_dot_from_file(file_name=os.path.join(FIXTURES, "cfg_try_except.jac"));
+        expected_dot = (
+            "digraph G {\n"
+            + '  0 [label="BB0\\ndef risky( x : int ) -> int\\ntry", shape=box];\n'
+            + '  1 [label="BB1\\ny = 10 / x ;", shape=box];\n'
+            + '  2 [label="BB2\\nexcept Exception\\ny = 0 ;", shape=box];\n'
+            + '  3 [label="BB3\\nfinally\\nprint ( y ) ;", shape=box];\n'
+            + '  4 [label="BB4\\nreturn y ;", shape=box];\n'
+            + "  0 -> 1;\n"
+            + "  0 -> 2;\n"
+            + "  0 -> 4;\n"
+            + "  1 -> 3;\n"
+            + "  2 -> 3;\n"
+            + "  3 -> 4;\n"
+            + "}\n"
+        );
+        assert dot == expected_dot;
+    }
+
+    def check_cfg_raise_terminal {
+        dot = cfg_dot_from_file(file_name=os.path.join(FIXTURES, "cfg_raise.jac"));
+        expected_dot = (
+            "digraph G {\n"
+            + '  0 [label="BB0\\ndef safe_sqrt( x : float ) -> float\\nif x < 0", shape=box];\n'
+            + '  1 [label="BB1\\nraise ValueError ( \\"negative\\" ) ;", shape=box];\n'
+            + '  2 [label="BB2\\nreturn x ** 0.5 ;", shape=box];\n'
+            + '  0 -> 1 [label="T"];\n'
+            + "  0 -> 2;\n"
+            + "}\n"
+        );
+        assert dot == expected_dot;
+    }
+
+    def check_cfg_boolean_short_circuit {
+        dot = cfg_dot_from_file(file_name=os.path.join(FIXTURES, "cfg_bool_expr.jac"));
+        expected_dot = (
+            "digraph G {\n"
+            + '  0 [label="BB0\\nx = 5 ;\\nif", shape=box];\n'
+            + '  1 [label="BB1\\nx < 3", shape=box];\n'
+            + '  2 [label="BB2\\nx < 10", shape=box];\n'
+            + '  3 [label="BB3\\nx > 20", shape=box];\n'
+            + '  4 [label="BB4\\nx < 30", shape=box];\n'
+            + '  5 [label="BB5\\nprint ( x ) ;\\nx = x + 1 ;", shape=box];\n'
+            + '  6 [label="BB6\\nprint ( \\"done\\" ) ;\\nif", shape=box];\n'
+            + '  7 [label="BB7\\nx > 0", shape=box];\n'
+            + '  8 [label="BB8\\nx == - 1", shape=box];\n'
+            + '  9 [label="BB9\\nx < 100", shape=box];\n'
+            + '  10 [label="BB10\\nx == 200", shape=box];\n'
+            + '  11 [label="BB11\\nprint ( \\"matched\\" ) ;", shape=box];\n'
+            + '  12 [label="BB12\\nprint ( \\"end\\" ) ;\\nif y", shape=box];\n'
+            + '  13 [label="BB13\\nprint ( \\"y is true\\" ) ;", shape=box];\n'
+            + '  14 [label="BB14\\nprint ( \\"finished\\" ) ;", shape=box];\n'
+            + "  0 -> 1;\n"
+            + '  1 -> 2 [label="T"];\n'
+            + '  1 -> 3 [label="F"];\n'
+            + '  2 -> 5 [label="T"];\n'
+            + '  2 -> 3 [label="F"];\n'
+            + '  3 -> 4 [label="T"];\n'
+            + '  3 -> 6 [label="F"];\n'
+            + '  4 -> 5 [label="T"];\n'
+            + '  4 -> 6 [label="F"];\n'
+            + "  5 -> 6;\n"
+            + "  6 -> 7;\n"
+            + '  7 -> 8 [label="F"];\n'
+            + '  7 -> 9 [label="T"];\n'
+            + '  8 -> 9 [label="T"];\n'
+            + '  8 -> 12 [label="F"];\n'
+            + '  9 -> 10 [label="F"];\n'
+            + '  9 -> 11 [label="T"];\n'
+            + '  10 -> 11 [label="T"];\n'
+            + '  10 -> 12 [label="F"];\n'
+            + "  11 -> 12;\n"
+            + '  12 -> 13 [label="T"];\n'
+            + "  12 -> 14;\n"
+            + "  13 -> 14;\n"
+            + "}\n"
+        );
+        assert dot == expected_dot;
+    }
+
+    def check_cfg_not_over_grouped_boolean_is_a_leaf_predicate {
+        dot = cfg_dot_from_file(
+            file_name=os.path.join(FIXTURES, "cfg_bool_not_group.jac")
+        );
+        expected_dot = (
+            "digraph G {\n"
+            + '  0 [label="BB0\\ndef mixed( a : int , b : int , c : int ) -> int\\nif", shape=box];\n'
+            + '  1 [label="BB1\\na > 0", shape=box];\n'
+            + '  2 [label="BB2\\nnot ( b > 0 or c > 0 )", shape=box];\n'
+            + '  3 [label="BB3\\nb > 0", shape=box];\n'
+            + '  4 [label="BB4\\nc > 0", shape=box];\n'
+            + '  5 [label="BB5\\nreturn 1 ;", shape=box];\n'
+            + '  6 [label="BB6\\nreturn 0 ;", shape=box];\n'
+            + "  0 -> 1;\n"
+            + '  1 -> 2 [label="T"];\n'
+            + '  1 -> 6 [label="F"];\n'
+            + "  2 -> 3;\n"
+            + '  2 -> 5 [label="T"];\n'
+            + '  2 -> 6 [label="F"];\n'
+            + '  3 -> 4 [label="F"];\n'
+            + "}\n"
+        );
+        assert dot == expected_dot;
+    }
+    run_cases(
+        [
+            ("cfg branches and loops", check_cfg_branches_and_loops),
+            ("cfg ability with has", check_cfg_ability_with_has),
+            ("cfg return stmt", check_cfg_return_stmt),
+            (
+                "cfg while loop with break continue and else",
+                check_cfg_while_loop_with_break_continue_and_else
+            ),
+            (
+                "cfg for loop with break continue and else",
+                check_cfg_for_loop_with_break_continue_and_else
+            ),
+            ("cfg try except finally", check_cfg_try_except_finally),
+            ("cfg raise terminal", check_cfg_raise_terminal),
+            ("cfg boolean short circuit", check_cfg_boolean_short_circuit),
+            (
+                "cfg not over grouped boolean is a leaf predicate",
+                check_cfg_not_over_grouped_boolean_is_a_leaf_predicate
+            )
+        ]
     );
-    assert dot == expected_dot;
 }
 
-test "cfg abilities and objects" {
-    dot = cfg_dot_from_file(file_name=os.path.join(FIXTURES, "cfg_ability_test.jac"));
-    expected_dot = (
-        "digraph G {\n"
-        + '  0 [label="BB0\\nobj math_mod", shape=box];\n'
-        + '  1 [label="BB1\\ndef divide( x : int , y : int ) -> int\\nif y == 0", shape=box];\n'
-        + '  2 [label="BB2\\nreturn 0 ;", shape=box];\n'
-        + '  3 [label="BB3\\nreturn x // y ;", shape=box];\n'
-        + '  4 [label="BB4\\ndef multiply( x : int , y : int ) -> int\\nreturn x * y ;", shape=box];\n'
-        + '  5 [label="BB5\\nx = 5 ;\\ny = 0 ;\\nmath = math_mod ( ) ;\\nz = math . divide ( x , y ) ;\\nprint ( z ) ;", shape=box];\n'
-        + "  0 -> 1;\n"
-        + "  0 -> 4;\n"
-        + '  1 -> 2 [label="T"];\n'
-        + '  1 -> 3 [label="F"];\n'
-        + "}\n"
+test "cfg abilities and objects, and related cases" {
+    def check_cfg_abilities_and_objects {
+        dot = cfg_dot_from_file(
+            file_name=os.path.join(FIXTURES, "cfg_ability_test.jac")
+        );
+        expected_dot = (
+            "digraph G {\n"
+            + '  0 [label="BB0\\nobj math_mod", shape=box];\n'
+            + '  1 [label="BB1\\ndef divide( x : int , y : int ) -> int\\nif y == 0", shape=box];\n'
+            + '  2 [label="BB2\\nreturn 0 ;", shape=box];\n'
+            + '  3 [label="BB3\\nreturn x // y ;", shape=box];\n'
+            + '  4 [label="BB4\\ndef multiply( x : int , y : int ) -> int\\nreturn x * y ;", shape=box];\n'
+            + '  5 [label="BB5\\nx = 5 ;\\ny = 0 ;\\nmath = math_mod ( ) ;\\nz = math . divide ( x , y ) ;\\nprint ( z ) ;", shape=box];\n'
+            + "  0 -> 1;\n"
+            + "  0 -> 4;\n"
+            + '  1 -> 2 [label="T"];\n'
+            + '  1 -> 3 [label="F"];\n'
+            + "}\n"
+        );
+        assert dot == expected_dot;
+    }
+
+    def check_cfg_for_else {
+        dot = cfg_dot_from_file(file_name=os.path.join(FIXTURES, "cfg_for_else.jac"));
+        expected_dot = (
+            "digraph G {\n"
+            + '  0 [label="BB0\\ndef find( items : list , target : int ) -> bool", shape=box];\n'
+            + '  1 [label="BB1\\nfor item in items", shape=box];\n'
+            + '  2 [label="BB2\\nif item == target", shape=box];\n'
+            + '  3 [label="BB3\\nreturn True ;", shape=box];\n'
+            + '  4 [label="BB4\\nreturn False ;", shape=box];\n'
+            + "  0 -> 1;\n"
+            + "  1 -> 2;\n"
+            + "  1 -> 4;\n"
+            + '  2 -> 3 [label="T"];\n'
+            + "  2 -> 1;\n"
+            + "}\n"
+        );
+        assert dot == expected_dot;
+    }
+    run_cases(
+        [
+            ("cfg abilities and objects", check_cfg_abilities_and_objects),
+            ("cfg for else", check_cfg_for_else)
+        ]
     );
-    assert dot == expected_dot;
 }
 
-test "cfg ability with has" {
-    dot = cfg_dot_from_file(file_name=os.path.join(FIXTURES, "cfg_has_var.jac"));
-    expected_dot = (
-        "digraph G {\n"
-        + '  0 [label="BB0\\nobj Rock", shape=box];\n'
-        + '  1 [label="BB1\\nhas pellets : list [ int ] ;", shape=box];\n'
-        + '  2 [label="BB2\\ndef count_pellets-> int\\nreturn self . pellets . length ( ) ;", shape=box];\n'
-        + '  3 [label="BB3\\nrock = Rock ( pellets = [ 1 , 2 , 3 ] ) ;\\nprint ( \\"Number of pellets: \\" + rock . count_pellets ( ) . to_string ( ) ) ;", shape=box];\n'
-        + "  0 -> 1;\n"
-        + "  0 -> 2;\n"
-        + "}\n"
+
+test "cfg if no else, and related cases" {
+    def check_cfg_if_no_else {
+        dot = cfg_dot_from_file(file_name=os.path.join(FIXTURES, "cfg_if_no_else.jac"));
+        expected_dot = (
+            "digraph G {\n"
+            + '  0 [label="BB0\\ndef test_if_without_else( x : int )\\nif ( x > 0 )", shape=box];\n'
+            + '  1 [label="BB1\\nprint ( \\"Positive\\" ) ;", shape=box];\n'
+            + '  2 [label="BB2\\nprint ( \\"Done\\" ) ;", shape=box];\n'
+            + '  3 [label="BB3\\ntest_if_without_else ( 5 ) ;\\ntest_if_without_else ( - 3 ) ;", shape=box];\n'
+            + '  0 -> 1 [label="T"];\n'
+            + "  0 -> 2;\n"
+            + "  1 -> 2;\n"
+            + "}\n"
+        );
+        assert dot == expected_dot;
+    }
+
+    def check_cfg_match_statement {
+        dot = cfg_dot_from_file(file_name=os.path.join(FIXTURES, "cfg_match.jac"));
+        expected_dot = (
+            "digraph G {\n"
+            + '  0 [label="BB0\\ndef classify( x : int ) -> str\\nmatch x", shape=box];\n'
+            + '  1 [label="BB1\\ncase 0\\nreturn \\"zero\\" ;", shape=box];\n'
+            + '  2 [label="BB2\\ncase 1\\nreturn \\"one\\" ;", shape=box];\n'
+            + '  3 [label="BB3\\ncase _\\nreturn \\"other\\" ;", shape=box];\n'
+            + "  0 -> 1;\n"
+            + "  0 -> 2;\n"
+            + "  0 -> 3;\n"
+            + "}\n"
+        );
+        assert dot == expected_dot;
+    }
+
+    def check_cfg_nested_loops {
+        dot = cfg_dot_from_file(
+            file_name=os.path.join(FIXTURES, "cfg_nested_loop.jac")
+        );
+        expected_dot = (
+            "digraph G {\n"
+            + '  0 [label="BB0\\nfor i in range ( 3 )", shape=box];\n'
+            + '  1 [label="BB1\\nfor j in range ( 3 )", shape=box];\n'
+            + '  2 [label="BB2\\nprint ( i , j ) ;", shape=box];\n'
+            + "  0 -> 1;\n"
+            + "  1 -> 2;\n"
+            + "  1 -> 0;\n"
+            + "  2 -> 1;\n"
+            + "}\n"
+        );
+        assert dot == expected_dot;
+    }
+    run_cases(
+        [
+            ("cfg if no else", check_cfg_if_no_else),
+            ("cfg match statement", check_cfg_match_statement),
+            ("cfg nested loops", check_cfg_nested_loops)
+        ]
     );
-    assert dot == expected_dot;
 }
 
-test "cfg if no else" {
-    dot = cfg_dot_from_file(file_name=os.path.join(FIXTURES, "cfg_if_no_else.jac"));
-    expected_dot = (
-        "digraph G {\n"
-        + '  0 [label="BB0\\ndef test_if_without_else( x : int )\\nif ( x > 0 )", shape=box];\n'
-        + '  1 [label="BB1\\nprint ( \\"Positive\\" ) ;", shape=box];\n'
-        + '  2 [label="BB2\\nprint ( \\"Done\\" ) ;", shape=box];\n'
-        + '  3 [label="BB3\\ntest_if_without_else ( 5 ) ;\\ntest_if_without_else ( - 3 ) ;", shape=box];\n'
-        + '  0 -> 1 [label="T"];\n'
-        + "  0 -> 2;\n"
-        + "  1 -> 2;\n"
-        + "}\n"
+
+test "cfg loop body if tail back-edges to header, and related cases" {
+    def check_cfg_loop_body_if_tail_back_edges_to_header {
+        dot = cfg_dot_from_file(
+            file_name=os.path.join(FIXTURES, "cfg_loop_if_backedge.jac")
+        );
+        expected_dot = (
+            "digraph G {\n"
+            + '  0 [label="BB0\\ndef use( items : list ) -> str\\ntag = \\"\\" ;", shape=box];\n'
+            + '  1 [label="BB1\\nfor item in items", shape=box];\n'
+            + '  2 [label="BB2\\nif item == \\"x\\"", shape=box];\n'
+            + '  3 [label="BB3\\ntag = item ;", shape=box];\n'
+            + '  4 [label="BB4\\nreturn tag ;", shape=box];\n'
+            + "  0 -> 1;\n"
+            + "  1 -> 2;\n"
+            + "  1 -> 4;\n"
+            + '  2 -> 3 [label="T"];\n'
+            + "  2 -> 1;\n"
+            + "  3 -> 1;\n"
+            + "}\n"
+        );
+        assert dot == expected_dot;
+    }
+
+    def check_cfg_while_loop_mid_branch_keeps_single_exit {
+        dot = cfg_dot_from_file(
+            file_name=os.path.join(FIXTURES, "cfg_while_mid_branch.jac")
+        );
+        expected_dot = (
+            "digraph G {\n"
+            + '  0 [label="BB0\\ndef mid( x : int ) -> int\\nif x > 0", shape=box];\n'
+            + '  1 [label="BB1\\nwhile x < 5", shape=box];\n'
+            + '  2 [label="BB2\\nx = x + 1 ;", shape=box];\n'
+            + '  3 [label="BB3\\nx = x + 2 ;", shape=box];\n'
+            + '  4 [label="BB4\\nreturn x ;", shape=box];\n'
+            + '  0 -> 1 [label="T"];\n'
+            + "  0 -> 4;\n"
+            + '  1 -> 2 [label="T"];\n'
+            + "  1 -> 3;\n"
+            + "  2 -> 1;\n"
+            + "  3 -> 4;\n"
+            + "}\n"
+        );
+        assert dot == expected_dot;
+    }
+    run_cases(
+        [
+            (
+                "cfg loop body if tail back-edges to header",
+                check_cfg_loop_body_if_tail_back_edges_to_header
+            ),
+            (
+                "cfg while loop mid branch keeps single exit",
+                check_cfg_while_loop_mid_branch_keeps_single_exit
+            )
+        ]
     );
-    assert dot == expected_dot;
 }
 
-test "cfg return stmt" {
-    dot = cfg_dot_from_file(file_name=os.path.join(FIXTURES, "cfg_return.jac"));
-    expected_dot = (
-        "digraph G {\n"
-        + '  0 [label="BB0\\ndef test_return_direct( )\\nprint ( \\"Before return\\" ) ;\\nreturn ;", shape=box];\n'
-        + '  1 [label="BB1\\nprint ( \\"After return\\" ) ;", shape=box];\n'
-        + '  2 [label="BB2\\ntest_return_direct ( ) ;", shape=box];\n'
-        + "}\n"
+test "cfg while loop at branch tail falls through to join, and related cases" {
+    def check_cfg_while_loop_at_branch_tail_falls_through_to_j {
+        dot = cfg_dot_from_file(
+            file_name=os.path.join(FIXTURES, "cfg_while_at_branch_tail.jac")
+        );
+        expected_dot = (
+            "digraph G {\n"
+            + '  0 [label="BB0\\ndef tail_while( x : int ) -> int\\nif x > 0", shape=box];\n'
+            + '  1 [label="BB1\\nwhile x < 5", shape=box];\n'
+            + '  2 [label="BB2\\nx = x + 1 ;", shape=box];\n'
+            + '  3 [label="BB3\\nreturn x ;", shape=box];\n'
+            + '  0 -> 1 [label="T"];\n'
+            + "  0 -> 3;\n"
+            + '  1 -> 2 [label="T"];\n'
+            + "  1 -> 3;\n"
+            + "  2 -> 1;\n"
+            + "}\n"
+        );
+        assert dot == expected_dot;
+    }
+
+    def check_cfg_comprehension_in_ternary_branch {
+        dot = cfg_dot_from_file(
+            file_name=os.path.join(FIXTURES, "cfg_compr_in_ternary.jac")
+        );
+        expected_dot = (
+            "digraph G {\n"
+            + '  0 [label="BB0\\nobj Items\\nhas data : list [ str ] = [ ] ;", shape=box];\n'
+            + '  1 [label="BB1\\nobj Container\\nhas items : Items | None = None ;", shape=box];\n'
+            + '  2 [label="BB2\\ndef comprehension_in_true_branch( c : Container ) -> list [ str ]", shape=box];\n'
+            + '  3 [label="BB3\\nreturn [ x for x in c . items . data ]", shape=box];\n'
+            + '  4 [label="BB4\\nc . items", shape=box];\n'
+            + '  5 [label="BB5\\nreturn [ ]", shape=box];\n'
+            + "  2 -> 4;\n"
+            + '  4 -> 3 [label="T"];\n'
+            + '  4 -> 5 [label="F"];\n'
+            + "}\n"
+        );
+        assert dot == expected_dot;
+    }
+    run_cases(
+        [
+            (
+                "cfg while loop at branch tail falls through to join",
+                check_cfg_while_loop_at_branch_tail_falls_through_to_j
+            ),
+            (
+                "cfg comprehension in ternary branch",
+                check_cfg_comprehension_in_ternary_branch
+            )
+        ]
     );
-    assert dot == expected_dot;
 }
 
-test "cfg while loop with break continue and else" {
-    dot = cfg_dot_from_file(file_name=os.path.join(FIXTURES, "cfg_while_stmt.jac"));
-    expected_dot = (
-        "digraph G {\n"
-        + '  0 [label="BB0\\nx = 0 ;", shape=box];\n'
-        + '  1 [label="BB1\\nwhile x < 5", shape=box];\n'
-        + '  2 [label="BB2\\nx = x + 1 ;\\nif x == 2", shape=box];\n'
-        + '  3 [label="BB3\\ncontinue ;", shape=box];\n'
-        + '  4 [label="BB4\\nprint ( x ) ;\\nif x == 4", shape=box];\n'
-        + '  5 [label="BB5\\nbreak ;", shape=box];\n'
-        + '  6 [label="BB6\\nprint ( \\"done\\" ) ;", shape=box];\n'
-        + "  0 -> 1;\n"
-        + '  1 -> 2 [label="T"];\n'
-        + '  1 -> 6 [label="F"];\n'
-        + '  2 -> 3 [label="T"];\n'
-        + "  2 -> 4;\n"
-        + "  3 -> 1;\n"
-        + '  4 -> 5 [label="T"];\n'
-        + "  4 -> 1;\n"
-        + "}\n"
+test "cfg forever loop at branch tail gets no fall-through, and related cases" {
+    def check_cfg_forever_loop_at_branch_tail_gets_no_fall_thr {
+        dot = cfg_dot_from_file(
+            file_name=os.path.join(FIXTURES, "cfg_forever_at_branch_tail.jac")
+        );
+        expected_dot = (
+            "digraph G {\n"
+            + '  0 [label="BB0\\ndef tail_forever( x : int ) -> int\\nif x > 0", shape=box];\n'
+            + '  1 [label="BB1\\nforever", shape=box];\n'
+            + '  2 [label="BB2\\nx = x + 1 ;\\nif x > 5", shape=box];\n'
+            + '  3 [label="BB3\\nbreak ;", shape=box];\n'
+            + '  4 [label="BB4\\nreturn x ;", shape=box];\n'
+            + '  0 -> 1 [label="T"];\n'
+            + "  0 -> 4;\n"
+            + "  1 -> 2;\n"
+            + '  2 -> 3 [label="T"];\n'
+            + "  2 -> 1;\n"
+            + "}\n"
+        );
+        assert dot == expected_dot;
+    }
+
+    def check_cfg_break_and_continue_in_a_loop_else_leave_for {
+        dot = cfg_dot_from_file(
+            file_name=os.path.join(FIXTURES, "cfg_loop_else_control.jac")
+        );
+        expected_dot = (
+            "digraph G {\n"
+            + '  0 [label="BB0\\ndef keep_odd( rows : list [ list [ int ] ] ) -> int\\nkept = 0 ;", shape=box];\n'
+            + '  1 [label="BB1\\nfor row in rows", shape=box];\n'
+            + '  2 [label="BB2\\nfor x in row", shape=box];\n'
+            + '  3 [label="BB3\\nif x % 2 == 0", shape=box];\n'
+            + '  4 [label="BB4\\nbreak ;\\nkept += 1 ;", shape=box];\n'
+            + '  5 [label="BB5\\ncontinue ;", shape=box];\n'
+            + '  6 [label="BB6\\nreturn kept ;", shape=box];\n'
+            + '  7 [label="BB7\\ndef stop_at_odd( rows : list [ list [ int ] ] ) -> int\\nseen = 0 ;", shape=box];\n'
+            + '  8 [label="BB8\\nfor row in rows", shape=box];\n'
+            + '  9 [label="BB9\\nfor x in row", shape=box];\n'
+            + '  10 [label="BB10\\nif x % 2 == 0", shape=box];\n'
+            + '  11 [label="BB11\\nbreak ;\\nseen += 1 ;", shape=box];\n'
+            + '  12 [label="BB12\\nbreak ;", shape=box];\n'
+            + '  13 [label="BB13\\nreturn seen ;", shape=box];\n'
+            + "  0 -> 1;\n"
+            + "  1 -> 2;\n"
+            + "  1 -> 6;\n"
+            + "  2 -> 3;\n"
+            + "  2 -> 5;\n"
+            + '  3 -> 4 [label="T"];\n'
+            + "  3 -> 2;\n"
+            + "  4 -> 1;\n"
+            + "  5 -> 1;\n"
+            + "  7 -> 8;\n"
+            + "  8 -> 9;\n"
+            + "  8 -> 13;\n"
+            + "  9 -> 10;\n"
+            + "  9 -> 12;\n"
+            + '  10 -> 11 [label="T"];\n'
+            + "  10 -> 9;\n"
+            + "  11 -> 8;\n"
+            + "  12 -> 13;\n"
+            + "}\n"
+        );
+        assert dot == expected_dot;
+    }
+    run_cases(
+        [
+            (
+                "cfg forever loop at branch tail gets no fall-through",
+                check_cfg_forever_loop_at_branch_tail_gets_no_fall_thr
+            ),
+            (
+                "cfg break and continue in a loop else leave for the enclosing loop",
+                check_cfg_break_and_continue_in_a_loop_else_leave_for
+            )
+        ]
     );
-    assert dot == expected_dot;
 }
 
-test "cfg for loop with break continue and else" {
-    dot = cfg_dot_from_file(file_name=os.path.join(FIXTURES, "cfg_for_stmt.jac"));
-    expected_dot = (
-        "digraph G {\n"
-        + '  0 [label="BB0\\nfor i in range ( 0 , 5 )", shape=box];\n'
-        + '  1 [label="BB1\\nif i == 1", shape=box];\n'
-        + '  2 [label="BB2\\ncontinue ;", shape=box];\n'
-        + '  3 [label="BB3\\nprint ( i ) ;\\nif i == 3", shape=box];\n'
-        + '  4 [label="BB4\\nbreak ;", shape=box];\n'
-        + '  5 [label="BB5\\nprint ( \\"done\\" ) ;", shape=box];\n'
-        + "  0 -> 1;\n"
-        + "  0 -> 5;\n"
-        + '  1 -> 2 [label="T"];\n'
-        + "  1 -> 3;\n"
-        + "  2 -> 0;\n"
-        + '  3 -> 4 [label="T"];\n'
-        + "  3 -> 0;\n"
-        + "}\n"
+
+test "cfg nested if, and related cases" {
+    def check_cfg_nested_if {
+        dot = cfg_dot_from_file(file_name=os.path.join(FIXTURES, "cfg_nested_if.jac"));
+        expected_dot = (
+            "digraph G {\n"
+            + '  0 [label="BB0\\ndef quadrant( x : int , y : int ) -> str\\nif x > 0", shape=box];\n'
+            + '  1 [label="BB1\\nif y > 0", shape=box];\n'
+            + '  2 [label="BB2\\nreturn \\"Q1\\" ;", shape=box];\n'
+            + '  3 [label="BB3\\nreturn \\"Q4\\" ;", shape=box];\n'
+            + '  4 [label="BB4\\nreturn \\"left\\" ;", shape=box];\n'
+            + '  0 -> 1 [label="T"];\n'
+            + '  0 -> 4 [label="F"];\n'
+            + '  1 -> 2 [label="T"];\n'
+            + '  1 -> 3 [label="F"];\n'
+            + "}\n"
+        );
+        assert dot == expected_dot;
+    }
+
+    def check_cfg_ternary_return_entry_block_label {
+        dot = cfg_dot_from_file(
+            file_name=os.path.join(FIXTURES, "cfg_ternary_return.jac")
+        );
+        expected_dot = (
+            "digraph G {\n"
+            + '  0 [label="BB0\\nobj Items\\nhas data : list [ str ] = [ ] ;", shape=box];\n'
+            + '  1 [label="BB1\\nobj Container\\nhas items : Items | None = None ;", shape=box];\n'
+            + '  2 [label="BB2\\ndef simple_attr_access( c : Container ) -> list [ str ]", shape=box];\n'
+            + '  3 [label="BB3\\nreturn c . items . data", shape=box];\n'
+            + '  4 [label="BB4\\nc . items", shape=box];\n'
+            + '  5 [label="BB5\\nreturn [ ]", shape=box];\n'
+            + "  2 -> 4;\n"
+            + '  4 -> 3 [label="T"];\n'
+            + '  4 -> 5 [label="F"];\n'
+            + "}\n"
+        );
+        assert dot == expected_dot;
+    }
+    run_cases(
+        [
+            ("cfg nested if", check_cfg_nested_if),
+            (
+                "cfg ternary return entry block label",
+                check_cfg_ternary_return_entry_block_label
+            )
+        ]
     );
-    assert dot == expected_dot;
 }
 
-test "cfg loop body if tail back-edges to header" {
-    dot = cfg_dot_from_file(
-        file_name=os.path.join(FIXTURES, "cfg_loop_if_backedge.jac")
+
+test "cfg deeply nested boolean cases" {
+    def check_cfg_deeply_nested_boolean_short_circuit {
+        dot = cfg_dot_from_file(
+            file_name=os.path.join(FIXTURES, "cfg_nested_bool.jac")
+        );
+        expected_dot = (
+            "digraph G {\n"
+            + '  0 [label="BB0\\ndef deep( a : int , b : int , c : int , d : int ) -> int\\nif", shape=box];\n'
+            + '  1 [label="BB1\\na > 0", shape=box];\n'
+            + '  2 [label="BB2\\nb > 0", shape=box];\n'
+            + '  3 [label="BB3\\nc > 0", shape=box];\n'
+            + '  4 [label="BB4\\nd > 0", shape=box];\n'
+            + '  5 [label="BB5\\nreturn 1 ;", shape=box];\n'
+            + '  6 [label="BB6\\nreturn 0 ;", shape=box];\n'
+            + "  0 -> 1;\n"
+            + '  1 -> 2 [label="T"];\n'
+            + '  1 -> 6 [label="F"];\n'
+            + '  2 -> 3 [label="T"];\n'
+            + '  2 -> 6 [label="F"];\n'
+            + '  3 -> 4 [label="F"];\n'
+            + '  3 -> 5 [label="T"];\n'
+            + '  4 -> 5 [label="T"];\n'
+            + '  4 -> 6 [label="F"];\n'
+            + "}\n"
+        );
+        assert dot == expected_dot;
+    }
+
+    def check_cfg_deeply_nested_boolean_or_rooted_short_circui {
+        dot = cfg_dot_from_file(
+            file_name=os.path.join(FIXTURES, "cfg_nested_bool_or.jac")
+        );
+        expected_dot = (
+            "digraph G {\n"
+            + '  0 [label="BB0\\ndef deep_or( a : int , b : int , c : int , d : int ) -> int\\nif", shape=box];\n'
+            + '  1 [label="BB1\\na > 0", shape=box];\n'
+            + '  2 [label="BB2\\nb > 0", shape=box];\n'
+            + '  3 [label="BB3\\nc > 0", shape=box];\n'
+            + '  4 [label="BB4\\nd > 0", shape=box];\n'
+            + '  5 [label="BB5\\nreturn 1 ;", shape=box];\n'
+            + '  6 [label="BB6\\nreturn 0 ;", shape=box];\n'
+            + "  0 -> 1;\n"
+            + '  1 -> 5 [label="T"];\n'
+            + '  1 -> 2 [label="F"];\n'
+            + '  2 -> 3 [label="F"];\n'
+            + '  2 -> 5 [label="T"];\n'
+            + '  3 -> 4 [label="T"];\n'
+            + '  3 -> 6 [label="F"];\n'
+            + '  4 -> 5 [label="T"];\n'
+            + '  4 -> 6 [label="F"];\n'
+            + "}\n"
+        );
+        assert dot == expected_dot;
+    }
+    run_cases(
+        [
+            (
+                "cfg deeply nested boolean short circuit",
+                check_cfg_deeply_nested_boolean_short_circuit
+            ),
+            (
+                "cfg deeply nested boolean or-rooted short circuit",
+                check_cfg_deeply_nested_boolean_or_rooted_short_circui
+            )
+        ]
     );
-    expected_dot = (
-        "digraph G {\n"
-        + '  0 [label="BB0\\ndef use( items : list ) -> str\\ntag = \\"\\" ;", shape=box];\n'
-        + '  1 [label="BB1\\nfor item in items", shape=box];\n'
-        + '  2 [label="BB2\\nif item == \\"x\\"", shape=box];\n'
-        + '  3 [label="BB3\\ntag = item ;", shape=box];\n'
-        + '  4 [label="BB4\\nreturn tag ;", shape=box];\n'
-        + "  0 -> 1;\n"
-        + "  1 -> 2;\n"
-        + "  1 -> 4;\n"
-        + '  2 -> 3 [label="T"];\n'
-        + "  2 -> 1;\n"
-        + "  3 -> 1;\n"
-        + "}\n"
-    );
-    assert dot == expected_dot;
 }
 
-test "cfg while loop at branch tail falls through to join" {
-    dot = cfg_dot_from_file(
-        file_name=os.path.join(FIXTURES, "cfg_while_at_branch_tail.jac")
-    );
-    expected_dot = (
-        "digraph G {\n"
-        + '  0 [label="BB0\\ndef tail_while( x : int ) -> int\\nif x > 0", shape=box];\n'
-        + '  1 [label="BB1\\nwhile x < 5", shape=box];\n'
-        + '  2 [label="BB2\\nx = x + 1 ;", shape=box];\n'
-        + '  3 [label="BB3\\nreturn x ;", shape=box];\n'
-        + '  0 -> 1 [label="T"];\n'
-        + "  0 -> 3;\n"
-        + '  1 -> 2 [label="T"];\n'
-        + "  1 -> 3;\n"
-        + "  2 -> 1;\n"
-        + "}\n"
-    );
-    assert dot == expected_dot;
-}
-
-test "cfg forever loop at branch tail gets no fall-through" {
-    dot = cfg_dot_from_file(
-        file_name=os.path.join(FIXTURES, "cfg_forever_at_branch_tail.jac")
-    );
-    expected_dot = (
-        "digraph G {\n"
-        + '  0 [label="BB0\\ndef tail_forever( x : int ) -> int\\nif x > 0", shape=box];\n'
-        + '  1 [label="BB1\\nforever", shape=box];\n'
-        + '  2 [label="BB2\\nx = x + 1 ;\\nif x > 5", shape=box];\n'
-        + '  3 [label="BB3\\nbreak ;", shape=box];\n'
-        + '  4 [label="BB4\\nreturn x ;", shape=box];\n'
-        + '  0 -> 1 [label="T"];\n'
-        + "  0 -> 4;\n"
-        + "  1 -> 2;\n"
-        + '  2 -> 3 [label="T"];\n'
-        + "  2 -> 1;\n"
-        + "}\n"
-    );
-    assert dot == expected_dot;
-}
-
-test "cfg while loop mid branch keeps single exit" {
-    dot = cfg_dot_from_file(
-        file_name=os.path.join(FIXTURES, "cfg_while_mid_branch.jac")
-    );
-    expected_dot = (
-        "digraph G {\n"
-        + '  0 [label="BB0\\ndef mid( x : int ) -> int\\nif x > 0", shape=box];\n'
-        + '  1 [label="BB1\\nwhile x < 5", shape=box];\n'
-        + '  2 [label="BB2\\nx = x + 1 ;", shape=box];\n'
-        + '  3 [label="BB3\\nx = x + 2 ;", shape=box];\n'
-        + '  4 [label="BB4\\nreturn x ;", shape=box];\n'
-        + '  0 -> 1 [label="T"];\n'
-        + "  0 -> 4;\n"
-        + '  1 -> 2 [label="T"];\n'
-        + "  1 -> 3;\n"
-        + "  2 -> 1;\n"
-        + "  3 -> 4;\n"
-        + "}\n"
-    );
-    assert dot == expected_dot;
-}
-
-test "cfg try except finally" {
-    dot = cfg_dot_from_file(file_name=os.path.join(FIXTURES, "cfg_try_except.jac"));
-    expected_dot = (
-        "digraph G {\n"
-        + '  0 [label="BB0\\ndef risky( x : int ) -> int\\ntry", shape=box];\n'
-        + '  1 [label="BB1\\ny = 10 / x ;", shape=box];\n'
-        + '  2 [label="BB2\\nexcept Exception\\ny = 0 ;", shape=box];\n'
-        + '  3 [label="BB3\\nfinally\\nprint ( y ) ;", shape=box];\n'
-        + '  4 [label="BB4\\nreturn y ;", shape=box];\n'
-        + "  0 -> 1;\n"
-        + "  0 -> 2;\n"
-        + "  0 -> 4;\n"
-        + "  1 -> 3;\n"
-        + "  2 -> 3;\n"
-        + "  3 -> 4;\n"
-        + "}\n"
-    );
-    assert dot == expected_dot;
-}
-
-test "cfg match statement" {
-    dot = cfg_dot_from_file(file_name=os.path.join(FIXTURES, "cfg_match.jac"));
-    expected_dot = (
-        "digraph G {\n"
-        + '  0 [label="BB0\\ndef classify( x : int ) -> str\\nmatch x", shape=box];\n'
-        + '  1 [label="BB1\\ncase 0\\nreturn \\"zero\\" ;", shape=box];\n'
-        + '  2 [label="BB2\\ncase 1\\nreturn \\"one\\" ;", shape=box];\n'
-        + '  3 [label="BB3\\ncase _\\nreturn \\"other\\" ;", shape=box];\n'
-        + "  0 -> 1;\n"
-        + "  0 -> 2;\n"
-        + "  0 -> 3;\n"
-        + "}\n"
-    );
-    assert dot == expected_dot;
-}
-
-test "cfg nested if" {
-    dot = cfg_dot_from_file(file_name=os.path.join(FIXTURES, "cfg_nested_if.jac"));
-    expected_dot = (
-        "digraph G {\n"
-        + '  0 [label="BB0\\ndef quadrant( x : int , y : int ) -> str\\nif x > 0", shape=box];\n'
-        + '  1 [label="BB1\\nif y > 0", shape=box];\n'
-        + '  2 [label="BB2\\nreturn \\"Q1\\" ;", shape=box];\n'
-        + '  3 [label="BB3\\nreturn \\"Q4\\" ;", shape=box];\n'
-        + '  4 [label="BB4\\nreturn \\"left\\" ;", shape=box];\n'
-        + '  0 -> 1 [label="T"];\n'
-        + '  0 -> 4 [label="F"];\n'
-        + '  1 -> 2 [label="T"];\n'
-        + '  1 -> 3 [label="F"];\n'
-        + "}\n"
-    );
-    assert dot == expected_dot;
-}
-
-test "cfg nested loops" {
-    dot = cfg_dot_from_file(file_name=os.path.join(FIXTURES, "cfg_nested_loop.jac"));
-    expected_dot = (
-        "digraph G {\n"
-        + '  0 [label="BB0\\nfor i in range ( 3 )", shape=box];\n'
-        + '  1 [label="BB1\\nfor j in range ( 3 )", shape=box];\n'
-        + '  2 [label="BB2\\nprint ( i , j ) ;", shape=box];\n'
-        + "  0 -> 1;\n"
-        + "  1 -> 2;\n"
-        + "  1 -> 0;\n"
-        + "  2 -> 1;\n"
-        + "}\n"
-    );
-    assert dot == expected_dot;
-}
-
-test "cfg for else" {
-    dot = cfg_dot_from_file(file_name=os.path.join(FIXTURES, "cfg_for_else.jac"));
-    expected_dot = (
-        "digraph G {\n"
-        + '  0 [label="BB0\\ndef find( items : list , target : int ) -> bool", shape=box];\n'
-        + '  1 [label="BB1\\nfor item in items", shape=box];\n'
-        + '  2 [label="BB2\\nif item == target", shape=box];\n'
-        + '  3 [label="BB3\\nreturn True ;", shape=box];\n'
-        + '  4 [label="BB4\\nreturn False ;", shape=box];\n'
-        + "  0 -> 1;\n"
-        + "  1 -> 2;\n"
-        + "  1 -> 4;\n"
-        + '  2 -> 3 [label="T"];\n'
-        + "  2 -> 1;\n"
-        + "}\n"
-    );
-    assert dot == expected_dot;
-}
-
-test "cfg break and continue in a loop else leave for the enclosing loop" {
-    dot = cfg_dot_from_file(
-        file_name=os.path.join(FIXTURES, "cfg_loop_else_control.jac")
-    );
-    expected_dot = (
-        "digraph G {\n"
-        + '  0 [label="BB0\\ndef keep_odd( rows : list [ list [ int ] ] ) -> int\\nkept = 0 ;", shape=box];\n'
-        + '  1 [label="BB1\\nfor row in rows", shape=box];\n'
-        + '  2 [label="BB2\\nfor x in row", shape=box];\n'
-        + '  3 [label="BB3\\nif x % 2 == 0", shape=box];\n'
-        + '  4 [label="BB4\\nbreak ;\\nkept += 1 ;", shape=box];\n'
-        + '  5 [label="BB5\\ncontinue ;", shape=box];\n'
-        + '  6 [label="BB6\\nreturn kept ;", shape=box];\n'
-        + '  7 [label="BB7\\ndef stop_at_odd( rows : list [ list [ int ] ] ) -> int\\nseen = 0 ;", shape=box];\n'
-        + '  8 [label="BB8\\nfor row in rows", shape=box];\n'
-        + '  9 [label="BB9\\nfor x in row", shape=box];\n'
-        + '  10 [label="BB10\\nif x % 2 == 0", shape=box];\n'
-        + '  11 [label="BB11\\nbreak ;\\nseen += 1 ;", shape=box];\n'
-        + '  12 [label="BB12\\nbreak ;", shape=box];\n'
-        + '  13 [label="BB13\\nreturn seen ;", shape=box];\n'
-        + "  0 -> 1;\n"
-        + "  1 -> 2;\n"
-        + "  1 -> 6;\n"
-        + "  2 -> 3;\n"
-        + "  2 -> 5;\n"
-        + '  3 -> 4 [label="T"];\n'
-        + "  3 -> 2;\n"
-        + "  4 -> 1;\n"
-        + "  5 -> 1;\n"
-        + "  7 -> 8;\n"
-        + "  8 -> 9;\n"
-        + "  8 -> 13;\n"
-        + "  9 -> 10;\n"
-        + "  9 -> 12;\n"
-        + '  10 -> 11 [label="T"];\n'
-        + "  10 -> 9;\n"
-        + "  11 -> 8;\n"
-        + "  12 -> 13;\n"
-        + "}\n"
-    );
-    assert dot == expected_dot;
-}
-
-test "cfg raise terminal" {
-    dot = cfg_dot_from_file(file_name=os.path.join(FIXTURES, "cfg_raise.jac"));
-    expected_dot = (
-        "digraph G {\n"
-        + '  0 [label="BB0\\ndef safe_sqrt( x : float ) -> float\\nif x < 0", shape=box];\n'
-        + '  1 [label="BB1\\nraise ValueError ( \\"negative\\" ) ;", shape=box];\n'
-        + '  2 [label="BB2\\nreturn x ** 0.5 ;", shape=box];\n'
-        + '  0 -> 1 [label="T"];\n'
-        + "  0 -> 2;\n"
-        + "}\n"
-    );
-    assert dot == expected_dot;
-}
-
-test "cfg ternary return entry block label" {
-    dot = cfg_dot_from_file(file_name=os.path.join(FIXTURES, "cfg_ternary_return.jac"));
-    expected_dot = (
-        "digraph G {\n"
-        + '  0 [label="BB0\\nobj Items\\nhas data : list [ str ] = [ ] ;", shape=box];\n'
-        + '  1 [label="BB1\\nobj Container\\nhas items : Items | None = None ;", shape=box];\n'
-        + '  2 [label="BB2\\ndef simple_attr_access( c : Container ) -> list [ str ]", shape=box];\n'
-        + '  3 [label="BB3\\nreturn c . items . data", shape=box];\n'
-        + '  4 [label="BB4\\nc . items", shape=box];\n'
-        + '  5 [label="BB5\\nreturn [ ]", shape=box];\n'
-        + "  2 -> 4;\n"
-        + '  4 -> 3 [label="T"];\n'
-        + '  4 -> 5 [label="F"];\n'
-        + "}\n"
-    );
-    assert dot == expected_dot;
-}
-
-test "cfg boolean short circuit" {
-    dot = cfg_dot_from_file(file_name=os.path.join(FIXTURES, "cfg_bool_expr.jac"));
-    expected_dot = (
-        "digraph G {\n"
-        + '  0 [label="BB0\\nx = 5 ;\\nif", shape=box];\n'
-        + '  1 [label="BB1\\nx < 3", shape=box];\n'
-        + '  2 [label="BB2\\nx < 10", shape=box];\n'
-        + '  3 [label="BB3\\nx > 20", shape=box];\n'
-        + '  4 [label="BB4\\nx < 30", shape=box];\n'
-        + '  5 [label="BB5\\nprint ( x ) ;\\nx = x + 1 ;", shape=box];\n'
-        + '  6 [label="BB6\\nprint ( \\"done\\" ) ;\\nif", shape=box];\n'
-        + '  7 [label="BB7\\nx > 0", shape=box];\n'
-        + '  8 [label="BB8\\nx == - 1", shape=box];\n'
-        + '  9 [label="BB9\\nx < 100", shape=box];\n'
-        + '  10 [label="BB10\\nx == 200", shape=box];\n'
-        + '  11 [label="BB11\\nprint ( \\"matched\\" ) ;", shape=box];\n'
-        + '  12 [label="BB12\\nprint ( \\"end\\" ) ;\\nif y", shape=box];\n'
-        + '  13 [label="BB13\\nprint ( \\"y is true\\" ) ;", shape=box];\n'
-        + '  14 [label="BB14\\nprint ( \\"finished\\" ) ;", shape=box];\n'
-        + "  0 -> 1;\n"
-        + '  1 -> 2 [label="T"];\n'
-        + '  1 -> 3 [label="F"];\n'
-        + '  2 -> 5 [label="T"];\n'
-        + '  2 -> 3 [label="F"];\n'
-        + '  3 -> 4 [label="T"];\n'
-        + '  3 -> 6 [label="F"];\n'
-        + '  4 -> 5 [label="T"];\n'
-        + '  4 -> 6 [label="F"];\n'
-        + "  5 -> 6;\n"
-        + "  6 -> 7;\n"
-        + '  7 -> 8 [label="F"];\n'
-        + '  7 -> 9 [label="T"];\n'
-        + '  8 -> 9 [label="T"];\n'
-        + '  8 -> 12 [label="F"];\n'
-        + '  9 -> 10 [label="F"];\n'
-        + '  9 -> 11 [label="T"];\n'
-        + '  10 -> 11 [label="T"];\n'
-        + '  10 -> 12 [label="F"];\n'
-        + "  11 -> 12;\n"
-        + '  12 -> 13 [label="T"];\n'
-        + "  12 -> 14;\n"
-        + "  13 -> 14;\n"
-        + "}\n"
-    );
-    assert dot == expected_dot;
-}
-
-test "cfg deeply nested boolean short circuit" {
-    dot = cfg_dot_from_file(file_name=os.path.join(FIXTURES, "cfg_nested_bool.jac"));
-    expected_dot = (
-        "digraph G {\n"
-        + '  0 [label="BB0\\ndef deep( a : int , b : int , c : int , d : int ) -> int\\nif", shape=box];\n'
-        + '  1 [label="BB1\\na > 0", shape=box];\n'
-        + '  2 [label="BB2\\nb > 0", shape=box];\n'
-        + '  3 [label="BB3\\nc > 0", shape=box];\n'
-        + '  4 [label="BB4\\nd > 0", shape=box];\n'
-        + '  5 [label="BB5\\nreturn 1 ;", shape=box];\n'
-        + '  6 [label="BB6\\nreturn 0 ;", shape=box];\n'
-        + "  0 -> 1;\n"
-        + '  1 -> 2 [label="T"];\n'
-        + '  1 -> 6 [label="F"];\n'
-        + '  2 -> 3 [label="T"];\n'
-        + '  2 -> 6 [label="F"];\n'
-        + '  3 -> 4 [label="F"];\n'
-        + '  3 -> 5 [label="T"];\n'
-        + '  4 -> 5 [label="T"];\n'
-        + '  4 -> 6 [label="F"];\n'
-        + "}\n"
-    );
-    assert dot == expected_dot;
-}
-
-test "cfg deeply nested boolean or-rooted short circuit" {
-    dot = cfg_dot_from_file(file_name=os.path.join(FIXTURES, "cfg_nested_bool_or.jac"));
-    expected_dot = (
-        "digraph G {\n"
-        + '  0 [label="BB0\\ndef deep_or( a : int , b : int , c : int , d : int ) -> int\\nif", shape=box];\n'
-        + '  1 [label="BB1\\na > 0", shape=box];\n'
-        + '  2 [label="BB2\\nb > 0", shape=box];\n'
-        + '  3 [label="BB3\\nc > 0", shape=box];\n'
-        + '  4 [label="BB4\\nd > 0", shape=box];\n'
-        + '  5 [label="BB5\\nreturn 1 ;", shape=box];\n'
-        + '  6 [label="BB6\\nreturn 0 ;", shape=box];\n'
-        + "  0 -> 1;\n"
-        + '  1 -> 5 [label="T"];\n'
-        + '  1 -> 2 [label="F"];\n'
-        + '  2 -> 3 [label="F"];\n'
-        + '  2 -> 5 [label="T"];\n'
-        + '  3 -> 4 [label="T"];\n'
-        + '  3 -> 6 [label="F"];\n'
-        + '  4 -> 5 [label="T"];\n'
-        + '  4 -> 6 [label="F"];\n'
-        + "}\n"
-    );
-    assert dot == expected_dot;
-}
-
-test "cfg not over grouped boolean is a leaf predicate" {
-    dot = cfg_dot_from_file(file_name=os.path.join(FIXTURES, "cfg_bool_not_group.jac"));
-    expected_dot = (
-        "digraph G {\n"
-        + '  0 [label="BB0\\ndef mixed( a : int , b : int , c : int ) -> int\\nif", shape=box];\n'
-        + '  1 [label="BB1\\na > 0", shape=box];\n'
-        + '  2 [label="BB2\\nnot ( b > 0 or c > 0 )", shape=box];\n'
-        + '  3 [label="BB3\\nb > 0", shape=box];\n'
-        + '  4 [label="BB4\\nc > 0", shape=box];\n'
-        + '  5 [label="BB5\\nreturn 1 ;", shape=box];\n'
-        + '  6 [label="BB6\\nreturn 0 ;", shape=box];\n'
-        + "  0 -> 1;\n"
-        + '  1 -> 2 [label="T"];\n'
-        + '  1 -> 6 [label="F"];\n'
-        + "  2 -> 3;\n"
-        + '  2 -> 5 [label="T"];\n'
-        + '  2 -> 6 [label="F"];\n'
-        + '  3 -> 4 [label="F"];\n'
-        + "}\n"
-    );
-    assert dot == expected_dot;
-}
-
-test "cfg comprehension in ternary branch" {
-    dot = cfg_dot_from_file(
-        file_name=os.path.join(FIXTURES, "cfg_compr_in_ternary.jac")
-    );
-    expected_dot = (
-        "digraph G {\n"
-        + '  0 [label="BB0\\nobj Items\\nhas data : list [ str ] = [ ] ;", shape=box];\n'
-        + '  1 [label="BB1\\nobj Container\\nhas items : Items | None = None ;", shape=box];\n'
-        + '  2 [label="BB2\\ndef comprehension_in_true_branch( c : Container ) -> list [ str ]", shape=box];\n'
-        + '  3 [label="BB3\\nreturn [ x for x in c . items . data ]", shape=box];\n'
-        + '  4 [label="BB4\\nc . items", shape=box];\n'
-        + '  5 [label="BB5\\nreturn [ ]", shape=box];\n'
-        + "  2 -> 4;\n"
-        + '  4 -> 3 [label="T"];\n'
-        + '  4 -> 5 [label="F"];\n'
-        + "}\n"
-    );
-    assert dot == expected_dot;
-}
 
 test "cfg try tails run finally" {
     dot = cfg_dot_from_file(file_name=os.path.join(FIXTURES, "cfg_try_tails.jac"));

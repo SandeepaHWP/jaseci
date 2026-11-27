@@ -34,7 +34,7 @@ import ctypes;
 import os;
 import from jaclang.compiler.driver.na_coverage { na_coverage_begin, na_coverage_end }
 import from jaclang.compiler.driver.program { JacProgram }
-import from tests.support { TESTS_DIR, native_address, native_force_opts }
+import from tests.support { TESTS_DIR, native_address, native_force_opts, run_cases }
 
 glob FIXTURES = os.path.join(
          TESTS_DIR, "compiler", "backends", "native", "fixtures"
@@ -89,34 +89,56 @@ test "a list of non-integer elements does not take the module's IR with it" {
     assert eng is not None , "no JIT engine was produced for the fixture";
 }
 
-test "str elements answer with their own emptiness" {
-    (_rec, _errors, eng) = measured();
-    assert answer(eng, "any_str_none") == 0;
-    assert answer(eng, "any_str_some") == 1;
-    assert answer(eng, "all_str_yes") == 1;
-    assert answer(eng, "all_str_no") == 0;
-}
+test "str elements answer with their own emptiness, and related cases" {
+    def check_str_elements_answer_with_their_own_emptiness {
+        (_rec, _errors, eng) = measured();
+        assert answer(eng, "any_str_none") == 0;
+        assert answer(eng, "any_str_some") == 1;
+        assert answer(eng, "all_str_yes") == 1;
+        assert answer(eng, "all_str_no") == 0;
+    }
 
-test "float elements answer with their own value" {
-    (_rec, _errors, eng) = measured();
-    assert answer(eng, "any_float_none") == 0;
-    assert answer(eng, "any_float_some") == 1;
-    assert answer(eng, "all_float_no") == 0;
-}
+    def check_float_elements_answer_with_their_own_value {
+        (_rec, _errors, eng) = measured();
+        assert answer(eng, "any_float_none") == 0;
+        assert answer(eng, "any_float_some") == 1;
+        assert answer(eng, "all_float_no") == 0;
+    }
 
-test "bool elements answer with themselves" {
-    (_rec, _errors, eng) = measured();
-    assert answer(eng, "any_bool_none") == 0;
-    assert answer(eng, "any_bool_some") == 1;
-    assert answer(eng, "all_bool_no") == 0;
-}
+    def check_bool_elements_answer_with_themselves {
+        (_rec, _errors, eng) = measured();
+        assert answer(eng, "any_bool_none") == 0;
+        assert answer(eng, "any_bool_some") == 1;
+        assert answer(eng, "all_bool_no") == 0;
+    }
 
-test "int elements keep the answer they always had" {
-    (_rec, _errors, eng) = measured();
-    assert answer(eng, "any_int_none") == 0;
-    assert answer(eng, "any_int_some") == 1;
-    assert answer(eng, "all_int_yes") == 1;
-    assert answer(eng, "all_int_no") == 0;
+    def check_int_elements_keep_the_answer_they_always_had {
+        (_rec, _errors, eng) = measured();
+        assert answer(eng, "any_int_none") == 0;
+        assert answer(eng, "any_int_some") == 1;
+        assert answer(eng, "all_int_yes") == 1;
+        assert answer(eng, "all_int_no") == 0;
+    }
+    run_cases(
+        [
+            (
+                "str elements answer with their own emptiness",
+                check_str_elements_answer_with_their_own_emptiness
+            ),
+            (
+                "float elements answer with their own value",
+                check_float_elements_answer_with_their_own_value
+            ),
+            (
+                "bool elements answer with themselves",
+                check_bool_elements_answer_with_themselves
+            ),
+            (
+                "int elements keep the answer they always had",
+                check_int_elements_keep_the_answer_they_always_had
+            )
+        ]
+    );
 }
 
 

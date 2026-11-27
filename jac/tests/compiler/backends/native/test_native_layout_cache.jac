@@ -2,7 +2,7 @@
 import subprocess;
 import tempfile;
 import from pathlib { Path }
-import from tests.support { jac_command }
+import from tests.support { jac_command, run_cases }
 
 
 def build_value(folder: Path, attempt: int, reused: bool = False) -> str {
@@ -60,13 +60,26 @@ def check_layout_edit(kind: str, inherited: bool = False) {
 }
 
 
-test "warm native object readers invalidate after a provider layout edit" {
-    check_layout_edit("obj");
-}
+test "warm native cases" {
+    def check_warm_native_object_readers_invalidate_after_a_pr {
+        check_layout_edit("obj");
+    }
 
-
-test "warm native node readers invalidate after a provider layout edit" {
-    check_layout_edit("node");
+    def check_warm_native_node_readers_invalidate_after_a_prov {
+        check_layout_edit("node");
+    }
+    run_cases(
+        [
+            (
+                "warm native object readers invalidate after a provider layout edit",
+                check_warm_native_object_readers_invalidate_after_a_pr
+            ),
+            (
+                "warm native node readers invalidate after a provider layout edit",
+                check_warm_native_node_readers_invalidate_after_a_prov
+            )
+        ]
+    );
 }
 
 

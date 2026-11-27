@@ -9,6 +9,8 @@ import from jaclang.compiler.frontend.roles { Kid }
 import gc;
 import weakref;
 import from jaclang.compiler.driver.program { JacProgram }
+import from tests.support { run_cases }
+
 
 glob SRC = "def area(r: float) -> float { return 3.14 * r * r; }\n";
 
@@ -81,13 +83,65 @@ def _probe(prog: JacProgram) -> tuple[any, ...] {
     );
 }
 
-test "released module trees are garbage collectable" {
-    prog = JacProgram();
-    (path, mod_ref, kid_ref, anchor_ref) = _probe(prog);
-    prog.release_module(JacProgram.hub_key(path));
-    gc.collect();
-    dead = [mod_ref() is None, kid_ref() is None, anchor_ref() is None];
-    assert all(dead) , f"leaked (module, kid, anchor): {dead}";
+test "released module trees are garbage collectable, and related cases" {
+    def check_released_module_trees_are_garbage_collectable {
+        prog = JacProgram();
+        (path, mod_ref, kid_ref, anchor_ref) = _probe(prog);
+        prog.release_module(JacProgram.hub_key(path));
+        gc.collect();
+        dead = [mod_ref() is None, kid_ref() is None, anchor_ref() is None];
+        assert all(dead) , f"leaked (module, kid, anchor): {dead}";
+    }
+
+    def check_a_compiler_phase_boundary_collects_both_applicat {
+        prog = JacProgram();
+        compiler = prog._get_compiler();
+        internal = compiler.selfhost.program;
+        (_, app_ref, _, _) = _probe(prog);
+        (_, internal_ref, _, _) = _probe(internal);
+        compiler.release_compile_state(prog);
+        assert app_ref() is None;
+        assert internal_ref() is None;
+        # Releasing working state must leave the compiler reusable.
+        (_, next_ref, _, _) = _probe(prog);
+        assert next_ref() is not None;
+        compiler.release_compile_state(prog);
+        assert next_ref() is None;
+    }
+
+    def check_a_compiler_phase_boundary_rejects_release_during {
+        prog = JacProgram();
+        (_, mod_ref, _, _) = _probe(prog);
+        prog.scratch.compile_depth += 1;
+        try {
+            try {
+                prog._get_compiler().release_compile_state(prog);
+            } except RuntimeError {
+                assert mod_ref() is not None;
+                return;
+            }
+            assert False , "compiler state was released while compilation was active";
+        } finally {
+            prog.scratch.compile_depth -= 1;
+            prog._get_compiler().release_compile_state(prog);
+        }
+    }
+    run_cases(
+        [
+            (
+                "released module trees are garbage collectable",
+                check_released_module_trees_are_garbage_collectable
+            ),
+            (
+                "a compiler phase boundary collects both application and selfhost trees",
+                check_a_compiler_phase_boundary_collects_both_applicat
+            ),
+            (
+                "a compiler phase boundary rejects release during an active compile",
+                check_a_compiler_phase_boundary_rejects_release_during
+            )
+        ]
+    );
 }
 
 def _compile_probe(prog: JacProgram) -> tuple[any, ...] {
@@ -109,39 +163,6 @@ test "a fully compiled module is collectable after release_compile_closure" {
     );
 }
 
-test "a compiler phase boundary collects both application and selfhost trees" {
-    prog = JacProgram();
-    compiler = prog._get_compiler();
-    internal = compiler.selfhost.program;
-    (_, app_ref, _, _) = _probe(prog);
-    (_, internal_ref, _, _) = _probe(internal);
-    compiler.release_compile_state(prog);
-    assert app_ref() is None;
-    assert internal_ref() is None;
-    # Releasing working state must leave the compiler reusable.
-    (_, next_ref, _, _) = _probe(prog);
-    assert next_ref() is not None;
-    compiler.release_compile_state(prog);
-    assert next_ref() is None;
-}
-
-test "a compiler phase boundary rejects release during an active compile" {
-    prog = JacProgram();
-    (_, mod_ref, _, _) = _probe(prog);
-    prog.scratch.compile_depth += 1;
-    try {
-        try {
-            prog._get_compiler().release_compile_state(prog);
-        } except RuntimeError {
-            assert mod_ref() is not None;
-            return;
-        }
-        assert False , "compiler state was released while compilation was active";
-    } finally {
-        prog.scratch.compile_depth -= 1;
-        prog._get_compiler().release_compile_state(prog);
-    }
-}
 
 def _stub_probe(prog: JacProgram) -> any {
     stub = prog.parse_str("value: int\n", "release_bootstrap.pyi");

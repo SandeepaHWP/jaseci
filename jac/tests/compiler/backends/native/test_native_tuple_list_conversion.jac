@@ -9,28 +9,46 @@ import from tests.support {
     get_func,
     native_build,
     NATIVE_FIXTURES,
-    NATIVE_MEMORY_PROFILES
+    NATIVE_MEMORY_PROFILES,
+    run_cases
 }
 
-test "list constructs scalar and mixed tuple elements in order" {
-    (engine, module) = compile_native("tuple_list_conversion.jac");
-    assert not native_lowering_issues(str(module.gen.llvm_ir));
-    call = get_func(engine, "scalars", ctypes.c_int64);
-    actual = call();
-    assert actual == 25 , actual;
-}
+test "tuple_list_conversion.jac cases" {
+    def check_list_constructs_scalar_and_mixed_tuple_elements {
+        (engine, module) = compile_native("tuple_list_conversion.jac");
 
-test "list retains fresh and returned tuple objects exactly once" {
-    (engine, module) = compile_native("tuple_list_conversion.jac");
-    assert not native_lowering_issues(str(module.gen.llvm_ir));
-    drops = get_func(engine, "drops", ctypes.c_int64);
-    for (name, expected) in [("fresh_objects", 10), ("returned_objects", 11)] {
-        call = get_func(engine, name, ctypes.c_int64);
-        before = drops();
-        assert call() == expected;
-        assert drops() - before == 2 , name;
+        assert not native_lowering_issues(str(module.gen.llvm_ir));
+        call = get_func(engine, "scalars", ctypes.c_int64);
+        actual = call();
+        assert actual == 25 , actual;
     }
+
+    def check_list_retains_fresh_and_returned_tuple_objects_ex {
+        (engine, module) = compile_native("tuple_list_conversion.jac");
+
+        assert not native_lowering_issues(str(module.gen.llvm_ir));
+        drops = get_func(engine, "drops", ctypes.c_int64);
+        for (name, expected) in [("fresh_objects", 10), ("returned_objects", 11)] {
+            call = get_func(engine, name, ctypes.c_int64);
+            before = drops();
+            assert call() == expected;
+            assert drops() - before == 2 , name;
+        }
+    }
+    run_cases(
+        [
+            (
+                "list constructs scalar and mixed tuple elements in order",
+                check_list_constructs_scalar_and_mixed_tuple_elements
+            ),
+            (
+                "list retains fresh and returned tuple objects exactly once",
+                check_list_retains_fresh_and_returned_tuple_objects_ex
+            )
+        ]
+    );
 }
+
 
 test "list shares borrowed tuple objects and releases both references" {
     (engine, module) = compile_native("tuple_list_shared.jac");

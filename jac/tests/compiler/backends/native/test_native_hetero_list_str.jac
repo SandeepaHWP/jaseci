@@ -14,7 +14,7 @@ element is released when its list dies, not merely kept alive.
 
 import ctypes;
 import os;
-import from tests.support { TESTS_DIR, native_address, native_force_opts }
+import from tests.support { TESTS_DIR, native_address, native_force_opts, run_cases }
 import from jaclang.compiler.driver.program { JacProgram }
 
 glob FIXTURES = os.path.join(
@@ -125,41 +125,66 @@ def _get_s(eng: any, name: str, restype: type | None, *argtypes: type) -> any {
 }
 
 
-test "heap string stored in a heterogeneous list by index assignment survives" {
-    eng = _compile(FIXTURE);
-    via_local = _get_s(eng, "via_local", ctypes.c_char_p, ctypes.c_char_p);
-    # r = [19, ""]; r[1] = s[5:12]; return r[1]  -> the sliced substring intact
-    assert via_local(b"u-ca=iso8601").decode("utf-8") == "iso8601";
-    assert via_local(b"12345abcdefg").decode("utf-8") == "abcdefg";
-}
+test "heap string stored in a heterogeneous list by index assignment survives, and related cases" {
+    def check_heap_string_stored_in_a_heterogeneous_list_by_in {
+        eng = _compile(FIXTURE);
 
+        via_local = _get_s(eng, "via_local", ctypes.c_char_p, ctypes.c_char_p);
+        # r = [19, ""]; r[1] = s[5:12]; return r[1]  -> the sliced substring intact
+        assert via_local(b"u-ca=iso8601").decode("utf-8") == "iso8601";
+        assert via_local(b"12345abcdefg").decode("utf-8") == "abcdefg";
+    }
 
-test "heap slices placed directly in a mixed list literal survive" {
-    eng = _compile(FIXTURE);
-    a = _get_s(eng, "via_literal_a", ctypes.c_char_p, ctypes.c_char_p);
-    b = _get_s(eng, "via_literal_b", ctypes.c_char_p, ctypes.c_char_p);
-    # r = [99, s[0:3], s[5:12]]
-    assert a(b"u-ca=iso8601").decode("utf-8") == "u-c";
-    assert b(b"u-ca=iso8601").decode("utf-8") == "iso8601";
-}
+    def check_heap_slices_placed_directly_in_a_mixed_list_lite {
+        eng = _compile(FIXTURE);
 
+        a = _get_s(eng, "via_literal_a", ctypes.c_char_p, ctypes.c_char_p);
+        b = _get_s(eng, "via_literal_b", ctypes.c_char_p, ctypes.c_char_p);
+        # r = [99, s[0:3], s[5:12]]
+        assert a(b"u-ca=iso8601").decode("utf-8") == "u-c";
+        assert b(b"u-ca=iso8601").decode("utf-8") == "iso8601";
+    }
 
-test "string passed as an argument and stored in a mixed list survives" {
-    eng = _compile(FIXTURE);
-    via_arg = _get_s(eng, "via_arg", ctypes.c_char_p, ctypes.c_int64, ctypes.c_char_p);
-    assert via_arg(7, b"hello").decode("utf-8") == "hello";
-    assert via_arg(0, b"").decode("utf-8") == "";
-}
+    def check_string_passed_as_an_argument_and_stored_in_a_mix {
+        eng = _compile(FIXTURE);
 
+        via_arg = _get_s(
+            eng, "via_arg", ctypes.c_char_p, ctypes.c_int64, ctypes.c_char_p
+        );
+        assert via_arg(7, b"hello").decode("utf-8") == "hello";
+        assert via_arg(0, b"").decode("utf-8") == "";
+    }
 
-test "many heterogeneous lists in a loop stay consistent (no corruption)" {
-    eng = _compile(FIXTURE);
-    churn = _get(eng, "churn", ctypes.c_int64, ctypes.c_int64);
-    # Each iter builds [i, "v" + str(i)] and sums len(list[1]). "v0".."v9" -> 2,
-    # "v10".."v99" -> 3, "v100".."v999" -> 4. Sum over i in [0, 1000):
-    #   10*2 + 90*3 + 900*4 = 20 + 270 + 3600 = 3890.
-    assert churn(1000) == 3890;
-    assert churn(0) == 0;
+    def check_many_heterogeneous_lists_in_a_loop_stay_consiste {
+        eng = _compile(FIXTURE);
+
+        churn = _get(eng, "churn", ctypes.c_int64, ctypes.c_int64);
+        # Each iter builds [i, "v" + str(i)] and sums len(list[1]). "v0".."v9" -> 2,
+        # "v10".."v99" -> 3, "v100".."v999" -> 4. Sum over i in [0, 1000):
+        #   10*2 + 90*3 + 900*4 = 20 + 270 + 3600 = 3890.
+        assert churn(1000) == 3890;
+        assert churn(0) == 0;
+    }
+    run_cases(
+        [
+            (
+                "heap string stored in a heterogeneous list by index assignment survives",
+                check_heap_string_stored_in_a_heterogeneous_list_by_in
+            ),
+            (
+                "heap slices placed directly in a mixed list literal survive",
+                check_heap_slices_placed_directly_in_a_mixed_list_lite
+            ),
+            (
+                "string passed as an argument and stored in a mixed list survives",
+                check_string_passed_as_an_argument_and_stored_in_a_mix
+            ),
+            (
+                "many heterogeneous lists in a loop stay consistent (no corruption)",
+                check_many_heterogeneous_lists_in_a_loop_stay_consiste
+            )
+        ]
+    );
 }
 
 

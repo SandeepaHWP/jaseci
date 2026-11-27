@@ -18,6 +18,8 @@ import re;
 import tempfile;
 import jaclang.compiler.frontend.unitree as uni;
 import from jaclang.compiler.driver.program { JacProgram }
+import from tests.support { run_cases }
+
 
 glob KERNEL_SRC: str = (
          "def:pub fib(n: int) -> int {\n"
@@ -137,34 +139,112 @@ test "native import compiles to nothing on the python side" {
     );
 }
 
-test "colliding native import basenames are a build error" {
-    tmp = tempfile.mkdtemp(prefix="jac_na_edge_");
-    for sub in ("a", "b") {
-        os.makedirs(os.path.join(tmp, sub));
-        with open(os.path.join(tmp, sub, "kernel.jac"), "w") as f {
-            f.write(KERNEL_SRC);
+test "colliding native import basenames are a build error, and related cases" {
+    def check_colliding_native_import_basenames_are_a_build_er {
+        tmp = tempfile.mkdtemp(prefix="jac_na_edge_");
+        for sub in ("a", "b") {
+            os.makedirs(os.path.join(tmp, sub));
+            with open(os.path.join(tmp, sub, "kernel.jac"), "w") as f {
+                f.write(KERNEL_SRC);
+            }
         }
-    }
-    host_path = os.path.join(tmp, "host.jac");
-    with open(host_path, "w") as f {
-        f.write(
-            "import from .a.kernel { fib }\n"
-            "import from .b.kernel { fib as fib_b }\n"
-            "\n"
-            "async def:pub show -> int {\n"
-            "    return await fib(4) + await fib_b(5);\n"
-            "}\n"
+        host_path = os.path.join(tmp, "host.jac");
+        with open(host_path, "w") as f {
+            f.write(
+                "import from .a.kernel { fib }\n"
+                "import from .b.kernel { fib as fib_b }\n"
+                "\n"
+                "async def:pub show -> int {\n"
+                "    return await fib(4) + await fib_b(5);\n"
+                "}\n"
+            );
+        }
+        with open(os.path.join(tmp, "jac.toml"), "w") as f {
+            f.write(PIN_HOST_CLIENT);
+        }
+        prog = JacProgram();
+        prog.compile(host_path);
+        msgs = [e.pretty_print() for e in prog.errors_had];
+        assert any(["E5083" in m for m in msgs]) , (
+            f"two na targets sharing a basename must not both claim"
+            f" /static/kernel.wasm; got: {msgs}"
         );
     }
-    with open(os.path.join(tmp, "jac.toml"), "w") as f {
-        f.write(PIN_HOST_CLIENT);
+
+    def check_a_non_function_name_cannot_cross_the_cl_na_edge {
+        tmp = tempfile.mkdtemp(prefix="jac_na_edge_");
+        with open(os.path.join(tmp, "kernel.jac"), "w") as f {
+            f.write(KERNEL_SRC + "\nobj View {\n    has id: str = \"\";\n}\n");
+        }
+        host_path = os.path.join(tmp, "host.jac");
+        with open(host_path, "w") as f {
+            f.write(
+                "import from .kernel { View }\n"
+                "\n"
+                "def:pub show -> str {\n"
+                "    return View(id=\"1\").id;\n"
+                "}\n"
+            );
+        }
+        with open(os.path.join(tmp, "jac.toml"), "w") as f {
+            f.write(PIN_HOST_CLIENT);
+        }
+        prog = JacProgram();
+        prog.compile(host_path);
+        msgs = [e.pretty_print() for e in prog.errors_had];
+        assert any(["E5100" in m for m in msgs]) , (
+            f"a wasm module exports only functions, so binding a type through"
+            f" __na_bind would hand the client an async callable it then `new`s --"
+            f" a TypeError at first render; got: {msgs}"
+        );
     }
-    prog = JacProgram();
-    prog.compile(host_path);
-    msgs = [e.pretty_print() for e in prog.errors_had];
-    assert any(["E5083" in m for m in msgs]) , (
-        f"two na targets sharing a basename must not both claim"
-        f" /static/kernel.wasm; got: {msgs}"
+
+    def check_a_native_type_is_rejected_even_when_only_used_as {
+        tmp = tempfile.mkdtemp(prefix="jac_na_edge_");
+        with open(os.path.join(tmp, "kernel.jac"), "w") as f {
+            f.write(KERNEL_SRC + "\nobj View {\n    has id: str = \"\";\n}\n");
+        }
+        host_path = os.path.join(tmp, "host.jac");
+        with open(host_path, "w") as f {
+            f.write(
+                "import from .kernel { View, fib }\n"
+                "\n"
+                "def shape(v: View) -> str {\n"
+                "    return v.id;\n"
+                "}\n"
+                "\n"
+                "async def:pub show -> int {\n"
+                "    return await fib(3);\n"
+                "}\n"
+            );
+        }
+        with open(os.path.join(tmp, "jac.toml"), "w") as f {
+            f.write(PIN_HOST_CLIENT);
+        }
+        prog = JacProgram();
+        prog.compile(host_path);
+        msgs = [e.pretty_print() for e in prog.errors_had];
+        assert any(["E5100" in m for m in msgs]) , (
+            f"the __na_bind destructure is emitted for every imported name, so an"
+            f" annotation-only type still binds a wasm export that does not exist;"
+            f" the edge rejects it rather than carry dead bindings: {msgs}"
+        );
+    }
+    run_cases(
+        [
+            (
+                "colliding native import basenames are a build error",
+                check_colliding_native_import_basenames_are_a_build_er
+            ),
+            (
+                "a non-function name cannot cross the cl->na edge",
+                check_a_non_function_name_cannot_cross_the_cl_na_edge
+            ),
+            (
+                "a native type is rejected even when only used as an annotation",
+                check_a_native_type_is_rejected_even_when_only_used_as
+            )
+        ]
     );
 }
 
@@ -225,33 +305,6 @@ test "the injected wasm host import is registered for materialization" {
     );
 }
 
-test "a non-function name cannot cross the cl->na edge" {
-    tmp = tempfile.mkdtemp(prefix="jac_na_edge_");
-    with open(os.path.join(tmp, "kernel.jac"), "w") as f {
-        f.write(KERNEL_SRC + "\nobj View {\n    has id: str = \"\";\n}\n");
-    }
-    host_path = os.path.join(tmp, "host.jac");
-    with open(host_path, "w") as f {
-        f.write(
-            "import from .kernel { View }\n"
-            "\n"
-            "def:pub show -> str {\n"
-            "    return View(id=\"1\").id;\n"
-            "}\n"
-        );
-    }
-    with open(os.path.join(tmp, "jac.toml"), "w") as f {
-        f.write(PIN_HOST_CLIENT);
-    }
-    prog = JacProgram();
-    prog.compile(host_path);
-    msgs = [e.pretty_print() for e in prog.errors_had];
-    assert any(["E5100" in m for m in msgs]) , (
-        f"a wasm module exports only functions, so binding a type through"
-        f" __na_bind would hand the client an async callable it then `new`s --"
-        f" a TypeError at first render; got: {msgs}"
-    );
-}
 
 test "na binding signatures resolve when the client module is not the entry" {
     tmp = tempfile.mkdtemp(prefix="jac_na_edge_");
@@ -282,36 +335,4 @@ test "na binding signatures resolve when the client module is not the entry" {
         f" {by_name['fib'].param_types}"
     );
     assert by_name["fib"].ret_type == "int";
-}
-
-test "a native type is rejected even when only used as an annotation" {
-    tmp = tempfile.mkdtemp(prefix="jac_na_edge_");
-    with open(os.path.join(tmp, "kernel.jac"), "w") as f {
-        f.write(KERNEL_SRC + "\nobj View {\n    has id: str = \"\";\n}\n");
-    }
-    host_path = os.path.join(tmp, "host.jac");
-    with open(host_path, "w") as f {
-        f.write(
-            "import from .kernel { View, fib }\n"
-            "\n"
-            "def shape(v: View) -> str {\n"
-            "    return v.id;\n"
-            "}\n"
-            "\n"
-            "async def:pub show -> int {\n"
-            "    return await fib(3);\n"
-            "}\n"
-        );
-    }
-    with open(os.path.join(tmp, "jac.toml"), "w") as f {
-        f.write(PIN_HOST_CLIENT);
-    }
-    prog = JacProgram();
-    prog.compile(host_path);
-    msgs = [e.pretty_print() for e in prog.errors_had];
-    assert any(["E5100" in m for m in msgs]) , (
-        f"the __na_bind destructure is emitted for every imported name, so an"
-        f" annotation-only type still binds a wasm export that does not exist;"
-        f" the edge rejects it rather than carry dead bindings: {msgs}"
-    );
 }

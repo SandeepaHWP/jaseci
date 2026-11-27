@@ -16,7 +16,7 @@ import from jaclang.compiler.passes.layout_pass {
 import jaclang.compiler.frontend.unitree as uni;
 import from jaclang.compiler.driver.program { JacProgram }
 import os;
-import from tests.support { TESTS_DIR, by_source_name }
+import from tests.support { TESTS_DIR, by_source_name, run_cases }
 import jaclang;
 
 glob FIXTURES = os.path.join(
@@ -108,43 +108,72 @@ test "obj with all primitive types produces layout" {
     assert len(layout.fields) == 5;
 }
 
-# ── Layout registry: obj reference fields ────────────────────
-test "obj with other obj field produces layout" {
-    reg = get_registry("valid_obj_refs.jac");
-    layout = by_source_name(reg.layouts).get("Line");
-    assert layout is not None;
-    names = [f.name for f in layout.fields];
-    assert "start" in names;
-    assert "end" in names;
-    assert "label" in names;
+test "obj with other obj field produces layout, and related cases" {
+    # ── Layout registry: obj reference fields ────────────────────
+    def check_obj_with_other_obj_field_produces_layout {
+        reg = get_registry("valid_obj_refs.jac");
+        layout = by_source_name(reg.layouts).get("Line");
+        assert layout is not None;
+        names = [f.name for f in layout.fields];
+        assert "start" in names;
+        assert "end" in names;
+        assert "label" in names;
+    }
+
+    # ── Layout registry: optional fields ─────────────────────────
+    def check_obj_with_optional_field_produces_layout {
+        reg = get_registry("valid_optional.jac");
+        layout = by_source_name(reg.layouts).get("OptionalFields");
+        assert layout is not None;
+        names = [f.name for f in layout.fields];
+        assert "maybe_int" in names;
+        assert "maybe_str" in names;
+    }
+    run_cases(
+        [
+            (
+                "obj with other obj field produces layout",
+                check_obj_with_other_obj_field_produces_layout
+            ),
+            (
+                "obj with optional field produces layout",
+                check_obj_with_optional_field_produces_layout
+            )
+        ]
+    );
 }
 
-# ── Layout registry: typed collections ───────────────────────
-test "obj with typed list field produces layout" {
-    reg = get_registry("valid_collections.jac");
-    layout = by_source_name(reg.layouts).get("WithList");
-    assert layout is not None;
-    assert len(layout.fields) == 1;
-    assert layout.fields[0].name == "items";
+test "obj with typed cases" {
+    # ── Layout registry: typed collections ───────────────────────
+    def check_obj_with_typed_list_field_produces_layout {
+        reg = get_registry("valid_collections.jac");
+        layout = by_source_name(reg.layouts).get("WithList");
+        assert layout is not None;
+        assert len(layout.fields) == 1;
+        assert layout.fields[0].name == "items";
+    }
+
+    def check_obj_with_typed_dict_field_produces_layout {
+        reg = get_registry("valid_collections.jac");
+        layout = by_source_name(reg.layouts).get("WithDict");
+        assert layout is not None;
+        assert len(layout.fields) == 1;
+        assert layout.fields[0].name == "entries";
+    }
+    run_cases(
+        [
+            (
+                "obj with typed list field produces layout",
+                check_obj_with_typed_list_field_produces_layout
+            ),
+            (
+                "obj with typed dict field produces layout",
+                check_obj_with_typed_dict_field_produces_layout
+            )
+        ]
+    );
 }
 
-test "obj with typed dict field produces layout" {
-    reg = get_registry("valid_collections.jac");
-    layout = by_source_name(reg.layouts).get("WithDict");
-    assert layout is not None;
-    assert len(layout.fields) == 1;
-    assert layout.fields[0].name == "entries";
-}
-
-# ── Layout registry: optional fields ─────────────────────────
-test "obj with optional field produces layout" {
-    reg = get_registry("valid_optional.jac");
-    layout = by_source_name(reg.layouts).get("OptionalFields");
-    assert layout is not None;
-    names = [f.name for f in layout.fields];
-    assert "maybe_int" in names;
-    assert "maybe_str" in names;
-}
 
 # ── Layout registry: enum fields ─────────────────────────────
 test "obj with enum field produces layout" {

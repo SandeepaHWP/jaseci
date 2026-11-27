@@ -12,7 +12,7 @@ import os;
 import subprocess;
 import sys;
 import tempfile;
-import from tests.support { cache_env }
+import from tests.support { cache_env, run_cases }
 import from tests.support { JAC_ROOT }
 
 glob PROG = (
@@ -105,8 +105,9 @@ for probe, expected in [(Probe.missing(), False), (Probe.hit(Source.CHECKOUT, '/
 glob STALE = "Probe.stale(['the shim predates its sources'])";
 
 
-test "the LLVM binding imports with a stale shim and only its calls raise" {
-    script = f"""
+test "the LLVM binding imports with a stale shim and only its calls raise, and related cases" {
+    def check_the_llvm_binding_imports_with_a_stale_shim_and_o {
+        script = f"""
 import sys
 sys.path.insert(0, {JAC_ROOT!r})
 from unittest.mock import patch
@@ -122,25 +123,14 @@ except ArtifactUnavailable:
 else:
     raise AssertionError('a binding call succeeded with no usable shim')
 """;
-    proc = subprocess.run(
-        [sys.executable, "-c", script], capture_output=True, text=True, timeout=600
-    );
-    assert proc.returncode == 0 , proc.stdout + proc.stderr;
-}
-
-
-test "jac native status reports a stale shim instead of crashing" {
-    with tempfile.TemporaryDirectory() as work {
-        (rc, out) = _run_no_llvm(["native", "status", "llvm-shim"], work, STALE);
-        assert rc == 0 , out;
-        assert "Traceback" not in out , out;
-        assert "the shim predates its sources" in out , out;
+        proc = subprocess.run(
+            [sys.executable, "-c", script], capture_output=True, text=True, timeout=600
+        );
+        assert proc.returncode == 0 , proc.stdout + proc.stderr;
     }
-}
 
-
-test "native lowering products take the native toolchain verdict from the host" {
-    script = f"""
+    def check_native_lowering_products_take_the_native_toolcha {
+        script = f"""
 import sys
 sys.path.insert(0, {JAC_ROOT!r})
 from jaclang.compiler.frontend.host import NeutralHost, active_host, install_host
@@ -160,10 +150,33 @@ try:
 finally:
     install_host(previous)
 """;
-    proc = subprocess.run(
-        [sys.executable, "-c", script], capture_output=True, text=True, timeout=600
+        proc = subprocess.run(
+            [sys.executable, "-c", script], capture_output=True, text=True, timeout=600
+        );
+        assert proc.returncode == 0 , proc.stdout + proc.stderr;
+    }
+    run_cases(
+        [
+            (
+                "the LLVM binding imports with a stale shim and only its calls raise",
+                check_the_llvm_binding_imports_with_a_stale_shim_and_o
+            ),
+            (
+                "native lowering products take the native toolchain verdict from the host",
+                check_native_lowering_products_take_the_native_toolcha
+            )
+        ]
     );
-    assert proc.returncode == 0 , proc.stdout + proc.stderr;
+}
+
+
+test "jac native status reports a stale shim instead of crashing" {
+    with tempfile.TemporaryDirectory() as work {
+        (rc, out) = _run_no_llvm(["native", "status", "llvm-shim"], work, STALE);
+        assert rc == 0 , out;
+        assert "Traceback" not in out , out;
+        assert "the shim predates its sources" in out , out;
+    }
 }
 
 

@@ -21,7 +21,7 @@ import os;
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.frontend.parser { parse as rd_parse }
 import from jaclang.compiler.frontend.unitree { Name, in_type_position }
-import from tests.support { TESTS_DIR }
+import from tests.support { TESTS_DIR, run_cases }
 
 glob PROBE_PATH = os.path.join(
          TESTS_DIR, "compiler", "fixtures", "type_position_probe.jac"
@@ -71,17 +71,58 @@ def _all_value_position(src: str, value: str, count: int) {
     }
 }
 
-test "a parameter, local, and field annotation are type positions" {
-    _all_type_position(
-        "obj Box {\n"
-        "    has held: Pt;\n"
-        "}\n"
-        "def take(p: Pt) -> int {\n"
-        "    q: Pt = p;\n"
-        "    return 0;\n"
-        "}\n",
-        "Pt",
-        3
+test "a parameter, local, and field annotation are type positions, and related cases" {
+    def check_a_parameter_local_and_field_annotation_are_type {
+        _all_type_position(
+            "obj Box {\n"
+            "    has held: Pt;\n"
+            "}\n"
+            "def take(p: Pt) -> int {\n"
+            "    q: Pt = p;\n"
+            "    return 0;\n"
+            "}\n",
+            "Pt",
+            3
+        );
+    }
+
+    def check_a_deeply_nested_annotation_is_a_type_position_at {
+        _all_type_position(
+            "def take(xs: dict[str, dict[str, dict[str, list[Pt]]]]) -> int {\n"
+            "    return 0;\n"
+            "}\n",
+            "Pt",
+            1
+        );
+    }
+
+    def check_an_ability_signature_inside_an_impl_is_a_type_po {
+        _all_type_position(
+            "obj Box {\n"
+            "    def held -> Pt;\n"
+            "}\n"
+            "impl Box.held -> Pt {\n"
+            "    return make();\n"
+            "}\n",
+            "Pt",
+            2
+        );
+    }
+    run_cases(
+        [
+            (
+                "a parameter, local, and field annotation are type positions",
+                check_a_parameter_local_and_field_annotation_are_type
+            ),
+            (
+                "a deeply nested annotation is a type position at any depth",
+                check_a_deeply_nested_annotation_is_a_type_position_at
+            ),
+            (
+                "an ability signature inside an impl is a type position",
+                check_an_ability_signature_inside_an_impl_is_a_type_po
+            )
+        ]
     );
 }
 
@@ -89,56 +130,66 @@ test "a return type is a type position" {
     _all_type_position("def make -> Pt {\n    return ret();\n}\n", "Pt", 1);
 }
 
-test "an `as` cast names a type, not a value" {
-    _all_type_position(
-        "def widen(p: any) -> int {\n    q = p as Pt;\n    return 0;\n}\n", "Pt", 1
+test "an `as` cast names a type, not a value, and related cases" {
+    def check_an_as_cast_names_a_type_not_a_value {
+        _all_type_position(
+            "def widen(p: any) -> int {\n    q = p as Pt;\n    return 0;\n}\n", "Pt", 1
+        );
+    }
+
+    def check_a_generic_parameter_bound_and_its_default_are_ty {
+        _all_type_position(
+            "def pick[T: Pt = Pt](v: T) -> T {\n    return v;\n}\n", "Pt", 2
+        );
+    }
+
+    def check_a_generic_argument_inside_an_annotation_is_a_typ {
+        _all_type_position(
+            "def take(xs: list[Pt]) -> dict[str, Pt] {\n    return {};\n}\n", "Pt", 2
+        );
+    }
+    run_cases(
+        [
+            (
+                "an `as` cast names a type, not a value",
+                check_an_as_cast_names_a_type_not_a_value
+            ),
+            (
+                "a generic parameter bound and its default are type positions",
+                check_a_generic_parameter_bound_and_its_default_are_ty
+            ),
+            (
+                "a generic argument inside an annotation is a type position",
+                check_a_generic_argument_inside_an_annotation_is_a_typ
+            )
+        ]
     );
 }
 
-test "a `type` alias right-hand side is a type position" {
-    _all_type_position("type Alias = Pt;\n", "Pt", 1);
-    _all_type_position("type Brand := Pt;\n", "Pt", 1);
-}
+test "a `type` alias right-hand side is a type position, and related cases" {
+    def check_a_type_alias_right_hand_side_is_a_type_position {
+        _all_type_position("type Alias = Pt;\n", "Pt", 1);
+        _all_type_position("type Brand := Pt;\n", "Pt", 1);
+    }
 
-test "a generic parameter bound and its default are type positions" {
-    _all_type_position(
-        "def pick[T: Pt = Pt](v: T) -> T {\n    return v;\n}\n", "Pt", 2
+    def check_an_edge_declaration_s_endpoints_are_type_positio {
+        _all_type_position("edge Link: Pt --> Pt {}\n", "Pt", 2);
+        _all_type_position("edge Held: Box --> Box {\n    has via: Pt;\n}\n", "Box", 2);
+    }
+    run_cases(
+        [
+            (
+                "a `type` alias right-hand side is a type position",
+                check_a_type_alias_right_hand_side_is_a_type_position
+            ),
+            (
+                "an edge declaration's endpoints are type positions",
+                check_an_edge_declaration_s_endpoints_are_type_positio
+            )
+        ]
     );
 }
 
-test "an edge declaration's endpoints are type positions" {
-    _all_type_position("edge Link: Pt --> Pt {}\n", "Pt", 2);
-    _all_type_position("edge Held: Box --> Box {\n    has via: Pt;\n}\n", "Box", 2);
-}
-
-test "a generic argument inside an annotation is a type position" {
-    _all_type_position(
-        "def take(xs: list[Pt]) -> dict[str, Pt] {\n    return {};\n}\n", "Pt", 2
-    );
-}
-
-test "a deeply nested annotation is a type position at any depth" {
-    _all_type_position(
-        "def take(xs: dict[str, dict[str, dict[str, list[Pt]]]]) -> int {\n"
-        "    return 0;\n"
-        "}\n",
-        "Pt",
-        1
-    );
-}
-
-test "an ability signature inside an impl is a type position" {
-    _all_type_position(
-        "obj Box {\n"
-        "    def held -> Pt;\n"
-        "}\n"
-        "impl Box.held -> Pt {\n"
-        "    return make();\n"
-        "}\n",
-        "Pt",
-        2
-    );
-}
 
 test "a call, an attribute base, and a parameter default are run-time uses" {
     _all_value_position("with entry {\n    v = Pt();\n}\n", "Pt", 1);

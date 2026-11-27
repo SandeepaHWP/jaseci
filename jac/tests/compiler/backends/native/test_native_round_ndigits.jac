@@ -14,36 +14,53 @@ constant non-negative n and refuses to lower otherwise.
 """
 
 import ctypes;
-import from tests.support { compile_native, get_func }
+import from tests.support { compile_native, get_func, run_cases }
 
-test "round follows Python halves and ndigits" {
-    (eng, _ir) = compile_native("round_ndigits.jac");
-    assert get_func(eng, "round_half_even_low", ctypes.c_int64)() == 2;
-    assert get_func(eng, "round_half_even_high", ctypes.c_int64)() == 4;
-    assert get_func(eng, "round_negative_half", ctypes.c_int64)() == -2;
-    assert get_func(eng, "round_two_places", ctypes.c_double)() == 0.83;
-    assert get_func(eng, "round_binary_half", ctypes.c_double)() == 2.67;
-    assert get_func(eng, "round_negative_places", ctypes.c_double)() == 1200.0;
-    places = get_func(
-        eng, "round_runtime_places", ctypes.c_double, ctypes.c_double, ctypes.c_int64
-    );
-    for (value, digits) in [
-        (-1.25, 1),
-        (0.125, 2),
-        (0.375, 2),
-        (5.55, 1),
-        (98765.4321, -3)
-    ] {
-        assert places(value, digits) == round(value, digits);
+test "round_ndigits.jac cases" {
+    def check_round_follows_python_halves_and_ndigits {
+        (eng, _ir) = compile_native("round_ndigits.jac");
+
+        assert get_func(eng, "round_half_even_low", ctypes.c_int64)() == 2;
+        assert get_func(eng, "round_half_even_high", ctypes.c_int64)() == 4;
+        assert get_func(eng, "round_negative_half", ctypes.c_int64)() == -2;
+        assert get_func(eng, "round_two_places", ctypes.c_double)() == 0.83;
+        assert get_func(eng, "round_binary_half", ctypes.c_double)() == 2.67;
+        assert get_func(eng, "round_negative_places", ctypes.c_double)() == 1200.0;
+        places = get_func(
+            eng,
+            "round_runtime_places",
+            ctypes.c_double,
+            ctypes.c_double,
+            ctypes.c_int64
+        );
+        for (value, digits) in [
+            (-1.25, 1),
+            (0.125, 2),
+            (0.375, 2),
+            (5.55, 1),
+            (98765.4321, -3)
+        ] {
+            assert places(value, digits) == round(value, digits);
+        }
+        assert get_func(eng, "round_int_places", ctypes.c_int64)() == 7;
     }
-    assert get_func(eng, "round_int_places", ctypes.c_int64)() == 7;
-}
 
-test "round with ndigits keeps floats in an unannotated comprehension" {
-    # The checker typed `round(x, n)` as int (it solved `_SupportsRound2[_T]`
-    # from `float.__round__`'s first overload), so the comprehension built an
-    # int list and each element was truncated: [0, 1] instead of [0.157, 1.5].
-    (eng, _ir) = compile_native("round_ndigits.jac");
-    total = get_func(eng, "round_places_in_comprehension", ctypes.c_double)();
-    assert abs(total - 1.657) < 1e-9;
+    def check_round_with_ndigits_keeps_floats_in_an_unannotate {
+        (eng, _ir) = compile_native("round_ndigits.jac");
+
+        total = get_func(eng, "round_places_in_comprehension", ctypes.c_double)();
+        assert abs(total - 1.657) < 1e-9;
+    }
+    run_cases(
+        [
+            (
+                "round follows Python halves and ndigits",
+                check_round_follows_python_halves_and_ndigits
+            ),
+            (
+                "round with ndigits keeps floats in an unannotated comprehension",
+                check_round_with_ndigits_keeps_floats_in_an_unannotate
+            )
+        ]
+    );
 }

@@ -24,7 +24,7 @@ Refs #8160
 
 import ctypes;
 import os;
-import from tests.support { TESTS_DIR, native_address, native_force_opts }
+import from tests.support { TESTS_DIR, native_address, native_force_opts, run_cases }
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.runtime.runtime { JacRuntime }
 import from jaclang.compiler.frontend.codeinfo {
@@ -100,90 +100,127 @@ def _sv_module -> object {
 }
 
 
-test "a leading spread of a list of tuples keeps its members distinct" {
-    eng = _compile();
-    expect = {
-        "head_dup": 2,
-        "head_zero_lead": 31,
-        "head_triple": 21,
-        "head_glob": 21,
-        "two_list_spreads": 31
-    };
-    for (name, want) in expect.items() {
-        got = _get(eng, name)(0);
-        assert got == want , (
-            f"{name}: got {got}, want {want} -- a short set means the members "
-            "were compared as C strings over the boxed tuple's bytes rather "
-            "than by the tuple layout"
+test "a leading spread of a list of tuples keeps its members distinct, and related cases" {
+    def check_a_leading_spread_of_a_list_of_tuples_keeps_its_m {
+        eng = _compile();
+
+        expect = {
+            "head_dup": 2,
+            "head_zero_lead": 31,
+            "head_triple": 21,
+            "head_glob": 21,
+            "two_list_spreads": 31
+        };
+        for (name, want) in expect.items() {
+            got = _get(eng, name)(0);
+            assert got == want , (
+                f"{name}: got {got}, want {want} -- a short set means the members "
+                "were compared as C strings over the boxed tuple's bytes rather "
+                "than by the tuple layout"
+            );
+        }
+    }
+
+    def check_membership_answers_by_tuple_value_not_by_a_leadi {
+        eng = _compile();
+
+        assert _get(eng, "head_member")(0) == 11 , (
+            "both inserted pairs must answer True"
+        );
+        assert _get(eng, "head_absent")(0) == 0 , (
+            "a pair that was never inserted must answer False even when it shares "
+            "a component with one that was"
         );
     }
-}
 
+    def check_the_shapes_that_already_recovered_the_layout_are {
+        eng = _compile();
 
-test "membership answers by tuple value, not by a leading byte" {
-    eng = _compile();
-    assert _get(eng, "head_member")(0) == 11 , ("both inserted pairs must answer True");
-    assert _get(eng, "head_absent")(0) == 0 , (
-        "a pair that was never inserted must answer False even when it shares "
-        "a component with one that was"
-    );
-}
-
-
-test "the shapes that already recovered the layout are unchanged" {
-    eng = _compile();
-    assert _get(eng, "compr_set")(0) == 21 , "a set comprehension of tuples";
-    assert _get(eng, "head_set_spread")(0) == 21 , (
-        "a set source carries its own element size through the spread"
-    );
-    assert _get(eng, "tail_list_spread")(0) == 21 , (
-        "a list of tuples spread into a set whose flavour a set source " "already fixed"
-    );
-}
-
-
-test "the layout is recovered whatever the source expression is" {
-    eng = _compile();
-    expect = {
-        "param_spread": 21,
-        "field_spread": 21,
-        "call_spread": 21,
-        "slice_spread": 21
-    };
-    for (name, want) in expect.items() {
-        got = _get(eng, name)(0);
-        assert got == want , (
-            f"{name}: got {got}, want {want} -- a parameter, a field, a call "
-            "result and a slice each reach their element type by a different "
-            "route, and none of them may fall back to pointer bytes"
+        assert _get(eng, "compr_set")(0) == 21 , "a set comprehension of tuples";
+        assert _get(eng, "head_set_spread")(0) == 21 , (
+            "a set source carries its own element size through the spread"
+        );
+        assert _get(eng, "tail_list_spread")(0) == 21 , (
+            "a list of tuples spread into a set whose flavour a set source "
+            "already fixed"
         );
     }
-}
 
+    def check_the_layout_is_recovered_whatever_the_source_expr {
+        eng = _compile();
 
-test "a spread whose element slot was never erased is untouched" {
-    eng = _compile();
-    assert _get(eng, "str_head_spread")(0) == 21 , (
-        "string elements are genuinely C-string keys and must stay so"
-    );
-    assert _get(eng, "int_head_spread")(0) == 21 , "scalar elements";
-}
-
-
-test "the spread copies its source rather than aliasing it" {
-    eng = _compile();
-    assert _get(eng, "source_survives")(0) == 230 , (
-        "appending to the source after the display must not reach the set"
-    );
-}
-
-
-test "every set-of-tuples spread agrees with the sv result" {
-    eng = _compile();
-    sv = _sv_module();
-    for name in FNS {
-        na = _get(eng, name)(0);
-        want = getattr(sv, name)(0);
-        assert na == want , f"{name}: native {na} != sv {want}";
+        expect = {
+            "param_spread": 21,
+            "field_spread": 21,
+            "call_spread": 21,
+            "slice_spread": 21
+        };
+        for (name, want) in expect.items() {
+            got = _get(eng, name)(0);
+            assert got == want , (
+                f"{name}: got {got}, want {want} -- a parameter, a field, a call "
+                "result and a slice each reach their element type by a different "
+                "route, and none of them may fall back to pointer bytes"
+            );
+        }
     }
+
+    def check_a_spread_whose_element_slot_was_never_erased_is {
+        eng = _compile();
+
+        assert _get(eng, "str_head_spread")(0) == 21 , (
+            "string elements are genuinely C-string keys and must stay so"
+        );
+        assert _get(eng, "int_head_spread")(0) == 21 , "scalar elements";
+    }
+
+    def check_the_spread_copies_its_source_rather_than_aliasin {
+        eng = _compile();
+
+        assert _get(eng, "source_survives")(0) == 230 , (
+            "appending to the source after the display must not reach the set"
+        );
+    }
+    def check_every_set_of_tuples_spread_agrees_with_the_sv_re {
+        eng = _compile();
+
+        sv = _sv_module();
+        for name in FNS {
+            na = _get(eng, name)(0);
+            want = getattr(sv, name)(0);
+            assert na == want , f"{name}: native {na} != sv {want}";
+        }
+    }
+    run_cases(
+        [
+            (
+                "a leading spread of a list of tuples keeps its members distinct",
+                check_a_leading_spread_of_a_list_of_tuples_keeps_its_m
+            ),
+            (
+                "membership answers by tuple value, not by a leading byte",
+                check_membership_answers_by_tuple_value_not_by_a_leadi
+            ),
+            (
+                "the shapes that already recovered the layout are unchanged",
+                check_the_shapes_that_already_recovered_the_layout_are
+            ),
+            (
+                "the layout is recovered whatever the source expression is",
+                check_the_layout_is_recovered_whatever_the_source_expr
+            ),
+            (
+                "a spread whose element slot was never erased is untouched",
+                check_a_spread_whose_element_slot_was_never_erased_is
+            ),
+            (
+                "the spread copies its source rather than aliasing it",
+                check_the_spread_copies_its_source_rather_than_aliasin
+            ),
+            (
+                "every set-of-tuples spread agrees with the sv result",
+                check_every_set_of_tuples_spread_agrees_with_the_sv_re
+            )
+        ]
+    );
 }

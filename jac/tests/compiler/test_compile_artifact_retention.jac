@@ -39,6 +39,8 @@ import os;
 import tempfile;
 import jaclang.compiler.frontend.unitree as uni;
 import from jaclang.compiler.driver.program { JacProgram }
+import from tests.support { run_cases }
+
 
 """Write a throwaway project and answer its directory."""
 def write_mods(mods: dict[(str, str)]) -> str {
@@ -187,42 +189,59 @@ test "no boundary fact anywhere in the process holds a module tree" {
     }
 }
 
-test "the module hub keys one module once" {
-    tmp = pinned_server_project();
-    prog = JacProgram();
-    prog.compile(os.path.join(tmp, "app.jac"));
-    seen: dict[(int, list[str])] = {};
-    for (key, mod) in prog.mod.hub.items() {
-        seen.setdefault(id(mod), []).append(key);
+test "app.jac cases" {
+    def check_the_module_hub_keys_one_module_once {
+        tmp = pinned_server_project();
+        prog = JacProgram();
+        prog.compile(os.path.join(tmp, "app.jac"));
+
+        seen: dict[(int, list[str])] = {};
+        for (key, mod) in prog.mod.hub.items() {
+            seen.setdefault(id(mod), []).append(key);
+        }
+        dupes = {
+            mod_id: keys
+            for (mod_id, keys) in seen.items()
+            if len(keys) > 1
+        };
+        assert not dupes , (
+            f"the hub keys one module under several spellings: {list(dupes.values())}. "
+            "A hub with two keys for one module is not a dedup layer -- the next "
+            "lookup that spells the path differently misses and re-parses"
+        );
     }
-    dupes = {
-        mod_id: keys
-        for (mod_id, keys) in seen.items()
-        if len(keys) > 1
-    };
-    assert not dupes , (
-        f"the hub keys one module under several spellings: {list(dupes.values())}. "
-        "A hub with two keys for one module is not a dedup layer -- the next "
-        "lookup that spells the path differently misses and re-parses"
+
+    def check_a_hub_lookup_finds_the_module_however_the_path_i {
+        tmp = pinned_server_project();
+        prog = JacProgram();
+        prog.compile(os.path.join(tmp, "app.jac"));
+
+        provider = os.path.join(tmp, "provider.jac");
+        real = os.path.realpath(provider);
+        by_real = prog.find_module(real);
+        assert by_real is not None , "the compiled provider is not in the hub at all";
+        by_spelling = prog.find_module(provider);
+        assert by_spelling is by_real , (
+            f"find_module({provider!r}) missed the module it finds under "
+            f"{real!r}. Every hub lookup must normalize through "
+            "JacProgram.hub_key, or a symlinked root (macOS /var, a git "
+            "worktree, a container mount) defeats the hub silently"
+        );
+    }
+    run_cases(
+        [
+            (
+                "the module hub keys one module once",
+                check_the_module_hub_keys_one_module_once
+            ),
+            (
+                "a hub lookup finds the module however the path is spelled",
+                check_a_hub_lookup_finds_the_module_however_the_path_i
+            )
+        ]
     );
 }
 
-test "a hub lookup finds the module however the path is spelled" {
-    tmp = pinned_server_project();
-    prog = JacProgram();
-    prog.compile(os.path.join(tmp, "app.jac"));
-    provider = os.path.join(tmp, "provider.jac");
-    real = os.path.realpath(provider);
-    by_real = prog.find_module(real);
-    assert by_real is not None , "the compiled provider is not in the hub at all";
-    by_spelling = prog.find_module(provider);
-    assert by_spelling is by_real , (
-        f"find_module({provider!r}) missed the module it finds under "
-        f"{real!r}. Every hub lookup must normalize through "
-        "JacProgram.hub_key, or a symlinked root (macOS /var, a git "
-        "worktree, a container mount) defeats the hub silently"
-    );
-}
 
 """Two evaluator structures are deliberately NOT in the released set.
 

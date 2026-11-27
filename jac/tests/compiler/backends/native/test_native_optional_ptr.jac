@@ -18,7 +18,8 @@ import from tests.support {
     compile_native,
     compile_native_ir,
     get_func,
-    native_force_opts
+    native_force_opts,
+    run_cases
 }
 
 import from jaclang.compiler.driver.program { JacProgram }
@@ -36,90 +37,126 @@ def compile_errors(fixture: str) -> list[str] {
     return [str(e) for e in prog.errors_had];
 }
 
-test "pointer optional: construct, narrow, and unwrap at every seam" {
-    (eng, _) = compile_native("optional_ptr.jac");
-    ol = get_func(eng, "opt_local_str", ctypes.c_int64, ctypes.c_int64);
-    assert ol(1) == 4 , "narrowed local unwraps to len('beta')";
-    assert ol(0) == -1 , "None local stays None";
-    up = get_func(eng, "use_opt_param", ctypes.c_int64, ctypes.c_int64);
-    assert up(1) == 5 , "value flows through the optional param";
-    assert up(0) == -1 , "explicit None selects the None branch";
-    oo = get_func(eng, "obj_opt_flow", ctypes.c_int64, ctypes.c_int64);
-    assert oo(1) == 7 , "narrowed obj optional reads its field";
-    assert oo(0) == -1 , "None obj optional narrows to the None branch";
+test "optional_ptr.jac cases" {
+    def check_pointer_optional_construct_narrow_and_unwrap_at {
+        (eng, _) = compile_native("optional_ptr.jac");
+
+        ol = get_func(eng, "opt_local_str", ctypes.c_int64, ctypes.c_int64);
+        assert ol(1) == 4 , "narrowed local unwraps to len('beta')";
+        assert ol(0) == -1 , "None local stays None";
+        up = get_func(eng, "use_opt_param", ctypes.c_int64, ctypes.c_int64);
+        assert up(1) == 5 , "value flows through the optional param";
+        assert up(0) == -1 , "explicit None selects the None branch";
+        oo = get_func(eng, "obj_opt_flow", ctypes.c_int64, ctypes.c_int64);
+        assert oo(1) == 7 , "narrowed obj optional reads its field";
+        assert oo(0) == -1 , "None obj optional narrows to the None branch";
+    }
+
+    def check_optional_casts_preserve_absent_and_false_valued {
+        (eng, _) = compile_native("optional_ptr.jac");
+
+        memo = get_func(eng, "memo_cast", ctypes.c_int64, ctypes.c_int64);
+        assert memo(0) == -1;
+        assert memo(1) == 7;
+        number = get_func(eng, "numeric_optional_cast", ctypes.c_int64, ctypes.c_int64);
+        assert number(0) == -1;
+        assert number(1) == 0;
+        assert get_func(eng, "required_cast_still_raises", ctypes.c_int64)() == 1;
+        assert get_func(eng, "memo_keeps_returned_object", ctypes.c_int64)() == 7;
+    }
+
+    def check_pointer_optional_equality_is_tag_arithmetic_matc {
+        (eng, _) = compile_native("optional_ptr.jac");
+
+        assert get_func(eng, "eq_matrix", ctypes.c_int64)() == 11101 , (
+            "None == None, None != '', None != 'alpha', value equality, self-equality"
+        );
+        assert get_func(eng, "field_flow", ctypes.c_int64)() == 111 , (
+            "field None -> value -> None round-trip through the tagged slot"
+        );
+    }
+
+    def check_pointer_optional_truthiness_and_f_string_follow {
+        (eng, _) = compile_native("optional_ptr.jac");
+
+        assert get_func(eng, "truthy_flow", ctypes.c_int64)() == 100 , (
+            "None and '' are falsy; a value is truthy"
+        );
+        assert get_func(eng, "fstr_flow", ctypes.c_int64)() == 1 , (
+            "f-string renders None as 'None' and a value as itself"
+        );
+    }
+
+    def check_narrowed_optionals_reach_str_helpers_concat_and {
+        (eng, _) = compile_native("optional_ptr.jac");
+
+        hn = get_func(eng, "helper_after_narrow", ctypes.c_int64, ctypes.c_int64);
+        assert hn(1) == 1 , "s.upper() on the narrowed payload";
+        assert hn(0) == 0 , "None side never reaches the helper";
+        assert get_func(eng, "concat_after_narrow", ctypes.c_int64)() == 1;
+        assert get_func(eng, "dict_key_narrowed", ctypes.c_int64)() == 5 , (
+            "narrowed optional key inserts and reads back"
+        );
+    }
+
+    def check_optional_container_elements_ride_jacval_slots {
+        (eng, _) = compile_native("optional_ptr.jac");
+
+        assert get_func(eng, "list_of_opt", ctypes.c_int64)() == 111 , (
+            "list[str | None]: tag read, equality, narrowed element"
+        );
+        assert get_func(eng, "matrix_flow", ctypes.c_int64)() == 111 , (
+            "nested list[list[int | None]]: read, narrow, overwrite"
+        );
+        assert get_func(eng, "unpack_flow", ctypes.c_int64)() == 34 , (
+            "tuple | None narrows then unpacks"
+        );
+    }
+
+    def check_optional_operands_in_container_membership_ride_t {
+        (eng, _) = compile_native("optional_ptr.jac");
+
+        assert get_func(eng, "marker_membership", ctypes.c_int64)() == 1110 , (
+            "None is in nothing; a carried value matches by payload"
+        );
+        assert get_func(eng, "opt_str_membership", ctypes.c_int64)() == 10 , (
+            "None-string membership is False, value matches by strcmp"
+        );
+    }
+    run_cases(
+        [
+            (
+                "pointer optional: construct, narrow, and unwrap at every seam",
+                check_pointer_optional_construct_narrow_and_unwrap_at
+            ),
+            (
+                "optional casts preserve absent and false-valued payloads",
+                check_optional_casts_preserve_absent_and_false_valued
+            ),
+            (
+                "pointer optional equality is tag arithmetic matching Python",
+                check_pointer_optional_equality_is_tag_arithmetic_matc
+            ),
+            (
+                "pointer optional truthiness and f-string follow Python",
+                check_pointer_optional_truthiness_and_f_string_follow
+            ),
+            (
+                "narrowed optionals reach str helpers, concat, and dict keys",
+                check_narrowed_optionals_reach_str_helpers_concat_and
+            ),
+            (
+                "optional container elements ride jacval slots",
+                check_optional_container_elements_ride_jacval_slots
+            ),
+            (
+                "optional operands in container membership ride tagged slots",
+                check_optional_operands_in_container_membership_ride_t
+            )
+        ]
+    );
 }
 
-test "optional casts preserve absent and false-valued payloads" {
-    (eng, _) = compile_native("optional_ptr.jac");
-    memo = get_func(eng, "memo_cast", ctypes.c_int64, ctypes.c_int64);
-    assert memo(0) == -1;
-    assert memo(1) == 7;
-    number = get_func(eng, "numeric_optional_cast", ctypes.c_int64, ctypes.c_int64);
-    assert number(0) == -1;
-    assert number(1) == 0;
-    assert get_func(eng, "required_cast_still_raises", ctypes.c_int64)() == 1;
-    assert get_func(eng, "memo_keeps_returned_object", ctypes.c_int64)() == 7;
-}
-
-test "pointer optional equality is tag arithmetic matching Python" {
-    (eng, _) = compile_native("optional_ptr.jac");
-    assert get_func(eng, "eq_matrix", ctypes.c_int64)() == 11101 , (
-        "None == None, None != '', None != 'alpha', value equality, self-equality"
-    );
-    assert get_func(eng, "field_flow", ctypes.c_int64)() == 111 , (
-        "field None -> value -> None round-trip through the tagged slot"
-    );
-}
-
-test "pointer optional truthiness and f-string follow Python" {
-    (eng, _) = compile_native("optional_ptr.jac");
-    assert get_func(eng, "truthy_flow", ctypes.c_int64)() == 100 , (
-        "None and '' are falsy; a value is truthy"
-    );
-    assert get_func(eng, "fstr_flow", ctypes.c_int64)() == 1 , (
-        "f-string renders None as 'None' and a value as itself"
-    );
-}
-
-test "narrowed optionals reach str helpers, concat, and dict keys" {
-    (eng, _) = compile_native("optional_ptr.jac");
-    hn = get_func(eng, "helper_after_narrow", ctypes.c_int64, ctypes.c_int64);
-    assert hn(1) == 1 , "s.upper() on the narrowed payload";
-    assert hn(0) == 0 , "None side never reaches the helper";
-    assert get_func(eng, "concat_after_narrow", ctypes.c_int64)() == 1;
-    assert get_func(eng, "dict_key_narrowed", ctypes.c_int64)() == 5 , (
-        "narrowed optional key inserts and reads back"
-    );
-}
-
-test "optional container elements ride jacval slots" {
-    (eng, _) = compile_native("optional_ptr.jac");
-    assert get_func(eng, "list_of_opt", ctypes.c_int64)() == 111 , (
-        "list[str | None]: tag read, equality, narrowed element"
-    );
-    assert get_func(eng, "matrix_flow", ctypes.c_int64)() == 111 , (
-        "nested list[list[int | None]]: read, narrow, overwrite"
-    );
-    assert get_func(eng, "unpack_flow", ctypes.c_int64)() == 34 , (
-        "tuple | None narrows then unpacks"
-    );
-}
-
-test "optional operands in container membership ride tagged slots" {
-    # The sealed-binary build hit this shape in the jac0core lexer
-    # (`prev_token_kind: TokenKind | None` tested with `in [TokenKind...]`):
-    # the optional operand makes the literal a jacval-element list, and the
-    # membership loop used to emit a raw integer icmp on the JacVal struct
-    # (E5020 LLVM IR parse failure). A None operand must also mean plain
-    # False membership, never an unwrap raise or a NULL strcmp.
-    (eng, _) = compile_native("optional_ptr.jac");
-    assert get_func(eng, "marker_membership", ctypes.c_int64)() == 1110 , (
-        "None is in nothing; a carried value matches by payload"
-    );
-    assert get_func(eng, "opt_str_membership", ctypes.c_int64)() == 10 , (
-        "None-string membership is False, value matches by strcmp"
-    );
-}
 
 test "un-narrowed optional use at strict sites is E1121, never runtime UB" {
     msgs = compile_errors("optional_ptr_diag.jac");

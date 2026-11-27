@@ -14,6 +14,8 @@ import jaclang;
 import jaclang.compiler.frontend.unitree as uni;
 import from jaclang { JacRuntime as Jac }
 import from jaclang.compiler.driver.program { JacProgram }
+import from tests.support { run_cases }
+
 
 def _jac_root -> str {
     here = __file__;
@@ -85,33 +87,61 @@ test "parameter count mismatch" {
     }
 }
 
-test "ability connected to decl" {
-    state = (out := JacProgram()).compile(os.path.join(FIXTURES, "base.jac"));
-    assert not out.errors_had;
-    # Annex impls are spliced into the head module's own scope, so impl symbols
-    # resolve directly off the head's symbol table (no separate impl module).
-    assert "impl.Test.say_hi" in state.sym_tab.names_in_scope;
-    say_hi_node = state.sym_tab.names_in_scope["impl.Test.say_hi"].decl.name_of;
-    assert isinstance(say_hi_node, uni.ImplDef) and say_hi_node.body is not None;
-    assert "impl.Test.init" in state.sym_tab.names_in_scope;
-    init_node = state.sym_tab.names_in_scope["impl.Test.init"].decl.name_of;
-    assert isinstance(init_node, uni.ImplDef) and init_node.body is not None;
+test "ability connected to decl cases" {
+    def check_ability_connected_to_decl {
+        state = (out := JacProgram()).compile(os.path.join(FIXTURES, "base.jac"));
+        assert not out.errors_had;
+        # Annex impls are spliced into the head module's own scope, so impl symbols
+        # resolve directly off the head's symbol table (no separate impl module).
+        assert "impl.Test.say_hi" in state.sym_tab.names_in_scope;
+        say_hi_node = state.sym_tab.names_in_scope["impl.Test.say_hi"].decl.name_of;
+        assert isinstance(say_hi_node, uni.ImplDef) and say_hi_node.body is not None;
+        assert "impl.Test.init" in state.sym_tab.names_in_scope;
+        init_node = state.sym_tab.names_in_scope["impl.Test.init"].decl.name_of;
+        assert isinstance(init_node, uni.ImplDef) and init_node.body is not None;
+    }
+
+    def check_ability_connected_to_decl_post {
+        state = (out := JacProgram()).compile(os.path.join(FIXTURES, "base2.jac"));
+        assert not out.errors_had;
+        assert "impl.Test.say_hi" in state.sym_tab.names_in_scope;
+        say_hi_node = state.sym_tab.names_in_scope["impl.Test.say_hi"].decl.name_of;
+        assert isinstance(say_hi_node, uni.ImplDef) and say_hi_node.body is not None;
+        assert "impl.Test.init" in state.sym_tab.names_in_scope;
+        init_node = state.sym_tab.names_in_scope["impl.Test.init"].decl.name_of;
+        assert isinstance(init_node, uni.ImplDef) and init_node.body is not None;
+    }
+    run_cases(
+        [
+            ("ability connected to decl", check_ability_connected_to_decl),
+            ("ability connected to decl post", check_ability_connected_to_decl_post)
+        ]
+    );
 }
 
-test "ability connected to decl post" {
-    state = (out := JacProgram()).compile(os.path.join(FIXTURES, "base2.jac"));
-    assert not out.errors_had;
-    assert "impl.Test.say_hi" in state.sym_tab.names_in_scope;
-    say_hi_node = state.sym_tab.names_in_scope["impl.Test.say_hi"].decl.name_of;
-    assert isinstance(say_hi_node, uni.ImplDef) and say_hi_node.body is not None;
-    assert "impl.Test.init" in state.sym_tab.names_in_scope;
-    init_node = state.sym_tab.names_in_scope["impl.Test.init"].decl.name_of;
-    assert isinstance(init_node, uni.ImplDef) and init_node.body is not None;
-}
 
-test "run base2" {
-    output = run_jac_import("base2", os.path.join(FIXTURES, "./"));
-    assert "56" in output;
+test "run base2, and related cases" {
+    def check_run_base2 {
+        output = run_jac_import("base2", os.path.join(FIXTURES, "./"));
+        assert "56" in output;
+    }
+
+    def check_impl_decl_resolution_fix {
+        output = run_jac_import("mtest", os.path.join(FIXTURES, "./"));
+        assert "2.0\n" in output;
+    }
+
+    def check_impl_grab {
+        output = run_jac_import("impl_grab", os.path.join(FIXTURES, "./"));
+        assert "1.414" in output;
+    }
+    run_cases(
+        [
+            ("run base2", check_run_base2),
+            ("impl decl resolution fix", check_impl_decl_resolution_fix),
+            ("impl grab", check_impl_grab)
+        ]
+    );
 }
 
 test "arch ref has sym" {
@@ -128,15 +158,6 @@ test "single impl annex" {
     assert print_ast_tree(mypass).count("ImplDef - impl.Circle.area") == 1;
 }
 
-test "impl decl resolution fix" {
-    output = run_jac_import("mtest", os.path.join(FIXTURES, "./"));
-    assert "2.0\n" in output;
-}
-
-test "impl grab" {
-    output = run_jac_import("impl_grab", os.path.join(FIXTURES, "./"));
-    assert "1.414" in output;
-}
 
 test "nested impls" {
     output = run_jac_import("nested_impls", os.path.join(FIXTURES, "./"));
@@ -149,15 +170,24 @@ test "nested impls" {
     assert "Final message:!" in lines[5];
 }
 
-test "abstraction bug" {
-    output = run_jac_import("atest", os.path.join(FIXTURES, "./"));
-    assert output == "42\n";
+test "abstraction bug, and related cases" {
+    def check_abstraction_bug {
+        output = run_jac_import("atest", os.path.join(FIXTURES, "./"));
+        assert output == "42\n";
+    }
+
+    def check_inner_mod_impl {
+        output = run_jac_import("enumerations", os.path.join(FIXTURES, "./"));
+        assert output == "1\n";
+    }
+    run_cases(
+        [
+            ("abstraction bug", check_abstraction_bug),
+            ("inner mod impl", check_inner_mod_impl)
+        ]
+    );
 }
 
-test "inner mod impl" {
-    output = run_jac_import("enumerations", os.path.join(FIXTURES, "./"));
-    assert output == "1\n";
-}
 
 test "impl body symbol resolution" {
     state = (out := JacProgram()).compile(

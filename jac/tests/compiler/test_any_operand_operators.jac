@@ -13,6 +13,8 @@ Unknown operands but not Any -- so `c += (..)` reported E1011.
 
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.driver.compile_options { CompileOptions }
+import from tests.support { run_cases }
+
 
 def check_src(src: str) -> list[str] {
     prog = JacProgram();
@@ -22,23 +24,37 @@ def check_src(src: str) -> list[str] {
     return [str(e) for e in prog.errors_had];
 }
 
-test "an Any operand absorbs a binary operator" {
-    src = "def probe(c: any, xs: list[str], s: str) -> None {\n"
-        + "    a = c + xs;\n"
-        + "    b = c + s;\n"
-        + "    d = xs + c;\n"
-        + "    assert a is not None and b is not None and d is not None;\n"
-        + "}\n";
-    errs = check_src(src);
-    assert not errs , f"Any operand rejected by binary operator: {errs}";
-}
+test "an Any cases" {
+    def check_an_any_operand_absorbs_a_binary_operator {
+        src = "def probe(c: any, xs: list[str], s: str) -> None {\n"
+            + "    a = c + xs;\n"
+            + "    b = c + s;\n"
+            + "    d = xs + c;\n"
+            + "    assert a is not None and b is not None and d is not None;\n"
+            + "}\n";
+        errs = check_src(src);
+        assert not errs , f"Any operand rejected by binary operator: {errs}";
+    }
 
-test "an Any target absorbs an augmented assignment" {
-    src = "def probe(c: any) -> None {\n"
-        + "    g: any = c;\n"
-        + "    g += ('x', 'y');\n"
-        + "    assert g is not None;\n"
-        + "}\n";
-    errs = check_src(src);
-    assert not errs , f"Any target rejected by augmented assignment: {errs}";
+    def check_an_any_target_absorbs_an_augmented_assignment {
+        src = "def probe(c: any) -> None {\n"
+            + "    g: any = c;\n"
+            + "    g += ('x', 'y');\n"
+            + "    assert g is not None;\n"
+            + "}\n";
+        errs = check_src(src);
+        assert not errs , f"Any target rejected by augmented assignment: {errs}";
+    }
+    run_cases(
+        [
+            (
+                "an Any operand absorbs a binary operator",
+                check_an_any_operand_absorbs_a_binary_operator
+            ),
+            (
+                "an Any target absorbs an augmented assignment",
+                check_an_any_target_absorbs_an_augmented_assignment
+            )
+        ]
+    );
 }

@@ -13,7 +13,7 @@ Fixtures exercised:
   - perf_deep_call_chain.jac
 """
 
-import from tests.support { jac_command }
+import from tests.support { jac_command, run_cases }
 
 import os;
 import re;
@@ -219,23 +219,62 @@ test "gc reduces rss for perf_alloc_storm" {
     print(f"[alloc_storm] gc={gc} KB  nogc={nogc} KB  saved={nogc - gc} KB");
 }
 
-test "gc reduces rss for perf_retain_release" {
-    # 1M reassignments -> ~100 MB leak without GC.
-    (gc, nogc) = _measure_gc_savings("perf_retain_release.jac", min_savings_kb=10240);
-    print(f"[retain_release] gc={gc} KB  nogc={nogc} KB  saved={nogc - gc} KB");
+test "gc reduces rss for perf_retain_release, and related cases" {
+    def check_gc_reduces_rss_for_perf_retain_release {
+        # 1M reassignments -> ~100 MB leak without GC.
+        (gc, nogc) = _measure_gc_savings(
+            "perf_retain_release.jac", min_savings_kb=10240
+        );
+        print(f"[retain_release] gc={gc} KB  nogc={nogc} KB  saved={nogc - gc} KB");
+    }
+
+    def check_gc_reduces_rss_for_perf_string_concat {
+        # String churn allocates fresh buffers each iter; without GC RSS balloons.
+        (gc, nogc) = _measure_gc_savings(
+            "perf_string_concat.jac", min_savings_kb=10240
+        );
+        print(f"[string_concat] gc={gc} KB  nogc={nogc} KB  saved={nogc - gc} KB");
+    }
+
+    def check_gc_reduces_rss_for_perf_deep_call_chain {
+        # Per-frame Frame() allocations pile up in 200x5000 calls without GC.
+        (gc, nogc) = _measure_gc_savings(
+            "perf_deep_call_chain.jac", min_savings_kb=10240
+        );
+        print(f"[deep_call_chain] gc={gc} KB  nogc={nogc} KB  saved={nogc - gc} KB");
+    }
+
+    def check_gc_reclaims_owned_temporaries_across_consumption {
+        # Regression guard for #6464: each iteration produces heap temporaries that
+        # are consumed by a for-loop, a comprehension, an `in` test, set.add, and
+        # call arguments. If any seam fails to release its temporary the leak
+        # survives even with GC on, so the GC-vs-no-GC delta collapses. With the
+        # releases in place GC keeps RSS flat while no-GC balloons.
+        (gc, nogc) = _measure_gc_savings("perf_owned_temps.jac", min_savings_kb=10240);
+        print(f"[owned_temps] gc={gc} KB  nogc={nogc} KB  saved={nogc - gc} KB");
+    }
+    run_cases(
+        [
+            (
+                "gc reduces rss for perf_retain_release",
+                check_gc_reduces_rss_for_perf_retain_release
+            ),
+            (
+                "gc reduces rss for perf_string_concat",
+                check_gc_reduces_rss_for_perf_string_concat
+            ),
+            (
+                "gc reduces rss for perf_deep_call_chain",
+                check_gc_reduces_rss_for_perf_deep_call_chain
+            ),
+            (
+                "gc reclaims owned temporaries across consumption seams",
+                check_gc_reclaims_owned_temporaries_across_consumption
+            )
+        ]
+    );
 }
 
-test "gc reduces rss for perf_string_concat" {
-    # String churn allocates fresh buffers each iter; without GC RSS balloons.
-    (gc, nogc) = _measure_gc_savings("perf_string_concat.jac", min_savings_kb=10240);
-    print(f"[string_concat] gc={gc} KB  nogc={nogc} KB  saved={nogc - gc} KB");
-}
-
-test "gc reduces rss for perf_deep_call_chain" {
-    # Per-frame Frame() allocations pile up in 200x5000 calls without GC.
-    (gc, nogc) = _measure_gc_savings("perf_deep_call_chain.jac", min_savings_kb=10240);
-    print(f"[deep_call_chain] gc={gc} KB  nogc={nogc} KB  saved={nogc - gc} KB");
-}
 
 test "gc reduces rss for chess" {
     # Feed EOF (Ctrl+D) immediately on stdin: input() returns empty so each
@@ -248,35 +287,39 @@ test "gc reduces rss for chess" {
     print(f"[chess] gc={gc} KB  nogc={nogc} KB  saved={nogc - gc} KB");
 }
 
-test "cycle_collect: reclaims mutually-referential struct cycles under load" {
-    # ~300k two-node `A <-> B` struct cycles, swept via `__rc_collect_cycles()`
-    # every 10k pairs. Unreclaimable by reference counting alone (each node pins
-    # its sibling's refcount at 1), so only the trial-deletion collector frees
-    # them. With cycles ON, RSS stays flat; with cycles OFF or no GC it balloons.
-    (on, off, nogc) = _measure_cycle_collection(
-        "cycle_collect_storm.jac", min_savings_kb=10240
-    );
-    print(f"[cycle_struct] on={on} KB  off={off} KB  nogc={nogc} KB");
-}
+test "cycle_collect: reclaims cases" {
+    def check_cycle_collect_reclaims_mutually_referential_stru {
+        # ~300k two-node `A <-> B` struct cycles, swept via `__rc_collect_cycles()`
+        # every 10k pairs. Unreclaimable by reference counting alone (each node pins
+        # its sibling's refcount at 1), so only the trial-deletion collector frees
+        # them. With cycles ON, RSS stays flat; with cycles OFF or no GC it balloons.
+        (on, off, nogc) = _measure_cycle_collection(
+            "cycle_collect_storm.jac", min_savings_kb=10240
+        );
+        print(f"[cycle_struct] on={on} KB  off={off} KB  nogc={nogc} KB");
+    }
 
-test "cycle_collect: reclaims cycles routed through a container's elements" {
-    # Cycle `a -> a.items(list) -> b -> b.items(list) -> a`. Reclaiming it
-    # requires the list to carry a trace fn exposing its managed elements to the
-    # collector; without it the box trace reaches the list and stops, leaking
-    # every pair even with collection on. This is the container-trace regression
-    # guard — the delta only survives if `__rc_trace_list_*` walks the elements.
-    (on, off, nogc) = _measure_cycle_collection(
-        "cycle_collect_container.jac", min_savings_kb=10240
+    def check_cycle_collect_reclaims_cycles_routed_through_a_c {
+        # Cycle `a -> a.items(list) -> b -> b.items(list) -> a`. Reclaiming it
+        # requires the list to carry a trace fn exposing its managed elements to the
+        # collector; without it the box trace reaches the list and stops, leaking
+        # every pair even with collection on. This is the container-trace regression
+        # guard — the delta only survives if `__rc_trace_list_*` walks the elements.
+        (on, off, nogc) = _measure_cycle_collection(
+            "cycle_collect_container.jac", min_savings_kb=10240
+        );
+        print(f"[cycle_container] on={on} KB  off={off} KB  nogc={nogc} KB");
+    }
+    run_cases(
+        [
+            (
+                "cycle_collect: reclaims mutually-referential struct cycles under load",
+                check_cycle_collect_reclaims_mutually_referential_stru
+            ),
+            (
+                "cycle_collect: reclaims cycles routed through a container's elements",
+                check_cycle_collect_reclaims_cycles_routed_through_a_c
+            )
+        ]
     );
-    print(f"[cycle_container] on={on} KB  off={off} KB  nogc={nogc} KB");
-}
-
-test "gc reclaims owned temporaries across consumption seams" {
-    # Regression guard for #6464: each iteration produces heap temporaries that
-    # are consumed by a for-loop, a comprehension, an `in` test, set.add, and
-    # call arguments. If any seam fails to release its temporary the leak
-    # survives even with GC on, so the GC-vs-no-GC delta collapses. With the
-    # releases in place GC keeps RSS flat while no-GC balloons.
-    (gc, nogc) = _measure_gc_savings("perf_owned_temps.jac", min_savings_kb=10240);
-    print(f"[owned_temps] gc={gc} KB  nogc={nogc} KB  saved={nogc - gc} KB");
 }

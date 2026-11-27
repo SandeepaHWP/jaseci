@@ -21,6 +21,8 @@ import from jaclang.compiler.capability_notes {
     TARGET_NATIVE,
     TARGET_SERVER
 }
+import from tests.support { run_cases }
+
 
 glob WIRE_SRC = (
          "import from typing { Generator, Literal, Optional, Text, TypeAlias, Union }\n\n"
@@ -147,21 +149,36 @@ test "a generator crosses as a streamed result and never as a parameter" {
     assert len(found) == 1 and "streamed result" in found[0][2] , found;
 }
 
-test "an archetype crosses only when every field does" {
-    found = request_refusals(typed_module(), "holder");
-    assert len(found) == 1 , found;
-    (what, spelled, why) = found[0];
-    assert what == "the return" and spelled == "Holder" , found;
-    assert "hook" in why , why;
+test "an archetype cases" {
+    def check_an_archetype_crosses_only_when_every_field_does {
+        found = request_refusals(typed_module(), "holder");
+        assert len(found) == 1 , found;
+        (what, spelled, why) = found[0];
+        assert what == "the return" and spelled == "Holder" , found;
+        assert "hook" in why , why;
+    }
+
+    def check_an_archetype_is_judged_by_the_fields_it_inherits {
+        found = request_refusals(typed_module(), "child");
+        assert len(found) == 1 , found;
+        (what, spelled, why) = found[0];
+        assert what == "the return" and spelled == "Child" , found;
+        assert "hook" in why , why;
+    }
+    run_cases(
+        [
+            (
+                "an archetype crosses only when every field does",
+                check_an_archetype_crosses_only_when_every_field_does
+            ),
+            (
+                "an archetype is judged by the fields it inherits too",
+                check_an_archetype_is_judged_by_the_fields_it_inherits
+            )
+        ]
+    );
 }
 
-test "an archetype is judged by the fields it inherits too" {
-    found = request_refusals(typed_module(), "child");
-    assert len(found) == 1 , found;
-    (what, spelled, why) = found[0];
-    assert what == "the return" and spelled == "Child" , found;
-    assert "hook" in why , why;
-}
 
 test "a native function with a default is not called from Python through its stub" {
     defaulted = function_named(typed_module(), "defaulted");

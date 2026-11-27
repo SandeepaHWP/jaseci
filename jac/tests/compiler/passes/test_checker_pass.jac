@@ -2,7 +2,7 @@
 
 import os;
 import from pathlib { Path }
-import from tests.support { JAC_ROOT }
+import from tests.support { JAC_ROOT, run_cases }
 import jaclang;
 import jaclang.compiler.frontend.unitree as uni;
 import from jaclang.compiler.driver.program { JacProgram }
@@ -2205,51 +2205,90 @@ test "disconnect_typed" {
         + "\n---\n".join(e.pretty_print() for e in e1098);
 }
 
-test "disconnect_op_no_w1051" {
-    # Issue #5885 gap 9: `del a --> b` (and its typed/reverse forms) used
-    # to fall through `apply_connect_or_disconnect` without setting a
-    # result type, so every disconnect site emitted a spurious W1051.
-    # The runtime returns `bool`, so the typed result is `bool` — and bare
-    # disconnect statements must produce no W1051 noise.
-    path = os.path.join(CHECKER_FIXTURES, "checker_disconnect_op_no_w1051.jac");
-    program = JacProgram();
-    mod = program.compile(path, options=NO_TC);
-    w1051 = [
-        w
-        for w in program.warnings_had
-        if w.code and w.code.code == "W1051"
-    ];
-    assert len(w1051) == 0 , f"Expected no W1051 on disconnect ops, got {len(w1051)}:\n"
-        + "\n---\n".join(w.pretty_print() for w in w1051);
-    # Disconnect must type as `bool` so that `removed: bool = a del --> b`
-    # is a clean assignment, not E1001 (Unknown -> bool).
-    assert len(program.errors_had) == 0 , f"Unexpected errors: {[
-        e.pretty_print() for e in program.errors_had
-    ]}";
+test "disconnect_op_no_w1051, and related cases" {
+    def check_disconnect_op_no_w1051 {
+        # Issue #5885 gap 9: `del a --> b` (and its typed/reverse forms) used
+        # to fall through `apply_connect_or_disconnect` without setting a
+        # result type, so every disconnect site emitted a spurious W1051.
+        # The runtime returns `bool`, so the typed result is `bool` — and bare
+        # disconnect statements must produce no W1051 noise.
+        path = os.path.join(CHECKER_FIXTURES, "checker_disconnect_op_no_w1051.jac");
+        program = JacProgram();
+        mod = program.compile(path, options=NO_TC);
+        w1051 = [
+            w
+            for w in program.warnings_had
+            if w.code and w.code.code == "W1051"
+        ];
+        assert len(w1051) == 0 , f"Expected no W1051 on disconnect ops, got {len(
+            w1051
+        )}:\n"
+            + "\n---\n".join(w.pretty_print() for w in w1051);
+        # Disconnect must type as `bool` so that `removed: bool = a del --> b`
+        # is a clean assignment, not E1001 (Unknown -> bool).
+        assert len(program.errors_had) == 0 , f"Unexpected errors: {[
+            e.pretty_print() for e in program.errors_had
+        ]}";
+    }
+
+    def check_named_entry_no_w1051 {
+        # Regression: a named entry block (`with entry:__main__`, `with entry:foo`)
+        # emitted a spurious W1051 on the entry-point label. A ModuleCode's `name`
+        # is a Name node that is a label, not a variable reference -- it has no
+        # symbol -- but exit_name type-evaluated it, got Unknown, and warned. This
+        # fired on the idiomatic `with entry:__main__` guard of nearly every program.
+        path = os.path.join(CHECKER_FIXTURES, "checker_named_entry_no_w1051.jac");
+        program = JacProgram();
+        mod = program.compile(path, options=NO_TC);
+        w1051 = [
+            w
+            for w in program.warnings_had
+            if w.code and w.code.code == "W1051"
+        ];
+        assert len(w1051) == 0 , f"Expected no W1051 on named entry labels, got {len(
+            w1051
+        )}:\n"
+            + "\n---\n".join(w.pretty_print() for w in w1051);
+        assert len(program.errors_had) == 0 , f"Unexpected errors: {[
+            e.pretty_print() for e in program.errors_had
+        ]}";
+    }
+
+    def check_super_init_dataclass_no_w1051 {
+        # Regression: `super.init(...)` on a parent whose constructor is
+        # dataclass-synthesized from `has` fields was emitting a spurious W1051
+        # (Unknown expression type) and an E1001 when the call result was assigned
+        # to a None-annotated slot. Root cause: _create_dataclass_init_method
+        # returned a FunctionType with return_type=UnknownType. Since an implicit
+        # __init__ returns None, the synthesized init must reflect that so member
+        # calls through `super.init(...)` type cleanly.
+        path = os.path.join(
+            CHECKER_FIXTURES, "checker_super_init_dataclass_no_w1051.jac"
+        );
+        program = JacProgram();
+        mod = program.compile(path, options=NO_TC);
+        w1051 = [
+            w
+            for w in program.warnings_had
+            if w.code and w.code.code == "W1051"
+        ];
+        assert len(w1051) == 0 , f"Expected no W1051 on super.init() with synthesized parent init, got {len(
+            w1051
+        )}:\n"
+            + "\n---\n".join(w.pretty_print() for w in w1051);
+        assert len(program.errors_had) == 0 , f"Unexpected errors: {[
+            e.pretty_print() for e in program.errors_had
+        ]}";
+    }
+    run_cases(
+        [
+            ("disconnect_op_no_w1051", check_disconnect_op_no_w1051),
+            ("named_entry_no_w1051", check_named_entry_no_w1051),
+            ("super_init_dataclass_no_w1051", check_super_init_dataclass_no_w1051)
+        ]
+    );
 }
 
-test "named_entry_no_w1051" {
-    # Regression: a named entry block (`with entry:__main__`, `with entry:foo`)
-    # emitted a spurious W1051 on the entry-point label. A ModuleCode's `name`
-    # is a Name node that is a label, not a variable reference -- it has no
-    # symbol -- but exit_name type-evaluated it, got Unknown, and warned. This
-    # fired on the idiomatic `with entry:__main__` guard of nearly every program.
-    path = os.path.join(CHECKER_FIXTURES, "checker_named_entry_no_w1051.jac");
-    program = JacProgram();
-    mod = program.compile(path, options=NO_TC);
-    w1051 = [
-        w
-        for w in program.warnings_had
-        if w.code and w.code.code == "W1051"
-    ];
-    assert len(w1051) == 0 , f"Expected no W1051 on named entry labels, got {len(
-        w1051
-    )}:\n"
-        + "\n---\n".join(w.pretty_print() for w in w1051);
-    assert len(program.errors_had) == 0 , f"Unexpected errors: {[
-        e.pretty_print() for e in program.errors_had
-    ]}";
-}
 
 test "lambda_param_inferred_from_expected_callable" {
     # Unannotated lambda params infer from the key= callable, so no E1054/W1051.
@@ -3038,30 +3077,6 @@ test "impl_self_member_assignment" {
         + "\n".join([err.pretty_print() for err in program.errors_had]);
 }
 
-test "super_init_dataclass_no_w1051" {
-    # Regression: `super.init(...)` on a parent whose constructor is
-    # dataclass-synthesized from `has` fields was emitting a spurious W1051
-    # (Unknown expression type) and an E1001 when the call result was assigned
-    # to a None-annotated slot. Root cause: _create_dataclass_init_method
-    # returned a FunctionType with return_type=UnknownType. Since an implicit
-    # __init__ returns None, the synthesized init must reflect that so member
-    # calls through `super.init(...)` type cleanly.
-    path = os.path.join(CHECKER_FIXTURES, "checker_super_init_dataclass_no_w1051.jac");
-    program = JacProgram();
-    mod = program.compile(path, options=NO_TC);
-    w1051 = [
-        w
-        for w in program.warnings_had
-        if w.code and w.code.code == "W1051"
-    ];
-    assert len(w1051) == 0 , f"Expected no W1051 on super.init() with synthesized parent init, got {len(
-        w1051
-    )}:\n"
-        + "\n---\n".join(w.pretty_print() for w in w1051);
-    assert len(program.errors_had) == 0 , f"Unexpected errors: {[
-        e.pretty_print() for e in program.errors_had
-    ]}";
-}
 
 test "enum_type_checking" {
     program = JacProgram();
@@ -3244,20 +3259,79 @@ test "assert_isinstance_narrowing" {
     assert 'has no attribute "value"' in err_msg , f"Expected attribute error, got: {err_msg}";
 }
 
-"""Assignment barrier: strict narrowing, widening reset, in-branch re-narrow."""
-test "assignment_barrier" {
-    program = JacProgram();
-    mod = program.compile(
-        os.path.join(CHECKER_FIXTURES, "checker_assignment_barrier.jac"), options=NO_TC
+test "assignment_barrier, and related cases" {
+    # Assignment barrier: strict narrowing, widening reset, in-branch re-narrow.
+    def check_assignment_barrier {
+        program = JacProgram();
+        mod = program.compile(
+            os.path.join(CHECKER_FIXTURES, "checker_assignment_barrier.jac"),
+            options=NO_TC
+        );
+        # The widening reassignment in `widen_via_reassign` resets `x` to
+        # `int | None`, so `return x` against the `int` return type is the
+        # only expected error.
+        assert len(program.errors_had) == 1 , "Expected 1 type error, but got "
+            + f"{len(program.errors_had)}:\n"
+            + "\n---\n".join(err.pretty_print() for err in program.errors_had);
+        msg = program.errors_had[0].pretty_print();
+        assert 'Cannot return int | NoneType' in msg , f"Expected widening-reset error, got: {msg}";
+    }
+
+    # Tuple-unpacking assignment acts as a narrowing barrier.
+    def check_tuple_unpack_barrier {
+        program = JacProgram();
+        mod = program.compile(
+            os.path.join(CHECKER_FIXTURES, "checker_tuple_unpack_barrier.jac"),
+            options=NO_TC
+        );
+        # After `(x, _) = reset_pair()` inside `if x is not None`, x must
+        # reset to int | None. `return x` then fails against int.
+        assert len(program.errors_had) == 1 , "Expected 1 type error, but got "
+            + f"{len(program.errors_had)}:\n"
+            + "\n---\n".join(err.pretty_print() for err in program.errors_had);
+        msg = program.errors_had[0].pretty_print();
+        assert 'Cannot return int | NoneType' in msg , f"Expected widening-reset error, got: {msg}";
+    }
+
+    # Destructuring assignment narrows by RHS element type when available.
+    def check_destructure_element_narrowing {
+        program = JacProgram();
+        mod = program.compile(
+            os.path.join(CHECKER_FIXTURES, "checker_destructure_element_narrowing.jac"),
+            options=NO_TC
+        );
+        # Four narrowing cases must succeed; only `no_narrow_non_strict`
+        # should error because its RHS element type matches the declared
+        # type and therefore fails the strict-narrowing check.
+        assert len(program.errors_had) == 1 , "Expected 1 type error, but got "
+            + f"{len(program.errors_had)}:\n"
+            + "\n---\n".join(err.pretty_print() for err in program.errors_had);
+        msg = program.errors_had[0].pretty_print();
+        assert 'Cannot return int | str' in msg , f"Expected non-strict-narrow error, got: {msg}";
+    }
+
+    # Per-position tuple index typing + variadic destructuring (issue #7238).
+    def check_tuple_index_typing {
+        program = JacProgram();
+        mod = program.compile(
+            os.path.join(CHECKER_FIXTURES, "checker_tuple_index_typing.jac"),
+            options=NO_TC
+        );
+        # Only `per_position_mismatch` errors: `t[1]` is bytes, assigned to str.
+        assert len(program.errors_had) == 1 , "Expected 1 type error, but got "
+            + f"{len(program.errors_had)}:\n"
+            + "\n---\n".join(err.pretty_print() for err in program.errors_had);
+        msg = program.errors_had[0].pretty_print();
+        assert 'Cannot assign bytes to str' in msg , f"Expected per-position mismatch, got: {msg}";
+    }
+    run_cases(
+        [
+            ("assignment_barrier", check_assignment_barrier),
+            ("tuple_unpack_barrier", check_tuple_unpack_barrier),
+            ("destructure_element_narrowing", check_destructure_element_narrowing),
+            ("tuple_index_typing", check_tuple_index_typing)
+        ]
     );
-    # The widening reassignment in `widen_via_reassign` resets `x` to
-    # `int | None`, so `return x` against the `int` return type is the
-    # only expected error.
-    assert len(program.errors_had) == 1 , "Expected 1 type error, but got "
-        + f"{len(program.errors_had)}:\n"
-        + "\n---\n".join(err.pretty_print() for err in program.errors_had);
-    msg = program.errors_had[0].pretty_print();
-    assert 'Cannot return int | NoneType' in msg , f"Expected widening-reset error, got: {msg}";
 }
 
 """Starred-unpack assignment acts as a narrowing barrier."""
@@ -3281,52 +3355,6 @@ test "starred_unpack_barrier" {
     assert 'Cannot assign str to int' in msg , f"Expected the last element's type, got: {msg}";
 }
 
-"""Tuple-unpacking assignment acts as a narrowing barrier."""
-test "tuple_unpack_barrier" {
-    program = JacProgram();
-    mod = program.compile(
-        os.path.join(CHECKER_FIXTURES, "checker_tuple_unpack_barrier.jac"),
-        options=NO_TC
-    );
-    # After `(x, _) = reset_pair()` inside `if x is not None`, x must
-    # reset to int | None. `return x` then fails against int.
-    assert len(program.errors_had) == 1 , "Expected 1 type error, but got "
-        + f"{len(program.errors_had)}:\n"
-        + "\n---\n".join(err.pretty_print() for err in program.errors_had);
-    msg = program.errors_had[0].pretty_print();
-    assert 'Cannot return int | NoneType' in msg , f"Expected widening-reset error, got: {msg}";
-}
-
-"""Destructuring assignment narrows by RHS element type when available."""
-test "destructure_element_narrowing" {
-    program = JacProgram();
-    mod = program.compile(
-        os.path.join(CHECKER_FIXTURES, "checker_destructure_element_narrowing.jac"),
-        options=NO_TC
-    );
-    # Four narrowing cases must succeed; only `no_narrow_non_strict`
-    # should error because its RHS element type matches the declared
-    # type and therefore fails the strict-narrowing check.
-    assert len(program.errors_had) == 1 , "Expected 1 type error, but got "
-        + f"{len(program.errors_had)}:\n"
-        + "\n---\n".join(err.pretty_print() for err in program.errors_had);
-    msg = program.errors_had[0].pretty_print();
-    assert 'Cannot return int | str' in msg , f"Expected non-strict-narrow error, got: {msg}";
-}
-
-"""Per-position tuple index typing + variadic destructuring (issue #7238)."""
-test "tuple_index_typing" {
-    program = JacProgram();
-    mod = program.compile(
-        os.path.join(CHECKER_FIXTURES, "checker_tuple_index_typing.jac"), options=NO_TC
-    );
-    # Only `per_position_mismatch` errors: `t[1]` is bytes, assigned to str.
-    assert len(program.errors_had) == 1 , "Expected 1 type error, but got "
-        + f"{len(program.errors_had)}:\n"
-        + "\n---\n".join(err.pretty_print() for err in program.errors_had);
-    msg = program.errors_had[0].pretty_print();
-    assert 'Cannot assign bytes to str' in msg , f"Expected per-position mismatch, got: {msg}";
-}
 
 """Match-case narrowing is killed by a later assignment to the subject."""
 test "match_case_reassign_reset" {
@@ -3414,47 +3442,58 @@ test "getattr_support" {
     assert "has no attribute" in user_errors[1].pretty_print();
 }
 
-"""Test NamedTuple type checking: constructor accepts positional arguments for fields."""
-test "namedtuple_constructor" {
-    program = JacProgram();
-    path = os.path.join(CHECKER_FIXTURES, "checker_namedtuple.jac");
-    mod = program.compile(path, options=NO_TC);
+test "namedtuple_constructor, and related cases" {
+    # Test NamedTuple type checking: constructor accepts positional arguments for fields.
+    def check_namedtuple_constructor {
+        program = JacProgram();
+        path = os.path.join(CHECKER_FIXTURES, "checker_namedtuple.jac");
+        mod = program.compile(path, options=NO_TC);
 
-    user_errors = [
-        err
-        for err in program.errors_had
-        if "vendor" not in err.loc.mod_path and "typeshed" not in err.loc.mod_path
-    ];
+        user_errors = [
+            err
+            for err in program.errors_had
+            if "vendor" not in err.loc.mod_path and "typeshed" not in err.loc.mod_path
+        ];
 
-    # NamedTuple should accept positional arguments for fields - no errors expected
-    assert len(user_errors) == 0 , f"Expected 0 errors for NamedTuple, got {len(
-        user_errors
-    )}: "
-        + "\n".join([err.pretty_print() for err in user_errors]);
+        # NamedTuple should accept positional arguments for fields - no errors expected
+        assert len(user_errors) == 0 , f"Expected 0 errors for NamedTuple, got {len(
+            user_errors
+        )}: "
+            + "\n".join([err.pretty_print() for err in user_errors]);
+    }
+
+    # Test overload resolution prefers concrete types over Unknown in type_args.
+    #
+    # When a method has multiple overloads (e.g., str.split), and one returns
+    # list[LiteralString] (Unknown) and another returns list[str], the type
+    # checker should prefer the concrete list[str] overload.
+    def check_overload_resolution_concrete_types {
+        program = JacProgram();
+        path = os.path.join(CHECKER_FIXTURES, "checker_overload_resolution.jac");
+        mod = program.compile(path, options=NO_TC);
+
+        user_errors = [
+            err
+            for err in program.errors_had
+            if "vendor" not in err.loc.mod_path and "typeshed" not in err.loc.mod_path
+        ];
+
+        # str.split() -> list[str], list[str][0] -> str, str + str -> str
+        # No errors expected when overload resolution picks concrete types
+        assert len(user_errors) == 0 , f"Expected 0 errors, got {len(user_errors)}: "
+            + "\n".join([err.pretty_print() for err in user_errors]);
+    }
+    run_cases(
+        [
+            ("namedtuple_constructor", check_namedtuple_constructor),
+            (
+                "overload_resolution_concrete_types",
+                check_overload_resolution_concrete_types
+            )
+        ]
+    );
 }
 
-"""Test overload resolution prefers concrete types over Unknown in type_args.
-
-When a method has multiple overloads (e.g., str.split), and one returns
-list[LiteralString] (Unknown) and another returns list[str], the type
-checker should prefer the concrete list[str] overload.
-"""
-test "overload_resolution_concrete_types" {
-    program = JacProgram();
-    path = os.path.join(CHECKER_FIXTURES, "checker_overload_resolution.jac");
-    mod = program.compile(path, options=NO_TC);
-
-    user_errors = [
-        err
-        for err in program.errors_had
-        if "vendor" not in err.loc.mod_path and "typeshed" not in err.loc.mod_path
-    ];
-
-    # str.split() -> list[str], list[str][0] -> str, str + str -> str
-    # No errors expected when overload resolution picks concrete types
-    assert len(user_errors) == 0 , f"Expected 0 errors, got {len(user_errors)}: "
-        + "\n".join([err.pretty_print() for err in user_errors]);
-}
 
 test "literal_string_type_checking" {
     program = JacProgram();
@@ -3540,32 +3579,41 @@ test "stdlib_star_reexport" {
     assert mod.sym_tab.lookup("SimpleQueue") is not None , "SimpleQueue not resolved - queue star re-export broken";
 }
 
-# =============================================================================
-# Generic Type Inference Tests (Pyright-style)
-# =============================================================================
-test "enumerate_type_inference" {
-    program = JacProgram();
-    path = os.path.join(CHECKER_FIXTURES, "checker_gap_enumerate_type.jac");
-    mod = program.compile(path, options=NO_TC);
-    assert len(program.errors_had) == 2 , f"Expected 2 type errors, got {len(
-        program.errors_had
-    )}";
-    errors_str = "\n".join(e.pretty_print() for e in program.errors_had);
-    assert "Cannot assign int to str" in errors_str;
-    assert "Cannot assign Item to int" in errors_str;
+test "enumerate_type_inference, and related cases" {
+    # =============================================================================
+    # Generic Type Inference Tests (Pyright-style)
+    # =============================================================================
+    def check_enumerate_type_inference {
+        program = JacProgram();
+        path = os.path.join(CHECKER_FIXTURES, "checker_gap_enumerate_type.jac");
+        mod = program.compile(path, options=NO_TC);
+        assert len(program.errors_had) == 2 , f"Expected 2 type errors, got {len(
+            program.errors_had
+        )}";
+        errors_str = "\n".join(e.pretty_print() for e in program.errors_had);
+        assert "Cannot assign int to str" in errors_str;
+        assert "Cannot assign Item to int" in errors_str;
+    }
+
+    def check_generic_call_inference {
+        program = JacProgram();
+        path = os.path.join(CHECKER_FIXTURES, "checker_gap_generic_call_inference.jac");
+        mod = program.compile(path, options=NO_TC);
+        assert len(program.errors_had) == 2 , f"Expected 2 type errors, got {len(
+            program.errors_had
+        )}";
+        errors_str = "\n".join(e.pretty_print() for e in program.errors_had);
+        assert "Cannot assign Item to str" in errors_str;
+        assert "Cannot assign Item to int" in errors_str;
+    }
+    run_cases(
+        [
+            ("enumerate_type_inference", check_enumerate_type_inference),
+            ("generic_call_inference", check_generic_call_inference)
+        ]
+    );
 }
 
-test "generic_call_inference" {
-    program = JacProgram();
-    path = os.path.join(CHECKER_FIXTURES, "checker_gap_generic_call_inference.jac");
-    mod = program.compile(path, options=NO_TC);
-    assert len(program.errors_had) == 2 , f"Expected 2 type errors, got {len(
-        program.errors_had
-    )}";
-    errors_str = "\n".join(e.pretty_print() for e in program.errors_had);
-    assert "Cannot assign Item to str" in errors_str;
-    assert "Cannot assign Item to int" in errors_str;
-}
 
 test "tuple iterable inference includes every position" {
     program = JacProgram();
@@ -3641,57 +3689,72 @@ test "enum_typed_base" {
     );
 }
 
-"""Attribute access on a `Self`-typed value resolves via the enclosing class.
-
-Regression for the E1031 raised on `unloaded.id = self.id;` in
-jac/jaclang/runtime/impl/archetype.impl.jac, where
-`object.__new__(self.__class__)` returns Self and the checker treated Self as an
-unbounded TypeVar with no member access. After the fix, attribute access on a
-Self-typed value resolves via the enclosing class — Pyright behavior.
-"""
-test "self_typevar_attr_access_via_enclosing_class" {
-    program = JacProgram();
-    mod = program.compile(
-        os.path.join(CHECKER_FIXTURES, "checker_self_type_attr_access.jac"),
-        options=NO_TC
-    );
-    user_errors = [
-        err
-        for err in program.errors_had
-        if "vendor" not in err.loc.mod_path and "typeshed" not in err.loc.mod_path
-    ];
-    assert len(user_errors) == 0 , f"Expected 0 user errors, got {len(user_errors)}:\n"
-        + "\n".join(e.pretty_print() for e in user_errors);
-    # Defensive: even any vendor-side errors must not still claim "type Self"
-    # for the user fixture's positions — that would mean the fix didn't take.
-    for err in program.errors_had {
-        if "checker_self_type_attr_access" in err.loc.mod_path {
-            assert "type \"Self\"" not in err.pretty_print() , f"Error should not refer to opaque Self type, got:\n{err.pretty_print()}";
+test "self_typevar_attr_access_via_enclosing_class, and related cases" {
+    # Attribute access on a `Self`-typed value resolves via the enclosing class.
+    #
+    # Regression for the E1031 raised on `unloaded.id = self.id;` in
+    # jac/jaclang/runtime/impl/archetype.impl.jac, where
+    # `object.__new__(self.__class__)` returns Self and the checker treated Self as an
+    # unbounded TypeVar with no member access. After the fix, attribute access on a
+    # Self-typed value resolves via the enclosing class — Pyright behavior.
+    def check_self_typevar_attr_access_via_enclosing_class {
+        program = JacProgram();
+        mod = program.compile(
+            os.path.join(CHECKER_FIXTURES, "checker_self_type_attr_access.jac"),
+            options=NO_TC
+        );
+        user_errors = [
+            err
+            for err in program.errors_had
+            if "vendor" not in err.loc.mod_path and "typeshed" not in err.loc.mod_path
+        ];
+        assert len(user_errors) == 0 , f"Expected 0 user errors, got {len(
+            user_errors
+        )}:\n"
+            + "\n".join(e.pretty_print() for e in user_errors);
+        # Defensive: even any vendor-side errors must not still claim "type Self"
+        # for the user fixture's positions — that would mean the fix didn't take.
+        for err in program.errors_had {
+            if "checker_self_type_attr_access" in err.loc.mod_path {
+                assert "type \"Self\"" not in err.pretty_print() , f"Error should not refer to opaque Self type, got:\n{err.pretty_print()}";
+            }
         }
     }
-}
 
-"""Self-typed return values resolve via the receiver class for chained and
-indirected access (issue #5688)."""
-test "self_class_member_access_5688" {
-    program = JacProgram();
-    mod = program.compile(
-        os.path.join(CHECKER_FIXTURES, "checker_self_class_member_access.jac"),
-        options=NO_TC
-    );
-    user_errors = [
-        err
-        for err in program.errors_had
-        if "vendor" not in err.loc.mod_path and "typeshed" not in err.loc.mod_path
-    ];
-    assert len(user_errors) == 0 , f"Expected 0 user errors, got {len(user_errors)}:\n"
-        + "\n".join(e.pretty_print() for e in user_errors);
-    for err in program.errors_had {
-        if "checker_self_class_member_access" in err.loc.mod_path {
-            assert "type \"Self\"" not in err.pretty_print() , f"Error should not refer to opaque Self type, got:\n{err.pretty_print()}";
+    # Self-typed return values resolve via the receiver class for chained and
+    # indirected access (issue #5688).
+    def check_self_class_member_access_5688 {
+        program = JacProgram();
+        mod = program.compile(
+            os.path.join(CHECKER_FIXTURES, "checker_self_class_member_access.jac"),
+            options=NO_TC
+        );
+        user_errors = [
+            err
+            for err in program.errors_had
+            if "vendor" not in err.loc.mod_path and "typeshed" not in err.loc.mod_path
+        ];
+        assert len(user_errors) == 0 , f"Expected 0 user errors, got {len(
+            user_errors
+        )}:\n"
+            + "\n".join(e.pretty_print() for e in user_errors);
+        for err in program.errors_had {
+            if "checker_self_class_member_access" in err.loc.mod_path {
+                assert "type \"Self\"" not in err.pretty_print() , f"Error should not refer to opaque Self type, got:\n{err.pretty_print()}";
+            }
         }
     }
+    run_cases(
+        [
+            (
+                "self_typevar_attr_access_via_enclosing_class",
+                check_self_typevar_attr_access_via_enclosing_class
+            ),
+            ("self_class_member_access_5688", check_self_class_member_access_5688)
+        ]
+    );
 }
+
 
 # ============================================================================
 # Root cause tests for type checker limitations (from runtime.impl.jac)
@@ -3700,290 +3763,369 @@ test "self_class_member_access_5688" {
 # Tests assert the CURRENT (broken) error count. When a root cause is fixed,
 # the error count should drop to 0 — update the assertion accordingly.
 # ============================================================================
-"""Root Cause 1: No narrowing after `raise`.
+test "checker_narrowing_root_causes.jac cases" {
+    # Root Cause 1: No narrowing after `raise`.
+    #
+    # After `if obj.attr is None { raise ...; }`, obj.attr should be narrowed from
+    # T|None to T. Currently the type checker doesn't narrow through raise, so
+    # subsequent attribute access on obj.attr produces false positive E1099 errors.
+    #
+    # Mirrors: runtime.impl.jac lines 1964-1978 (JacRuntime.program.mtir_map after
+    # raise on None check).
+    def check_root_cause_1_raise_does_not_narrow {
+        program = JacProgram();
+        mod = program.compile(
+            os.path.join(CHECKER_FIXTURES, "checker_narrowing_root_causes.jac"),
+            options=NO_TC
+        );
 
-After `if obj.attr is None { raise ...; }`, obj.attr should be narrowed from
-T|None to T. Currently the type checker doesn't narrow through raise, so
-subsequent attribute access on obj.attr produces false positive E1099 errors.
+        # ok_ function (line 96-101) must produce no errors
+        ok_errors = [
+            e
+            for e in program.errors_had
+            if e.loc
+                and str(e.loc.mod_path).endswith("checker_narrowing_root_causes.jac")
+                and 96 <= e.loc.first_line <= 101
+        ];
+        assert len(ok_errors) == 0 , f"ok_raise_narrowing_simple should have 0 errors, got {len(
+            ok_errors
+        )}:\n"
+            + "\n---\n".join(e.pretty_print() for e in ok_errors);
 
-Mirrors: runtime.impl.jac lines 1964-1978 (JacRuntime.program.mtir_map after
-raise on None check).
-"""
-test "root_cause_1_raise_does_not_narrow" {
-    program = JacProgram();
-    mod = program.compile(
-        os.path.join(CHECKER_FIXTURES, "checker_narrowing_root_causes.jac"),
-        options=NO_TC
+        # fail_ functions (lines 105-134) currently produce false positive errors
+        rc1_errors = [
+            e
+            for e in program.errors_had
+            if e.loc
+                and str(e.loc.mod_path).endswith("checker_narrowing_root_causes.jac")
+                and 105 <= e.loc.first_line <= 134
+        ];
+        # FIXED: Raise narrowing now promotes inverted narrowings to parent scope.
+        assert len(rc1_errors) == 0 , f"Expected 0 raise-narrowing errors (fixed), got {len(
+            rc1_errors
+        )}:\n"
+            + "\n---\n".join(e.pretty_print() for e in rc1_errors);
+    }
+
+    # Root Cause 2: Unknown type cascades into N errors.
+    #
+    # When an attribute access resolves to Unknown (e.g., accessing a subclass-only
+    # attribute through a base-class reference), every subsequent access on that
+    # Unknown value produces another E1032 error. One root cause produces N errors.
+    #
+    # Mirrors: runtime.impl.jac lines 933-952 (Memory.l3 -> Unknown -> .values()).
+    def check_root_cause_2_unknown_cascade {
+        program = JacProgram();
+        mod = program.compile(
+            os.path.join(CHECKER_FIXTURES, "checker_narrowing_root_causes.jac"),
+            options=NO_TC
+        );
+
+        # fail_ functions (lines 148-162) — one root E1030 cascades into E1032s
+        rc2_errors = [
+            e
+            for e in program.errors_had
+            if e.loc and 148 <= e.loc.first_line <= 162
+        ];
+        # Cascading E1032 suppressed for chained AtomTrailer/FuncCall targets.
+        # Name targets still report: persistence.some_attr, data.values() are first
+        # attribute accesses on Unknown variables — each is a real diagnostic.
+        # 5: 2 root E1030 + 2 E1032 on Name targets + 1 return mismatch.
+        assert len(rc2_errors) == 5 , f"Expected 5 unknown-cascade errors, got {len(
+            rc2_errors
+        )}:\n"
+            + "\n---\n".join(e.pretty_print() for e in rc2_errors);
+    }
+
+    # Root Cause 3: Callable type annotation resolves to _SpecialForm.
+    #
+    # When a parameter is annotated as `Callable`, the checker resolves the type to
+    # `_SpecialForm` (typing internal) instead of the actual callable protocol. This
+    # means __name__ access fails and passing Callable to Callable[...] fails.
+    #
+    # Mirrors: runtime.impl.jac lines 1204-1212 (test_fun: Callable -> __name__),
+    # line 1837 (caller: Callable -> _SpecialForm).
+    def check_root_cause_3_callable_as_special_form {
+        program = JacProgram();
+        mod = program.compile(
+            os.path.join(CHECKER_FIXTURES, "checker_narrowing_root_causes.jac"),
+            options=NO_TC
+        );
+
+        # fail_ functions (lines 175-193) — Callable resolves to _SpecialForm
+        rc3_errors = [
+            e
+            for e in program.errors_had
+            if e.loc and 175 <= e.loc.first_line <= 193
+        ];
+        # FIXED: Bare Callable now resolves to FunctionType (gradual form).
+        assert len(rc3_errors) == 0 , f"Expected 0 callable errors (fixed), got {len(
+            rc3_errors
+        )}:\n"
+            + "\n---\n".join(e.pretty_print() for e in rc3_errors);
+    }
+
+    # Root Cause 4: Assignment to narrowed-None field rejected.
+    #
+    # Inside `if dest.nd is None { dest.nd = value; }`, the checker narrows dest.nd
+    # to NoneType in the true branch. But reassignment with a valid value should be
+    # accepted — the checker incorrectly rejects it as "Cannot assign T to NoneType".
+    #
+    # Mirrors: runtime.impl.jac line 1353 (last.nd = post_filter after `is None` check).
+    def check_root_cause_4_assign_to_narrowed_none {
+        program = JacProgram();
+        mod = program.compile(
+            os.path.join(CHECKER_FIXTURES, "checker_narrowing_root_causes.jac"),
+            options=NO_TC
+        );
+
+        # fail_ function (lines 208-216) — assign Callable to narrowed-NoneType field
+        rc4_errors = [
+            e
+            for e in program.errors_had
+            if e.loc and 208 <= e.loc.first_line <= 216
+        ];
+        # FIXED: Assignment now uses declared field type, not narrowed type.
+        assert len(rc4_errors) == 0 , f"Expected 0 assign-to-narrowed-None errors (fixed), got {len(
+            rc4_errors
+        )}:\n"
+            + "\n---\n".join(e.pretty_print() for e in rc4_errors);
+    }
+
+    # Root Cause 5: String slicing loses type information.
+    #
+    # When a str is sliced (s[1:], s[:-3]) or indexed (s[0]), the type checker resolves
+    # the result to Unknown instead of str. Subsequent string method calls fail with E1032.
+    #
+    # Mirrors: runtime.impl.jac line 1096 (chomp_target = chomp_target[1:] -> .startswith fails).
+    def check_root_cause_5_string_slice_preserves_type {
+        program = JacProgram();
+        mod = program.compile(
+            os.path.join(CHECKER_FIXTURES, "checker_narrowing_root_causes.jac"),
+            options=NO_TC
+        );
+
+        # Regression guard for the former "string slice loses type" root cause.
+        # The pass_ functions exercise the three patterns that used to degrade
+        # str to Unknown. They must type-check cleanly. See the fixture header
+        # comment above the pass_string_* functions for the full fix summary.
+        rc5_errors = [
+            e
+            for e in program.errors_had
+            if e.loc and 239 <= e.loc.first_line <= 258
+        ];
+        assert len(rc5_errors) == 0 , f"Expected 0 string-slice errors, got {len(
+            rc5_errors
+        )}:\n"
+            + "\n---\n".join(e.pretty_print() for e in rc5_errors);
+    }
+
+    # Root Cause 6: Stdlib return types resolve to Unknown.
+    #
+    # When calling stdlib functions like importlib.util.spec_from_file_location,
+    # the return type resolves to Unknown instead of ModuleSpec|None. All subsequent
+    # attribute access (.origin, .loader, .submodule_search_locations) cascades.
+    # This is the single largest source of errors in runtime.impl.jac (~20 errors).
+    #
+    # Mirrors: runtime.impl.jac lines 1118-1165 (spec_from_file_location chain).
+    def check_root_cause_6_stdlib_returns_unknown {
+        program = JacProgram();
+        mod = program.compile(
+            os.path.join(CHECKER_FIXTURES, "checker_narrowing_root_causes.jac"),
+            options=NO_TC
+        );
+
+        # fail_ functions (lines 267-305) — importlib.util returns Unknown
+        rc6_errors = [
+            e
+            for e in program.errors_had
+            if e.loc and 267 <= e.loc.first_line <= 305
+        ];
+        # 1 (down from 11): aliased stub re-exports are followed now, so
+        # spec_from_file_location types as `ModuleSpec | None`, the truthiness
+        # guards narrow it, and the Unknown cascades are gone. The one remaining
+        # error is real fixture code: `exec_module(None)` passes NoneType where
+        # a ModuleType parameter is declared.
+        assert len(rc6_errors) == 1 , f"Expected 1 stdlib error, got {len(
+            rc6_errors
+        )}:\n"
+            + "\n---\n".join(e.pretty_print() for e in rc6_errors);
+    }
+
+    # Root Cause 7: Nullable attribute access without raise guard.
+    #
+    # When a field is typed as T|None (like user_root: NodeAnchor|None) and code
+    # accesses attributes on it without an explicit None check, or through a ternary
+    # where one branch is nullable, the checker correctly flags it. These are real
+    # bugs in runtime.impl.jac that produce E1099 errors.
+    #
+    # Mirrors: runtime.impl.jac lines 930-952 (ranchor from ternary with nullable),
+    # line 961 (user_root.archetype), line 1576 (user_root.id).
+    def check_root_cause_7_nullable_attr_access {
+        program = JacProgram();
+        mod = program.compile(
+            os.path.join(CHECKER_FIXTURES, "checker_narrowing_root_causes.jac"),
+            options=NO_TC
+        );
+
+        # fail_ functions (lines 316-350) — nullable access without guard
+        rc7_errors = [
+            e
+            for e in program.errors_had
+            if e.loc and 316 <= e.loc.first_line <= 350
+        ];
+        # 4 errors: 4 E1099 (attr missing from NoneType). Previously 8 because
+        # each E1099 returned Unknown, cascading to E1002 "return Unknown". Now
+        # partial union member access returns the resolved type, eliminating cascades.
+        assert len(rc7_errors) == 4 , f"Expected 4 nullable-access errors, got {len(
+            rc7_errors
+        )}:\n"
+            + "\n---\n".join(e.pretty_print() for e in rc7_errors);
+    }
+
+    # Root Cause 8: Dynamic / runtime class attributes not recognized.
+    #
+    # When code accesses attributes that are set dynamically at runtime (via setattr,
+    # type(), or metaclass magic), the checker doesn't know about them. Also, accessing
+    # attributes on object-typed params fails because object has a minimal interface.
+    #
+    # Mirrors: runtime.impl.jac line 1001 (type[Archetype].reports),
+    # line 1947 (JacByLLM._default_llm_instance), line 1888 (object.call_params),
+    # line 2221 (ThreadPoolExecutor.submit).
+    def check_root_cause_8_dynamic_class_attrs {
+        program = JacProgram();
+        mod = program.compile(
+            os.path.join(CHECKER_FIXTURES, "checker_narrowing_root_causes.jac"),
+            options=NO_TC
+        );
+
+        # fail_ functions (lines 360-390) — dynamic attrs and stdlib methods
+        rc8_errors = [
+            e
+            for e in program.errors_had
+            if e.loc and 360 <= e.loc.first_line <= 390
+        ];
+        # 3 errors: type[Archetype].reports, WalkerArchetype._instance,
+        # object.call_params. The former 4th (executor.submit on a then-Unknown
+        # ThreadPoolExecutor) went away after the relative .pyi re-export fix
+        # loaded concurrent/futures stubs and typing/typing_extensions ParamSpec
+        # parity let Callable[_P, _T] accept the lambda gradually.
+        assert len(rc8_errors) == 3 , f"Expected 3 dynamic-attr errors, got {len(
+            rc8_errors
+        )}:\n"
+            + "\n---\n".join(e.pretty_print() for e in rc8_errors);
+    }
+
+    # Root Cause 9: Union with Any blocks attribute access.
+    #
+    # When a type is a union containing Any (e.g., Any | EdgeArchetype), the checker
+    # reports that Any doesn't have the attribute, even though Any should be compatible
+    # with all attribute access by definition.
+    #
+    # Mirrors: runtime.impl.jac line ~1400 (__jac__ on Any | EdgeArchetype | GenericEdge).
+    def check_root_cause_9_any_in_union {
+        program = JacProgram();
+        mod = program.compile(
+            os.path.join(CHECKER_FIXTURES, "checker_narrowing_root_causes.jac"),
+            options=NO_TC
+        );
+
+        # fail_ functions (lines 396-415) — Any in union blocks attr access
+        rc9_errors = [
+            e
+            for e in program.errors_had
+            if e.loc and 396 <= e.loc.first_line <= 415
+        ];
+        # Both member lookup and calls preserve the Any alternative. The known
+        # str branch returns str from upper(), so len(val.upper()) is valid.
+        assert not rc9_errors , "Unexpected any-in-union errors:\n"
+            + "\n---\n".join(e.pretty_print() for e in rc9_errors);
+    }
+
+    # Baseline: TypeVar in standalone def should produce no E1065 errors.
+    def check_root_cause_10_typevar_in_def_ok {
+        program = JacProgram();
+        mod = program.compile(
+            os.path.join(CHECKER_FIXTURES, "checker_narrowing_root_causes.jac"),
+            options=NO_TC
+        );
+
+        # ok_typevar_in_def (lines 420-425) — should have no E1065 errors
+        ok_errors = [
+            e
+            for e in program.errors_had
+            if e.loc
+                and 420 <= e.loc.first_line <= 425
+                and e.code is not None
+                and e.code.code == "E1065"
+        ];
+        assert len(ok_errors) == 0 , f"TypeVar in def should have 0 E1065 errors, got {len(
+            ok_errors
+        )}:\n"
+            + "\n---\n".join(e.pretty_print() for e in ok_errors);
+    }
+
+    # Total error count for root causes fixture.
+    def check_root_causes_total_error_count {
+        program = JacProgram();
+        mod = program.compile(
+            os.path.join(CHECKER_FIXTURES, "checker_narrowing_root_causes.jac"),
+            options=NO_TC
+        );
+
+        # Scope the count to this fixture: diagnostics from lazy stub evaluation
+        # depend on which program first evaluates the imported classes.
+        _fixture_errors = [
+            e
+            for e in program.errors_had
+            if e.loc
+                and str(e.loc.mod_path).endswith("checker_narrowing_root_causes.jac")
+        ];
+        # Union member calls now preserve Any, removing Root Cause 9's last
+        # spurious error. The remaining negative cases still emit 13 errors.
+        assert len(_fixture_errors) == 13 , f"Expected 13 fixture errors, got {len(
+            _fixture_errors
+        )}:\n"
+            + "\n---\n".join(e.pretty_print() for e in _fixture_errors);
+    }
+    run_cases(
+        [
+            (
+                "root_cause_1_raise_does_not_narrow",
+                check_root_cause_1_raise_does_not_narrow
+            ),
+            ("root_cause_2_unknown_cascade", check_root_cause_2_unknown_cascade),
+            (
+                "root_cause_3_callable_as_special_form",
+                check_root_cause_3_callable_as_special_form
+            ),
+            (
+                "root_cause_4_assign_to_narrowed_none",
+                check_root_cause_4_assign_to_narrowed_none
+            ),
+            (
+                "root_cause_5_string_slice_preserves_type",
+                check_root_cause_5_string_slice_preserves_type
+            ),
+            (
+                "root_cause_6_stdlib_returns_unknown",
+                check_root_cause_6_stdlib_returns_unknown
+            ),
+            (
+                "root_cause_7_nullable_attr_access",
+                check_root_cause_7_nullable_attr_access
+            ),
+            (
+                "root_cause_8_dynamic_class_attrs",
+                check_root_cause_8_dynamic_class_attrs
+            ),
+            ("root_cause_9_any_in_union", check_root_cause_9_any_in_union),
+            ("root_cause_10_typevar_in_def_ok", check_root_cause_10_typevar_in_def_ok),
+            ("root_causes_total_error_count", check_root_causes_total_error_count)
+        ]
     );
-
-    # ok_ function (line 96-101) must produce no errors
-    ok_errors = [
-        e
-        for e in program.errors_had
-        if e.loc
-            and str(e.loc.mod_path).endswith("checker_narrowing_root_causes.jac")
-            and 96 <= e.loc.first_line <= 101
-    ];
-    assert len(ok_errors) == 0 , f"ok_raise_narrowing_simple should have 0 errors, got {len(
-        ok_errors
-    )}:\n"
-        + "\n---\n".join(e.pretty_print() for e in ok_errors);
-
-    # fail_ functions (lines 105-134) currently produce false positive errors
-    rc1_errors = [
-        e
-        for e in program.errors_had
-        if e.loc
-            and str(e.loc.mod_path).endswith("checker_narrowing_root_causes.jac")
-            and 105 <= e.loc.first_line <= 134
-    ];
-    # FIXED: Raise narrowing now promotes inverted narrowings to parent scope.
-    assert len(rc1_errors) == 0 , f"Expected 0 raise-narrowing errors (fixed), got {len(
-        rc1_errors
-    )}:\n"
-        + "\n---\n".join(e.pretty_print() for e in rc1_errors);
 }
 
-"""Root Cause 2: Unknown type cascades into N errors.
-
-When an attribute access resolves to Unknown (e.g., accessing a subclass-only
-attribute through a base-class reference), every subsequent access on that
-Unknown value produces another E1032 error. One root cause produces N errors.
-
-Mirrors: runtime.impl.jac lines 933-952 (Memory.l3 -> Unknown -> .values()).
-"""
-test "root_cause_2_unknown_cascade" {
-    program = JacProgram();
-    mod = program.compile(
-        os.path.join(CHECKER_FIXTURES, "checker_narrowing_root_causes.jac"),
-        options=NO_TC
-    );
-
-    # fail_ functions (lines 148-162) — one root E1030 cascades into E1032s
-    rc2_errors = [
-        e
-        for e in program.errors_had
-        if e.loc and 148 <= e.loc.first_line <= 162
-    ];
-    # Cascading E1032 suppressed for chained AtomTrailer/FuncCall targets.
-    # Name targets still report: persistence.some_attr, data.values() are first
-    # attribute accesses on Unknown variables — each is a real diagnostic.
-    # 5: 2 root E1030 + 2 E1032 on Name targets + 1 return mismatch.
-    assert len(rc2_errors) == 5 , f"Expected 5 unknown-cascade errors, got {len(
-        rc2_errors
-    )}:\n"
-        + "\n---\n".join(e.pretty_print() for e in rc2_errors);
-}
-
-"""Root Cause 3: Callable type annotation resolves to _SpecialForm.
-
-When a parameter is annotated as `Callable`, the checker resolves the type to
-`_SpecialForm` (typing internal) instead of the actual callable protocol. This
-means __name__ access fails and passing Callable to Callable[...] fails.
-
-Mirrors: runtime.impl.jac lines 1204-1212 (test_fun: Callable -> __name__),
-line 1837 (caller: Callable -> _SpecialForm).
-"""
-test "root_cause_3_callable_as_special_form" {
-    program = JacProgram();
-    mod = program.compile(
-        os.path.join(CHECKER_FIXTURES, "checker_narrowing_root_causes.jac"),
-        options=NO_TC
-    );
-
-    # fail_ functions (lines 175-193) — Callable resolves to _SpecialForm
-    rc3_errors = [
-        e
-        for e in program.errors_had
-        if e.loc and 175 <= e.loc.first_line <= 193
-    ];
-    # FIXED: Bare Callable now resolves to FunctionType (gradual form).
-    assert len(rc3_errors) == 0 , f"Expected 0 callable errors (fixed), got {len(
-        rc3_errors
-    )}:\n"
-        + "\n---\n".join(e.pretty_print() for e in rc3_errors);
-}
-
-"""Root Cause 4: Assignment to narrowed-None field rejected.
-
-Inside `if dest.nd is None { dest.nd = value; }`, the checker narrows dest.nd
-to NoneType in the true branch. But reassignment with a valid value should be
-accepted — the checker incorrectly rejects it as "Cannot assign T to NoneType".
-
-Mirrors: runtime.impl.jac line 1353 (last.nd = post_filter after `is None` check).
-"""
-test "root_cause_4_assign_to_narrowed_none" {
-    program = JacProgram();
-    mod = program.compile(
-        os.path.join(CHECKER_FIXTURES, "checker_narrowing_root_causes.jac"),
-        options=NO_TC
-    );
-
-    # fail_ function (lines 208-216) — assign Callable to narrowed-NoneType field
-    rc4_errors = [
-        e
-        for e in program.errors_had
-        if e.loc and 208 <= e.loc.first_line <= 216
-    ];
-    # FIXED: Assignment now uses declared field type, not narrowed type.
-    assert len(rc4_errors) == 0 , f"Expected 0 assign-to-narrowed-None errors (fixed), got {len(
-        rc4_errors
-    )}:\n"
-        + "\n---\n".join(e.pretty_print() for e in rc4_errors);
-}
-
-"""Root Cause 5: String slicing loses type information.
-
-When a str is sliced (s[1:], s[:-3]) or indexed (s[0]), the type checker resolves
-the result to Unknown instead of str. Subsequent string method calls fail with E1032.
-
-Mirrors: runtime.impl.jac line 1096 (chomp_target = chomp_target[1:] -> .startswith fails).
-"""
-test "root_cause_5_string_slice_preserves_type" {
-    program = JacProgram();
-    mod = program.compile(
-        os.path.join(CHECKER_FIXTURES, "checker_narrowing_root_causes.jac"),
-        options=NO_TC
-    );
-
-    # Regression guard for the former "string slice loses type" root cause.
-    # The pass_ functions exercise the three patterns that used to degrade
-    # str to Unknown. They must type-check cleanly. See the fixture header
-    # comment above the pass_string_* functions for the full fix summary.
-    rc5_errors = [
-        e
-        for e in program.errors_had
-        if e.loc and 239 <= e.loc.first_line <= 258
-    ];
-    assert len(rc5_errors) == 0 , f"Expected 0 string-slice errors, got {len(
-        rc5_errors
-    )}:\n"
-        + "\n---\n".join(e.pretty_print() for e in rc5_errors);
-}
-
-"""Root Cause 6: Stdlib return types resolve to Unknown.
-
-When calling stdlib functions like importlib.util.spec_from_file_location,
-the return type resolves to Unknown instead of ModuleSpec|None. All subsequent
-attribute access (.origin, .loader, .submodule_search_locations) cascades.
-This is the single largest source of errors in runtime.impl.jac (~20 errors).
-
-Mirrors: runtime.impl.jac lines 1118-1165 (spec_from_file_location chain).
-"""
-test "root_cause_6_stdlib_returns_unknown" {
-    program = JacProgram();
-    mod = program.compile(
-        os.path.join(CHECKER_FIXTURES, "checker_narrowing_root_causes.jac"),
-        options=NO_TC
-    );
-
-    # fail_ functions (lines 267-305) — importlib.util returns Unknown
-    rc6_errors = [
-        e
-        for e in program.errors_had
-        if e.loc and 267 <= e.loc.first_line <= 305
-    ];
-    # 1 (down from 11): aliased stub re-exports are followed now, so
-    # spec_from_file_location types as `ModuleSpec | None`, the truthiness
-    # guards narrow it, and the Unknown cascades are gone. The one remaining
-    # error is real fixture code: `exec_module(None)` passes NoneType where
-    # a ModuleType parameter is declared.
-    assert len(rc6_errors) == 1 , f"Expected 1 stdlib error, got {len(rc6_errors)}:\n"
-        + "\n---\n".join(e.pretty_print() for e in rc6_errors);
-}
-
-"""Root Cause 7: Nullable attribute access without raise guard.
-
-When a field is typed as T|None (like user_root: NodeAnchor|None) and code
-accesses attributes on it without an explicit None check, or through a ternary
-where one branch is nullable, the checker correctly flags it. These are real
-bugs in runtime.impl.jac that produce E1099 errors.
-
-Mirrors: runtime.impl.jac lines 930-952 (ranchor from ternary with nullable),
-line 961 (user_root.archetype), line 1576 (user_root.id).
-"""
-test "root_cause_7_nullable_attr_access" {
-    program = JacProgram();
-    mod = program.compile(
-        os.path.join(CHECKER_FIXTURES, "checker_narrowing_root_causes.jac"),
-        options=NO_TC
-    );
-
-    # fail_ functions (lines 316-350) — nullable access without guard
-    rc7_errors = [
-        e
-        for e in program.errors_had
-        if e.loc and 316 <= e.loc.first_line <= 350
-    ];
-    # 4 errors: 4 E1099 (attr missing from NoneType). Previously 8 because
-    # each E1099 returned Unknown, cascading to E1002 "return Unknown". Now
-    # partial union member access returns the resolved type, eliminating cascades.
-    assert len(rc7_errors) == 4 , f"Expected 4 nullable-access errors, got {len(
-        rc7_errors
-    )}:\n"
-        + "\n---\n".join(e.pretty_print() for e in rc7_errors);
-}
-
-"""Root Cause 8: Dynamic / runtime class attributes not recognized.
-
-When code accesses attributes that are set dynamically at runtime (via setattr,
-type(), or metaclass magic), the checker doesn't know about them. Also, accessing
-attributes on object-typed params fails because object has a minimal interface.
-
-Mirrors: runtime.impl.jac line 1001 (type[Archetype].reports),
-line 1947 (JacByLLM._default_llm_instance), line 1888 (object.call_params),
-line 2221 (ThreadPoolExecutor.submit).
-"""
-test "root_cause_8_dynamic_class_attrs" {
-    program = JacProgram();
-    mod = program.compile(
-        os.path.join(CHECKER_FIXTURES, "checker_narrowing_root_causes.jac"),
-        options=NO_TC
-    );
-
-    # fail_ functions (lines 360-390) — dynamic attrs and stdlib methods
-    rc8_errors = [
-        e
-        for e in program.errors_had
-        if e.loc and 360 <= e.loc.first_line <= 390
-    ];
-    # 3 errors: type[Archetype].reports, WalkerArchetype._instance,
-    # object.call_params. The former 4th (executor.submit on a then-Unknown
-    # ThreadPoolExecutor) went away after the relative .pyi re-export fix
-    # loaded concurrent/futures stubs and typing/typing_extensions ParamSpec
-    # parity let Callable[_P, _T] accept the lambda gradually.
-    assert len(rc8_errors) == 3 , f"Expected 3 dynamic-attr errors, got {len(
-        rc8_errors
-    )}:\n"
-        + "\n---\n".join(e.pretty_print() for e in rc8_errors);
-}
-
-"""Root Cause 9: Union with Any blocks attribute access.
-
-When a type is a union containing Any (e.g., Any | EdgeArchetype), the checker
-reports that Any doesn't have the attribute, even though Any should be compatible
-with all attribute access by definition.
-
-Mirrors: runtime.impl.jac line ~1400 (__jac__ on Any | EdgeArchetype | GenericEdge).
-"""
-test "root_cause_9_any_in_union" {
-    program = JacProgram();
-    mod = program.compile(
-        os.path.join(CHECKER_FIXTURES, "checker_narrowing_root_causes.jac"),
-        options=NO_TC
-    );
-
-    # fail_ functions (lines 396-415) — Any in union blocks attr access
-    rc9_errors = [
-        e
-        for e in program.errors_had
-        if e.loc and 396 <= e.loc.first_line <= 415
-    ];
-    # Both member lookup and calls preserve the Any alternative. The known
-    # str branch returns str from upper(), so len(val.upper()) is valid.
-    assert not rc9_errors , "Unexpected any-in-union errors:\n"
-        + "\n---\n".join(e.pretty_print() for e in rc9_errors);
-}
 
 """Issue #7158: `Any` must absorb inside a union for attribute access.
 
@@ -4039,51 +4181,6 @@ test "root_cause_10_typevar_in_impl" {
         + "\n---\n".join(e.pretty_print() for e in rc10_errors);
 }
 
-"""Baseline: TypeVar in standalone def should produce no E1065 errors."""
-test "root_cause_10_typevar_in_def_ok" {
-    program = JacProgram();
-    mod = program.compile(
-        os.path.join(CHECKER_FIXTURES, "checker_narrowing_root_causes.jac"),
-        options=NO_TC
-    );
-
-    # ok_typevar_in_def (lines 420-425) — should have no E1065 errors
-    ok_errors = [
-        e
-        for e in program.errors_had
-        if e.loc
-            and 420 <= e.loc.first_line <= 425
-            and e.code is not None
-            and e.code.code == "E1065"
-    ];
-    assert len(ok_errors) == 0 , f"TypeVar in def should have 0 E1065 errors, got {len(
-        ok_errors
-    )}:\n"
-        + "\n---\n".join(e.pretty_print() for e in ok_errors);
-}
-
-"""Total error count for root causes fixture."""
-test "root_causes_total_error_count" {
-    program = JacProgram();
-    mod = program.compile(
-        os.path.join(CHECKER_FIXTURES, "checker_narrowing_root_causes.jac"),
-        options=NO_TC
-    );
-
-    # Scope the count to this fixture: diagnostics from lazy stub evaluation
-    # depend on which program first evaluates the imported classes.
-    _fixture_errors = [
-        e
-        for e in program.errors_had
-        if e.loc and str(e.loc.mod_path).endswith("checker_narrowing_root_causes.jac")
-    ];
-    # Union member calls now preserve Any, removing Root Cause 9's last
-    # spurious error. The remaining negative cases still emit 13 errors.
-    assert len(_fixture_errors) == 13 , f"Expected 13 fixture errors, got {len(
-        _fixture_errors
-    )}:\n"
-        + "\n---\n".join(e.pretty_print() for e in _fixture_errors);
-}
 
 """MRO resolves correctly when base class imported through Python __init__.py re-export."""
 test "bare_generic_iteration_is_a_hard_error" {
@@ -4212,94 +4309,121 @@ test "explicit_any_propagates_through_operations" {
         + "\n---\n".join(e.pretty_print() for e in program.errors_had);
 }
 
-test "explicit_any_annotations_emit_w1037" {
-    # Explicit `any` annotations disable type checking, so each one — on a
-    # param, return type, field, assignment, or nested inside a generic or
-    # union — should produce a W1037 warning. Specific types must not warn.
-    program = JacProgram();
-    mod = program.compile(
-        os.path.join(CHECKER_FIXTURES, "checker_explicit_any.jac"), options=NO_TC
+test "explicit_any_annotations_emit_w1037, and related cases" {
+    def check_explicit_any_annotations_emit_w1037 {
+        # Explicit `any` annotations disable type checking, so each one — on a
+        # param, return type, field, assignment, or nested inside a generic or
+        # union — should produce a W1037 warning. Specific types must not warn.
+        program = JacProgram();
+        mod = program.compile(
+            os.path.join(CHECKER_FIXTURES, "checker_explicit_any.jac"), options=NO_TC
+        );
+
+        explicit_any_warnings = [
+            w
+            for w in program.warnings_had
+            if "W1037" in w.pretty_print()
+        ];
+        # Expected sites (6 total):
+        #   1. `x: any`          param type on `takes_any`
+        #   2. `-> any`          return type on `takes_any`
+        #   3. `y: any = 5`      annotated assignment
+        #   4. `list[any]`       nested any in a generic param
+        #   5. `any | None`      any branch of a union return type
+        #   6. `payload: any`    field annotation
+        assert len(explicit_any_warnings) == 6 , f"Expected 6 W1037 warnings, got {len(
+            explicit_any_warnings
+        )}:\n"
+            + "\n---\n".join(w.pretty_print() for w in explicit_any_warnings);
+    }
+
+    def check_explicit_typing_any_annotations_emit_w1037 {
+        # `typing.Any` is the same gradual-typing escape hatch as the Jac `any`
+        # keyword and must warn identically. Without this, `from typing { Any }`
+        # would be a silent loophole around W1037.
+        program = JacProgram();
+        mod = program.compile(
+            os.path.join(CHECKER_FIXTURES, "checker_explicit_typing_any.jac"),
+            options=NO_TC
+        );
+
+        explicit_any_warnings = [
+            w
+            for w in program.warnings_had
+            if "W1037" in w.pretty_print()
+        ];
+        # Expected sites (6 total), mirroring checker_explicit_any.jac:
+        #   1. `x: Any`          param type on `takes_any`
+        #   2. `-> Any`          return type on `takes_any`
+        #   3. `y: Any = 5`      annotated assignment
+        #   4. `list[Any]`       nested Any in a generic param
+        #   5. `Any | None`      Any branch of a union return type
+        #   6. `payload: Any`    field annotation
+        assert len(explicit_any_warnings) == 6 , f"Expected 6 W1037 warnings, got {len(
+            explicit_any_warnings
+        )}:\n"
+            + "\n---\n".join(w.pretty_print() for w in explicit_any_warnings);
+    }
+    run_cases(
+        [
+            (
+                "explicit_any_annotations_emit_w1037",
+                check_explicit_any_annotations_emit_w1037
+            ),
+            (
+                "explicit_typing_any_annotations_emit_w1037",
+                check_explicit_typing_any_annotations_emit_w1037
+            )
+        ]
     );
-
-    explicit_any_warnings = [
-        w
-        for w in program.warnings_had
-        if "W1037" in w.pretty_print()
-    ];
-    # Expected sites (6 total):
-    #   1. `x: any`          param type on `takes_any`
-    #   2. `-> any`          return type on `takes_any`
-    #   3. `y: any = 5`      annotated assignment
-    #   4. `list[any]`       nested any in a generic param
-    #   5. `any | None`      any branch of a union return type
-    #   6. `payload: any`    field annotation
-    assert len(explicit_any_warnings) == 6 , f"Expected 6 W1037 warnings, got {len(
-        explicit_any_warnings
-    )}:\n"
-        + "\n---\n".join(w.pretty_print() for w in explicit_any_warnings);
 }
 
-test "explicit_typing_any_annotations_emit_w1037" {
-    # `typing.Any` is the same gradual-typing escape hatch as the Jac `any`
-    # keyword and must warn identically. Without this, `from typing { Any }`
-    # would be a silent loophole around W1037.
-    program = JacProgram();
-    mod = program.compile(
-        os.path.join(CHECKER_FIXTURES, "checker_explicit_typing_any.jac"), options=NO_TC
+
+test "jsx_step1_callable_annotation, and related cases" {
+    # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    # JSX type safety tests (Steps 1-6)
+    # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    def check_jsx_step1_callable_annotation {
+        path = os.path.join(
+            CHECKER_FIXTURES, "checker_jsx_step1_callable_annotation.jac"
+        );
+        program = JacProgram();
+        mod = program.compile(path, options=NO_TC);
+
+        e1053_errors = [
+            e
+            for e in program.errors_had
+            if e.code and e.code.code == "E1053"
+        ];
+        assert len(e1053_errors) >= 1 , f"Expected E1053 for int->Callable mismatch, got {len(
+            e1053_errors
+        )} errors:\n"
+            + "\n---\n".join(err.pretty_print() for err in program.errors_had);
+    }
+
+    def check_jsx_step2_handler_aliases {
+        path = os.path.join(CHECKER_FIXTURES, "checker_jsx_step2_handler_aliases.jac");
+        program = JacProgram();
+        mod = program.compile(path, options=NO_TC);
+
+        e1053_errors = [
+            e
+            for e in program.errors_had
+            if e.code and e.code.code == "E1053"
+        ];
+        assert len(e1053_errors) >= 1 , f"Expected E1053 for bad_handler->MouseEventHandler mismatch, got {len(
+            e1053_errors
+        )} errors:\n"
+            + "\n---\n".join(err.pretty_print() for err in program.errors_had);
+    }
+    run_cases(
+        [
+            ("jsx_step1_callable_annotation", check_jsx_step1_callable_annotation),
+            ("jsx_step2_handler_aliases", check_jsx_step2_handler_aliases)
+        ]
     );
-
-    explicit_any_warnings = [
-        w
-        for w in program.warnings_had
-        if "W1037" in w.pretty_print()
-    ];
-    # Expected sites (6 total), mirroring checker_explicit_any.jac:
-    #   1. `x: Any`          param type on `takes_any`
-    #   2. `-> Any`          return type on `takes_any`
-    #   3. `y: Any = 5`      annotated assignment
-    #   4. `list[Any]`       nested Any in a generic param
-    #   5. `Any | None`      Any branch of a union return type
-    #   6. `payload: Any`    field annotation
-    assert len(explicit_any_warnings) == 6 , f"Expected 6 W1037 warnings, got {len(
-        explicit_any_warnings
-    )}:\n"
-        + "\n---\n".join(w.pretty_print() for w in explicit_any_warnings);
 }
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# JSX type safety tests (Steps 1-6)
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-test "jsx_step1_callable_annotation" {
-    path = os.path.join(CHECKER_FIXTURES, "checker_jsx_step1_callable_annotation.jac");
-    program = JacProgram();
-    mod = program.compile(path, options=NO_TC);
-
-    e1053_errors = [
-        e
-        for e in program.errors_had
-        if e.code and e.code.code == "E1053"
-    ];
-    assert len(e1053_errors) >= 1 , f"Expected E1053 for int->Callable mismatch, got {len(
-        e1053_errors
-    )} errors:\n"
-        + "\n---\n".join(err.pretty_print() for err in program.errors_had);
-}
-
-test "jsx_step2_handler_aliases" {
-    path = os.path.join(CHECKER_FIXTURES, "checker_jsx_step2_handler_aliases.jac");
-    program = JacProgram();
-    mod = program.compile(path, options=NO_TC);
-
-    e1053_errors = [
-        e
-        for e in program.errors_had
-        if e.code and e.code.code == "E1053"
-    ];
-    assert len(e1053_errors) >= 1 , f"Expected E1053 for bad_handler->MouseEventHandler mismatch, got {len(
-        e1053_errors
-    )} errors:\n"
-        + "\n---\n".join(err.pretty_print() for err in program.errors_had);
-}
 
 def _jsx_msgs(program: JacProgram, code: str) -> list[any] {
     return sorted(
@@ -4638,25 +4762,59 @@ test "lambda_block_body_return_type_inference" {
         );
 }
 
-test "root_special_var_returns_root_type" {
-    # Bare `root` should resolve as a SpecialVarRef returning Root, so that
-    # `root spawn Walker()` resolves the walker type and `.reports` is accessible.
-    path = os.path.join(CHECKER_FIXTURES, "checker_root_call_type.jac");
-    program = JacProgram();
-    mod = program.compile(path, options=NO_TC);
-    assert len(program.errors_had) == 0 , f"Expected 0 errors, got {len(
-        program.errors_had
-    )}:\n"
-        + "\n---\n".join(e.pretty_print() for e in program.errors_had);
-    w1051 = [
-        w
-        for w in program.warnings_had
-        if w.code is not None and w.code.code == "W1051"
-    ];
-    assert len(w1051) == 0 , f"Expected no W1051 warnings for bare `root`, got {len(
-        w1051
-    )}:\n"
-        + "\n---\n".join(w.pretty_print() for w in w1051);
+test "root_special_var_returns_root_type, and related cases" {
+    def check_root_special_var_returns_root_type {
+        # Bare `root` should resolve as a SpecialVarRef returning Root, so that
+        # `root spawn Walker()` resolves the walker type and `.reports` is accessible.
+        path = os.path.join(CHECKER_FIXTURES, "checker_root_call_type.jac");
+        program = JacProgram();
+        mod = program.compile(path, options=NO_TC);
+        assert len(program.errors_had) == 0 , f"Expected 0 errors, got {len(
+            program.errors_had
+        )}:\n"
+            + "\n---\n".join(e.pretty_print() for e in program.errors_had);
+        w1051 = [
+            w
+            for w in program.warnings_had
+            if w.code is not None and w.code.code == "W1051"
+        ];
+        assert len(w1051) == 0 , f"Expected no W1051 warnings for bare `root`, got {len(
+            w1051
+        )}:\n"
+            + "\n---\n".join(w.pretty_print() for w in w1051);
+    }
+
+    def check_isinstance_and_narrowing {
+        # isinstance(x, T) in LHS of AND should narrow x to T for RHS operands.
+        path = os.path.join(CHECKER_FIXTURES, "checker_isinstance_and_narrowing.jac");
+        program = JacProgram();
+        mod = program.compile(path, options=NO_TC);
+
+        # All functions use isinstance in AND conditions to guard attribute access.
+        # No errors should be produced — the narrowing should resolve all attributes.
+        assert len(program.errors_had) == 0 , f"Expected 0 errors (isinstance AND narrowing should resolve all attrs), got {len(
+            program.errors_had
+        )}:\n"
+            + "\n---\n".join(e.pretty_print() for e in program.errors_had);
+
+        # No W1051 warnings either
+        w1051 = [
+            w
+            for w in program.warnings_had
+            if w.code is not None and w.code.code == "W1051"
+        ];
+        assert len(w1051) == 0 , f"Expected no W1051 warnings, got {len(w1051)}:\n"
+            + "\n---\n".join(w.pretty_print() for w in w1051);
+    }
+    run_cases(
+        [
+            (
+                "root_special_var_returns_root_type",
+                check_root_special_var_returns_root_type
+            ),
+            ("isinstance_and_narrowing", check_isinstance_and_narrowing)
+        ]
+    );
 }
 
 test "compare_operator_validation" {
@@ -4860,28 +5018,6 @@ test "walker_typed_reports_validation" {
         + "\n---\n".join(e.pretty_print() for e in other);
 }
 
-test "isinstance_and_narrowing" {
-    # isinstance(x, T) in LHS of AND should narrow x to T for RHS operands.
-    path = os.path.join(CHECKER_FIXTURES, "checker_isinstance_and_narrowing.jac");
-    program = JacProgram();
-    mod = program.compile(path, options=NO_TC);
-
-    # All functions use isinstance in AND conditions to guard attribute access.
-    # No errors should be produced — the narrowing should resolve all attributes.
-    assert len(program.errors_had) == 0 , f"Expected 0 errors (isinstance AND narrowing should resolve all attrs), got {len(
-        program.errors_had
-    )}:\n"
-        + "\n---\n".join(e.pretty_print() for e in program.errors_had);
-
-    # No W1051 warnings either
-    w1051 = [
-        w
-        for w in program.warnings_had
-        if w.code is not None and w.code.code == "W1051"
-    ];
-    assert len(w1051) == 0 , f"Expected no W1051 warnings, got {len(w1051)}:\n"
-        + "\n---\n".join(w.pretty_print() for w in w1051);
-}
 
 test "pipe_forward_typing_matches_call_form" {
     path = os.path.join(CHECKER_FIXTURES, "checker_pipe_forward_typing.jac");
@@ -5040,44 +5176,59 @@ test "numeric_kind_disallows_float_to_int" {
         + "\n---\n".join(e.pretty_print() for e in typed_errs);
 }
 
-test "comprehension_filter_narrows_head" {
-    # `[x for x in xs if x is not None]` must type as `list[T]`, not
-    # `list[T | None]` -- the filter proves the head value is non-None.
-    # Generalises to subscript heads under stable loop-var indices.
-    path = os.path.join(CHECKER_FIXTURES, "checker_compr_filter_narrowing.jac");
-    program = JacProgram();
-    mod = program.compile(path, options=NO_TC);
+test "comprehension_filter_narrows_head, and related cases" {
+    def check_comprehension_filter_narrows_head {
+        # `[x for x in xs if x is not None]` must type as `list[T]`, not
+        # `list[T | None]` -- the filter proves the head value is non-None.
+        # Generalises to subscript heads under stable loop-var indices.
+        path = os.path.join(CHECKER_FIXTURES, "checker_compr_filter_narrowing.jac");
+        program = JacProgram();
+        mod = program.compile(path, options=NO_TC);
 
-    narrow_errs = [
-        e
-        for e in program.errors_had
-        if e.code and e.code.code in ("E1099", "E1030", "E1001", "E1002")
-    ];
-    assert len(narrow_errs) == 0 , f"Expected comprehension filter narrowing to propagate to head, got {len(
-        narrow_errs
-    )}:\n"
-        + "\n---\n".join(e.pretty_print() for e in narrow_errs);
+        narrow_errs = [
+            e
+            for e in program.errors_had
+            if e.code and e.code.code in ("E1099", "E1030", "E1001", "E1002")
+        ];
+        assert len(narrow_errs) == 0 , f"Expected comprehension filter narrowing to propagate to head, got {len(
+            narrow_errs
+        )}:\n"
+            + "\n---\n".join(e.pretty_print() for e in narrow_errs);
+    }
+
+    def check_subscript_narrowing_stable_indices {
+        # Repeated subscript expressions `x[i]` / `x[i][j]` must narrow as
+        # aliases when neither `x` nor the indices are reassigned between
+        # reads. Pyright's "narrowable expression" rule -- plain names,
+        # int literals, and loop variables count.
+        path = os.path.join(CHECKER_FIXTURES, "checker_subscript_narrowing_stable.jac");
+        program = JacProgram();
+        mod = program.compile(path, options=NO_TC);
+
+        narrow_errs = [
+            e
+            for e in program.errors_had
+            if e.code and e.code.code in ("E1099", "E1030", "E1001", "E1002")
+        ];
+        assert len(narrow_errs) == 0 , f"Expected stable-index subscript narrowing to propagate, got {len(
+            narrow_errs
+        )}:\n"
+            + "\n---\n".join(e.pretty_print() for e in narrow_errs);
+    }
+    run_cases(
+        [
+            (
+                "comprehension_filter_narrows_head",
+                check_comprehension_filter_narrows_head
+            ),
+            (
+                "subscript_narrowing_stable_indices",
+                check_subscript_narrowing_stable_indices
+            )
+        ]
+    );
 }
 
-test "subscript_narrowing_stable_indices" {
-    # Repeated subscript expressions `x[i]` / `x[i][j]` must narrow as
-    # aliases when neither `x` nor the indices are reassigned between
-    # reads. Pyright's "narrowable expression" rule -- plain names,
-    # int literals, and loop variables count.
-    path = os.path.join(CHECKER_FIXTURES, "checker_subscript_narrowing_stable.jac");
-    program = JacProgram();
-    mod = program.compile(path, options=NO_TC);
-
-    narrow_errs = [
-        e
-        for e in program.errors_had
-        if e.code and e.code.code in ("E1099", "E1030", "E1001", "E1002")
-    ];
-    assert len(narrow_errs) == 0 , f"Expected stable-index subscript narrowing to propagate, got {len(
-        narrow_errs
-    )}:\n"
-        + "\n---\n".join(e.pretty_print() for e in narrow_errs);
-}
 
 test "enum_member_assignable_to_base_type" {
     # `enum Color { RED = 1 }` — `Color.RED` is the int value 1.
@@ -5293,37 +5444,65 @@ test "edge_without_an_endpoint_clause_is_rejected" {
     assert got == [("E2086", 6)] , f"only the bare edge on line 6 may be flagged, got {got}";
 }
 
-test "mobui_project_forbids_html_intrinsic_tags" {
-    # D17: in a mobui (React Native) project, raw HTML host tags are
-    # forbidden — JsxIntrinsicGuardPass emits E1105 for each lowercase tag,
-    # with a fix-it pointing at the @jac/mobui / RN component. Uppercase user
-    # components (<Card>) are allowed. The pass runs in the IR product, so
-    # it fires even with type_check=False (the .jac / build path).
-    path = os.path.join(CHECKER_FIXTURES, "checker_jsx_mobui_html_forbidden.jac");
-    program = JacProgram();
-    program.compile(
-        path, options=CompileOptions(ui="mobui", project_root=CHECKER_FIXTURES)
+test "checker_jsx_mobui_html_forbidden.jac cases" {
+    def check_mobui_project_forbids_html_intrinsic_tags {
+        path = os.path.join(CHECKER_FIXTURES, "checker_jsx_mobui_html_forbidden.jac");
+        program = JacProgram();
+        program.compile(
+            path, options=CompileOptions(ui="mobui", project_root=CHECKER_FIXTURES)
+        );
+
+        e1105 = [
+            e
+            for e in program.errors_had
+            if e.code and e.code.code == "E1105"
+        ];
+        # Host tags: <span>, <div>, <button>, <img> => 4. <Card> is exempt.
+        assert len(e1105) == 4 , f"Expected 4 E1105 (div/span/button/img), got {len(
+            e1105
+        )}:\n"
+            + "\n---\n".join(e.pretty_print() for e in e1105);
+
+        # Assert against the diagnostic messages (not pretty_print, whose source
+        # context would include nearby lines like the <Card .../> line).
+        msgs = "\n".join(e.msg for e in e1105);
+        # No component tag is ever flagged.
+        assert "<Card>" not in msgs , f"<Card> must not be flagged:\n{msgs}";
+        # The fix-it suggestions are present (div -> View, span -> Text, etc.).
+        assert "View" in msgs , f"Expected a 'View' suggestion:\n{msgs}";
+        assert "Text" in msgs , f"Expected a 'Text' suggestion:\n{msgs}";
+    }
+
+    def check_mobui_project_allows_lowercase_component_in_scop {
+        path = os.path.join(CHECKER_FIXTURES, "checker_jsx_mobui_html_forbidden.jac");
+        program = JacProgram();
+        program.compile(
+            path, options=CompileOptions(ui="mobui", project_root=CHECKER_FIXTURES)
+        );
+
+        e1105 = [
+            e
+            for e in program.errors_had
+            if e.code and e.code.code == "E1105"
+        ];
+        msgs = "\n".join(e.msg for e in e1105);
+        assert "<myCard>" not in msgs , f"<myCard> is in scope and must not be flagged:\n{msgs}";
+        assert len(e1105) == 4 , f"Expected 4 E1105 (div/span/button/img), got {len(
+            e1105
+        )}:\n{msgs}";
+    }
+    run_cases(
+        [
+            (
+                "mobui_project_forbids_html_intrinsic_tags",
+                check_mobui_project_forbids_html_intrinsic_tags
+            ),
+            (
+                "mobui_project_allows_lowercase_component_in_scope",
+                check_mobui_project_allows_lowercase_component_in_scop
+            )
+        ]
     );
-
-    e1105 = [
-        e
-        for e in program.errors_had
-        if e.code and e.code.code == "E1105"
-    ];
-    # Host tags: <span>, <div>, <button>, <img> => 4. <Card> is exempt.
-    assert len(e1105) == 4 , f"Expected 4 E1105 (div/span/button/img), got {len(
-        e1105
-    )}:\n"
-        + "\n---\n".join(e.pretty_print() for e in e1105);
-
-    # Assert against the diagnostic messages (not pretty_print, whose source
-    # context would include nearby lines like the <Card .../> line).
-    msgs = "\n".join(e.msg for e in e1105);
-    # No component tag is ever flagged.
-    assert "<Card>" not in msgs , f"<Card> must not be flagged:\n{msgs}";
-    # The fix-it suggestions are present (div -> View, span -> Text, etc.).
-    assert "View" in msgs , f"Expected a 'View' suggestion:\n{msgs}";
-    assert "Text" in msgs , f"Expected a 'Text' suggestion:\n{msgs}";
 }
 
 test "web_project_allows_html_intrinsic_tags" {
@@ -5342,26 +5521,6 @@ test "web_project_allows_html_intrinsic_tags" {
         + "\n---\n".join(e.pretty_print() for e in e1105);
 }
 
-test "mobui_project_allows_lowercase_component_in_scope" {
-    # An in-scope lowercase component must NOT trigger E1105 — the guard
-    # resolves it via scope lookup and recognises it as a user component.
-    # The 4 HTML host tags in the same fixture still emit E1105 as expected.
-    path = os.path.join(CHECKER_FIXTURES, "checker_jsx_mobui_html_forbidden.jac");
-    program = JacProgram();
-    program.compile(
-        path, options=CompileOptions(ui="mobui", project_root=CHECKER_FIXTURES)
-    );
-    e1105 = [
-        e
-        for e in program.errors_had
-        if e.code and e.code.code == "E1105"
-    ];
-    msgs = "\n".join(e.msg for e in e1105);
-    assert "<myCard>" not in msgs , f"<myCard> is in scope and must not be flagged:\n{msgs}";
-    assert len(e1105) == 4 , f"Expected 4 E1105 (div/span/button/img), got {len(
-        e1105
-    )}:\n{msgs}";
-}
 
 test "mobui_project_lowercase_component_no_w1050" {
     # Gap 3: in a mobui project, an in-scope lowercase component must not

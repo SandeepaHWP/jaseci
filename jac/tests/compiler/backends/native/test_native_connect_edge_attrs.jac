@@ -24,7 +24,8 @@ import from tests.support {
     TESTS_DIR,
     assert_native_identity,
     native_address,
-    native_force_opts
+    native_force_opts,
+    run_cases
 }
 
 glob FIXTURES = os.path.join(
@@ -76,42 +77,79 @@ test "connects with edge attributes lower natively without seams" {
     assert eng is not None , "no JIT engine was produced for the fixture";
 }
 
-test "literal, variable and computed values are assigned" {
-    (_rec, _errors, eng) = measured();
-    assert answer(eng, "literal_attrs") == 31;
-    assert answer(eng, "variable_attrs") == 71;
-    assert answer(eng, "expression_attrs") == 631;
+test "literal, variable and computed values are assigned, and related cases" {
+    def check_literal_variable_and_computed_values_are_assigne {
+        (_rec, _errors, eng) = measured();
+        assert answer(eng, "literal_attrs") == 31;
+        assert answer(eng, "variable_attrs") == 71;
+        assert answer(eng, "expression_attrs") == 631;
+    }
+
+    def check_backward_and_undirected_connects_assign_their_ed {
+        (_rec, _errors, eng) = measured();
+        assert answer(eng, "backward_attrs") == 61;
+        assert answer(eng, "undirected_attrs") == 441;
+    }
+
+    def check_connects_inside_functions_methods_and_abilities {
+        (_rec, _errors, eng) = measured();
+        assert answer(eng, "inside_function") == 41;
+        assert answer(eng, "inside_method") == 421;
+        assert answer(eng, "inside_walker_ability") == 61;
+    }
+
+    def check_runtime_edge_types_and_subclasses_receive_the_as {
+        (_rec, _errors, eng) = measured();
+        assert answer(eng, "dynamic_type_attrs") == 21;
+        assert answer(eng, "subclass_attrs") == 1025;
+        assert answer(eng, "instance_with_attrs") == 91;
+    }
+    run_cases(
+        [
+            (
+                "literal, variable and computed values are assigned",
+                check_literal_variable_and_computed_values_are_assigne
+            ),
+            (
+                "backward and undirected connects assign their edge",
+                check_backward_and_undirected_connects_assign_their_ed
+            ),
+            (
+                "connects inside functions, methods and abilities assign their edge",
+                check_connects_inside_functions_methods_and_abilities
+            ),
+            (
+                "runtime edge types and subclasses receive the assignments",
+                check_runtime_edge_types_and_subclasses_receive_the_as
+            )
+        ]
+    );
 }
 
-test "fields left out keep their defaults" {
-    (_rec, _errors, eng) = measured();
-    assert answer(eng, "defaults_kept") == 501;
+test "fields left out keep their defaults, and related cases" {
+    def check_fields_left_out_keep_their_defaults {
+        (_rec, _errors, eng) = measured();
+        assert answer(eng, "defaults_kept") == 501;
+    }
+
+    def check_assignments_land_after_postinit_as_in_the_python {
+        (_rec, _errors, eng) = measured();
+        assert answer(eng, "assigned_after_postinit") == 1100;
+    }
+    run_cases(
+        [
+            (
+                "fields left out keep their defaults",
+                check_fields_left_out_keep_their_defaults
+            ),
+            (
+                "assignments land after postinit, as in the Python runtime",
+                check_assignments_land_after_postinit_as_in_the_python
+            )
+        ]
+    );
 }
 
-test "backward and undirected connects assign their edge" {
-    (_rec, _errors, eng) = measured();
-    assert answer(eng, "backward_attrs") == 61;
-    assert answer(eng, "undirected_attrs") == 441;
-}
-
-test "connects inside functions, methods and abilities assign their edge" {
-    (_rec, _errors, eng) = measured();
-    assert answer(eng, "inside_function") == 41;
-    assert answer(eng, "inside_method") == 421;
-    assert answer(eng, "inside_walker_ability") == 61;
-}
-
-test "runtime edge types and subclasses receive the assignments" {
-    (_rec, _errors, eng) = measured();
-    assert answer(eng, "dynamic_type_attrs") == 21;
-    assert answer(eng, "subclass_attrs") == 1025;
-    assert answer(eng, "instance_with_attrs") == 91;
-}
-
-test "assignments land after postinit, as in the Python runtime" {
-    (_rec, _errors, eng) = measured();
-    assert answer(eng, "assigned_after_postinit") == 1100;
-}
 
 test "repeated connects replace string fields on every edge" {
     (_rec, _errors, eng) = measured();

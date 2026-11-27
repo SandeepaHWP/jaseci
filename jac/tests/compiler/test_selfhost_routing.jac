@@ -4,6 +4,7 @@ modules."""
 import os;
 import jaclang;
 import from jaclang.compiler.driver.program { JacProgram }
+import from tests.support { run_cases }
 
 
 def _pkg_path(rel: str) -> str {
@@ -12,45 +13,66 @@ def _pkg_path(rel: str) -> str {
 }
 
 
-test "a native stdlib module resolves into the program that imports it" {
-    prog = JacProgram();
-    cache = prog._get_compiler().selfhost;
-    assert not cache.is_selfhost(prog);
-    sock = _pkg_path("runtime/na_stdlib/socket.jac");
-    assert os.path.isfile(sock) , sock;
-    assert cache.owns(sock) , "the native stdlib ships inside the jaclang tree";
-    assert cache.resolve(sock, prog) is prog , (
-        "a checked program's socket import was routed into the self-host hub,"
-        " where its type memos would outlive this program's compile closure"
+test "a native stdlib module resolves into the program that imports it, and related cases" {
+    def check_a_native_stdlib_module_resolves_into_the_program {
+        prog = JacProgram();
+        cache = prog._get_compiler().selfhost;
+        assert not cache.is_selfhost(prog);
+        sock = _pkg_path("runtime/na_stdlib/socket.jac");
+        assert os.path.isfile(sock) , sock;
+        assert cache.owns(sock) , "the native stdlib ships inside the jaclang tree";
+        assert cache.resolve(sock, prog) is prog , (
+            "a checked program's socket import was routed into the self-host hub,"
+            " where its type memos would outlive this program's compile closure"
+        );
+    }
+
+    def check_a_compiler_module_still_resolves_into_the_self_h {
+        prog = JacProgram();
+        cache = prog._get_compiler().selfhost;
+        log_mod = _pkg_path("compiler/driver/log.jac");
+        assert os.path.isfile(log_mod) , log_mod;
+        assert cache.resolve(log_mod, prog) is cache.program;
+        assert cache.resolve(log_mod, prog, force=True) is prog;
+    }
+
+    def check_shared_construction_runtime_resolves_into_its_co {
+        prog = JacProgram();
+        cache = prog._get_compiler().selfhost;
+        fragment = _pkg_path("runtime/graph_fragment.jac");
+        assert cache.owns(fragment);
+        assert cache.resolve(fragment, prog) is prog;
+        assert cache.resolve(fragment, cache.program) is cache.program;
+    }
+
+    def check_the_self_host_program_keeps_its_own_native_stdli {
+        prog = JacProgram();
+        cache = prog._get_compiler().selfhost;
+        sock = _pkg_path("runtime/na_stdlib/socket.jac");
+        assert cache.resolve(sock, cache.program) is cache.program;
+    }
+    run_cases(
+        [
+            (
+                "a native stdlib module resolves into the program that imports it",
+                check_a_native_stdlib_module_resolves_into_the_program
+            ),
+            (
+                "a compiler module still resolves into the self-host program",
+                check_a_compiler_module_still_resolves_into_the_self_h
+            ),
+            (
+                "shared construction runtime resolves into its consumer program",
+                check_shared_construction_runtime_resolves_into_its_co
+            ),
+            (
+                "the self-host program keeps its own native stdlib imports",
+                check_the_self_host_program_keeps_its_own_native_stdli
+            )
+        ]
     );
 }
 
-
-test "a compiler module still resolves into the self-host program" {
-    prog = JacProgram();
-    cache = prog._get_compiler().selfhost;
-    log_mod = _pkg_path("compiler/driver/log.jac");
-    assert os.path.isfile(log_mod) , log_mod;
-    assert cache.resolve(log_mod, prog) is cache.program;
-    assert cache.resolve(log_mod, prog, force=True) is prog;
-}
-
-test "shared construction runtime resolves into its consumer program" {
-    prog = JacProgram();
-    cache = prog._get_compiler().selfhost;
-    fragment = _pkg_path("runtime/graph_fragment.jac");
-    assert cache.owns(fragment);
-    assert cache.resolve(fragment, prog) is prog;
-    assert cache.resolve(fragment, cache.program) is cache.program;
-}
-
-
-test "the self-host program keeps its own native stdlib imports" {
-    prog = JacProgram();
-    cache = prog._get_compiler().selfhost;
-    sock = _pkg_path("runtime/na_stdlib/socket.jac");
-    assert cache.resolve(sock, cache.program) is cache.program;
-}
 
 test "lazy compiler bytecode does not inherit the caller's analysis request" {
     import from pathlib { Path }

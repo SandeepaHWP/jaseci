@@ -15,7 +15,8 @@ import from tests.support {
     get_func,
     has_error_code,
     native_address,
-    native_force_opts
+    native_force_opts,
+    run_cases
 }
 import jaclang;
 
@@ -125,184 +126,328 @@ def compile_na_inline(label: str, code: str) -> JacProgram {
     return prog;
 }
 
-test "generator: for-loop drives a while/yield state machine" {
-    (eng, _) = compile_native("generators.jac");
-    f = get_func(eng, "total_of", ctypes.c_int64, ctypes.c_int64);
-    assert f(5) == 10 , "0+1+2+3+4";
-    assert f(0) == 0 , "empty generator yields nothing";
-    assert f(1) == 0 , "single yield of 0";
-}
+test "generators.jac cases" {
+    def check_generator_for_loop_drives_a_while_yield_state_ma {
+        (eng, _) = compile_native("generators.jac");
 
-test "generator: early break abandons the stream safely" {
-    (eng, _) = compile_native("generators.jac");
-    f = get_func(eng, "early_break", ctypes.c_int64, ctypes.c_int64, ctypes.c_int64);
-    assert f(10, 3) == 3 , "sees 0,1,2 then breaks";
-}
+        f = get_func(eng, "total_of", ctypes.c_int64, ctypes.c_int64);
+        assert f(5) == 10 , "0+1+2+3+4";
+        assert f(0) == 0 , "empty generator yields nothing";
+        assert f(1) == 0 , "single yield of 0";
+    }
 
-test "generator: first-class next() advances a stored instance" {
-    (eng, _) = compile_native("generators.jac");
-    f = get_func(eng, "manual_next", ctypes.c_int64, ctypes.c_int64);
-    assert f(5) == 1 , "a=0, b=1 -> 0*10+1";
-}
+    def check_generator_early_break_abandons_the_stream_safely {
+        (eng, _) = compile_native("generators.jac");
 
-test "generator: independent instances do not share frames" {
-    (eng, _) = compile_native("generators.jac");
-    f = get_func(eng, "two_streams", ctypes.c_int64, ctypes.c_int64);
-    # sum over a,b in [0..2]^2 of a*b = (0+1+2)^2 = 9.
-    assert f(3) == 9;
-}
+        f = get_func(
+            eng, "early_break", ctypes.c_int64, ctypes.c_int64, ctypes.c_int64
+        );
+        assert f(10, 3) == 3 , "sees 0,1,2 then breaks";
+    }
 
-test "generator: yield inside a for-over-range resumes mid-loop" {
-    (eng, _) = compile_native("generators.jac");
-    f = get_func(eng, "total_for_yield", ctypes.c_int64, ctypes.c_int64);
-    assert f(4) == 12 , "0+2+4+6";
-}
+    def check_generator_first_class_next_advances_a_stored_ins {
+        (eng, _) = compile_native("generators.jac");
 
-test "generator: plain return stops iteration early" {
-    (eng, _) = compile_native("generators.jac");
-    f = get_func(
-        eng, "total_stop_early", ctypes.c_int64, ctypes.c_int64, ctypes.c_int64
+        f = get_func(eng, "manual_next", ctypes.c_int64, ctypes.c_int64);
+        assert f(5) == 1 , "a=0, b=1 -> 0*10+1";
+    }
+
+    def check_generator_independent_instances_do_not_share_fra {
+        (eng, _) = compile_native("generators.jac");
+
+        f = get_func(eng, "two_streams", ctypes.c_int64, ctypes.c_int64);
+        # sum over a,b in [0..2]^2 of a*b = (0+1+2)^2 = 9.
+        assert f(3) == 9;
+    }
+
+    def check_generator_yield_inside_a_for_over_range_resumes {
+        (eng, _) = compile_native("generators.jac");
+
+        f = get_func(eng, "total_for_yield", ctypes.c_int64, ctypes.c_int64);
+        assert f(4) == 12 , "0+2+4+6";
+    }
+
+    def check_generator_plain_return_stops_iteration_early {
+        (eng, _) = compile_native("generators.jac");
+
+        f = get_func(
+            eng, "total_stop_early", ctypes.c_int64, ctypes.c_int64, ctypes.c_int64
+        );
+        assert f(10, 4) == 6 , "0+1+2+3 then return";
+    }
+
+    def check_generator_str_parameter_is_retained_by_the_frame {
+        (eng, _) = compile_native("generators.jac");
+
+        f = get_sfunc(eng, "echo_len", ctypes.c_int64, ctypes.c_char_p);
+        assert f(b"abcd") == 12 , "len('abcd') * 3";
+    }
+
+    def check_generator_composes_under_the_lazy_map_adapter {
+        (eng, _) = compile_native("generators.jac");
+
+        f = get_func(eng, "doubled_total", ctypes.c_int64, ctypes.c_int64);
+        assert f(4) == 12 , "2*(0+1+2+3)";
+    }
+    run_cases(
+        [
+            (
+                "generator: for-loop drives a while/yield state machine",
+                check_generator_for_loop_drives_a_while_yield_state_ma
+            ),
+            (
+                "generator: early break abandons the stream safely",
+                check_generator_early_break_abandons_the_stream_safely
+            ),
+            (
+                "generator: first-class next() advances a stored instance",
+                check_generator_first_class_next_advances_a_stored_ins
+            ),
+            (
+                "generator: independent instances do not share frames",
+                check_generator_independent_instances_do_not_share_fra
+            ),
+            (
+                "generator: yield inside a for-over-range resumes mid-loop",
+                check_generator_yield_inside_a_for_over_range_resumes
+            ),
+            (
+                "generator: plain return stops iteration early",
+                check_generator_plain_return_stops_iteration_early
+            ),
+            (
+                "generator: str parameter is retained by the frame across yields",
+                check_generator_str_parameter_is_retained_by_the_frame
+            ),
+            (
+                "generator: composes under the lazy map adapter",
+                check_generator_composes_under_the_lazy_map_adapter
+            )
+        ]
     );
-    assert f(10, 4) == 6 , "0+1+2+3 then return";
 }
 
-test "generator: str parameter is retained by the frame across yields" {
-    (eng, _) = compile_native("generators.jac");
-    f = get_sfunc(eng, "echo_len", ctypes.c_int64, ctypes.c_char_p);
-    assert f(b"abcd") == 12 , "len('abcd') * 3";
+
+test "generators_residual.jac cases" {
+    def check_generator_yield_from_chains_generators_lists_and {
+        (eng, _) = compile_native("generators_residual.jac");
+
+        f = get_func(eng, "total_chain", ctypes.c_int64, ctypes.c_int64);
+        assert f(3) == 1302 , "0+1+2 + 100+200 + 999";
+        assert f(0) == 1299 , "empty inner generator, then 100+200+999";
+    }
+
+    def check_generator_yield_from_a_string_yields_its_charact {
+        (eng, _) = compile_native("generators_residual.jac");
+
+        f = get_sfunc(eng, "count_chars", ctypes.c_int64, ctypes.c_char_p);
+        assert f(b"abcd") == 4;
+        assert f(b"") == 0;
+    }
+
+    def check_generator_bare_yield_paces_iteration {
+        (eng, _) = compile_native("generators_residual.jac");
+
+        f = get_func(eng, "count_pacer", ctypes.c_int64, ctypes.c_int64);
+        assert f(5) == 5;
+        assert f(0) == 0;
+    }
+
+    def check_generator_return_value_stops_iteration_value_dis {
+        (eng, _) = compile_native("generators_residual.jac");
+
+        f = get_func(eng, "total_upto_return", ctypes.c_int64, ctypes.c_int64);
+        assert f(7) == 3 , "1+2, the returned 70 has no JacIter consumer";
+    }
+
+    def check_generator_yield_inside_a_for_over_a_list_resumes {
+        (eng, _) = compile_native("generators_residual.jac");
+
+        f = get_func(eng, "total_doubles", ctypes.c_int64);
+        assert f() == 12 , "2+4+6";
+    }
+
+    def check_generator_yield_inside_a_for_over_dict_keys_resu {
+        (eng, _) = compile_native("generators_residual.jac");
+
+        f = get_func(eng, "count_keys", ctypes.c_int64);
+        assert f() == 3 , "len('a') + len('bb')";
+    }
+
+    def check_generator_yield_inside_a_for_over_a_string_resum {
+        (eng, _) = compile_native("generators_residual.jac");
+
+        f = get_sfunc(eng, "count_per_char", ctypes.c_int64, ctypes.c_char_p);
+        assert f(b"xyz") == 3;
+    }
+
+    def check_generator_yield_inside_try_exception_raised_and {
+        (eng, _) = compile_native("generators_residual.jac");
+
+        f = get_func(eng, "total_resilient", ctypes.c_int64, ctypes.c_int64);
+        assert f(0) == 7 , "1+2+4, no exception";
+        assert f(1) == 8 , "1, boom caught, 3, 4";
+    }
+    run_cases(
+        [
+            (
+                "generator: yield from chains generators, lists, and plain yields",
+                check_generator_yield_from_chains_generators_lists_and
+            ),
+            (
+                "generator: yield from a string yields its characters",
+                check_generator_yield_from_a_string_yields_its_charact
+            ),
+            (
+                "generator: bare yield paces iteration",
+                check_generator_bare_yield_paces_iteration
+            ),
+            (
+                "generator: return <value> stops iteration, value discarded on JacIter",
+                check_generator_return_value_stops_iteration_value_dis
+            ),
+            (
+                "generator: yield inside a for over a list resumes mid-loop",
+                check_generator_yield_inside_a_for_over_a_list_resumes
+            ),
+            (
+                "generator: yield inside a for over dict keys resumes mid-loop",
+                check_generator_yield_inside_a_for_over_dict_keys_resu
+            ),
+            (
+                "generator: yield inside a for over a string resumes mid-loop",
+                check_generator_yield_inside_a_for_over_a_string_resum
+            ),
+            (
+                "generator: yield inside try, exception raised and caught across resumes",
+                check_generator_yield_inside_try_exception_raised_and
+            )
+        ]
+    );
 }
 
-test "generator: composes under the lazy map adapter" {
-    (eng, _) = compile_native("generators.jac");
-    f = get_func(eng, "doubled_total", ctypes.c_int64, ctypes.c_int64);
-    assert f(4) == 12 , "2*(0+1+2+3)";
+
+test "generators_finally.jac cases" {
+    def check_generator_yield_inside_finally_resumes_through_b {
+        (eng, _) = compile_native("generators_finally.jac");
+
+        f = get_func(eng, "sum_yf", ctypes.c_int64, ctypes.c_int64);
+        assert f(5) == 11 , "yields 5 then 6";
+        assert f(10) == 21 , "yields 10 then 11";
+    }
+
+    def check_generator_abandoning_a_yield_in_finally_stream_d {
+        (eng, _) = compile_native("generators_finally.jac");
+
+        f = get_func(eng, "first_yf", ctypes.c_int64, ctypes.c_int64);
+        assert f(10) == 10 , "early return abandons the stream without crashing";
+    }
+    run_cases(
+        [
+            (
+                "generator: yield inside finally resumes through both continuations",
+                check_generator_yield_inside_finally_resumes_through_b
+            ),
+            (
+                "generator: abandoning a yield-in-finally stream drops the frame safely",
+                check_generator_abandoning_a_yield_in_finally_stream_d
+            )
+        ]
+    );
 }
 
-test "generator: yield from chains generators, lists, and plain yields" {
-    (eng, _) = compile_native("generators_residual.jac");
-    f = get_func(eng, "total_chain", ctypes.c_int64, ctypes.c_int64);
-    assert f(3) == 1302 , "0+1+2 + 100+200 + 999";
-    assert f(0) == 1299 , "empty inner generator, then 100+200+999";
+
+test "generators_closures.jac cases" {
+    def check_generator_capturing_lambda_escaping_inside_a_gen {
+        (eng, _) = compile_native("generators_closures.jac");
+
+        f = get_func(eng, "sum_gen_scaled", ctypes.c_int64, ctypes.c_int64);
+        assert f(3) == 9 , "g(1)+g(2) with k=3: 3+6";
+        assert f(0) == 0;
+    }
+
+    def check_generator_plain_param_after_a_captured_param_kee {
+        (eng, _) = compile_native("generators_closures.jac");
+
+        f = get_func(
+            eng, "sum_gen_mixed", ctypes.c_int64, ctypes.c_int64, ctypes.c_int64
+        );
+        assert f(3, 10) == 63 , "g(10)+g(11) with k=3: 30+33";
+        assert f(0, 5) == 0;
+    }
+
+    def check_generator_capturing_lambda_as_a_map_callback_ins {
+        (eng, _) = compile_native("generators_closures.jac");
+
+        f = get_func(eng, "sum_gen_mapped", ctypes.c_int64, ctypes.c_int64);
+        assert f(10) == 36 , "11+12+13";
+    }
+    run_cases(
+        [
+            (
+                "generator: capturing lambda escaping inside a generator frame",
+                check_generator_capturing_lambda_escaping_inside_a_gen
+            ),
+            (
+                "generator: plain param after a captured param keeps its own value",
+                check_generator_plain_param_after_a_captured_param_kee
+            ),
+            (
+                "generator: capturing lambda as a map callback inside a generator",
+                check_generator_capturing_lambda_as_a_map_callback_ins
+            )
+        ]
+    );
 }
 
-test "generator: yield from a string yields its characters" {
-    (eng, _) = compile_native("generators_residual.jac");
-    f = get_sfunc(eng, "count_chars", ctypes.c_int64, ctypes.c_char_p);
-    assert f(b"abcd") == 4;
-    assert f(b"") == 0;
-}
 
-test "generator: bare yield paces iteration" {
-    (eng, _) = compile_native("generators_residual.jac");
-    f = get_func(eng, "count_pacer", ctypes.c_int64, ctypes.c_int64);
-    assert f(5) == 5;
-    assert f(0) == 0;
-}
+test "generators_iter_ownership.jac cases" {
+    def check_generator_enumerate_inside_a_generator_body_surv {
+        (eng, _) = compile_native("generators_iter_ownership.jac");
 
-test "generator: return <value> stops iteration, value discarded on JacIter" {
-    (eng, _) = compile_native("generators_residual.jac");
-    f = get_func(eng, "total_upto_return", ctypes.c_int64, ctypes.c_int64);
-    assert f(7) == 3 , "1+2, the returned 70 has no JacIter consumer";
-}
+        f = get_func(eng, "total_picked", ctypes.c_int64, ctypes.c_int64);
+        assert f(200) == 200 * (20 + 30);
+    }
 
-test "generator: yield inside a for over a list resumes mid-loop" {
-    (eng, _) = compile_native("generators_residual.jac");
-    f = get_func(eng, "total_doubles", ctypes.c_int64);
-    assert f() == 12 , "2+4+6";
-}
+    def check_generator_a_for_loop_iterator_in_a_frame_slot_is {
+        (eng, _) = compile_native("generators_iter_ownership.jac");
 
-test "generator: yield inside a for over dict keys resumes mid-loop" {
-    (eng, _) = compile_native("generators_residual.jac");
-    f = get_func(eng, "count_keys", ctypes.c_int64);
-    assert f() == 3 , "len('a') + len('bb')";
-}
-
-test "generator: yield inside a for over a string resumes mid-loop" {
-    (eng, _) = compile_native("generators_residual.jac");
-    f = get_sfunc(eng, "count_per_char", ctypes.c_int64, ctypes.c_char_p);
-    assert f(b"xyz") == 3;
-}
-
-test "generator: yield inside try, exception raised and caught across resumes" {
-    (eng, _) = compile_native("generators_residual.jac");
-    f = get_func(eng, "total_resilient", ctypes.c_int64, ctypes.c_int64);
-    assert f(0) == 7 , "1+2+4, no exception";
-    assert f(1) == 8 , "1, boom caught, 3, 4";
-}
-
-test "generator: yield inside finally resumes through both continuations" {
-    # #7626 A6: the finally region records its pending continuation in a
-    # frame slot, so suspending inside it is legal. Full iteration yields
-    # the try value then the finally value (CPython parity).
-    (eng, _) = compile_native("generators_finally.jac");
-    f = get_func(eng, "sum_yf", ctypes.c_int64, ctypes.c_int64);
-    assert f(5) == 11 , "yields 5 then 6";
-    assert f(10) == 21 , "yields 10 then 11";
-}
-
-test "generator: abandoning a yield-in-finally stream drops the frame safely" {
-    (eng, _) = compile_native("generators_finally.jac");
-    f = get_func(eng, "first_yf", ctypes.c_int64, ctypes.c_int64);
-    assert f(10) == 10 , "early return abandons the stream without crashing";
-}
-
-test "generator: capturing lambda escaping inside a generator frame" {
-    # #7626 A2: closure cells for generator locals are allocated in the
-    # creation fn and their handles live in frame slots, so a lambda can
-    # escape as a value inside a generator body.
-    (eng, _) = compile_native("generators_closures.jac");
-    f = get_func(eng, "sum_gen_scaled", ctypes.c_int64, ctypes.c_int64);
-    assert f(3) == 9 , "g(1)+g(2) with k=3: 3+6";
-    assert f(0) == 0;
-}
-
-test "generator: plain param after a captured param keeps its own value" {
-    # Cell-promoted params leave param_slots, so the creation fn must map
-    # remaining plain params by their ORIGINAL signature index -- not by
-    # enumeration order -- or `base` here would be stored from k's arg.
-    (eng, _) = compile_native("generators_closures.jac");
-    f = get_func(eng, "sum_gen_mixed", ctypes.c_int64, ctypes.c_int64, ctypes.c_int64);
-    assert f(3, 10) == 63 , "g(10)+g(11) with k=3: 30+33";
-    assert f(0, 5) == 0;
-}
-
-test "generator: capturing lambda as a map callback inside a generator" {
-    (eng, _) = compile_native("generators_closures.jac");
-    f = get_func(eng, "sum_gen_mapped", ctypes.c_int64, ctypes.c_int64);
-    assert f(10) == 36 , "11+12+13";
-}
-
-test "generator: enumerate inside a generator body survives frame drop" {
-    (eng, _) = compile_native("generators_iter_ownership.jac");
-    f = get_func(eng, "total_picked", ctypes.c_int64, ctypes.c_int64);
-    assert f(200) == 200 * (20 + 30);
+        make = get_func(eng, "make_counter", ctypes.c_void_p, ctypes.c_int64);
+        alias = get_func(eng, "alias", ctypes.c_void_p, ctypes.c_void_p);
+        drain_owned = get_func(eng, "drain_owned", ctypes.c_int64, ctypes.c_void_p);
+        drain_borrowed = get_func(
+            eng, "drain_borrowed", ctypes.c_int64, ctypes.c_void_p
+        );
+        first_borrowed = get_func(
+            eng, "first_borrowed", ctypes.c_int64, ctypes.c_void_p
+        );
+        for (label, run, expected) in [
+            ("owned", drain_owned, 6),
+            ("borrowed", drain_borrowed, 6),
+            ("abandoned", first_borrowed, 0)
+        ] {
+            it = make(4);
+            assert alias(it) == it;
+            before = iter_refs(it);
+            assert before == 2 , f"{label}: caller holds two references";
+            assert run(it) == expected , label;
+            assert iter_refs(it) == before , f"{label}: iterator reference count drifted";
+        }
+    }
+    run_cases(
+        [
+            (
+                "generator: enumerate inside a generator body survives frame drop",
+                check_generator_enumerate_inside_a_generator_body_surv
+            ),
+            (
+                "generator: a for-loop iterator in a frame slot is released exactly once",
+                check_generator_a_for_loop_iterator_in_a_frame_slot_is
+            )
+        ]
+    );
 }
 
 def iter_refs(it: int) -> int {
     return ctypes.c_int64.from_address(it + HDR_RC_OFF).value;
-}
-
-test "generator: a for-loop iterator in a frame slot is released exactly once" {
-    # The caller keeps two references to one iterator so an extra release
-    # shows up as a count instead of a freed block. Draining a generator
-    # whose loop iterates an owned alias, a borrowed parameter, or abandons
-    # the loop mid-way must leave the caller's count where it was.
-    (eng, _) = compile_native("generators_iter_ownership.jac");
-    make = get_func(eng, "make_counter", ctypes.c_void_p, ctypes.c_int64);
-    alias = get_func(eng, "alias", ctypes.c_void_p, ctypes.c_void_p);
-    drain_owned = get_func(eng, "drain_owned", ctypes.c_int64, ctypes.c_void_p);
-    drain_borrowed = get_func(eng, "drain_borrowed", ctypes.c_int64, ctypes.c_void_p);
-    first_borrowed = get_func(eng, "first_borrowed", ctypes.c_int64, ctypes.c_void_p);
-    for (label, run, expected) in [
-        ("owned", drain_owned, 6),
-        ("borrowed", drain_borrowed, 6),
-        ("abandoned", first_borrowed, 0)
-    ] {
-        it = make(4);
-        assert alias(it) == it;
-        before = iter_refs(it);
-        assert before == 2 , f"{label}: caller holds two references";
-        assert run(it) == expected , label;
-        assert iter_refs(it) == before , f"{label}: iterator reference count drifted";
-    }
 }

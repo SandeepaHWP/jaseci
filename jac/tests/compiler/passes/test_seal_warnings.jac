@@ -8,7 +8,7 @@ keeps it quiet.
 """
 
 import os;
-import from tests.support { JAC_ROOT }
+import from tests.support { JAC_ROOT, run_cases }
 import from jaclang.compiler.driver.program { JacProgram }
 
 glob FIXTURES = os.path.join(
@@ -32,10 +32,24 @@ test "owned binding into an unannotated param warns W1312" {
     assert _codes("seal_warn_plain_param.jac") == ["W1312"];
 }
 
-test "owned binding into an own param is quiet" {
-    assert _codes("seal_warn_own_param_ok.jac") == [];
-}
+test "owned binding into an own param is quiet, and related cases" {
+    def check_owned_binding_into_an_own_param_is_quiet {
+        assert _codes("seal_warn_own_param_ok.jac") == [];
+    }
 
-test "managed() at the call site is quiet" {
-    assert _codes("seal_warn_managed_ok.jac") == [];
+    def check_managed_at_the_call_site_is_quiet {
+        assert _codes("seal_warn_managed_ok.jac") == [];
+    }
+    run_cases(
+        [
+            (
+                "owned binding into an own param is quiet",
+                check_owned_binding_into_an_own_param_is_quiet
+            ),
+            (
+                "managed() at the call site is quiet",
+                check_managed_at_the_call_site_is_quiet
+            )
+        ]
+    );
 }

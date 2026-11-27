@@ -32,7 +32,7 @@ import from jaclang.compiler.driver.ifacecache { artifact_cache_path }
 import from jaclang.dist.precompile_bytecode { precompile_unit }
 import from types { CodeType }
 import from unittest.mock { patch }
-import from tests.support { cache_env }
+import from tests.support { cache_env, run_cases }
 
 glob SPEC_SRC: str = "obj Spec {\n    has name: str,\n        help: str;\n}\n",
      OTHER_SRC: str = "def helper -> int {\n    return 1;\n}\n",
@@ -257,37 +257,52 @@ test "a comptime embed cannot read outside its package root" {
     }
 }
 
-test "a comptime function body edit is observed by its callers" {
-    paths = _pair(
-        "comptime def banner -> str {\n    return \"banner one\";\n}\n",
-        "comptime import from prodmod { banner }\n\n"
-        "comptime TITLE: str = banner();\n\n"
-        "with entry {\n    print(TITLE);\n}\n"
-    );
-    with _isolated(paths["root"]) {
-        _refolds(
-            paths,
-            "comptime def banner -> str {\n    return \"banner two\";\n}\n",
-            "banner two"
+test "a comptime function body edit is observed by its callers, and related cases" {
+    def check_a_comptime_function_body_edit_is_observed_by_its {
+        paths = _pair(
+            "comptime def banner -> str {\n    return \"banner one\";\n}\n",
+            "comptime import from prodmod { banner }\n\n"
+            "comptime TITLE: str = banner();\n\n"
+            "with entry {\n    print(TITLE);\n}\n"
         );
+        with _isolated(paths["root"]) {
+            _refolds(
+                paths,
+                "comptime def banner -> str {\n    return \"banner two\";\n}\n",
+                "banner two"
+            );
+        }
     }
+
+    def check_a_class_body_comptime_constant_edit_is_observed {
+        paths = _pair(
+            "obj Palette {\n    comptime PRIMARY: str = \"ink one\";\n}\n",
+            "comptime import from prodmod { Palette }\n\n"
+            "comptime SHADE: str = Palette.PRIMARY;\n\n"
+            "with entry {\n    print(SHADE);\n}\n"
+        );
+        with _isolated(paths["root"]) {
+            _refolds(
+                paths,
+                "obj Palette {\n    comptime PRIMARY: str = \"ink two\";\n}\n",
+                "ink two"
+            );
+        }
+    }
+    run_cases(
+        [
+            (
+                "a comptime function body edit is observed by its callers",
+                check_a_comptime_function_body_edit_is_observed_by_its
+            ),
+            (
+                "a class-body comptime constant edit is observed by its readers",
+                check_a_class_body_comptime_constant_edit_is_observed
+            )
+        ]
+    );
 }
 
-test "a class-body comptime constant edit is observed by its readers" {
-    paths = _pair(
-        "obj Palette {\n    comptime PRIMARY: str = \"ink one\";\n}\n",
-        "comptime import from prodmod { Palette }\n\n"
-        "comptime SHADE: str = Palette.PRIMARY;\n\n"
-        "with entry {\n    print(SHADE);\n}\n"
-    );
-    with _isolated(paths["root"]) {
-        _refolds(
-            paths,
-            "obj Palette {\n    comptime PRIMARY: str = \"ink two\";\n}\n",
-            "ink two"
-        );
-    }
-}
 
 test "an enum member value edit is observed by its readers" {
     paths = _pair(

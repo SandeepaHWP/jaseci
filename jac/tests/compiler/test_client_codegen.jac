@@ -4,7 +4,7 @@ import from jaclang.compiler.backends.py.codegen_shim { generated_python }
 import os;
 import tempfile;
 import from pathlib { Path }
-import from tests.support { JAC_ROOT }
+import from tests.support { JAC_ROOT, run_cases }
 import from tempfile { NamedTemporaryFile, TemporaryDirectory }
 import jaclang;
 import from jaclang.compiler.driver.program { JacProgram }
@@ -89,32 +89,65 @@ test "compilation skips python stubs" {
     assert mod.gen.client_manifest.params.get("component", []) == [];
 }
 
-# Consolidated: type() lowering + spawn operator (share one JacProgram)
-test "type() lowering and spawn operator" {
-    prog = JacProgram();
+test "type() lowering and spawn operator, and related cases" {
+    # Consolidated: type() lowering + spawn operator (share one JacProgram)
+    def check_type_lowering_and_spawn_operator {
+        prog = JacProgram();
 
-    # --- type() lowering ---
-    typeof_code = '"""Test type() lowering."""\n\ndef check_types() -> any {\n    x = 42;\n    y = "hello";\n    z = True;\n\n    t1 = type(x);\n    t2 = type(y);\n    t3 = type(z);\n    t4 = type("world");\n\n    return t1;\n}\n';
-    mod = compile_inline(typeof_code, prog, client=True);
-    assert mod.gen.js.strip() , "Expected JavaScript output for client code";
-    for pattern in [
-        "_jac.builtin.type(x)",
-        "_jac.builtin.type(y)",
-        "_jac.builtin.type(z)",
-        '_jac.builtin.type("world")'
-    ] {
-        assert pattern in mod.gen.js;
+        # --- type() lowering ---
+        typeof_code = '"""Test type() lowering."""\n\ndef check_types() -> any {\n    x = 42;\n    y = "hello";\n    z = True;\n\n    t1 = type(x);\n    t2 = type(y);\n    t3 = type(z);\n    t4 = type("world");\n\n    return t1;\n}\n';
+        mod = compile_inline(typeof_code, prog, client=True);
+        assert mod.gen.js.strip() , "Expected JavaScript output for client code";
+        for pattern in [
+            "_jac.builtin.type(x)",
+            "_jac.builtin.type(y)",
+            "_jac.builtin.type(z)",
+            '_jac.builtin.type("world")'
+        ] {
+            assert pattern in mod.gen.js;
+        }
+
+        # --- spawn operator supports positional and spread ---
+        spawn_code = "walker MixedWalker {\n    has label: str;\n    has count: int;\n    has meta: dict[any, any] = {};\n    can execute with Root entry { }\n}\n\ndef spawn_client() -> dict[any, any] {\n    node_id = \"abcd\";\n    extra = {\"meta\": {\"source\": \"client\"}};\n    positional = node_id spawn MixedWalker(\"First\", 3);\n    spread = MixedWalker(\"Second\", 1, **extra) spawn root;\n    return {\"positional\": positional, \"spread\": spread};\n}\n";
+        mod2 = compile_inline(spawn_code, prog, client=True);
+        js = mod2.gen.js;
+        assert '__jacSpawn("MixedWalker", node_id, {"label": "First", "count": 3},'
+            in js;
+        assert '__jacSpawn("MixedWalker", "", {"label": "Second", "count": 1, ...extra},'
+            in js;
+        import json;
+        assert json.dumps(endpoint_key(mod2, "walker", "MixedWalker")) in js;
     }
 
-    # --- spawn operator supports positional and spread ---
-    spawn_code = "walker MixedWalker {\n    has label: str;\n    has count: int;\n    has meta: dict[any, any] = {};\n    can execute with Root entry { }\n}\n\ndef spawn_client() -> dict[any, any] {\n    node_id = \"abcd\";\n    extra = {\"meta\": {\"source\": \"client\"}};\n    positional = node_id spawn MixedWalker(\"First\", 3);\n    spread = MixedWalker(\"Second\", 1, **extra) spawn root;\n    return {\"positional\": positional, \"spread\": spread};\n}\n";
-    mod2 = compile_inline(spawn_code, prog, client=True);
-    js = mod2.gen.js;
-    assert '__jacSpawn("MixedWalker", node_id, {"label": "First", "count": 3},' in js;
-    assert '__jacSpawn("MixedWalker", "", {"label": "Second", "count": 1, ...extra},'
-        in js;
-    import json;
-    assert json.dumps(endpoint_key(mod2, "walker", "MixedWalker")) in js;
+    def check_client_capability_check_rejects_silently_dropped {
+        code = """def race() -> int {
+    fut = flow slow_op();
+    return wait fut;
+}
+
+def slow_op() -> int {
+    return 1;
+}
+""";
+        prog = JacProgram();
+        try {
+            compile_inline(code, prog=prog, client=True);
+        } except Exception {}
+        msgs = " ".join([str(e) for e in prog.errors_had]);
+        assert "Client pathway does not yet support flow/wait concurrency" in msgs , f"client-placed flow/wait must be diagnosed, got: {msgs[0:600]}";
+    }
+    run_cases(
+        [
+            (
+                "type() lowering and spawn operator",
+                check_type_lowering_and_spawn_operator
+            ),
+            (
+                "client capability check rejects silently-dropped constructs",
+                check_client_capability_check_rejects_silently_dropped
+            )
+        ]
+    );
 }
 
 test "client import local jac module gets relative path" {
@@ -134,61 +167,73 @@ test "client import local jac module gets relative path" {
     }
 }
 
-# Consolidated: def:pub + endpoint effects (share one JacProgram)
-test "def pub and endpoint effects" {
-    prog = JacProgram();
+test "def pub and endpoint effects, and related cases" {
+    # Consolidated: def:pub + endpoint effects (share one JacProgram)
+    def check_def_pub_and_endpoint_effects {
+        prog = JacProgram();
 
-    # --- def pub called from client imports jac call function ---
-    defpub_code = '"""\nTest def:pub called from client context.\n"""\n\nimport os;\n\ndef:pub get_server_data(name: str) -> dict[any, any] {\n    return {"message": "Hello " + name + os.sep};\n}\n\nasync def:pub app() -> Any {\n    data = await get_server_data("World");\n    return <div>{data}</div>;\n}\n';
-    mod = compile_inline(defpub_code, prog);
-    js = mod.gen.js;
-    assert js.strip() , "Expected JavaScript output for client code";
-    assert "__jacCallFunction" in js , "__jacCallFunction should be present in generated JS";
-    assert "@jac/runtime" in js , "__jacCallFunction should be imported from @jac/runtime";
-    assert '__jacCallFunction("get_server_data"' in js , "Should generate __jacCallFunction call with function name";
+        # --- def pub called from client imports jac call function ---
+        defpub_code = '"""\nTest def:pub called from client context.\n"""\n\nimport os;\n\ndef:pub get_server_data(name: str) -> dict[any, any] {\n    return {"message": "Hello " + name + os.sep};\n}\n\nasync def:pub app() -> Any {\n    data = await get_server_data("World");\n    return <div>{data}</div>;\n}\n';
+        mod = compile_inline(defpub_code, prog);
+        js = mod.gen.js;
+        assert js.strip() , "Expected JavaScript output for client code";
+        assert "__jacCallFunction" in js , "__jacCallFunction should be present in generated JS";
+        assert "@jac/runtime" in js , "__jacCallFunction should be imported from @jac/runtime";
+        assert '__jacCallFunction("get_server_data"' in js , "Should generate __jacCallFunction call with function name";
 
-    # --- endpoint effects classifies walkers and functions ---
-    effects_code = '"""Test auto endpoint effects."""\n\nnode Todo {\n    has title: str,\n        done: bool = False;\n}\n\nwalker get_todos {\n    can visit_root with Root entry {\n        report [-->];\n    }\n}\n\nwalker create_todo {\n    has title: str;\n    can do_create with Root entry {\n        here ++> Todo(title=self.title);\n    }\n}\n\ndef:pub get_stats() -> dict[any, any] {\n    return {"count": 10};\n}\n\ndef:pub reset_data() -> dict[any, any] {\n    items: list[any] = [];\n    del items;\n    return {};\n}\n\nasync def:pub app() -> Any {\n    todos = root spawn get_todos();\n    root spawn create_todo(title="test");\n    stats = await get_stats();\n    result = await reset_data();\n    return <div>{stats}{result}{todos}</div>;\n}\n';
-    mod2 = compile_inline(effects_code, prog);
-    effects = mod2.gen.client_manifest.endpoint_effects;
-    # Walker reader: no write operations in body
-    assert endpoint_key(mod2, "walker", "get_todos") in effects , "get_todos should be in endpoint_effects";
-    assert not effects[endpoint_key(mod2, "walker", "get_todos")]["writes"] , "get_todos should be classified as reader";
-    # Walker writer: has connect op (++>) and node constructor
-    assert endpoint_key(mod2, "walker", "create_todo") in effects , "create_todo should be in endpoint_effects";
-    assert effects[endpoint_key(mod2, "walker", "create_todo")]["writes"] , "create_todo should be classified as writer";
-    # Function reader: just returns data, no mutations
-    assert endpoint_key(mod2, "func", "get_stats") in effects , "get_stats should be in endpoint_effects";
-    assert not effects[endpoint_key(mod2, "func", "get_stats")]["writes"] , "get_stats should be classified as reader";
-    # Function writer: has del statement
-    assert endpoint_key(mod2, "func", "reset_data") in effects , "reset_data should be in endpoint_effects";
-    assert effects[endpoint_key(mod2, "func", "reset_data")]["writes"] , "reset_data should be classified as writer";
-    # Verify read dependencies is present
-    for key in effects {
-        assert "reads" in effects[key] , f"{key} should have read dependency list";
-        assert len(effects[key]["reads"]) > 0 , f"{key} should have non-empty read dependencies";
+        # --- endpoint effects classifies walkers and functions ---
+        effects_code = '"""Test auto endpoint effects."""\n\nnode Todo {\n    has title: str,\n        done: bool = False;\n}\n\nwalker get_todos {\n    can visit_root with Root entry {\n        report [-->];\n    }\n}\n\nwalker create_todo {\n    has title: str;\n    can do_create with Root entry {\n        here ++> Todo(title=self.title);\n    }\n}\n\ndef:pub get_stats() -> dict[any, any] {\n    return {"count": 10};\n}\n\ndef:pub reset_data() -> dict[any, any] {\n    items: list[any] = [];\n    del items;\n    return {};\n}\n\nasync def:pub app() -> Any {\n    todos = root spawn get_todos();\n    root spawn create_todo(title="test");\n    stats = await get_stats();\n    result = await reset_data();\n    return <div>{stats}{result}{todos}</div>;\n}\n';
+        mod2 = compile_inline(effects_code, prog);
+        effects = mod2.gen.client_manifest.endpoint_effects;
+        # Walker reader: no write operations in body
+        assert endpoint_key(mod2, "walker", "get_todos") in effects , "get_todos should be in endpoint_effects";
+        assert not effects[endpoint_key(mod2, "walker", "get_todos")]["writes"] , "get_todos should be classified as reader";
+        # Walker writer: has connect op (++>) and node constructor
+        assert endpoint_key(mod2, "walker", "create_todo") in effects , "create_todo should be in endpoint_effects";
+        assert effects[endpoint_key(mod2, "walker", "create_todo")]["writes"] , "create_todo should be classified as writer";
+        # Function reader: just returns data, no mutations
+        assert endpoint_key(mod2, "func", "get_stats") in effects , "get_stats should be in endpoint_effects";
+        assert not effects[endpoint_key(mod2, "func", "get_stats")]["writes"] , "get_stats should be classified as reader";
+        # Function writer: has del statement
+        assert endpoint_key(mod2, "func", "reset_data") in effects , "reset_data should be in endpoint_effects";
+        assert effects[endpoint_key(mod2, "func", "reset_data")]["writes"] , "reset_data should be classified as writer";
+        # Verify read dependencies is present
+        for key in effects {
+            assert "reads" in effects[key] , f"{key} should have read dependency list";
+            assert len(effects[key]["reads"]) > 0 , f"{key} should have non-empty read dependencies";
+        }
     }
+
+    def check_endpoint_effects_follow_helper_calls {
+        prog = JacProgram();
+
+        # A walker (and a def:pub function) whose only graph mutation happens
+        # inside a plain `def` helper. The classifier must follow the call into
+        # the helper -- otherwise the walker is misclassified as a reader and the
+        # client cache is never invalidated after the mutation.
+        code = '"""Interprocedural endpoint effect analysis."""\n\nnode Item {\n    has title: str,\n        tags: list[any] = [];\n}\n\ndef _add_tag(it: Item, label: str) -> None {\n    it.tags = it.tags + [label];\n}\n\nwalker tag_item {\n    has label: str;\n    can do_tag with Root entry {\n        for it in [-->[?:Item]] {\n            _add_tag(it, self.label);\n        }\n    }\n}\n\ndef:pub mark_item(label: str) -> dict[any, any] {\n    items: list[Item] = [];\n    for it in items {\n        _add_tag(it, label);\n    }\n    return {};\n}\n\nasync def:pub app() -> Any {\n    root spawn tag_item(label="x");\n    result = await mark_item("y");\n    return <div>{result}</div>;\n}\n';
+        mod = compile_inline(code, prog);
+        effects = mod.gen.client_manifest.endpoint_effects;
+
+        # The walker mutates Item.tags only inside the `_add_tag` helper.
+        assert endpoint_key(mod, "walker", "tag_item") in effects , "tag_item should be in endpoint_effects";
+        assert effects[endpoint_key(mod, "walker", "tag_item")]["writes"] , "tag_item mutates the graph via a helper -- must be classified as writer";
+
+        # Same for a def:pub function delegating its write to a helper.
+        assert endpoint_key(mod, "func", "mark_item") in effects , "mark_item should be in endpoint_effects";
+        assert effects[endpoint_key(mod, "func", "mark_item")]["writes"] , "mark_item mutates the graph via a helper -- must be classified as writer";
+    }
+    run_cases(
+        [
+            ("def pub and endpoint effects", check_def_pub_and_endpoint_effects),
+            (
+                "endpoint effects follow helper calls",
+                check_endpoint_effects_follow_helper_calls
+            )
+        ]
+    );
 }
 
-test "endpoint effects follow helper calls" {
-    prog = JacProgram();
-
-    # A walker (and a def:pub function) whose only graph mutation happens
-    # inside a plain `def` helper. The classifier must follow the call into
-    # the helper -- otherwise the walker is misclassified as a reader and the
-    # client cache is never invalidated after the mutation.
-    code = '"""Interprocedural endpoint effect analysis."""\n\nnode Item {\n    has title: str,\n        tags: list[any] = [];\n}\n\ndef _add_tag(it: Item, label: str) -> None {\n    it.tags = it.tags + [label];\n}\n\nwalker tag_item {\n    has label: str;\n    can do_tag with Root entry {\n        for it in [-->[?:Item]] {\n            _add_tag(it, self.label);\n        }\n    }\n}\n\ndef:pub mark_item(label: str) -> dict[any, any] {\n    items: list[Item] = [];\n    for it in items {\n        _add_tag(it, label);\n    }\n    return {};\n}\n\nasync def:pub app() -> Any {\n    root spawn tag_item(label="x");\n    result = await mark_item("y");\n    return <div>{result}</div>;\n}\n';
-    mod = compile_inline(code, prog);
-    effects = mod.gen.client_manifest.endpoint_effects;
-
-    # The walker mutates Item.tags only inside the `_add_tag` helper.
-    assert endpoint_key(mod, "walker", "tag_item") in effects , "tag_item should be in endpoint_effects";
-    assert effects[endpoint_key(mod, "walker", "tag_item")]["writes"] , "tag_item mutates the graph via a helper -- must be classified as writer";
-
-    # Same for a def:pub function delegating its write to a helper.
-    assert endpoint_key(mod, "func", "mark_item") in effects , "mark_item should be in endpoint_effects";
-    assert effects[endpoint_key(mod, "func", "mark_item")]["writes"] , "mark_item mutates the graph via a helper -- must be classified as writer";
-}
 
 test "jac call function sends params directly" {
     # The framework-agnostic surface (incl. __jacCallFunction) now lives in the
@@ -295,8 +340,9 @@ test "component rename is skipped when the PascalCase name is already taken" {
     assert "const page" not in js;
 }
 
-test "archetype constructors in jsx-attribute lambdas emit new" {
-    code = """obj Task {
+test "archetype constructors in jsx-attribute lambdas emit new, and related cases" {
+    def check_archetype_constructors_in_jsx_attribute_lambdas {
+        code = """obj Task {
     has label: str = \"\";
 }
 
@@ -315,14 +361,14 @@ def:pub app -> JsxElement {
         </div>;
 }
 """;
-    mod = compile_inline(code, client=True);
-    js = mod.gen.js;
-    n = js.count("new Task(");
-    assert n >= 2 , f"constructor lost 'new' inside jsx-attribute lambda (found {n}): {js[-1500:]}";
-}
+        mod = compile_inline(code, client=True);
+        js = mod.gen.js;
+        n = js.count("new Task(");
+        assert n >= 2 , f"constructor lost 'new' inside jsx-attribute lambda (found {n}): {js[-1500:]}";
+    }
 
-test "constructor as call argument in component-prop lambda emits new" {
-    code = """obj Program {
+    def check_constructor_as_call_argument_in_component_prop_l {
+        code = """obj Program {
     has name: str = \"untitled\";
 }
 
@@ -341,11 +387,25 @@ def:pub app -> JsxElement {
         </div>;
 }
 """;
-    mod = compile_inline(code, client=True);
-    js = mod.gen.js;
-    n = js.count("new Program(");
-    assert n >= 1 , f"constructor lost 'new' in component-prop lambda (found {n}): {js[-1500:]}";
+        mod = compile_inline(code, client=True);
+        js = mod.gen.js;
+        n = js.count("new Program(");
+        assert n >= 1 , f"constructor lost 'new' in component-prop lambda (found {n}): {js[-1500:]}";
+    }
+    run_cases(
+        [
+            (
+                "archetype constructors in jsx-attribute lambdas emit new",
+                check_archetype_constructors_in_jsx_attribute_lambdas
+            ),
+            (
+                "constructor as call argument in component-prop lambda emits new",
+                check_constructor_as_call_argument_in_component_prop_l
+            )
+        ]
+    );
 }
+
 
 test "absolute imports in nested modules emit importer-relative specifiers" {
     with TemporaryDirectory() as td {
@@ -370,23 +430,6 @@ test "absolute imports in nested modules emit importer-relative specifiers" {
     }
 }
 
-test "client capability check rejects silently-dropped constructs" {
-    code = """def race() -> int {
-    fut = flow slow_op();
-    return wait fut;
-}
-
-def slow_op() -> int {
-    return 1;
-}
-""";
-    prog = JacProgram();
-    try {
-        compile_inline(code, prog=prog, client=True);
-    } except Exception {}
-    msgs = " ".join([str(e) for e in prog.errors_had]);
-    assert "Client pathway does not yet support flow/wait concurrency" in msgs , f"client-placed flow/wait must be diagnosed, got: {msgs[0:600]}";
-}
 
 test "client generators lower to JS function* with yield" {
     code = """def gen_vals(limit: int) -> any {

@@ -16,7 +16,7 @@ pattern.
 
 import ctypes;
 import os;
-import from tests.support { TESTS_DIR, native_address, native_force_opts }
+import from tests.support { TESTS_DIR, native_address, native_force_opts, run_cases }
 import jaclang;
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.backends.native.llvm.binding { ExecutionEngine }
@@ -55,9 +55,28 @@ test "sorted over an empty list returns an empty list" {
     assert f() == len(sorted([]));
 }
 
-test "in-place sort of an empty list is a no-op" {
-    f = native_fn("sort_empty_in_place_len");
-    assert f() == 0;
+test "in-place sort of an empty list is a no-op, and related cases" {
+    def check_in_place_sort_of_an_empty_list_is_a_no_op {
+        f = native_fn("sort_empty_in_place_len");
+        assert f() == 0;
+    }
+
+    def check_an_emptied_comprehension_result_sorts_without_a {
+        f = native_fn("sorted_empty_from_compr");
+        assert f() == 0;
+    }
+    run_cases(
+        [
+            (
+                "in-place sort of an empty list is a no-op",
+                check_in_place_sort_of_an_empty_list_is_a_no_op
+            ),
+            (
+                "an emptied comprehension result sorts without a read",
+                check_an_emptied_comprehension_result_sorts_without_a
+            )
+        ]
+    );
 }
 
 test "single-element list still sorts to itself" {
@@ -68,9 +87,4 @@ test "single-element list still sorts to itself" {
 test "two elements still swap into order" {
     f = native_fn("sorted_pair_first");
     assert f() == sorted([9, 3])[0];
-}
-
-test "an emptied comprehension result sorts without a read" {
-    f = native_fn("sorted_empty_from_compr");
-    assert f() == 0;
 }

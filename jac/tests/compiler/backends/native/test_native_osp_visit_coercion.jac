@@ -6,7 +6,7 @@ and release the converted temporary rather than freeing the source twice.
 """
 
 import ctypes;
-import from tests.support { native_address }
+import from tests.support { native_address, run_cases }
 import os;
 import from jaclang.compiler.driver.program { JacProgram }
 import from tests.support { JAC_ROOT, native_force_opts }
@@ -43,10 +43,24 @@ def run_visits(name: str, repeats: int) -> int {
     return ctypes.CFUNCTYPE(ctypes.c_int64, ctypes.c_int64)(address)(repeats);
 }
 
-test "indexed visit lists compile and survive repeated traversal" {
-    assert run_visits("indexed_visits", 10000) == 30000;
-}
+test "indexed visit lists compile and survive repeated traversal, and related cases" {
+    def check_indexed_visit_lists_compile_and_survive_repeated {
+        assert run_visits("indexed_visits", 10000) == 30000;
+    }
 
-test "visit coercion preserves borrowed lists and node fields" {
-    assert run_visits("borrowed_visits", 10000) == 120014;
+    def check_visit_coercion_preserves_borrowed_lists_and_node {
+        assert run_visits("borrowed_visits", 10000) == 120014;
+    }
+    run_cases(
+        [
+            (
+                "indexed visit lists compile and survive repeated traversal",
+                check_indexed_visit_lists_compile_and_survive_repeated
+            ),
+            (
+                "visit coercion preserves borrowed lists and node fields",
+                check_visit_coercion_preserves_borrowed_lists_and_node
+            )
+        ]
+    );
 }

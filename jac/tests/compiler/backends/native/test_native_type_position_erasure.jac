@@ -43,7 +43,7 @@ import from jaclang.compiler.driver.compile_options { CompileOptions }
 import from jaclang.compiler.frontend.parser { parse as rd_parse }
 import from jaclang.compiler.placement.placement { scan_native_blockers }
 import from jaclang.compiler.driver.program { JacProgram }
-import from tests.support { TESTS_DIR, by_source_name, native_address }
+import from tests.support { TESTS_DIR, by_source_name, native_address, run_cases }
 
 glob FIXTURES = os.path.join(
          TESTS_DIR, "compiler", "backends", "native", "fixtures"
@@ -123,36 +123,69 @@ def _run_py_lane(fixture_stem: str, func_name: str) -> any {
 }
 
 
-test "a typing.cast import no longer blocks native placement" {
-    assert _scan_verdict(_module_with("import from typing { cast }")) == "OK" , (
-        "`import from typing { cast }` still demotes the module, so every "
-        "import closure reaching it stays demoted too"
+test "a typing.cast import no longer blocks native placement, and related cases" {
+    def check_a_typing_cast_import_no_longer_blocks_native_pla {
+        assert _scan_verdict(_module_with("import from typing { cast }")) == "OK" , (
+            "`import from typing { cast }` still demotes the module, so every "
+            "import closure reaching it stays demoted too"
+        );
+    }
+
+    def check_a_typevar_import_no_longer_blocks_native_placeme {
+        assert _scan_verdict(_module_with("import from typing { TypeVar }")) == "OK" , (
+            "`import from typing { TypeVar }` still demotes the module; the "
+            "generic parameter it binds is erased at every use site already"
+        );
+    }
+    run_cases(
+        [
+            (
+                "a typing.cast import no longer blocks native placement",
+                check_a_typing_cast_import_no_longer_blocks_native_pla
+            ),
+            (
+                "a TypeVar import no longer blocks native placement",
+                check_a_typevar_import_no_longer_blocks_native_placeme
+            )
+        ]
     );
 }
 
 
-test "typing.cast lowers with no seam" {
-    (prog, ir) = _compile_native("typing_cast_identity.jac");
-    assert not prog.errors_had , f"{[str(e) for e in prog.errors_had]}";
-    layout = ir.gen.native_layout;
-    assert layout is not None , "whole-module native compile aborted";
-    for fn in ["run", "widen"] {
-        assert fn in layout.functions , (
-            f"'{fn}' was demoted to a Python seam rather than erasing the "
-            f"cast: {sorted(layout.functions)}"
+test "typing_cast_identity.jac cases" {
+    def check_typing_cast_lowers_with_no_seam {
+        (prog, ir) = _compile_native("typing_cast_identity.jac");
+
+        assert not prog.errors_had , f"{[str(e) for e in prog.errors_had]}";
+        layout = ir.gen.native_layout;
+        assert layout is not None , "whole-module native compile aborted";
+        for fn in ["run", "widen"] {
+            assert fn in layout.functions , (
+                f"'{fn}' was demoted to a Python seam rather than erasing the "
+                f"cast: {sorted(layout.functions)}"
+            );
+        }
+    }
+
+    def check_typing_cast_is_the_identity_on_both_lanes {
+        (prog, ir) = _compile_native("typing_cast_identity.jac");
+
+        assert not prog.errors_had , f"{[str(e) for e in prog.errors_had]}";
+        native = _native_int_fn(ir, "run")();
+        assert native == 21 , f"native cast chain returned {native}, expected 21";
+        assert _run_py_lane("typing_cast_identity", "run") == native , (
+            "the native erasure and `typing.cast` disagree; `cast` returns its "
+            "second argument unchanged in Python, so the lanes must match"
         );
     }
-}
-
-
-test "typing.cast is the identity on both lanes" {
-    (prog, ir) = _compile_native("typing_cast_identity.jac");
-    assert not prog.errors_had , f"{[str(e) for e in prog.errors_had]}";
-    native = _native_int_fn(ir, "run")();
-    assert native == 21 , f"native cast chain returned {native}, expected 21";
-    assert _run_py_lane("typing_cast_identity", "run") == native , (
-        "the native erasure and `typing.cast` disagree; `cast` returns its "
-        "second argument unchanged in Python, so the lanes must match"
+    run_cases(
+        [
+            ("typing.cast lowers with no seam", check_typing_cast_lowers_with_no_seam),
+            (
+                "typing.cast is the identity on both lanes",
+                check_typing_cast_is_the_identity_on_both_lanes
+            )
+        ]
     );
 }
 
@@ -176,14 +209,6 @@ test "the cast erasure reaches an annexed impl body" {
 }
 
 
-test "a TypeVar import no longer blocks native placement" {
-    assert _scan_verdict(_module_with("import from typing { TypeVar }")) == "OK" , (
-        "`import from typing { TypeVar }` still demotes the module; the "
-        "generic parameter it binds is erased at every use site already"
-    );
-}
-
-
 test "a module-scope TypeVar glob produces native IR" {
     (prog, ir) = _compile_native("typing_typevar_glob.jac");
     assert not prog.errors_had , f"{[str(e) for e in prog.errors_had]}";
@@ -202,37 +227,63 @@ test "an erased base is a type position, not a run-time use" {
 }
 
 
-test "an `as` cast type is a type position, not a run-time use" {
-    assert _rejected_imports("type_position_cast_type.jac") == [] , (
-        "a Python name mentioned only as the type of an `as` cast was read as "
-        "a run-time use; a cast lowers to its own operand natively, so "
-        "nothing in the emitted unit reads the module"
+test "an `as` cast type is a type position, not a run-time use, and related cases" {
+    def check_an_as_cast_type_is_a_type_position_not_a_run_tim {
+        assert _rejected_imports("type_position_cast_type.jac") == [] , (
+            "a Python name mentioned only as the type of an `as` cast was read as "
+            "a run-time use; a cast lowers to its own operand natively, so "
+            "nothing in the emitted unit reads the module"
+        );
+    }
+
+    def check_a_type_alias_right_hand_side_is_a_type_position {
+        assert _rejected_imports("type_position_alias_rhs.jac") == [] , (
+            "a Python name mentioned only in a `type` alias was read as a "
+            "run-time use; native glob lowering drops a type declaration, so "
+            "nothing in the emitted unit reads the module"
+        );
+    }
+    run_cases(
+        [
+            (
+                "an `as` cast type is a type position, not a run-time use",
+                check_an_as_cast_type_is_a_type_position_not_a_run_tim
+            ),
+            (
+                "a `type` alias right-hand side is a type position, not a run-time use",
+                check_a_type_alias_right_hand_side_is_a_type_position
+            )
+        ]
     );
 }
 
 
-test "a `type` alias right-hand side is a type position, not a run-time use" {
-    assert _rejected_imports("type_position_alias_rhs.jac") == [] , (
-        "a Python name mentioned only in a `type` alias was read as a "
-        "run-time use; native glob lowering drops a type declaration, so "
-        "nothing in the emitted unit reads the module"
-    );
-}
+test "a base the native lane keeps still refuses, and related cases" {
+    def check_a_base_the_native_lane_keeps_still_refuses {
+        assert _rejected_imports("type_position_retained_base.jac") == ["threading"] , (
+            "an ordinary Python base is a run-time dependency: the archetype "
+            "cannot mean what it says without it, and a native unit cannot "
+            "supply it. Only an erased base is free"
+        );
+    }
 
-
-test "a base the native lane keeps still refuses" {
-    assert _rejected_imports("type_position_retained_base.jac") == ["threading"] , (
-        "an ordinary Python base is a run-time dependency: the archetype "
-        "cannot mean what it says without it, and a native unit cannot "
-        "supply it. Only an erased base is free"
-    );
-}
-
-
-test "a run-time use of a Python module still refuses" {
-    assert _rejected_imports("type_position_runtime_use.jac") == ["threading"] , (
-        "widening the gate to compile-time positions must not accept a name "
-        "the native unit would have to call"
+    def check_a_run_time_use_of_a_python_module_still_refuses {
+        assert _rejected_imports("type_position_runtime_use.jac") == ["threading"] , (
+            "widening the gate to compile-time positions must not accept a name "
+            "the native unit would have to call"
+        );
+    }
+    run_cases(
+        [
+            (
+                "a base the native lane keeps still refuses",
+                check_a_base_the_native_lane_keeps_still_refuses
+            ),
+            (
+                "a run-time use of a Python module still refuses",
+                check_a_run_time_use_of_a_python_module_still_refuses
+            )
+        ]
     );
 }
 

@@ -19,6 +19,8 @@ import from jaclang.compiler.frontend.parser.frontend { parse }
 import from jaclang.compiler.passes.ast_validation_pass { ASTValidationPass }
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.driver.pass_driver { run_pass }
+import from tests.support { run_cases }
+
 
 glob _test_tmp_dir: str = tempfile.mkdtemp(prefix="jac_test_new_builtin_"),
      _client_tmp_dir: str = os.path.join(_test_tmp_dir, "client");
@@ -82,51 +84,74 @@ test "new() as a call is not flagged by ast_validation_pass" {
     );
 }
 
-test "new as a bare identifier (function reference) is allowed" {
-    prog = parse_and_validate("with entry { f = new; }");
-    assert not has_code(prog, "E0010") , (
-        "Passing `new` as a first-class function reference must be allowed"
+test "new as a bare identifier (function reference) is allowed, and related cases" {
+    def check_new_as_a_bare_identifier_function_reference_is_a {
+        prog = parse_and_validate("with entry { f = new; }");
+
+        assert not has_code(prog, "E0010") , (
+            "Passing `new` as a first-class function reference must be allowed"
+        );
+    }
+
+    def check_f_new_first_class_reference_does_not_emit_e0012 {
+        prog = parse_and_validate("with entry { f = new; }");
+
+        assert not has_code(prog, "E0012") , (
+            "Legitimate `f = new;` must not trip the JS-pattern detector"
+        );
+        assert not has_code(prog, "E0002");
+    }
+    run_cases(
+        [
+            (
+                "new as a bare identifier (function reference) is allowed",
+                check_new_as_a_bare_identifier_function_reference_is_a
+            ),
+            (
+                "`f = new;` (first-class reference) does NOT emit E0012",
+                check_f_new_first_class_reference_does_not_emit_e0012
+            )
+        ]
     );
 }
 
-test "JS-style `new Foo()` keyword usage still errors" {
-    # `new Foo(1, 2)` is not Jac syntax: it should still fail to parse
-    # (or fail validation). We only require *some* error, not a specific code.
-    prog = parse_and_validate("with entry { x = new Foo(1, 2); }");
-    assert len(prog.errors_had) > 0 , (
-        "JS-style `new Foo()` must continue to be rejected"
+test "JS-style `new cases" {
+    def check_js_style_new_foo_keyword_usage_still_errors {
+        prog = parse_and_validate("with entry { x = new Foo(1, 2); }");
+
+        assert len(prog.errors_had) > 0 , (
+            "JS-style `new Foo()` must continue to be rejected"
+        );
+    }
+
+    def check_js_style_new_foo_emits_e0012_not_a_generic_parse {
+        prog = parse_and_validate("with entry { x = new Foo(1, 2); }");
+
+        assert has_code(prog, "E0012") , (
+            "Assignment-style `x = new Foo(...)` must emit E0012"
+        );
+        assert not has_code(prog, "E0002") , (
+            "Should not also emit E0002 when E0012 fired for the same offense"
+        );
+    }
+    run_cases(
+        [
+            (
+                "JS-style `new Foo()` keyword usage still errors",
+                check_js_style_new_foo_keyword_usage_still_errors
+            ),
+            (
+                "JS-style `new Foo(...)` emits E0012, not a generic parse error",
+                check_js_style_new_foo_emits_e0012_not_a_generic_parse
+            )
+        ]
     );
 }
 
-test "JS-style `new Foo(...)` emits E0012, not a generic parse error" {
-    # The parser detects `<value> = new <atom>` and `new <atom>;` shapes
-    # and emits the migration-friendly E0012 rather than the cascade of
-    # E0002 (Missing ';') errors users used to hit. Locks in the helpful
-    # diagnostic so a future regression cannot silently downgrade it.
-    prog = parse_and_validate("with entry { x = new Foo(1, 2); }");
-    assert has_code(prog, "E0012") , (
-        "Assignment-style `x = new Foo(...)` must emit E0012"
-    );
-    assert not has_code(prog, "E0002") , (
-        "Should not also emit E0002 when E0012 fired for the same offense"
-    );
-}
 
 test "JS-style bare `new Foo();` emits E0012" {
     prog = parse_and_validate("with entry { new Foo(1, 2); }");
     assert has_code(prog, "E0012") , ("Bare statement `new Foo(...)` must emit E0012");
-    assert not has_code(prog, "E0002");
-}
-
-test "`f = new;` (first-class reference) does NOT emit E0012" {
-    # Passing `new` as a first-class function reference is legitimate
-    # now that it is an ambient builtin. The detection rule only fires
-    # when `;` is *missing* after a bare `new`, so this pattern must
-    # parse cleanly.
-    prog = parse_and_validate("with entry { f = new; }");
-    assert not has_code(prog, "E0012") , (
-        "Legitimate `f = new;` must not trip the JS-pattern detector"
-    );
     assert not has_code(prog, "E0002");
 }
 
@@ -147,21 +172,38 @@ test "cl: new(Cls, args) lowers to Reflect.construct in JS output" {
     );
 }
 
-test "cl: new(Cls) with no args lowers to Reflect.construct(Cls, [])" {
-    code = "def make_set() -> Any {\n" + "    return new(Set);\n" + "}\n";
-    mod = compile_inline(code, client=True);
-    js = mod.gen.js;
-    assert "Reflect.construct(Set, [])" in js , (
-        "new(Set) with no args must lower to Reflect.construct(Set, []); got:\n" + js
-    );
-}
+test "cl: new(Cls) with no args lowers to Reflect.construct(Cls, []), and related cases" {
+    def check_cl_new_cls_with_no_args_lowers_to_reflect_constr {
+        code = "def make_set() -> Any {\n" + "    return new(Set);\n" + "}\n";
+        mod = compile_inline(code, client=True);
+        js = mod.gen.js;
+        assert "Reflect.construct(Set, [])" in js , (
+            "new(Set) with no args must lower to Reflect.construct(Set, []); got:\n"
+            + js
+        );
+    }
 
-test "cl: new with multiple args produces a JS array of args" {
-    code = "def mk(a: int, b: int) -> Any {\n" + "    return new(Map, a, b);\n" + "}\n";
-    mod = compile_inline(code, client=True);
-    js = mod.gen.js;
-    assert "Reflect.construct(Map, [a, b])" in js , (
-        "new(Map, a, b) must lower to Reflect.construct(Map, [a, b]); got:\n" + js
+    def check_cl_new_with_multiple_args_produces_a_js_array_of {
+        code = "def mk(a: int, b: int) -> Any {\n"
+            + "    return new(Map, a, b);\n"
+            + "}\n";
+        mod = compile_inline(code, client=True);
+        js = mod.gen.js;
+        assert "Reflect.construct(Map, [a, b])" in js , (
+            "new(Map, a, b) must lower to Reflect.construct(Map, [a, b]); got:\n" + js
+        );
+    }
+    run_cases(
+        [
+            (
+                "cl: new(Cls) with no args lowers to Reflect.construct(Cls, [])",
+                check_cl_new_cls_with_no_args_lowers_to_reflect_constr
+            ),
+            (
+                "cl: new with multiple args produces a JS array of args",
+                check_cl_new_with_multiple_args_produces_a_js_array_of
+            )
+        ]
     );
 }
 

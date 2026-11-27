@@ -30,7 +30,8 @@ import from tests.support {
     by_source_name,
     compile_native,
     get_func,
-    native_force_opts
+    native_force_opts,
+    run_cases
 }
 
 import from jaclang.runtime.interop_bridge { _pyb_shadows }
@@ -74,52 +75,78 @@ test "a native class over a Python-side base compiles with no seams" {
     }
 }
 
-test "postinit chain, inherited store and inherited call match Python" {
-    (eng, _) = compile_native("pyb_native_main.jac");
-    get_func(eng, "jac_entry", None)();
-    f = get_func(eng, "run_all", ctypes.c_int64);
-    assert f() == EXPECTED , f"native lane produced {f()}, expected {EXPECTED}";
+test "pyb_native_main.jac cases" {
+    def check_postinit_chain_inherited_store_and_inherited_cal {
+        (eng, _) = compile_native("pyb_native_main.jac");
+
+        get_func(eng, "jac_entry", None)();
+        f = get_func(eng, "run_all", ctypes.c_int64);
+        assert f() == EXPECTED , f"native lane produced {f()}, expected {EXPECTED}";
+    }
+
+    def check_the_python_lane_and_the_native_lane_agree_on_the {
+        (eng, _) = compile_native("pyb_native_main.jac");
+
+        get_func(eng, "jac_entry", None)();
+        native_val = get_func(eng, "run_all", ctypes.c_int64)();
+        py_val = run_py_lane("pyb_native_main", "run_all");
+        assert native_val == py_val , (
+            f"lane divergence: native {native_val} vs python {py_val}"
+        );
+    }
+    def check_an_inherited_field_store_is_visible_on_the_pytho {
+        (eng, _) = compile_native("pyb_native_main.jac");
+
+        get_func(eng, "jac_entry", None)();
+        _pyb_shadows.clear();
+        kept = get_func(eng, "keep_and_poke", ctypes.c_int64)();
+        assert kept == 100 , f"keep_and_poke returned {kept}";
+        assert len(_pyb_shadows) == 1 , (
+            f"expected one live shadow, found {len(_pyb_shadows)}"
+        );
+        shadow: any = list(_pyb_shadows.values())[0];
+        assert type(shadow).__name__ == "Kid" , type(shadow).__name__;
+        assert any(c.__name__ == "PyBase" for c in type(shadow).__mro__) , (
+            "shadow is not an instance of the Python base"
+        );
+        assert shadow.count == 100 , f"shadow.count is {shadow.count}";
+        assert shadow.trace == "|base" , f"shadow.trace is {shadow.trace!r}";
+        assert shadow.label == "kid" , f"shadow.label is {shadow.label!r}";
+    }
+
+    def check_releasing_the_native_owner_drops_its_python_shad {
+        (eng, _) = compile_native("pyb_native_main.jac");
+
+        _pyb_shadows.clear();
+        get_func(eng, "jac_entry", None)();
+        transient = get_func(eng, "run_all", ctypes.c_int64)();
+        assert transient == EXPECTED , f"run_all returned {transient}";
+        assert len(_pyb_shadows) == 0 , (
+            f"transient instances leaked {len(_pyb_shadows)} shadow(s)"
+        );
+    }
+    run_cases(
+        [
+            (
+                "postinit chain, inherited store and inherited call match Python",
+                check_postinit_chain_inherited_store_and_inherited_cal
+            ),
+            (
+                "the Python lane and the native lane agree on the fixture",
+                check_the_python_lane_and_the_native_lane_agree_on_the
+            ),
+            (
+                "an inherited field store is visible on the Python shadow",
+                check_an_inherited_field_store_is_visible_on_the_pytho
+            ),
+            (
+                "releasing the native owner drops its Python shadow",
+                check_releasing_the_native_owner_drops_its_python_shad
+            )
+        ]
+    );
 }
 
-test "the Python lane and the native lane agree on the fixture" {
-    (eng, _) = compile_native("pyb_native_main.jac");
-    get_func(eng, "jac_entry", None)();
-    native_val = get_func(eng, "run_all", ctypes.c_int64)();
-    py_val = run_py_lane("pyb_native_main", "run_all");
-    assert native_val == py_val , (
-        f"lane divergence: native {native_val} vs python {py_val}"
-    );
-}
-
-test "an inherited field store is visible on the Python shadow" {
-    (eng, _) = compile_native("pyb_native_main.jac");
-    get_func(eng, "jac_entry", None)();
-    _pyb_shadows.clear();
-    kept = get_func(eng, "keep_and_poke", ctypes.c_int64)();
-    assert kept == 100 , f"keep_and_poke returned {kept}";
-    assert len(_pyb_shadows) == 1 , (
-        f"expected one live shadow, found {len(_pyb_shadows)}"
-    );
-    shadow: any = list(_pyb_shadows.values())[0];
-    assert type(shadow).__name__ == "Kid" , type(shadow).__name__;
-    assert any(c.__name__ == "PyBase" for c in type(shadow).__mro__) , (
-        "shadow is not an instance of the Python base"
-    );
-    assert shadow.count == 100 , f"shadow.count is {shadow.count}";
-    assert shadow.trace == "|base" , f"shadow.trace is {shadow.trace!r}";
-    assert shadow.label == "kid" , f"shadow.label is {shadow.label!r}";
-}
-
-test "releasing the native owner drops its Python shadow" {
-    (eng, _) = compile_native("pyb_native_main.jac");
-    _pyb_shadows.clear();
-    get_func(eng, "jac_entry", None)();
-    transient = get_func(eng, "run_all", ctypes.c_int64)();
-    assert transient == EXPECTED , f"run_all returned {transient}";
-    assert len(_pyb_shadows) == 0 , (
-        f"transient instances leaked {len(_pyb_shadows)} shadow(s)"
-    );
-}
 
 test "a subscripted generic Python-side base still bridges" {
     # A subscripted base reference is an AtomTrailer carrying an IndexSlice

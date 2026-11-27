@@ -27,7 +27,7 @@ Refs #8150, #8027 (T1.1), #8039, #8052
 
 import ctypes;
 import os;
-import from tests.support { TESTS_DIR, native_address, native_force_opts }
+import from tests.support { TESTS_DIR, native_address, native_force_opts, run_cases }
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.runtime.runtime { JacRuntime }
 import from jaclang.compiler.frontend.codeinfo {
@@ -180,26 +180,39 @@ glob N2 = "narrow_ternary_chain.jac",
      N2_FLAGS = [0, 1, 2, 3];
 
 
-test "N2: a nested ternary resolves each arm to its own value" {
-    f = _get(N2, "resolve_ternary");
-    assert f(0) == 1 , "the absent spec falls to the innermost else (PUBLIC)";
-    assert f(1) == 0 , "an already-resolved member is passed through (PRIVATE)";
-    assert f(2) == 2 , "a node's member is read off the middle arm (PROTECTED)";
+test "N2: a nested ternary resolves each arm to its own value, and related cases" {
+    def check_n2_a_nested_ternary_resolves_each_arm_to_its_own {
+        f = _get(N2, "resolve_ternary");
+        assert f(0) == 1 , "the absent spec falls to the innermost else (PUBLIC)";
+        assert f(1) == 0 , "an already-resolved member is passed through (PRIVATE)";
+        assert f(2) == 2 , "a node's member is read off the middle arm (PROTECTED)";
+    }
+
+    def check_n2_a_ternary_yielding_a_container_keeps_its_elem {
+        f = _get(N2, "resolved_body_sum");
+        assert f(0) == 0 , "an empty list resolves to nothing";
+        assert f(1) == 7 , "a bare list arm keeps both elements";
+        assert f(2) == 18 , "the node arm's inner list keeps all three";
+        assert f(3) == 0 , "a node whose body is not a list resolves to empty";
+    }
+    run_cases(
+        [
+            (
+                "N2: a nested ternary resolves each arm to its own value",
+                check_n2_a_nested_ternary_resolves_each_arm_to_its_own
+            ),
+            (
+                "N2: a ternary yielding a container keeps its elements",
+                check_n2_a_ternary_yielding_a_container_keeps_its_elem
+            )
+        ]
+    );
 }
 
 
 test "N2: the ternary and the flat resolution answer identically" {
     _agree(N2, "resolve_ternary", "resolve_flat", N2_FLAGS);
     _agree(N2, "resolved_body_sum", "resolved_body_flat_sum", N2_FLAGS);
-}
-
-
-test "N2: a ternary yielding a container keeps its elements" {
-    f = _get(N2, "resolved_body_sum");
-    assert f(0) == 0 , "an empty list resolves to nothing";
-    assert f(1) == 7 , "a bare list arm keeps both elements";
-    assert f(2) == 18 , "the node arm's inner list keeps all three";
-    assert f(3) == 0 , "a node whose body is not a list resolves to empty";
 }
 
 
@@ -368,19 +381,32 @@ test "N6: a union-conditional copy actually breaks the alias" {
 }
 
 
-test "N6: the copy is shallow but the slots are the object's own" {
-    f = _get(N6, "copied_list_keeps_payload");
-    assert f(0) == 7 , "replacing the caller's slot 0 must not move the object's";
-    assert f(1) == 8 , "the same with a different payload";
-    assert f(2) == 9 , "and again";
-}
+test "N6: the copy is shallow but the slots are the object's own, and related cases" {
+    def check_n6_the_copy_is_shallow_but_the_slots_are_the_obj {
+        f = _get(N6, "copied_list_keeps_payload");
+        assert f(0) == 7 , "replacing the caller's slot 0 must not move the object's";
+        assert f(1) == 8 , "the same with a different payload";
+        assert f(2) == 9 , "and again";
+    }
 
-
-test "N6: the non-list member passes through the postinit untouched" {
-    f = _get(N6, "expr_body_untouched");
-    assert f(0) == 41 , "an expression body is not copied and is not lost";
-    assert f(1) == 42 , "the payload survives the union-conditional branch";
-    assert f(2) == 43 , "and again";
+    def check_n6_the_non_list_member_passes_through_the_postin {
+        f = _get(N6, "expr_body_untouched");
+        assert f(0) == 41 , "an expression body is not copied and is not lost";
+        assert f(1) == 42 , "the payload survives the union-conditional branch";
+        assert f(2) == 43 , "and again";
+    }
+    run_cases(
+        [
+            (
+                "N6: the copy is shallow but the slots are the object's own",
+                check_n6_the_copy_is_shallow_but_the_slots_are_the_obj
+            ),
+            (
+                "N6: the non-list member passes through the postinit untouched",
+                check_n6_the_non_list_member_passes_through_the_postin
+            )
+        ]
+    );
 }
 
 

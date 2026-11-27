@@ -18,6 +18,8 @@ import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.driver.compiler { COMPILE_GC_THRESHOLDS }
 import from jaclang.compiler.driver.nativecache { NativeBuildSession, SessionHeap }
 import from jaclang.compiler.backends.native.link_plan { build_link_plan }
+import from tests.support { run_cases }
+
 
 glob FIXTURES = str(Path(__file__).resolve().parent / "fixtures" / "link_diamond"),
      UNITS: list[str] = ["base.jac", "left.jac", "right.jac", "extra.jac", "top.jac"];
@@ -141,60 +143,74 @@ test "a link plan hands the collector back exactly as it found it" {
     }
 }
 
-test "a unit's analysis is frozen for the rest of the session" {
-    assert gc.isenabled() and gc.get_freeze_count() == 0;
-    root_dir = _diamond_copy();
-    base = os.path.realpath(os.path.join(root_dir, "base.jac"));
-    prog = JacProgram();
-    opts = _opts();
-    prog.options = opts;
-    registry = prog.native_units();
-    checked: list[bool] = [];
+test "a unit's analysis is frozen for the rest of the session, and related cases" {
+    def check_a_unit_s_analysis_is_frozen_for_the_rest_of_the {
+        assert gc.isenabled() and gc.get_freeze_count() == 0;
+        root_dir = _diamond_copy();
+        base = os.path.realpath(os.path.join(root_dir, "base.jac"));
+        prog = JacProgram();
+        opts = _opts();
+        prog.options = opts;
+        registry = prog.native_units();
+        checked: list[bool] = [];
 
-    def watch(line: str) {
-        session = registry.session;
-        if session is None or "] lower" not in line {
-            return;
+        def watch(line: str) {
+            session = registry.session;
+            if session is None or "] lower" not in line {
+                return;
+            }
+            analyzed = session.lowered.get(base);
+            if analyzed is not None {
+                assert gc.is_tracked(analyzed);
+                checked.append(_is_scanned(analyzed));
+            }
         }
-        analyzed = session.lowered.get(base);
-        if analyzed is not None {
-            assert gc.is_tracked(analyzed);
-            checked.append(_is_scanned(analyzed));
+        registry.progress = watch;
+        build_link_plan(prog, [os.path.join(root_dir, "top.jac")], opts);
+        assert checked , "units were lowered after base in this session";
+        assert not any(checked) , "a full collection would walk base's analysis again";
+        assert gc.get_freeze_count() == 0;
+    }
+
+    def check_a_failing_build_still_hands_the_collector_back {
+        assert gc.isenabled() and gc.get_freeze_count() == 0;
+        before = _collector_state();
+        root_dir = _diamond_copy();
+        prog = JacProgram();
+        opts = _opts();
+        prog.options = opts;
+        finish = NativeBuildSession.finish;
+        froze: list[int] = [];
+
+        def fail(self: NativeBuildSession, paths: list[str]) {
+            froze.append(gc.get_freeze_count());
+            raise RuntimeError("the build failed after lowering");
         }
-    }
-    registry.progress = watch;
-    build_link_plan(prog, [os.path.join(root_dir, "top.jac")], opts);
-    assert checked , "units were lowered after base in this session";
-    assert not any(checked) , "a full collection would walk base's analysis again";
-    assert gc.get_freeze_count() == 0;
-}
-
-test "a failing build still hands the collector back" {
-    assert gc.isenabled() and gc.get_freeze_count() == 0;
-    before = _collector_state();
-    root_dir = _diamond_copy();
-    prog = JacProgram();
-    opts = _opts();
-    prog.options = opts;
-    finish = NativeBuildSession.finish;
-    froze: list[int] = [];
-
-    def fail(self: NativeBuildSession, paths: list[str]) {
-        froze.append(gc.get_freeze_count());
-        raise RuntimeError("the build failed after lowering");
-    }
-    NativeBuildSession.finish = fail;
-    try {
-        raised = False;
+        NativeBuildSession.finish = fail;
         try {
-            build_link_plan(prog, [os.path.join(root_dir, "top.jac")], opts);
-        } except RuntimeError {
-            raised = True;
+            raised = False;
+            try {
+                build_link_plan(prog, [os.path.join(root_dir, "top.jac")], opts);
+            } except RuntimeError {
+                raised = True;
+            }
+            assert raised;
+        } finally {
+            NativeBuildSession.finish = finish;
         }
-        assert raised;
-    } finally {
-        NativeBuildSession.finish = finish;
+        assert froze and froze[0] > 0 , "the session held the collector when it failed";
+        assert _collector_state() == before;
     }
-    assert froze and froze[0] > 0 , "the session held the collector when it failed";
-    assert _collector_state() == before;
+    run_cases(
+        [
+            (
+                "a unit's analysis is frozen for the rest of the session",
+                check_a_unit_s_analysis_is_frozen_for_the_rest_of_the
+            ),
+            (
+                "a failing build still hands the collector back",
+                check_a_failing_build_still_hands_the_collector_back
+            )
+        ]
+    );
 }

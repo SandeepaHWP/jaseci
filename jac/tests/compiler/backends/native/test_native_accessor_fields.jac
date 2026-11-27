@@ -19,7 +19,8 @@ import from tests.support {
     TESTS_DIR,
     by_source_name,
     native_address,
-    native_force_opts
+    native_force_opts,
+    run_cases
 }
 import jaclang.compiler.frontend.unitree as uni;
 import from jaclang.compiler.driver.program { JacProgram }
@@ -56,18 +57,69 @@ def get_func(eng: any, name: str, restype: type | None, *argtypes: type) -> any 
 }
 
 
-test "accessor with no backing field computes from other fields" {
-    (eng, _) = accessor_engine();
-    f = get_func(eng, "read_computed", ctypes.c_int64, ctypes.c_int64);
-    assert f(9) == 18 , "b.doubled runs the getter over the live head";
-    assert f(0) == 0 , "a zero head is a zero result, not a stale slot";
+test "accessor with no backing field computes from other fields, and related cases" {
+    def check_accessor_with_no_backing_field_computes_from_oth {
+        (eng, _) = accessor_engine();
+        f = get_func(eng, "read_computed", ctypes.c_int64, ctypes.c_int64);
+        assert f(9) == 18 , "b.doubled runs the getter over the live head";
+        assert f(0) == 0 , "a zero head is a zero result, not a stale slot";
+    }
+
+    def check_an_overridden_accessor_dispatches_on_the_runtime {
+        (eng, _) = accessor_engine();
+        f = get_func(eng, "inherited_accessor", ctypes.c_int64, ctypes.c_int64);
+        assert f(0) == 101 , "Tagged.label.getter";
+        assert f(1) == 102 , "Renamed.label.getter overrides it";
+    }
+    run_cases(
+        [
+            (
+                "accessor with no backing field computes from other fields",
+                check_accessor_with_no_backing_field_computes_from_oth
+            ),
+            (
+                "an overridden accessor dispatches on the runtime class",
+                check_an_overridden_accessor_dispatches_on_the_runtime
+            )
+        ]
+    );
 }
 
 
-test "accessor over a backing slot reads the backing slot" {
-    (eng, _) = accessor_engine();
-    f = get_func(eng, "read_backed", ctypes.c_int64);
-    assert f() == 3 , "b.width returns _width's default, not an unwritten slot";
+test "accessor over a backing slot reads the backing slot, and related cases" {
+    def check_accessor_over_a_backing_slot_reads_the_backing_s {
+        (eng, _) = accessor_engine();
+        f = get_func(eng, "read_backed", ctypes.c_int64);
+        assert f() == 3 , "b.width returns _width's default, not an unwritten slot";
+    }
+
+    def check_a_property_takes_no_data_slot_so_later_fields_do {
+        (eng, _) = accessor_engine();
+        f = get_func(eng, "neighbour_fields_intact", ctypes.c_int64);
+        assert f() == 7011 , "head is 7 and tail is 11 across two intervening properties";
+    }
+
+    def check_accessors_resolve_the_same_way_inside_a_method_b {
+        (eng, _) = accessor_engine();
+        f = get_func(eng, "accessors_from_method", ctypes.c_int64);
+        assert f() == 82 , "doubled 14 + width 50 + head 7 + tail 11";
+    }
+    run_cases(
+        [
+            (
+                "accessor over a backing slot reads the backing slot",
+                check_accessor_over_a_backing_slot_reads_the_backing_s
+            ),
+            (
+                "a property takes no data slot, so later fields do not shift",
+                check_a_property_takes_no_data_slot_so_later_fields_do
+            ),
+            (
+                "accessors resolve the same way inside a method body",
+                check_accessors_resolve_the_same_way_inside_a_method_b
+            )
+        ]
+    );
 }
 
 
@@ -77,28 +129,6 @@ test "assigning an accessor field runs the setter body" {
     assert f(4) == 40 , "the setter multiplies by ten before storing";
     r = get_func(eng, "roundtrip_setter", ctypes.c_int64, ctypes.c_int64);
     assert r(4) == 40 , "reading back after the setter goes through the getter";
-}
-
-
-test "a property takes no data slot, so later fields do not shift" {
-    (eng, _) = accessor_engine();
-    f = get_func(eng, "neighbour_fields_intact", ctypes.c_int64);
-    assert f() == 7011 , "head is 7 and tail is 11 across two intervening properties";
-}
-
-
-test "accessors resolve the same way inside a method body" {
-    (eng, _) = accessor_engine();
-    f = get_func(eng, "accessors_from_method", ctypes.c_int64);
-    assert f() == 82 , "doubled 14 + width 50 + head 7 + tail 11";
-}
-
-
-test "an overridden accessor dispatches on the runtime class" {
-    (eng, _) = accessor_engine();
-    f = get_func(eng, "inherited_accessor", ctypes.c_int64, ctypes.c_int64);
-    assert f(0) == 101 , "Tagged.label.getter";
-    assert f(1) == 102 , "Renamed.label.getter overrides it";
 }
 
 

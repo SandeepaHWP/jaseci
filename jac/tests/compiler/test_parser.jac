@@ -13,7 +13,7 @@ import os;
 import re;
 import sys;
 import from pathlib { Path }
-import from tests.support { JAC_ROOT }
+import from tests.support { JAC_ROOT, run_cases }
 import jaclang;
 import jaclang.compiler.frontend.unitree as uni;
 import from jaclang.compiler.frontend.constant { CodeContext }
@@ -55,9 +55,28 @@ test "graph object lookup remains distinct from ownership borrows" {
         ];
 }
 
-test "parser fam" {
-    (module, had_error) = rd_parse(load_fixture("fam.jac"), "");
-    assert not had_error;
+test "parser fam, and related cases" {
+    def check_parser_fam {
+        (module, had_error) = rd_parse(load_fixture("fam.jac"), "");
+        assert not had_error;
+    }
+
+    def check_parser_kwesc {
+        (module, had_error) = rd_parse(load_fixture("kwesc.jac"), "");
+        assert not had_error;
+    }
+
+    def check_parser_mod_doc_test {
+        (module, had_error) = rd_parse(load_fixture("mod_doc_test.jac"), "");
+        assert not had_error;
+    }
+    run_cases(
+        [
+            ("parser fam", check_parser_fam),
+            ("parser kwesc", check_parser_kwesc),
+            ("parser mod doc test", check_parser_mod_doc_test)
+        ]
+    );
 }
 
 test "a comprehension iterable is any operator expression short of the ternary" {
@@ -89,15 +108,6 @@ test "staticmethod checks out" {
     assert "staticmethod" not in out;
 }
 
-test "parser kwesc" {
-    (module, had_error) = rd_parse(load_fixture("kwesc.jac"), "");
-    assert not had_error;
-}
-
-test "parser mod doc test" {
-    (module, had_error) = rd_parse(load_fixture("mod_doc_test.jac"), "");
-    assert not had_error;
-}
 
 test "all ast has normalize" {
     import from jaclang.compiler.tools.normalize_pass { NormalizePass }
@@ -456,75 +466,91 @@ walker MyWalker {
     assert name1 != name2;
 }
 
-test "string-path import with jac runtime" {
-    source = """
+test "string-path import with jac runtime, and related cases" {
+    def check_string_path_import_with_jac_runtime {
+        source = """
 import from "@jac/runtime" {
     jacLogin,
     jacLogout,
     renderJsxTree,
 }
 """;
-    prog = JacProgram();
-    mod = prog.parse_str(source, "test.jac");
-    assert not prog.errors_had , f"Parser errors: {prog.errors_had}";
+        prog = JacProgram();
+        mod = prog.parse_str(source, "test.jac");
+        assert not prog.errors_had , f"Parser errors: {prog.errors_had}";
 
-    imports = [
-        stmt
-        for stmt in mod.body
-        if type(stmt).__name__ == "Import"
-    ];
-    assert len(imports) == 1 , "Should have one import statement";
+        imports = [
+            stmt
+            for stmt in mod.body
+            if type(stmt).__name__ == "Import"
+        ];
+        assert len(imports) == 1 , "Should have one import statement";
 
-    import_stmt = imports[0];
-    assert isinstance(import_stmt, uni.Import);
-    assert import_stmt.from_loc is not None , "Import should have from_loc";
-    assert import_stmt.from_loc.dot_path_str == "@jac/runtime" , (
-        "Module path should be '@jac/runtime'"
-    );
-    assert len(import_stmt.items) == 3 , "Should have 3 imported items";
-    item_names = [
-        item.name.value
-        for item in import_stmt.items
-        if isinstance(item, uni.ModuleItem)
-    ];
-    assert "jacLogin" in item_names;
-    assert "jacLogout" in item_names;
-    assert "renderJsxTree" in item_names;
-}
+        import_stmt = imports[0];
+        assert isinstance(import_stmt, uni.Import);
+        assert import_stmt.from_loc is not None , "Import should have from_loc";
+        assert import_stmt.from_loc.dot_path_str == "@jac/runtime" , (
+            "Module path should be '@jac/runtime'"
+        );
+        assert len(import_stmt.items) == 3 , "Should have 3 imported items";
+        item_names = [
+            item.name.value
+            for item in import_stmt.items
+            if isinstance(item, uni.ModuleItem)
+        ];
+        assert "jacLogin" in item_names;
+        assert "jacLogout" in item_names;
+        assert "renderJsxTree" in item_names;
+    }
 
-test "extensionless logical clib import parses as clib decls (issue #6387)" {
-    # A native C-FFI import may name the library by a dotted, extensionless logical
-    # name instead of a string-literal path. The brace block opening with a `def`
-    # is what marks it as a clib block, so the from-path is parsed as Name nodes
-    # and the declarations land in clib_decls (not items).
-    source = """
+    def check_extensionless_logical_clib_import_parses_as_clib {
+        # A native C-FFI import may name the library by a dotted, extensionless logical
+        # name instead of a string-literal path. The brace block opening with a `def`
+        # is what marks it as a clib block, so the from-path is parsed as Name nodes
+        # and the declarations land in clib_decls (not items).
+        source = """
 import from raylib {
     def InitWindow(width: i32, height: i32, title: str) -> None;
     def CloseWindow -> None;
 }
 """;
-    prog = JacProgram();
-    mod = prog.parse_str(source, "test_logical_clib.jac");
-    assert not prog.errors_had , f"Parser errors: {prog.errors_had}";
-    imports = [
-        stmt
-        for stmt in mod.body
-        if type(stmt).__name__ == "Import"
-    ];
-    assert len(imports) == 1 , "Should have one import statement";
-    import_stmt = imports[0];
-    assert isinstance(import_stmt, uni.Import);
-    # Library named by a bare Name (not a String literal), no extension.
-    assert import_stmt.from_loc is not None , "Import should have from_loc";
-    assert import_stmt.from_loc.dot_path_str == "raylib" , "logical name should be 'raylib'";
-    assert import_stmt.from_loc.path is not None;
-    assert isinstance(import_stmt.from_loc.path[0], uni.Name) , "path must be a Name, not String";
-    # The extern declarations land in clib_decls, and there are no import items.
-    assert import_stmt.clib_decls is not None and len(import_stmt.clib_decls) == 2 , (
-        f"expected 2 clib decls, got {import_stmt.clib_decls}"
+        prog = JacProgram();
+        mod = prog.parse_str(source, "test_logical_clib.jac");
+        assert not prog.errors_had , f"Parser errors: {prog.errors_had}";
+        imports = [
+            stmt
+            for stmt in mod.body
+            if type(stmt).__name__ == "Import"
+        ];
+        assert len(imports) == 1 , "Should have one import statement";
+        import_stmt = imports[0];
+        assert isinstance(import_stmt, uni.Import);
+        # Library named by a bare Name (not a String literal), no extension.
+        assert import_stmt.from_loc is not None , "Import should have from_loc";
+        assert import_stmt.from_loc.dot_path_str == "raylib" , "logical name should be 'raylib'";
+        assert import_stmt.from_loc.path is not None;
+        assert isinstance(import_stmt.from_loc.path[0], uni.Name) , "path must be a Name, not String";
+        # The extern declarations land in clib_decls, and there are no import items.
+        assert import_stmt.clib_decls is not None
+            and len(import_stmt.clib_decls) == 2 , (
+            f"expected 2 clib decls, got {import_stmt.clib_decls}"
+        );
+        assert len(import_stmt.items) == 0 , "clib import must not produce import items";
+    }
+    run_cases(
+        [
+            (
+                "string-path import with jac runtime",
+                check_string_path_import_with_jac_runtime
+            ),
+            (
+                "extensionless logical clib import parses as clib decls (issue #6387)",
+                check_extensionless_logical_clib_import_parses_as_clib
+            )
+        ]
     );
-    assert len(import_stmt.items) == 0 , "clib import must not produce import items";
 }
+
 
 test "dotted logical clib import parses with sub-path (issue #6387)" {
     source = """
@@ -587,36 +613,62 @@ test "decorated test blocks" {
     assert not t.decorators;
 }
 
-test "bracket filter after edge ref" {
-    (mod, err) = rd_parse('walker W { can go with entry { visit [-->][?:Foo]; } }', "");
-    assert not err , "Failed to parse [-->][?:Foo]";
-}
+test "bracket filter after edge ref, and related cases" {
+    def check_bracket_filter_after_edge_ref {
+        (mod, err) = rd_parse(
+            'walker W { can go with entry { visit [-->][?:Foo]; } }', ""
+        );
+        assert not err , "Failed to parse [-->][?:Foo]";
+    }
 
-test "bracket filter with conditions" {
-    (mod, err) = rd_parse(
-        'walker W { can go with entry { visit [-->][?:Foo, bar==5]; } }', ""
+    def check_standalone_bracket_filter_expr {
+        (mod, err) = rd_parse('with entry { x = [?:Foo, a<3]; }', "");
+        assert not err , "Failed to parse standalone [?:Foo, a<3]";
+    }
+
+    def check_bracket_filter_on_list {
+        (mod, err) = rd_parse('with entry { print(my_list[?:MyObj, a<4]); }', "");
+        assert not err , "Failed to parse list bracket filter";
+    }
+    run_cases(
+        [
+            ("bracket filter after edge ref", check_bracket_filter_after_edge_ref),
+            ("standalone bracket filter expr", check_standalone_bracket_filter_expr),
+            ("bracket filter on list", check_bracket_filter_on_list)
+        ]
     );
-    assert not err , "Failed to parse [-->][?:Foo, bar==5]";
 }
 
-test "bracket filter no type" {
-    (mod, err) = rd_parse(
-        'walker W { can go with entry { visit [-->][?bar==5]; } }', ""
+test "bracket filter with conditions, and related cases" {
+    def check_bracket_filter_with_conditions {
+        (mod, err) = rd_parse(
+            'walker W { can go with entry { visit [-->][?:Foo, bar==5]; } }', ""
+        );
+        assert not err , "Failed to parse [-->][?:Foo, bar==5]";
+    }
+
+    def check_bracket_filter_no_type {
+        (mod, err) = rd_parse(
+            'walker W { can go with entry { visit [-->][?bar==5]; } }', ""
+        );
+        assert not err , "Failed to parse [-->][?bar==5]";
+    }
+
+    def check_chained_bracket_filters {
+        (mod, err) = rd_parse(
+            'walker W { can go with entry { x = [root-->][?:Foo][?val==10]; } }', ""
+        );
+        assert not err , "Failed to parse chained bracket filters";
+    }
+    run_cases(
+        [
+            ("bracket filter with conditions", check_bracket_filter_with_conditions),
+            ("bracket filter no type", check_bracket_filter_no_type),
+            ("chained bracket filters", check_chained_bracket_filters)
+        ]
     );
-    assert not err , "Failed to parse [-->][?bar==5]";
 }
 
-test "chained bracket filters" {
-    (mod, err) = rd_parse(
-        'walker W { can go with entry { x = [root-->][?:Foo][?val==10]; } }', ""
-    );
-    assert not err , "Failed to parse chained bracket filters";
-}
-
-test "standalone bracket filter expr" {
-    (mod, err) = rd_parse('with entry { x = [?:Foo, a<3]; }', "");
-    assert not err , "Failed to parse standalone [?:Foo, a<3]";
-}
 
 test "bracket filter trailer produces FilterCompr AST" {
     (mod_new, err) = rd_parse('with entry { x[?:Foo, a==5]; }', "");
@@ -643,52 +695,63 @@ test "bracket filter trailer produces FilterCompr AST" {
     assert len(new_fc.compares) == 1 , "Filter should carry exactly the a==5 compare";
 }
 
-test "bracket filter on list" {
-    (mod, err) = rd_parse('with entry { print(my_list[?:MyObj, a<4]); }', "");
-    assert not err , "Failed to parse list bracket filter";
+
+test "typed edge ref after start expr cases" {
+    def check_typed_edge_ref_after_start_expr_no_filter {
+        # BUG: `[root->:Type:->]` failed to parse because parse_list_or_compr
+        # only checked for ARROW_R/ARROW_L/ARROW_BI/ARROW_R_P1/ARROW_L_P1 after
+        # the first expression, missing the (RETURN_HINT, COLON, ...) form the
+        # lexer actually produces for `->:`. The bare-start form `[->:Type:->]`
+        # already parsed because that path went through parse_edge_ref_chain
+        # directly. (Reproduces the docs example in the Part 2 'Advanced:
+        # Custom Edges' section of the AI day planner tutorial.)
+        src = (
+            'edge Scheduled { has time: str; }'
+            'node Task { has title: str; }'
+            'with entry {'
+            '    root +>: Scheduled(time="9:00am") :+> Task(title="Run");'
+            '    x = [root->:Scheduled:->];'
+            '}'
+        );
+        (mod, err) = rd_parse(src, "");
+        assert not err , (
+            "Failed to parse [root->:Scheduled:->] (typed edge ref after "
+            "explicit start expression)"
+        );
+    }
+
+    def check_typed_edge_ref_after_start_expr_with_filter_cond {
+        # Same root cause as the test above, plus continue_edge_ref_chain
+        # was using a stripped-down inline branch that did not accept the
+        # `:cond` filter clause that parse_edge_op_ref already supports.
+        src = (
+            'edge Scheduled { has priority: int = 1; }'
+            'node Task { has title: str; }'
+            'with entry {'
+            '    root +>: Scheduled(priority=3) :+> Task(title="A");'
+            '    urgent = [root->:Scheduled:priority>=3:->];'
+            '}'
+        );
+        (mod, err) = rd_parse(src, "");
+        assert not err , (
+            "Failed to parse [root->:Scheduled:priority>=3:->] (typed edge "
+            "ref with a filter condition after an explicit start expression)"
+        );
+    }
+    run_cases(
+        [
+            (
+                "typed edge ref after start expr - no filter",
+                check_typed_edge_ref_after_start_expr_no_filter
+            ),
+            (
+                "typed edge ref after start expr - with filter condition",
+                check_typed_edge_ref_after_start_expr_with_filter_cond
+            )
+        ]
+    );
 }
 
-test "typed edge ref after start expr - no filter" {
-    # BUG: `[root->:Type:->]` failed to parse because parse_list_or_compr
-    # only checked for ARROW_R/ARROW_L/ARROW_BI/ARROW_R_P1/ARROW_L_P1 after
-    # the first expression, missing the (RETURN_HINT, COLON, ...) form the
-    # lexer actually produces for `->:`. The bare-start form `[->:Type:->]`
-    # already parsed because that path went through parse_edge_ref_chain
-    # directly. (Reproduces the docs example in the Part 2 'Advanced:
-    # Custom Edges' section of the AI day planner tutorial.)
-    src = (
-        'edge Scheduled { has time: str; }'
-        'node Task { has title: str; }'
-        'with entry {'
-        '    root +>: Scheduled(time="9:00am") :+> Task(title="Run");'
-        '    x = [root->:Scheduled:->];'
-        '}'
-    );
-    (mod, err) = rd_parse(src, "");
-    assert not err , (
-        "Failed to parse [root->:Scheduled:->] (typed edge ref after "
-        "explicit start expression)"
-    );
-}
-
-test "typed edge ref after start expr - with filter condition" {
-    # Same root cause as the test above, plus continue_edge_ref_chain
-    # was using a stripped-down inline branch that did not accept the
-    # `:cond` filter clause that parse_edge_op_ref already supports.
-    src = (
-        'edge Scheduled { has priority: int = 1; }'
-        'node Task { has title: str; }'
-        'with entry {'
-        '    root +>: Scheduled(priority=3) :+> Task(title="A");'
-        '    urgent = [root->:Scheduled:priority>=3:->];'
-        '}'
-    );
-    (mod, err) = rd_parse(src, "");
-    assert not err , (
-        "Failed to parse [root->:Scheduled:priority>=3:->] (typed edge "
-        "ref with a filter condition after an explicit start expression)"
-    );
-}
 
 test "typed edge ref bare start with filter still parses" {
     # Sanity check: the bare-start form (no explicit start expression)

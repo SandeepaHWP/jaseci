@@ -20,7 +20,8 @@ import from tests.support {
     compile_native_ir,
     get_func,
     jac_command,
-    TESTS_DIR
+    TESTS_DIR,
+    run_cases
 }
 import from jaclang.compiler.frontend.codeinfo {
     NATIVE_RESERVED_C_SYMBOLS,
@@ -33,21 +34,38 @@ glob FIXTURES = os.path.join(
      ),
      EXPECTED_LINES: list[str] = ["7 2 104.0 4.0", "3 8.0 99 3", "11 5"];
 
-test "a user floor, sqrt and glob pow coexist with the math module natively" {
-    (engine, _module) = compile_native("c_symbol_shadowing.jac");
-    assert get_func(engine, "user_floor_probe", ctypes.c_int64)() == 7;
-    assert get_func(engine, "math_floor_probe", ctypes.c_int64)() == 2;
-    assert get_func(engine, "user_sqrt_probe", ctypes.c_double)() == 104.0;
-    assert get_func(engine, "math_sqrt_probe", ctypes.c_double)() == 4.0;
-    assert get_func(engine, "glob_pow_probe", ctypes.c_int64)() == 3;
-    assert get_func(engine, "math_pow_probe", ctypes.c_double)() == 8.0;
+test "c_symbol_shadowing.jac cases" {
+    def check_a_user_floor_sqrt_and_glob_pow_coexist_with_the {
+        (engine, _module) = compile_native("c_symbol_shadowing.jac");
+
+        assert get_func(engine, "user_floor_probe", ctypes.c_int64)() == 7;
+        assert get_func(engine, "math_floor_probe", ctypes.c_int64)() == 2;
+        assert get_func(engine, "user_sqrt_probe", ctypes.c_double)() == 104.0;
+        assert get_func(engine, "math_sqrt_probe", ctypes.c_double)() == 4.0;
+        assert get_func(engine, "glob_pow_probe", ctypes.c_int64)() == 3;
+        assert get_func(engine, "math_pow_probe", ctypes.c_double)() == 8.0;
+    }
+
+    def check_user_strlen_puts_and_main_do_not_replace_the_run {
+        (engine, _module) = compile_native("c_symbol_shadowing.jac");
+
+        assert get_func(engine, "strlen_probe", ctypes.c_int64)() == 11099;
+        assert get_func(engine, "entry_names_probe", ctypes.c_int64)() == 1105;
+    }
+    run_cases(
+        [
+            (
+                "a user floor, sqrt and glob pow coexist with the math module natively",
+                check_a_user_floor_sqrt_and_glob_pow_coexist_with_the
+            ),
+            (
+                "user strlen, puts and main do not replace the runtime's C symbols",
+                check_user_strlen_puts_and_main_do_not_replace_the_run
+            )
+        ]
+    );
 }
 
-test "user strlen, puts and main do not replace the runtime's C symbols" {
-    (engine, _module) = compile_native("c_symbol_shadowing.jac");
-    assert get_func(engine, "strlen_probe", ctypes.c_int64)() == 11099;
-    assert get_func(engine, "entry_names_probe", ctypes.c_int64)() == 1105;
-}
 
 test "C-named user definitions get Jac-owned symbols and C keeps its own" {
     module = compile_native_ir("c_symbol_shadowing.jac");
@@ -80,21 +98,36 @@ test "a public C-named definition is emitted as __jac_def_ beside the C symbol" 
     assert get_func(engine, "math_floor_probe", ctypes.c_int64)() == 2;
 }
 
-test "the backend's own floor extern does not bind to a user floor" {
-    (engine, _module) = compile_native("c_symbol_shadowing_ratio.jac");
-    assert get_func(engine, "ratio_probe", ctypes.c_int64)() == 52;
-    assert get_func(engine, "user_floor_probe", ctypes.c_double)() == 1.5;
+test "the backend's own floor extern does not bind to a user floor, and related cases" {
+    def check_the_backend_s_own_floor_extern_does_not_bind_to {
+        (engine, _module) = compile_native("c_symbol_shadowing_ratio.jac");
+        assert get_func(engine, "ratio_probe", ctypes.c_int64)() == 52;
+        assert get_func(engine, "user_floor_probe", ctypes.c_double)() == 1.5;
+    }
+
+    def check_c_named_definitions_imported_from_a_separately_c {
+        (engine, _module) = compile_native("c_symbol_shadowing_xmod.jac");
+        assert get_func(engine, "imported_floor_probe", ctypes.c_int64)() == 8;
+        assert get_func(engine, "math_floor_probe", ctypes.c_int64)() == 3;
+        assert get_func(engine, "imported_ceil_probe", ctypes.c_double)() == 15.0;
+        assert get_func(engine, "math_ceil_probe", ctypes.c_int64)() == 2;
+        assert get_func(engine, "imported_glob_probe", ctypes.c_int64)() == 9;
+        assert get_func(engine, "math_exp_probe", ctypes.c_double)() == 1.0;
+    }
+    run_cases(
+        [
+            (
+                "the backend's own floor extern does not bind to a user floor",
+                check_the_backend_s_own_floor_extern_does_not_bind_to
+            ),
+            (
+                "C-named definitions imported from a separately compiled module bind correctly",
+                check_c_named_definitions_imported_from_a_separately_c
+            )
+        ]
+    );
 }
 
-test "C-named definitions imported from a separately compiled module bind correctly" {
-    (engine, _module) = compile_native("c_symbol_shadowing_xmod.jac");
-    assert get_func(engine, "imported_floor_probe", ctypes.c_int64)() == 8;
-    assert get_func(engine, "math_floor_probe", ctypes.c_int64)() == 3;
-    assert get_func(engine, "imported_ceil_probe", ctypes.c_double)() == 15.0;
-    assert get_func(engine, "math_ceil_probe", ctypes.c_int64)() == 2;
-    assert get_func(engine, "imported_glob_probe", ctypes.c_int64)() == 9;
-    assert get_func(engine, "math_exp_probe", ctypes.c_double)() == 1.0;
-}
 
 test "jac run keeps a module with a user floor and import math native" {
     proc = subprocess.run(

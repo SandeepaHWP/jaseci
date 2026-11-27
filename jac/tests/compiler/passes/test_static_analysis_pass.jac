@@ -2,7 +2,7 @@
 
 import from jaclang.compiler.backends.py.codegen_shim { generated_python }
 import os;
-import from tests.support { JAC_ROOT }
+import from tests.support { JAC_ROOT, run_cases }
 import jaclang;
 import jaclang.compiler.frontend.unitree as uni;
 import from jaclang.compiler.driver.program { JacProgram }
@@ -11,47 +11,90 @@ glob FIXTURES = os.path.join(
          JAC_ROOT, "tests", "compiler", "passes", "fixtures", "static_analysis"
      );
 
-test "unused variable produces warning" {
-    file_path = os.path.join(FIXTURES, "unused_var.jac");
-    prog = JacProgram();
-    prog.compile(file_path);
-    warning_msgs = [str(w) for w in prog.warnings_had];
-    assert any("'x' is defined but never used" in w for w in warning_msgs) , f"Expected unused variable warning for 'x', got: {warning_msgs}";
+test "unused variable produces warning, and related cases" {
+    def check_unused_variable_produces_warning {
+        file_path = os.path.join(FIXTURES, "unused_var.jac");
+        prog = JacProgram();
+        prog.compile(file_path);
+        warning_msgs = [str(w) for w in prog.warnings_had];
+        assert any("'x' is defined but never used" in w for w in warning_msgs) , f"Expected unused variable warning for 'x', got: {warning_msgs}";
+    }
+
+    def check_unreachable_code_after_return {
+        file_path = os.path.join(FIXTURES, "unreachable_after_return.jac");
+        prog = JacProgram();
+        prog.compile(file_path);
+        warning_msgs = [str(w) for w in prog.warnings_had];
+        assert any("Unreachable" in w for w in warning_msgs) , f"Expected unreachable code warning, got: {warning_msgs}";
+    }
+    run_cases(
+        [
+            (
+                "unused variable produces warning",
+                check_unused_variable_produces_warning
+            ),
+            ("unreachable code after return", check_unreachable_code_after_return)
+        ]
+    );
 }
 
-test "used variables produce no warnings" {
-    file_path = os.path.join(FIXTURES, "used_var.jac");
-    prog = JacProgram();
-    prog.compile(file_path);
-    warning_msgs = [str(w) for w in prog.warnings_had];
-    unused_warnings = [
-        w
-        for w in warning_msgs
-        if "defined but never used" in w
-    ];
-    assert len(unused_warnings) == 0 , f"Expected no unused variable warnings, got: {unused_warnings}";
+test "used variables produce no warnings, and related cases" {
+    def check_used_variables_produce_no_warnings {
+        file_path = os.path.join(FIXTURES, "used_var.jac");
+        prog = JacProgram();
+        prog.compile(file_path);
+        warning_msgs = [str(w) for w in prog.warnings_had];
+        unused_warnings = [
+            w
+            for w in warning_msgs
+            if "defined but never used" in w
+        ];
+        assert len(unused_warnings) == 0 , f"Expected no unused variable warnings, got: {unused_warnings}";
+    }
+
+    def check_skip_patterns_produce_no_warnings {
+        file_path = os.path.join(FIXTURES, "skip_patterns.jac");
+        prog = JacProgram();
+        prog.compile(file_path);
+        warning_msgs = [str(w) for w in prog.warnings_had];
+        unused_warnings = [
+            w
+            for w in warning_msgs
+            if "defined but never used" in w
+        ];
+        assert len(unused_warnings) == 0 , f"Expected no warnings for skip patterns, got: {unused_warnings}";
+    }
+
+    def check_by_llm_ability_params_produce_no_unused_warnings {
+        file_path = os.path.join(FIXTURES, "genai_ability_params.jac");
+        prog = JacProgram();
+        prog.compile(file_path);
+        warning_msgs = [str(w) for w in prog.warnings_had];
+        unused_warnings = [
+            w
+            for w in warning_msgs
+            if "defined but never used" in w
+        ];
+        assert len(unused_warnings) == 0 , f"Expected no unused warnings for by-llm params, got: {unused_warnings}";
+    }
+    run_cases(
+        [
+            (
+                "used variables produce no warnings",
+                check_used_variables_produce_no_warnings
+            ),
+            (
+                "skip patterns produce no warnings",
+                check_skip_patterns_produce_no_warnings
+            ),
+            (
+                "by-llm ability params produce no unused warnings",
+                check_by_llm_ability_params_produce_no_unused_warnings
+            )
+        ]
+    );
 }
 
-test "skip patterns produce no warnings" {
-    file_path = os.path.join(FIXTURES, "skip_patterns.jac");
-    prog = JacProgram();
-    prog.compile(file_path);
-    warning_msgs = [str(w) for w in prog.warnings_had];
-    unused_warnings = [
-        w
-        for w in warning_msgs
-        if "defined but never used" in w
-    ];
-    assert len(unused_warnings) == 0 , f"Expected no warnings for skip patterns, got: {unused_warnings}";
-}
-
-test "unreachable code after return" {
-    file_path = os.path.join(FIXTURES, "unreachable_after_return.jac");
-    prog = JacProgram();
-    prog.compile(file_path);
-    warning_msgs = [str(w) for w in prog.warnings_had];
-    assert any("Unreachable" in w for w in warning_msgs) , f"Expected unreachable code warning, got: {warning_msgs}";
-}
 
 test "all reachable code produces no unreachable warnings" {
     file_path = os.path.join(FIXTURES, "all_reachable.jac");
@@ -75,18 +118,6 @@ test "impl file warnings: undefined name and unreachable code are reported" {
     assert any("Unreachable" in w for w in warning_msgs) , f"Expected unreachable code warning from impl file, got: {warning_msgs}";
 }
 
-test "by-llm ability params produce no unused warnings" {
-    file_path = os.path.join(FIXTURES, "genai_ability_params.jac");
-    prog = JacProgram();
-    prog.compile(file_path);
-    warning_msgs = [str(w) for w in prog.warnings_had];
-    unused_warnings = [
-        w
-        for w in warning_msgs
-        if "defined but never used" in w
-    ];
-    assert len(unused_warnings) == 0 , f"Expected no unused warnings for by-llm params, got: {unused_warnings}";
-}
 
 test "classmethod and staticmethod on obj produce warnings" {
     file_path = os.path.join(FIXTURES, "classmethod_on_obj.jac");

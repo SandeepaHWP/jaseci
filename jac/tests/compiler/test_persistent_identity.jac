@@ -21,6 +21,7 @@ import from jaclang.data.type_identity {
 }
 import from jaclang.data.store { AnchorRow, Store }
 import from jaclang.server.session { Session }
+import from tests.support { run_cases }
 
 def exercise(shared: bool, evolve: bool = False) {
     with TemporaryDirectory() as td, TemporaryDirectory() as storage {
@@ -216,13 +217,28 @@ def exercise(shared: bool, evolve: bool = False) {
     }
 }
 
-test "services automatically share stored types and the application database" {
-    exercise(True);
+test "services automatically share stored types and the application database, and related cases" {
+    def check_services_automatically_share_stored_types_and_th {
+        exercise(True);
+    }
+
+    def check_unrelated_application_types_neither_quarantine_n {
+        exercise(False);
+    }
+    run_cases(
+        [
+            (
+                "services automatically share stored types and the application database",
+                check_services_automatically_share_stored_types_and_th
+            ),
+            (
+                "unrelated application types neither quarantine nor heal-prune",
+                check_unrelated_application_types_neither_quarantine_n
+            )
+        ]
+    );
 }
 
-test "unrelated application types neither quarantine nor heal-prune" {
-    exercise(False);
-}
 
 test "legacy path-derived names fail explicitly" {
     try {

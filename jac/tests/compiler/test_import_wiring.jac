@@ -17,6 +17,8 @@ import from jaclang.compiler.frontend.parser.frontend { parse }
 import from jaclang.compiler.frontend.module_facts { ModuleFacts }
 import from jaclang.compiler.frontend.unitree { ModuleItem }
 import from jaclang.cli.commands.architecture { _arch_init, _arch_sync }
+import from tests.support { run_cases }
+
 
 glob _UTIL: str = "def now -> str {\n    return \"t\";\n}\n",
      _OTHER: str = "def helper -> int {\n    return 1;\n}\n",
@@ -740,20 +742,51 @@ test "a wired C global a function assigns counts as used" {
 }
 
 
-test "a wired Jac name a function only assigns is still unused" {
-    base = _standard(
-        arch=_ARCH.replace(
-            "    core.util ++> app.main { now as when }\n",
-            "    core.util ++> app.main { now as when }\n"
-            "    core.other ++> app.main { helper }\n"
-        ),
-        main=_MAIN + "\ndef reset {\n    helper = 0;\n}\n"
-    );
-    try {
-        assert _errors(_compile(base, "app/main.jac")) == ["E1146"];
-    } finally {
-        shutil.rmtree(base, ignore_errors=True);
+test "a wired Jac name a function only assigns is still unused, and related cases" {
+    def check_a_wired_jac_name_a_function_only_assigns_is_stil {
+        base = _standard(
+            arch=_ARCH.replace(
+                "    core.util ++> app.main { now as when }\n",
+                "    core.util ++> app.main { now as when }\n"
+                "    core.other ++> app.main { helper }\n"
+            ),
+            main=_MAIN + "\ndef reset {\n    helper = 0;\n}\n"
+        );
+        try {
+            assert _errors(_compile(base, "app/main.jac")) == ["E1146"];
+        } finally {
+            shutil.rmtree(base, ignore_errors=True);
+        }
     }
+
+    def check_a_local_name_that_shadows_a_wired_one_does_not_c {
+        base = _standard(
+            arch=_ARCH.replace(
+                "    core.util ++> app.main { now as when }\n",
+                "    core.util ++> app.main { now as when }\n"
+                "    core.other ++> app.main { helper }\n"
+            ),
+            main=_MAIN
+                + "\ndef twice(helper: int) -> int {\n    return helper * 2;\n}\n"
+        );
+        try {
+            assert _errors(_compile(base, "app/main.jac")) == ["E1146"];
+        } finally {
+            shutil.rmtree(base, ignore_errors=True);
+        }
+    }
+    run_cases(
+        [
+            (
+                "a wired Jac name a function only assigns is still unused",
+                check_a_wired_jac_name_a_function_only_assigns_is_stil
+            ),
+            (
+                "a local name that shadows a wired one does not count as its use",
+                check_a_local_name_that_shadows_a_wired_one_does_not_c
+            )
+        ]
+    );
 }
 
 
@@ -1209,55 +1242,68 @@ test "a name read inside an import from c block counts as used" {
 }
 
 
-test "grouped targets on one line each reach their own function" {
-    base = _standard(
-        arch=_ARCH
-            + "\ngraph import {\n"
-            + "    core.other ++> [app.main.greet { helper }, app.main.again { helper as h }]\n"
-            + "}\n",
-        main=(
-            "def greet -> str {\n"
-            "    return serve() + when() + str(helper());\n"
-            "}\n"
-            "\n"
-            "def again -> int {\n"
-            "    return h();\n"
-            "}\n"
-        )
-    );
-    try {
-        assert _errors(_compile(base, "app/main.jac")) == [];
-    } finally {
-        shutil.rmtree(base, ignore_errors=True);
+test "grouped targets on one line each reach their own function, and related cases" {
+    def check_grouped_targets_on_one_line_each_reach_their_own {
+        base = _standard(
+            arch=_ARCH
+                + "\ngraph import {\n"
+                + "    core.other ++> [app.main.greet { helper }, app.main.again { helper as h }]\n"
+                + "}\n",
+            main=(
+                "def greet -> str {\n"
+                "    return serve() + when() + str(helper());\n"
+                "}\n"
+                "\n"
+                "def again -> int {\n"
+                "    return h();\n"
+                "}\n"
+            )
+        );
+        try {
+            assert _errors(_compile(base, "app/main.jac")) == [];
+        } finally {
+            shutil.rmtree(base, ignore_errors=True);
+        }
     }
-}
 
-
-"""One wire whose chain names two functions of the same module reaches both.
-The consumer index kept a single scope per wire and module, so the second
-function silently got no import; `jac fmt` merges same-payload consumers into
-one chain, so formatting alone could break a working wiring."""
-test "a chained wire reaches every function of one module it names" {
-    base = _standard(
-        arch=_ARCH
-            + "\ngraph import {\n"
-            + "    core.other ++> app.main.greet | app.main.again { helper }\n"
-            + "}\n",
-        main=(
-            "def greet -> str {\n"
-            "    return serve() + when() + str(helper());\n"
-            "}\n"
-            "\n"
-            "def again -> int {\n"
-            "    return helper();\n"
-            "}\n"
-        )
-    );
-    try {
-        assert _errors(_compile(base, "app/main.jac")) == [];
-    } finally {
-        shutil.rmtree(base, ignore_errors=True);
+    # One wire whose chain names two functions of the same module reaches both.
+    # The consumer index kept a single scope per wire and module, so the second
+    # function silently got no import; `jac fmt` merges same-payload consumers into
+    # one chain, so formatting alone could break a working wiring.
+    def check_a_chained_wire_reaches_every_function_of_one_mod {
+        base = _standard(
+            arch=_ARCH
+                + "\ngraph import {\n"
+                + "    core.other ++> app.main.greet | app.main.again { helper }\n"
+                + "}\n",
+            main=(
+                "def greet -> str {\n"
+                "    return serve() + when() + str(helper());\n"
+                "}\n"
+                "\n"
+                "def again -> int {\n"
+                "    return helper();\n"
+                "}\n"
+            )
+        );
+        try {
+            assert _errors(_compile(base, "app/main.jac")) == [];
+        } finally {
+            shutil.rmtree(base, ignore_errors=True);
+        }
     }
+    run_cases(
+        [
+            (
+                "grouped targets on one line each reach their own function",
+                check_grouped_targets_on_one_line_each_reach_their_own
+            ),
+            (
+                "a chained wire reaches every function of one module it names",
+                check_a_chained_wire_reaches_every_function_of_one_mod
+            )
+        ]
+    );
 }
 
 
@@ -1337,23 +1383,6 @@ test "jac fmt keeps the escape on a wired name that is a keyword" {
         assert "`return as result" in text , text;
         _write(base, "archwire.jac", text);
         assert _formatted(base, "archwire.jac") == text;
-    } finally {
-        shutil.rmtree(base, ignore_errors=True);
-    }
-}
-
-
-test "a local name that shadows a wired one does not count as its use" {
-    base = _standard(
-        arch=_ARCH.replace(
-            "    core.util ++> app.main { now as when }\n",
-            "    core.util ++> app.main { now as when }\n"
-            "    core.other ++> app.main { helper }\n"
-        ),
-        main=_MAIN + "\ndef twice(helper: int) -> int {\n    return helper * 2;\n}\n"
-    );
-    try {
-        assert _errors(_compile(base, "app/main.jac")) == ["E1146"];
     } finally {
         shutil.rmtree(base, ignore_errors=True);
     }

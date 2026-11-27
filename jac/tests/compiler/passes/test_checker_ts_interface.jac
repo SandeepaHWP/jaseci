@@ -19,118 +19,219 @@ import from .checker_npm_harness {
     make_degrade_npm_project,
     pretty_checker_errors
 }
+import from tests.support { run_cases }
 
-test "interface field access resolves with correct types" {
-    with TemporaryDirectory() as td {
-        proj = make_iface_npm_project(Path(cast(str, td)));
-        f = proj / "lib" / "app.jac";
-        f.write_text(
-            'import from "cfgpkg" { getConfig, getDerived }\n\n'
-            'def:pub use() -> str {\n'
-            '    c = getConfig();\n'
-            '    theme: str = c.theme;\n'
-            '    retries: float = c.retries;\n'
-            '    d = getDerived();\n'
-            '    inherited: str = d.id;\n'
-            '    extra_val: float = d.extra;\n'
-            '    return theme;\n'
-            '}\n'
-        );
-        (program, err_codes, _) = check_npm_file(f);
-        assert len(program.errors_had) == 0 , "Interface field access should type-check cleanly, got "
-        f"{len(program.errors_had)} diagnostic(s):\n{pretty_checker_errors(program)}";
+
+test "interface field access resolves with correct types, and related cases" {
+    def check_interface_field_access_resolves_with_correct_typ {
+        with TemporaryDirectory() as td {
+            proj = make_iface_npm_project(Path(cast(str, td)));
+            f = proj / "lib" / "app.jac";
+            f.write_text(
+                'import from "cfgpkg" { getConfig, getDerived }\n\n'
+                'def:pub use() -> str {\n'
+                '    c = getConfig();\n'
+                '    theme: str = c.theme;\n'
+                '    retries: float = c.retries;\n'
+                '    d = getDerived();\n'
+                '    inherited: str = d.id;\n'
+                '    extra_val: float = d.extra;\n'
+                '    return theme;\n'
+                '}\n'
+            );
+            (program, err_codes, _) = check_npm_file(f);
+            assert len(program.errors_had) == 0 , "Interface field access should type-check cleanly, got "
+            f"{len(program.errors_had)} diagnostic(s):\n{pretty_checker_errors(
+                program
+            )}";
+        }
     }
+
+    def check_an_any_typed_interface_field_flows_gradually_lik {
+        with TemporaryDirectory() as td {
+            proj = make_iface_npm_project(Path(cast(str, td)));
+            f = proj / "lib" / "gradual.jac";
+            # `payload: any` resolves to a *foreign* any (not the opaque `object`
+            # that rejects everything), so it flows gradually into a concrete-typed
+            # local -- the same gradualness untyped external JS values get. Access
+            # itself is precise (a bogus field still errors; see below).
+            f.write_text(
+                'import from "cfgpkg" { getConfig }\n\n'
+                'def:pub use() -> str {\n'
+                '    c = getConfig();\n'
+                '    s: str = c.payload;\n'
+                '    return s;\n'
+                '}\n'
+            );
+            (program, err_codes, _) = check_npm_file(f);
+            assert len(program.errors_had) == 0 , "An any-typed interface field should flow gradually, got "
+            f"{len(program.errors_had)} diagnostic(s):\n{pretty_checker_errors(
+                program
+            )}";
+        }
+    }
+    run_cases(
+        [
+            (
+                "interface field access resolves with correct types",
+                check_interface_field_access_resolves_with_correct_typ
+            ),
+            (
+                "an any-typed interface field flows gradually like untyped JS",
+                check_an_any_typed_interface_field_flows_gradually_lik
+            )
+        ]
+    );
 }
 
-test "whole-object assignment of a synthetic interface to an unrelated type errors" {
-    with TemporaryDirectory() as td {
-        proj = make_iface_npm_project(Path(cast(str, td)));
-        f = proj / "lib" / "strict_src.jac";
-        # Synthetic interface values keep precise field types; whole-object
-        # assignment into an unrelated Jac annotation must fail (unlike the
-        # old foreign-any suppressor). Member access and matching annotations
-        # remain valid in the sibling tests.
-        f.write_text(
-            'import from "cfgpkg" { getConfig }\n\n'
-            'def:pub use() -> str {\n'
-            '    x: str = getConfig();\n'
-            '    return x;\n'
-            '}\n'
-        );
-        (program, err_codes, _) = check_npm_file(f);
-        assert len(program.errors_had) > 0 , "Expected a type error assigning Config into str, got none";
-        assert any(c in ("E1001", "E1002", "E1035") for c in err_codes) , f"Expected an assignment type error, got codes {err_codes}:\n{pretty_checker_errors(
-            program
-        )}";
+test "whole-object assignment of a synthetic interface to an unrelated type errors, and related cases" {
+    def check_whole_object_assignment_of_a_synthetic_interface {
+        with TemporaryDirectory() as td {
+            proj = make_iface_npm_project(Path(cast(str, td)));
+            f = proj / "lib" / "strict_src.jac";
+            # Synthetic interface values keep precise field types; whole-object
+            # assignment into an unrelated Jac annotation must fail (unlike the
+            # old foreign-any suppressor). Member access and matching annotations
+            # remain valid in the sibling tests.
+            f.write_text(
+                'import from "cfgpkg" { getConfig }\n\n'
+                'def:pub use() -> str {\n'
+                '    x: str = getConfig();\n'
+                '    return x;\n'
+                '}\n'
+            );
+            (program, err_codes, _) = check_npm_file(f);
+            assert len(program.errors_had) > 0 , "Expected a type error assigning Config into str, got none";
+            assert any(c in ("E1001", "E1002", "E1035") for c in err_codes) , f"Expected an assignment type error, got codes {err_codes}:\n{pretty_checker_errors(
+                program
+            )}";
+        }
     }
+
+    def check_assigning_a_concrete_jac_value_into_a_synthetic {
+        with TemporaryDirectory() as td {
+            proj = make_iface_npm_project(Path(cast(str, td)));
+            f = proj / "lib" / "dest_strict.jac";
+            # Dest-side synthetic annotations must still reject incompatible Jac
+            # values (str/int into Config). Leniency is only for external sources.
+            # `Config` is a d.ts interface, so it is a type-only export and rides
+            # in on `import type` (a plain import of it is E1131).
+            f.write_text(
+                'import type from "cfgpkg" { Config }\n\n'
+                'def:pub bad() -> None {\n'
+                '    c: Config = "hello";\n'
+                '}\n'
+            );
+            (program, err_codes, _) = check_npm_file(f);
+            assert len(program.errors_had) > 0 , "Expected a type error assigning str into Config, got none";
+            assert any(c in ("E1001", "E1002", "E1035") for c in err_codes) , f"Expected an assignment type error, got codes {err_codes}:\n{pretty_checker_errors(
+                program
+            )}";
+        }
+    }
+
+    def check_interface_method_return_type_is_checked_not_any {
+        # The declared return type flows precisely: `greet` returns `string`, so
+        # assigning its result into a `float` must error (the return is not any).
+        with TemporaryDirectory() as td {
+            proj = make_iface_npm_project(Path(cast(str, td)));
+            f = proj / "lib" / "method_ret_bad.jac";
+            f.write_text(
+                'import from "cfgpkg" { getConfig }\n\n'
+                'def:pub bad() -> None {\n'
+                '    c = getConfig();\n'
+                '    n: float = c.greet("world");\n'
+                '}\n'
+            );
+            (program, err_codes, _) = check_npm_file(f);
+            assert len(program.errors_had) > 0 , "Expected a type error assigning greet's string result into a float, got none";
+            assert any(c in ("E1001", "E1002", "E1035") for c in err_codes) , f"Expected an assignment type error, got codes {err_codes}:"
+            f"\n{pretty_checker_errors(program)}";
+        }
+    }
+    run_cases(
+        [
+            (
+                "whole-object assignment of a synthetic interface to an unrelated type errors",
+                check_whole_object_assignment_of_a_synthetic_interface
+            ),
+            (
+                "assigning a concrete Jac value into a synthetic interface annotation errors",
+                check_assigning_a_concrete_jac_value_into_a_synthetic
+            ),
+            (
+                "interface method return type is checked, not any",
+                check_interface_method_return_type_is_checked_not_any
+            )
+        ]
+    );
 }
 
-test "assigning a concrete Jac value into a synthetic interface annotation errors" {
-    with TemporaryDirectory() as td {
-        proj = make_iface_npm_project(Path(cast(str, td)));
-        f = proj / "lib" / "dest_strict.jac";
-        # Dest-side synthetic annotations must still reject incompatible Jac
-        # values (str/int into Config). Leniency is only for external sources.
-        # `Config` is a d.ts interface, so it is a type-only export and rides
-        # in on `import type` (a plain import of it is E1131).
-        f.write_text(
-            'import type from "cfgpkg" { Config }\n\n'
-            'def:pub bad() -> None {\n'
-            '    c: Config = "hello";\n'
-            '}\n'
-        );
-        (program, err_codes, _) = check_npm_file(f);
-        assert len(program.errors_had) > 0 , "Expected a type error assigning str into Config, got none";
-        assert any(c in ("E1001", "E1002", "E1035") for c in err_codes) , f"Expected an assignment type error, got codes {err_codes}:\n{pretty_checker_errors(
-            program
-        )}";
+
+test "interface imported directly as a type annotation resolves fields, and related cases" {
+    def check_interface_imported_directly_as_a_type_annotation {
+        with TemporaryDirectory() as td {
+            proj = make_iface_npm_project(Path(cast(str, td)));
+            f = proj / "lib" / "annot.jac";
+            # Config is imported and used directly as an annotation (type position),
+            # not just inferred from a return type. Field access on the annotated
+            # local must resolve precisely. The interface is a type-only export, so
+            # it rides in on its own `import type` beside the value import.
+            f.write_text(
+                'import from "cfgpkg" { getConfig }\n'
+                'import type from "cfgpkg" { Config }\n\n'
+                'def:pub use() -> str {\n'
+                '    c: Config = getConfig();\n'
+                '    theme: str = c.theme;\n'
+                '    return theme;\n'
+                '}\n'
+            );
+            (program, err_codes, _) = check_npm_file(f);
+            assert len(program.errors_had) == 0 , "Interface used directly as an annotation should resolve, got "
+            f"{len(program.errors_had)} diagnostic(s):\n{pretty_checker_errors(
+                program
+            )}";
+        }
     }
+
+    def check_interface_method_call_type_checks_with_correct_a {
+        # Regression for issue where the .d.ts parser captured method signatures
+        # but the synthesizer dropped them, so `c.onChange("x")` errored with
+        # E1030 ("Type Config has no attribute onChange"). Methods now synthesize
+        # as FunctionType members of the structural class symbol table.
+        with TemporaryDirectory() as td {
+            proj = make_iface_npm_project(Path(cast(str, td)));
+            f = proj / "lib" / "method_ok.jac";
+            f.write_text(
+                'import from "cfgpkg" { getConfig }\n\n'
+                'def:pub use() -> str {\n'
+                '    c = getConfig();\n'
+                '    c.onChange("ready");\n'
+                '    greeting: str = c.greet("world");\n'
+                '    return greeting;\n'
+                '}\n'
+            );
+            (program, err_codes, _) = check_npm_file(f);
+            assert len(program.errors_had) == 0 , "Interface method call should type-check cleanly, got "
+            f"{len(program.errors_had)} diagnostic(s):\n{pretty_checker_errors(
+                program
+            )}";
+        }
+    }
+    run_cases(
+        [
+            (
+                "interface imported directly as a type annotation resolves fields",
+                check_interface_imported_directly_as_a_type_annotation
+            ),
+            (
+                "interface method call type-checks with correct argument types",
+                check_interface_method_call_type_checks_with_correct_a
+            )
+        ]
+    );
 }
 
-test "interface imported directly as a type annotation resolves fields" {
-    with TemporaryDirectory() as td {
-        proj = make_iface_npm_project(Path(cast(str, td)));
-        f = proj / "lib" / "annot.jac";
-        # Config is imported and used directly as an annotation (type position),
-        # not just inferred from a return type. Field access on the annotated
-        # local must resolve precisely. The interface is a type-only export, so
-        # it rides in on its own `import type` beside the value import.
-        f.write_text(
-            'import from "cfgpkg" { getConfig }\n'
-            'import type from "cfgpkg" { Config }\n\n'
-            'def:pub use() -> str {\n'
-            '    c: Config = getConfig();\n'
-            '    theme: str = c.theme;\n'
-            '    return theme;\n'
-            '}\n'
-        );
-        (program, err_codes, _) = check_npm_file(f);
-        assert len(program.errors_had) == 0 , "Interface used directly as an annotation should resolve, got "
-        f"{len(program.errors_had)} diagnostic(s):\n{pretty_checker_errors(program)}";
-    }
-}
-
-test "an any-typed interface field flows gradually like untyped JS" {
-    with TemporaryDirectory() as td {
-        proj = make_iface_npm_project(Path(cast(str, td)));
-        f = proj / "lib" / "gradual.jac";
-        # `payload: any` resolves to a *foreign* any (not the opaque `object`
-        # that rejects everything), so it flows gradually into a concrete-typed
-        # local -- the same gradualness untyped external JS values get. Access
-        # itself is precise (a bogus field still errors; see below).
-        f.write_text(
-            'import from "cfgpkg" { getConfig }\n\n'
-            'def:pub use() -> str {\n'
-            '    c = getConfig();\n'
-            '    s: str = c.payload;\n'
-            '    return s;\n'
-            '}\n'
-        );
-        (program, err_codes, _) = check_npm_file(f);
-        assert len(program.errors_had) == 0 , "An any-typed interface field should flow gradually, got "
-        f"{len(program.errors_had)} diagnostic(s):\n{pretty_checker_errors(program)}";
-    }
-}
 
 test "accessing a nonexistent interface field errors" {
     with TemporaryDirectory() as td {
@@ -170,128 +271,181 @@ test "cross-interface field keeps the sibling interface's real type" {
     }
 }
 
-test "cross-interface bogus field through a sibling ref errors" {
-    with TemporaryDirectory() as td {
-        proj = make_relational_npm_project(Path(cast(str, td)));
-        f = proj / "lib" / "sibling_bad.jac";
-        # The key regression guard: with the old foreign-`any` collapse this
-        # produced no error at all. Now `child` is the real `Child` shell, so a
-        # bogus attribute must raise E1030.
-        f.write_text(
-            'import from "relpkg" { getParent }\n\n'
-            'def:pub bad() -> str {\n'
-            '    p = getParent();\n'
-            '    return p.child.nope;\n'
-            '}\n'
-        );
-        (program, err_codes, _) = check_npm_file(f);
-        assert "E1030" in err_codes , f"Expected E1030 for a bogus field through a sibling ref, got codes {err_codes}:"
-        f"\n{pretty_checker_errors(program)}";
+test "cross-interface bogus field through a sibling ref errors, and related cases" {
+    def check_cross_interface_bogus_field_through_a_sibling_re {
+        with TemporaryDirectory() as td {
+            proj = make_relational_npm_project(Path(cast(str, td)));
+            f = proj / "lib" / "sibling_bad.jac";
+            # The key regression guard: with the old foreign-`any` collapse this
+            # produced no error at all. Now `child` is the real `Child` shell, so a
+            # bogus attribute must raise E1030.
+            f.write_text(
+                'import from "relpkg" { getParent }\n\n'
+                'def:pub bad() -> str {\n'
+                '    p = getParent();\n'
+                '    return p.child.nope;\n'
+                '}\n'
+            );
+            (program, err_codes, _) = check_npm_file(f);
+            assert "E1030" in err_codes , f"Expected E1030 for a bogus field through a sibling ref, got codes {err_codes}:"
+            f"\n{pretty_checker_errors(program)}";
+        }
     }
+
+    def check_recursive_interface_field_bogus_access_errors {
+        with TemporaryDirectory() as td {
+            proj = make_relational_npm_project(Path(cast(str, td)));
+            f = proj / "lib" / "rec_bad.jac";
+            f.write_text(
+                'import from "relpkg" { getHead }\n\n'
+                'def:pub bad() -> str {\n'
+                '    n = getHead();\n'
+                '    return n.next.nope;\n'
+                '}\n'
+            );
+            (program, err_codes, _) = check_npm_file(f);
+            assert "E1030" in err_codes , f"Expected E1030 for a bogus field through a recursive ref, got codes {err_codes}:"
+            f"\n{pretty_checker_errors(program)}";
+        }
+    }
+    run_cases(
+        [
+            (
+                "cross-interface bogus field through a sibling ref errors",
+                check_cross_interface_bogus_field_through_a_sibling_re
+            ),
+            (
+                "recursive interface field bogus access errors",
+                check_recursive_interface_field_bogus_access_errors
+            )
+        ]
+    );
 }
 
-test "recursive interface field resolves with its own type" {
-    with TemporaryDirectory() as td {
-        proj = make_relational_npm_project(Path(cast(str, td)));
-        f = proj / "lib" / "rec_ok.jac";
-        # `Node.next` is typed `Node` (self-reference). It must resolve to the
-        # shell instance, so `next.value` is a real `number`.
-        f.write_text(
-            'import from "relpkg" { getHead }\n\n'
-            'def:pub use() -> float {\n'
-            '    n = getHead();\n'
-            '    v: float = n.next.value;\n'
-            '    return v;\n'
-            '}\n'
-        );
-        (program, err_codes, _) = check_npm_file(f);
-        assert len(program.errors_had) == 0 , "Recursive interface field should resolve with its own type, got "
-        f"{len(program.errors_had)} diagnostic(s):\n{pretty_checker_errors(program)}";
+test "recursive interface field resolves with its own type, and related cases" {
+    def check_recursive_interface_field_resolves_with_its_own {
+        with TemporaryDirectory() as td {
+            proj = make_relational_npm_project(Path(cast(str, td)));
+            f = proj / "lib" / "rec_ok.jac";
+            # `Node.next` is typed `Node` (self-reference). It must resolve to the
+            # shell instance, so `next.value` is a real `number`.
+            f.write_text(
+                'import from "relpkg" { getHead }\n\n'
+                'def:pub use() -> float {\n'
+                '    n = getHead();\n'
+                '    v: float = n.next.value;\n'
+                '    return v;\n'
+                '}\n'
+            );
+            (program, err_codes, _) = check_npm_file(f);
+            assert len(program.errors_had) == 0 , "Recursive interface field should resolve with its own type, got "
+            f"{len(program.errors_had)} diagnostic(s):\n{pretty_checker_errors(
+                program
+            )}";
+        }
     }
+
+    def check_interface_field_typed_via_a_typealias_resolves {
+        with TemporaryDirectory() as td {
+            proj = make_relational_npm_project(Path(cast(str, td)));
+            f = proj / "lib" / "alias_ok.jac";
+            # `Holder.wrapped` is typed via `type Wrapped = Child`. The typealias
+            # resolution path must also thread shells so `wrapped.name` resolves to
+            # a `string`.
+            f.write_text(
+                'import from "relpkg" { getHolder }\n\n'
+                'def:pub use() -> str {\n'
+                '    h = getHolder();\n'
+                '    name: str = h.wrapped.name;\n'
+                '    return name;\n'
+                '}\n'
+            );
+            (program, err_codes, _) = check_npm_file(f);
+            assert len(program.errors_had) == 0 , "Typealias-to-interface field should resolve, got "
+            f"{len(program.errors_had)} diagnostic(s):\n{pretty_checker_errors(
+                program
+            )}";
+        }
+    }
+    run_cases(
+        [
+            (
+                "recursive interface field resolves with its own type",
+                check_recursive_interface_field_resolves_with_its_own
+            ),
+            (
+                "interface field typed via a typealias resolves",
+                check_interface_field_typed_via_a_typealias_resolves
+            )
+        ]
+    );
 }
 
-test "recursive interface field bogus access errors" {
-    with TemporaryDirectory() as td {
-        proj = make_relational_npm_project(Path(cast(str, td)));
-        f = proj / "lib" / "rec_bad.jac";
-        f.write_text(
-            'import from "relpkg" { getHead }\n\n'
-            'def:pub bad() -> str {\n'
-            '    n = getHead();\n'
-            '    return n.next.nope;\n'
-            '}\n'
-        );
-        (program, err_codes, _) = check_npm_file(f);
-        assert "E1030" in err_codes , f"Expected E1030 for a bogus field through a recursive ref, got codes {err_codes}:"
-        f"\n{pretty_checker_errors(program)}";
+
+test "array of interface refs resolves element field types, and related cases" {
+    def check_array_of_interface_refs_resolves_element_field_t {
+        with TemporaryDirectory() as td {
+            proj = make_relational_npm_project(Path(cast(str, td)));
+            f = proj / "lib" / "arr_ok.jac";
+            # `Parent.children` is `Child[]`. Subscripting yields the real `Child`
+            # element type, so `children[0].name` is a `string`. Exercises the
+            # array branch of _map_ts_type with threaded shells.
+            f.write_text(
+                'import from "relpkg" { getParent }\n\n'
+                'def:pub use() -> str {\n'
+                '    p = getParent();\n'
+                '    first = p.children[0];\n'
+                '    name: str = first.name;\n'
+                '    return name;\n'
+                '}\n'
+            );
+            (program, err_codes, _) = check_npm_file(f);
+            assert len(program.errors_had) == 0 , "Array element interface field should resolve, got "
+            f"{len(program.errors_had)} diagnostic(s):\n{pretty_checker_errors(
+                program
+            )}";
+        }
     }
+
+    def check_optional_recursive_interface_field_narrows_to_it {
+        # `Node.parent?: Node` resolves to `Node | None` (not foreign any), so a
+        # None-narrow recovers the real `Node` and `parent.value` is a `number`.
+        with TemporaryDirectory() as td {
+            proj = make_relational_npm_project(Path(cast(str, td)));
+            f = proj / "lib" / "opt_ok.jac";
+            f.write_text(
+                'import from "relpkg" { getHead }\n\n'
+                'def:pub use() -> float {\n'
+                '    n = getHead();\n'
+                '    p = n.parent;\n'
+                '    if p is not None {\n'
+                '        v: float = p.value;\n'
+                '        return v;\n'
+                '    }\n'
+                '    return 0.0;\n'
+                '}\n'
+            );
+            (program, err_codes, _) = check_npm_file(f);
+            assert len(program.errors_had) == 0 , "Optional recursive field should narrow to its real Node type, got "
+            f"{len(program.errors_had)} diagnostic(s):\n{pretty_checker_errors(
+                program
+            )}";
+        }
+    }
+    run_cases(
+        [
+            (
+                "array of interface refs resolves element field types",
+                check_array_of_interface_refs_resolves_element_field_t
+            ),
+            (
+                "optional recursive interface field narrows to its real member type",
+                check_optional_recursive_interface_field_narrows_to_it
+            )
+        ]
+    );
 }
 
-test "array of interface refs resolves element field types" {
-    with TemporaryDirectory() as td {
-        proj = make_relational_npm_project(Path(cast(str, td)));
-        f = proj / "lib" / "arr_ok.jac";
-        # `Parent.children` is `Child[]`. Subscripting yields the real `Child`
-        # element type, so `children[0].name` is a `string`. Exercises the
-        # array branch of _map_ts_type with threaded shells.
-        f.write_text(
-            'import from "relpkg" { getParent }\n\n'
-            'def:pub use() -> str {\n'
-            '    p = getParent();\n'
-            '    first = p.children[0];\n'
-            '    name: str = first.name;\n'
-            '    return name;\n'
-            '}\n'
-        );
-        (program, err_codes, _) = check_npm_file(f);
-        assert len(program.errors_had) == 0 , "Array element interface field should resolve, got "
-        f"{len(program.errors_had)} diagnostic(s):\n{pretty_checker_errors(program)}";
-    }
-}
-
-test "interface field typed via a typealias resolves" {
-    with TemporaryDirectory() as td {
-        proj = make_relational_npm_project(Path(cast(str, td)));
-        f = proj / "lib" / "alias_ok.jac";
-        # `Holder.wrapped` is typed via `type Wrapped = Child`. The typealias
-        # resolution path must also thread shells so `wrapped.name` resolves to
-        # a `string`.
-        f.write_text(
-            'import from "relpkg" { getHolder }\n\n'
-            'def:pub use() -> str {\n'
-            '    h = getHolder();\n'
-            '    name: str = h.wrapped.name;\n'
-            '    return name;\n'
-            '}\n'
-        );
-        (program, err_codes, _) = check_npm_file(f);
-        assert len(program.errors_had) == 0 , "Typealias-to-interface field should resolve, got "
-        f"{len(program.errors_had)} diagnostic(s):\n{pretty_checker_errors(program)}";
-    }
-}
-
-test "interface method call type-checks with correct argument types" {
-    # Regression for issue where the .d.ts parser captured method signatures
-    # but the synthesizer dropped them, so `c.onChange("x")` errored with
-    # E1030 ("Type Config has no attribute onChange"). Methods now synthesize
-    # as FunctionType members of the structural class symbol table.
-    with TemporaryDirectory() as td {
-        proj = make_iface_npm_project(Path(cast(str, td)));
-        f = proj / "lib" / "method_ok.jac";
-        f.write_text(
-            'import from "cfgpkg" { getConfig }\n\n'
-            'def:pub use() -> str {\n'
-            '    c = getConfig();\n'
-            '    c.onChange("ready");\n'
-            '    greeting: str = c.greet("world");\n'
-            '    return greeting;\n'
-            '}\n'
-        );
-        (program, err_codes, _) = check_npm_file(f);
-        assert len(program.errors_had) == 0 , "Interface method call should type-check cleanly, got "
-        f"{len(program.errors_had)} diagnostic(s):\n{pretty_checker_errors(program)}";
-    }
-}
 
 test "interface method call with a wrong argument type errors" {
     # A method's parameters are real, not any: passing a number where a string
@@ -314,49 +468,6 @@ test "interface method call with a wrong argument type errors" {
     }
 }
 
-test "interface method return type is checked, not any" {
-    # The declared return type flows precisely: `greet` returns `string`, so
-    # assigning its result into a `float` must error (the return is not any).
-    with TemporaryDirectory() as td {
-        proj = make_iface_npm_project(Path(cast(str, td)));
-        f = proj / "lib" / "method_ret_bad.jac";
-        f.write_text(
-            'import from "cfgpkg" { getConfig }\n\n'
-            'def:pub bad() -> None {\n'
-            '    c = getConfig();\n'
-            '    n: float = c.greet("world");\n'
-            '}\n'
-        );
-        (program, err_codes, _) = check_npm_file(f);
-        assert len(program.errors_had) > 0 , "Expected a type error assigning greet's string result into a float, got none";
-        assert any(c in ("E1001", "E1002", "E1035") for c in err_codes) , f"Expected an assignment type error, got codes {err_codes}:"
-        f"\n{pretty_checker_errors(program)}";
-    }
-}
-
-test "optional recursive interface field narrows to its real member type" {
-    # `Node.parent?: Node` resolves to `Node | None` (not foreign any), so a
-    # None-narrow recovers the real `Node` and `parent.value` is a `number`.
-    with TemporaryDirectory() as td {
-        proj = make_relational_npm_project(Path(cast(str, td)));
-        f = proj / "lib" / "opt_ok.jac";
-        f.write_text(
-            'import from "relpkg" { getHead }\n\n'
-            'def:pub use() -> float {\n'
-            '    n = getHead();\n'
-            '    p = n.parent;\n'
-            '    if p is not None {\n'
-            '        v: float = p.value;\n'
-            '        return v;\n'
-            '    }\n'
-            '    return 0.0;\n'
-            '}\n'
-        );
-        (program, err_codes, _) = check_npm_file(f);
-        assert len(program.errors_had) == 0 , "Optional recursive field should narrow to its real Node type, got "
-        f"{len(program.errors_had)} diagnostic(s):\n{pretty_checker_errors(program)}";
-    }
-}
 
 test "accessing through an optional interface field without narrowing errors" {
     # Regression guard: an optional interface reference must NOT collapse to
@@ -468,26 +579,62 @@ test "callable interface is callable with a typed return and keeps its fields" {
     }
 }
 
-test "index-signature interface synthesizes no fields, so keyed access errors" {
-    # `interface Dict { [key: string]: number }` has only an index signature,
-    # which is not modeled. The synthesized class has no members, so any keyed
-    # access raises E1030 rather than resolving to a number. Documents the
-    # degradation (index signatures are unsupported) instead of pretending the
-    # value is a precise map.
-    with TemporaryDirectory() as td {
-        proj = make_degrade_npm_project(Path(cast(str, td)));
-        f = proj / "lib" / "idx.jac";
-        f.write_text(
-            'import from "degpkg" { getDict }\n\n'
-            'def:pub bad() -> None {\n'
-            '    d = getDict();\n'
-            '    x = d.anything;\n'
-            '}\n'
-        );
-        (program, err_codes, _) = check_npm_file(f);
-        assert "E1030" in err_codes , f"Expected E1030 for keyed access on an index-signature interface, got codes {err_codes}:"
-        f"\n{pretty_checker_errors(program)}";
+test "index-signature interface synthesizes no fields, so keyed access errors, and related cases" {
+    def check_index_signature_interface_synthesizes_no_fields {
+        # `interface Dict { [key: string]: number }` has only an index signature,
+        # which is not modeled. The synthesized class has no members, so any keyed
+        # access raises E1030 rather than resolving to a number. Documents the
+        # degradation (index signatures are unsupported) instead of pretending the
+        # value is a precise map.
+        with TemporaryDirectory() as td {
+            proj = make_degrade_npm_project(Path(cast(str, td)));
+            f = proj / "lib" / "idx.jac";
+            f.write_text(
+                'import from "degpkg" { getDict }\n\n'
+                'def:pub bad() -> None {\n'
+                '    d = getDict();\n'
+                '    x = d.anything;\n'
+                '}\n'
+            );
+            (program, err_codes, _) = check_npm_file(f);
+            assert "E1030" in err_codes , f"Expected E1030 for keyed access on an index-signature interface, got codes {err_codes}:"
+            f"\n{pretty_checker_errors(program)}";
+        }
     }
+
+    def check_merged_interface_declarations_do_not_combine_mem {
+        # TS declaration merging (`interface Merged` declared twice) is not
+        # supported: only one block's members survive synthesis, so a field from
+        # the other block raises E1030. Documents the limitation rather than
+        # silently exposing a partial union.
+        with TemporaryDirectory() as td {
+            proj = make_degrade_npm_project(Path(cast(str, td)));
+            f = proj / "lib" / "merge.jac";
+            f.write_text(
+                'import from "degpkg" { getMerged }\n\n'
+                'def:pub bad() -> None {\n'
+                '    m = getMerged();\n'
+                '    x = m.a;\n'
+                '    y = m.b;\n'
+                '}\n'
+            );
+            (program, err_codes, _) = check_npm_file(f);
+            assert "E1030" in err_codes , f"Expected E1030 from an unmerged declaration's field, got codes {err_codes}:"
+            f"\n{pretty_checker_errors(program)}";
+        }
+    }
+    run_cases(
+        [
+            (
+                "index-signature interface synthesizes no fields, so keyed access errors",
+                check_index_signature_interface_synthesizes_no_fields
+            ),
+            (
+                "merged interface declarations do not combine members",
+                check_merged_interface_declarations_do_not_combine_mem
+            )
+        ]
+    );
 }
 
 test "an implicit-any interface member flows gradually" {
@@ -533,27 +680,6 @@ test "an abstract class synthesizes like a normal structural class" {
     }
 }
 
-test "merged interface declarations do not combine members" {
-    # TS declaration merging (`interface Merged` declared twice) is not
-    # supported: only one block's members survive synthesis, so a field from
-    # the other block raises E1030. Documents the limitation rather than
-    # silently exposing a partial union.
-    with TemporaryDirectory() as td {
-        proj = make_degrade_npm_project(Path(cast(str, td)));
-        f = proj / "lib" / "merge.jac";
-        f.write_text(
-            'import from "degpkg" { getMerged }\n\n'
-            'def:pub bad() -> None {\n'
-            '    m = getMerged();\n'
-            '    x = m.a;\n'
-            '    y = m.b;\n'
-            '}\n'
-        );
-        (program, err_codes, _) = check_npm_file(f);
-        assert "E1030" in err_codes , f"Expected E1030 from an unmerged declaration's field, got codes {err_codes}:"
-        f"\n{pretty_checker_errors(program)}";
-    }
-}
 
 test "callable interface enforces its call-signature return type" {
     # The `__call__` return is `number` -> float, so assigning it to a str

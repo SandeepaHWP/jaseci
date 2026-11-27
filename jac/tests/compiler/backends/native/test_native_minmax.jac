@@ -2,7 +2,7 @@
 import ctypes;
 import math;
 import itertools;
-import from tests.support { compile_native, get_func }
+import from tests.support { compile_native, get_func, run_cases }
 
 glob _ENGINES: list[any] = [];
 def engine -> any {
@@ -62,17 +62,44 @@ test "float ties retain the first value and NaNs follow ordered comparisons" {
     }
 }
 
-test "empty input raises or returns default without reading element zero" {
-    assert get_func(engine(), "empty_checks", ctypes.c_bool)();
+test "empty input raises or returns default without reading element zero, and related cases" {
+    def check_empty_input_raises_or_returns_default_without_re {
+        assert get_func(engine(), "empty_checks", ctypes.c_bool)();
+    }
+
+    def check_png_predictor_idiom_lowers_without_rewriting_the {
+        assert get_func(engine(), "paeth", ctypes.c_bool)();
+    }
+
+    def check_boolean_unsigned_and_singleton_lists_preserve_sc {
+        assert get_func(engine(), "scalar_checks", ctypes.c_bool)();
+    }
+
+    def check_sized_scalars_and_eager_defaults_preserve_values {
+        assert get_func(engine(), "more_scalars", ctypes.c_bool)();
+    }
+    run_cases(
+        [
+            (
+                "empty input raises or returns default without reading element zero",
+                check_empty_input_raises_or_returns_default_without_re
+            ),
+            (
+                "PNG predictor idiom lowers without rewriting the caller",
+                check_png_predictor_idiom_lowers_without_rewriting_the
+            ),
+            (
+                "boolean unsigned and singleton lists preserve scalar ordering",
+                check_boolean_unsigned_and_singleton_lists_preserve_sc
+            ),
+            (
+                "sized scalars and eager defaults preserve values and input order",
+                check_sized_scalars_and_eager_defaults_preserve_values
+            )
+        ]
+    );
 }
 
-test "PNG predictor idiom lowers without rewriting the caller" {
-    assert get_func(engine(), "paeth", ctypes.c_bool)();
-}
-
-test "boolean unsigned and singleton lists preserve scalar ordering" {
-    assert get_func(engine(), "scalar_checks", ctypes.c_bool)();
-}
 
 test "extrema also link and run in a standalone native binary" {
     import tempfile;
@@ -85,9 +112,6 @@ test "extrema also link and run in a standalone native binary" {
     }
 }
 
-test "sized scalars and eager defaults preserve values and input order" {
-    assert get_func(engine(), "more_scalars", ctypes.c_bool)();
-}
 
 test "unsupported keyword forms refuse lowering instead of discarding arguments" {
     import tempfile;

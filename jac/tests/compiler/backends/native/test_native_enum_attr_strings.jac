@@ -11,7 +11,7 @@ sealed-artifact crash.
 
 import ctypes;
 import os;
-import from tests.support { TESTS_DIR, native_address, native_force_opts }
+import from tests.support { TESTS_DIR, native_address, native_force_opts, run_cases }
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.backends.native.llvm.binding { ExecutionEngine }
 
@@ -44,22 +44,44 @@ def call_i64(name: str, arg: int) -> int {
     return ctypes.CFUNCTYPE(ctypes.c_int64, ctypes.c_int64)(addr)(arg);
 }
 
-test "runtime string-enum .value feeds len()" {
-    assert call_i64("color_value_len", 0) == 3;
-    assert call_i64("color_value_len", 1) == 5;
-}
+test "runtime string-enum .value feeds len(), and related cases" {
+    def check_runtime_string_enum_value_feeds_len {
+        assert call_i64("color_value_len", 0) == 3;
+        assert call_i64("color_value_len", 1) == 5;
+    }
 
-test "runtime string-enum .name feeds concatenation" {
-    assert call_i64("color_name_concat", 0) == 4;
-    assert call_i64("color_name_concat", 1) == 6;
-}
+    def check_runtime_string_enum_name_feeds_concatenation {
+        assert call_i64("color_name_concat", 0) == 4;
+        assert call_i64("color_name_concat", 1) == 6;
+    }
 
-test "runtime int-enum .name feeds len()" {
-    assert call_i64("prio_name_len", 0) == 3;
-    assert call_i64("prio_name_len", 1) == 4;
-}
+    def check_runtime_int_enum_name_feeds_len {
+        assert call_i64("prio_name_len", 0) == 3;
+        assert call_i64("prio_name_len", 1) == 4;
+    }
 
-test "runtime int-enum .value is the declared value" {
-    assert call_i64("prio_value_of", 0) == 1;
-    assert call_i64("prio_value_of", 1) == 2;
+    def check_runtime_int_enum_value_is_the_declared_value {
+        assert call_i64("prio_value_of", 0) == 1;
+        assert call_i64("prio_value_of", 1) == 2;
+    }
+    run_cases(
+        [
+            (
+                "runtime string-enum .value feeds len()",
+                check_runtime_string_enum_value_feeds_len
+            ),
+            (
+                "runtime string-enum .name feeds concatenation",
+                check_runtime_string_enum_name_feeds_concatenation
+            ),
+            (
+                "runtime int-enum .name feeds len()",
+                check_runtime_int_enum_name_feeds_len
+            ),
+            (
+                "runtime int-enum .value is the declared value",
+                check_runtime_int_enum_value_is_the_declared_value
+            )
+        ]
+    );
 }

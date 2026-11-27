@@ -26,7 +26,7 @@ skip; it is the backstop for a base that ends up without a vtable.
 import os;
 import subprocess;
 import tempfile;
-import from tests.support { jac_command, TESTS_DIR }
+import from tests.support { jac_command, TESTS_DIR, run_cases }
 
 glob FIXTURES = os.path.join(
          TESTS_DIR, "compiler", "backends", "native", "fixtures"
@@ -83,18 +83,33 @@ def run_lines(fixture: str, native: bool) -> list[str] {
     ];
 }
 
-test "the server pathway runs the override through the base" {
-    assert run_lines(FLAT_FIXTURE, False) == ["spot=8"] , (
-        "`FlatSource.spot` dispatches `self.trace`, and TreeSource's trace "
-        "adds 7: the answer is 8"
+test "the server pathway runs the override through the base, and related cases" {
+    def check_the_server_pathway_runs_the_override_through_the {
+        assert run_lines(FLAT_FIXTURE, False) == ["spot=8"] , (
+            "`FlatSource.spot` dispatches `self.trace`, and TreeSource's trace "
+            "adds 7: the answer is 8"
+        );
+    }
+
+    def check_a_public_base_s_own_body_reaches_an_importer_s_o {
+        assert run_lines(FLAT_FIXTURE, True) == ["spot=8"] , (
+            "native must not quietly answer -1 by running the base's own trace"
+        );
+    }
+    run_cases(
+        [
+            (
+                "the server pathway runs the override through the base",
+                check_the_server_pathway_runs_the_override_through_the
+            ),
+            (
+                "a public base's own body reaches an importer's override natively",
+                check_a_public_base_s_own_body_reaches_an_importer_s_o
+            )
+        ]
     );
 }
 
-test "a public base's own body reaches an importer's override natively" {
-    assert run_lines(FLAT_FIXTURE, True) == ["spot=8"] , (
-        "native must not quietly answer -1 by running the base's own trace"
-    );
-}
 
 test "a base whose members live in impl blocks dispatches the override" {
     # The same pair with every member declared in an `impl`: the class body

@@ -8,7 +8,7 @@ in a cold block. The IR test pins that shape; the run tests pin the semantics.
 """
 
 import ctypes;
-import from tests.support { compile_native, compile_native_ir, get_func }
+import from tests.support { compile_native, compile_native_ir, get_func, run_cases }
 
 test "list subscripts check the in-range case with one weighted unsigned compare" {
     text = str(compile_native_ir("list_index_check.jac").gen.llvm_ir);
@@ -33,26 +33,47 @@ test "list subscripts check the in-range case with one weighted unsigned compare
     }
 }
 
-test "list reads follow Python index semantics" {
-    (eng, _) = compile_native("list_index_check.jac");
-    f = get_func(eng, "read_at", ctypes.c_int64, ctypes.c_int64, ctypes.c_int64);
-    assert [f(5, 2), f(5, -1), f(5, -5)] == [20, 40, 0];
-    assert [f(5, 5), f(5, -6), f(0, 0), f(0, -1)] == [-999, -999, -999, -999];
-    big = 1 << 62;
-    assert [f(5, big), f(5, -big), f(5, -(1 << 63))] == [-999, -999, -999];
-    w = get_func(eng, "walk", ctypes.c_int64, ctypes.c_int64);
-    assert w(1000) == 0;
-}
+test "list_index_check.jac cases" {
+    def check_list_reads_follow_python_index_semantics {
+        (eng, _) = compile_native("list_index_check.jac");
 
-test "list writes follow Python index semantics" {
-    (eng, _) = compile_native("list_index_check.jac");
-    f = get_func(
-        eng, "write_at", ctypes.c_int64, ctypes.c_int64, ctypes.c_int64, ctypes.c_int64
+        f = get_func(eng, "read_at", ctypes.c_int64, ctypes.c_int64, ctypes.c_int64);
+        assert [f(5, 2), f(5, -1), f(5, -5)] == [20, 40, 0];
+        assert [f(5, 5), f(5, -6), f(0, 0), f(0, -1)] == [-999, -999, -999, -999];
+        big = 1 << 62;
+        assert [f(5, big), f(5, -big), f(5, -(1 << 63))] == [-999, -999, -999];
+        w = get_func(eng, "walk", ctypes.c_int64, ctypes.c_int64);
+        assert w(1000) == 0;
+    }
+
+    def check_list_writes_follow_python_index_semantics {
+        (eng, _) = compile_native("list_index_check.jac");
+
+        f = get_func(
+            eng,
+            "write_at",
+            ctypes.c_int64,
+            ctypes.c_int64,
+            ctypes.c_int64,
+            ctypes.c_int64
+        );
+        assert f(4, 1, 7) == 7 * 31 * 31;
+        assert f(4, -1, 7) == 7;
+        assert f(4, -4, 7) == 7 * 31 * 31 * 31;
+        assert f(4, 4, 7) == -999;
+        assert f(4, -5, 7) == -999;
+        assert f(4, -(1 << 63), 7) == -999;
+    }
+    run_cases(
+        [
+            (
+                "list reads follow Python index semantics",
+                check_list_reads_follow_python_index_semantics
+            ),
+            (
+                "list writes follow Python index semantics",
+                check_list_writes_follow_python_index_semantics
+            )
+        ]
     );
-    assert f(4, 1, 7) == 7 * 31 * 31;
-    assert f(4, -1, 7) == 7;
-    assert f(4, -4, 7) == 7 * 31 * 31 * 31;
-    assert f(4, 4, 7) == -999;
-    assert f(4, -5, 7) == -999;
-    assert f(4, -(1 << 63), 7) == -999;
 }

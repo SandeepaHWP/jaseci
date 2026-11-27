@@ -10,7 +10,7 @@ import os;
 import re;
 import subprocess;
 import tempfile;
-import from tests.support { jac_command, TESTS_DIR }
+import from tests.support { jac_command, TESTS_DIR, run_cases }
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.driver.compile_options { CompileOptions }
 
@@ -55,15 +55,30 @@ def _violations(gc_mode: str, enforce: bool) -> list[str] {
     return bad;
 }
 
-test "raw libc string calls stay inside the helper layer (enforced none)" {
-    bad = _violations("none", True);
-    assert not bad , f"{len(bad)} raw sites:\n" + "\n".join(bad[:25]);
+test "raw libc string calls stay inside the helper layer cases" {
+    def check_raw_libc_string_calls_stay_inside_the_helper_lay {
+        bad = _violations("none", True);
+        assert not bad , f"{len(bad)} raw sites:\n" + "\n".join(bad[:25]);
+    }
+
+    def check_raw_libc_string_calls_stay_inside_the_helper_lay_2 {
+        bad = _violations("rc", False);
+        assert not bad , f"{len(bad)} raw sites:\n" + "\n".join(bad[:25]);
+    }
+    run_cases(
+        [
+            (
+                "raw libc string calls stay inside the helper layer (enforced none)",
+                check_raw_libc_string_calls_stay_inside_the_helper_lay
+            ),
+            (
+                "raw libc string calls stay inside the helper layer (managed rc)",
+                check_raw_libc_string_calls_stay_inside_the_helper_lay_2
+            )
+        ]
+    );
 }
 
-test "raw libc string calls stay inside the helper layer (managed rc)" {
-    bad = _violations("rc", False);
-    assert not bad , f"{len(bad)} raw sites:\n" + "\n".join(bad[:25]);
-}
 
 test "string surface output is byte-identical across gc modes" {
     with tempfile.TemporaryDirectory() as tmp {

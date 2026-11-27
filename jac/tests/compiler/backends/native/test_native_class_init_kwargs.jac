@@ -19,7 +19,7 @@ and it takes no arguments, which native construction refuses naming the class.
 A `class` deriving an `obj` inherits the `obj`'s generated constructor.
 """
 
-import from tests.support { assert_native_identity, jac_command }
+import from tests.support { assert_native_identity, jac_command, run_cases }
 
 import os;
 import subprocess;
@@ -29,17 +29,32 @@ import from pathlib { Path }
 glob FIXTURES = str(Path(__file__).resolve().parent / "fixtures"),
      PROFILES: list[str] = ["managed", "rc"];
 
-test "keyword construction binds against the initializer like CPython" {
-    assert_native_identity(
-        os.path.join(FIXTURES, "class_init_kwargs.jac"), profiles=PROFILES
+test "keyword construction binds against the initializer like CPython, and related cases" {
+    def check_keyword_construction_binds_against_the_initializ {
+        assert_native_identity(
+            os.path.join(FIXTURES, "class_init_kwargs.jac"), profiles=PROFILES
+        );
+    }
+
+    def check_super_init_into_an_obj_s_field_derived_initializ {
+        assert_native_identity(
+            os.path.join(FIXTURES, "super_init_derived.jac"), profiles=PROFILES
+        );
+    }
+    run_cases(
+        [
+            (
+                "keyword construction binds against the initializer like CPython",
+                check_keyword_construction_binds_against_the_initializ
+            ),
+            (
+                "super.init into an obj's field-derived initializer stores the fields",
+                check_super_init_into_an_obj_s_field_derived_initializ
+            )
+        ]
     );
 }
 
-test "super.init into an obj's field-derived initializer stores the fields" {
-    assert_native_identity(
-        os.path.join(FIXTURES, "super_init_derived.jac"), profiles=PROFILES
-    );
-}
 
 test "a class with no initializer refuses constructor arguments" {
     out_bin = os.path.join(tempfile.mkdtemp(), "probe.bin");

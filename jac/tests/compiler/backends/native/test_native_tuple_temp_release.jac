@@ -6,7 +6,7 @@ call with an object inside, 192 with a string. The fixture indexes three
 million fresh tuples in each form; peak RSS has to stay flat instead of
 growing by about 370 MB and 560 MB."""
 
-import from tests.support { jac_command }
+import from tests.support { jac_command, run_cases }
 import os;
 import re;
 import subprocess;
@@ -58,14 +58,28 @@ def _run(mode: str) -> tuple[int, str] {
     return (rss, proc.stdout.strip());
 }
 
-test "a returned tuple holding an object is released after its field is read" {
-    (rss, out) = _run("obj");
-    assert out == "4499998500000" , out;
-    assert 0 <= rss < 40 , f"peak RSS {rss} MB";
-}
+test "a returned tuple holding cases" {
+    def check_a_returned_tuple_holding_an_object_is_released_a {
+        (rss, out) = _run("obj");
+        assert out == "4499998500000" , out;
+        assert 0 <= rss < 40 , f"peak RSS {rss} MB";
+    }
 
-test "a returned tuple holding a string is released after its field is read" {
-    (rss, out) = _run("str");
-    assert out == "8999997000000" , out;
-    assert 0 <= rss < 40 , f"peak RSS {rss} MB";
+    def check_a_returned_tuple_holding_a_string_is_released_af {
+        (rss, out) = _run("str");
+        assert out == "8999997000000" , out;
+        assert 0 <= rss < 40 , f"peak RSS {rss} MB";
+    }
+    run_cases(
+        [
+            (
+                "a returned tuple holding an object is released after its field is read",
+                check_a_returned_tuple_holding_an_object_is_released_a
+            ),
+            (
+                "a returned tuple holding a string is released after its field is read",
+                check_a_returned_tuple_holding_a_string_is_released_af
+            )
+        ]
+    );
 }

@@ -25,7 +25,7 @@ same fixture, since a dropped store is still well typed and still compiles.
 
 import ctypes;
 import os;
-import from tests.support { TESTS_DIR, native_address, native_force_opts }
+import from tests.support { TESTS_DIR, native_address, native_force_opts, run_cases }
 import from jaclang.compiler.driver.na_coverage { na_coverage_begin, na_coverage_end }
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.runtime.runtime { JacRuntime }
@@ -149,50 +149,145 @@ test "an optional erased slot lowers rather than demoting" {
 }
 
 
-test "the constructor argument for an optional erased slot survives" {
-    f = _get(_compile(FIXTURE), "ctor_num");
-    assert f(2) == 32 , (
-        "the Leaf handed to the constructor must be what the slot holds; "
-        "a dropped store reads back as None and answers -1"
+test "the constructor argument for an optional erased slot survives, and related cases" {
+    def check_the_constructor_argument_for_an_optional_erased {
+        f = _get(_compile(FIXTURE), "ctor_num");
+        assert f(2) == 32 , (
+            "the Leaf handed to the constructor must be what the slot holds; "
+            "a dropped store reads back as None and answers -1"
+        );
+        assert f(0) == 30 , "the same store with a different payload";
+    }
+
+    def check_a_store_over_a_constructor_set_slot_is_what_the {
+        f = _get(_compile(FIXTURE), "overwrite_num");
+        assert f(1) == 61 , "the assigned Leaf, not the constructed one";
+        assert f(0) == 1 , "no assignment: the constructed Leaf";
+    }
+    run_cases(
+        [
+            (
+                "the constructor argument for an optional erased slot survives",
+                check_the_constructor_argument_for_an_optional_erased
+            ),
+            (
+                "a store over a constructor-set slot is what the next read sees",
+                check_a_store_over_a_constructor_set_slot_is_what_the
+            )
+        ]
     );
-    assert f(0) == 30 , "the same store with a different payload";
 }
 
 
-test "the slot after the erased option keeps its own offset" {
-    f = _get(_compile(FIXTURE), "ctor_tag");
-    assert f(0) == 7 , (
-        "a mis-sized option would shift `tag` and return part of the "
-        "pointer instead of 7"
-    );
-}
-
-
-test "constructing and assigning the same slot agree" {
-    eng = _compile(FIXTURE);
-    ctor = _get(eng, "ctor_num");
-    assign = _get(eng, "assign_num");
-    for flag in FLAGS {
-        assert ctor(flag) == assign(flag) , (
-            f"ctor_num({flag}) == {ctor(flag)} but assign_num({flag}) == "
-            f"{assign(flag)}; the two write paths must reach one slot"
+test "the slot after the erased option keeps its own offset, and related cases" {
+    def check_the_slot_after_the_erased_option_keeps_its_own_o {
+        f = _get(_compile(FIXTURE), "ctor_tag");
+        assert f(0) == 7 , (
+            "a mis-sized option would shift `tag` and return part of the "
+            "pointer instead of 7"
         );
     }
+
+    def check_a_str_payload_reads_back_whole_through_the_erase {
+        f = _get(_compile(FIXTURE), "ctor_name_len");
+        assert f(0) == 5 , "'abcde' behind the optional erased slot";
+    }
+    run_cases(
+        [
+            (
+                "the slot after the erased option keeps its own offset",
+                check_the_slot_after_the_erased_option_keeps_its_own_o
+            ),
+            (
+                "a str payload reads back whole through the erased option",
+                check_a_str_payload_reads_back_whole_through_the_erase
+            )
+        ]
+    );
 }
 
 
-test "an untouched optional slot is None, and so is an explicit one" {
-    eng = _compile(FIXTURE);
-    d = _get(eng, "default_none");
-    e = _get(eng, "explicit_none");
-    assert d(0) == -1 , "the declared `= None` default stays None";
-    assert e(1) == -2 , "a None passed by name stays None";
-}
+test "constructing and assigning the same slot agree, and related cases" {
+    def check_constructing_and_assigning_the_same_slot_agree {
+        eng = _compile(FIXTURE);
 
+        ctor = _get(eng, "ctor_num");
+        assign = _get(eng, "assign_num");
+        for flag in FLAGS {
+            assert ctor(flag) == assign(flag) , (
+                f"ctor_num({flag}) == {ctor(flag)} but assign_num({flag}) == "
+                f"{assign(flag)}; the two write paths must reach one slot"
+            );
+        }
+    }
 
-test "a str payload reads back whole through the erased option" {
-    f = _get(_compile(FIXTURE), "ctor_name_len");
-    assert f(0) == 5 , "'abcde' behind the optional erased slot";
+    def check_an_untouched_optional_slot_is_none_and_so_is_an {
+        eng = _compile(FIXTURE);
+
+        d = _get(eng, "default_none");
+        e = _get(eng, "explicit_none");
+        assert d(0) == -1 , "the declared `= None` default stays None";
+        assert e(1) == -2 , "a None passed by name stays None";
+    }
+
+    def check_the_option_crosses_a_return_type_and_a_parameter {
+        eng = _compile(FIXTURE);
+
+        r = _get(eng, "returned_num");
+        p = _get(eng, "param_num");
+        assert r(0) == 141 , "70 + 71 through the returned Ctx";
+        assert p(0) == 86 , "80 + 6 through the annotated parameter";
+    }
+
+    def check_the_non_generic_control_still_answers_for_the_pa {
+        eng = _compile(FIXTURE);
+
+        z = _get(eng, "nongen_zero");
+        n = _get(eng, "nongen_num");
+        assert z(0) == 0 , (
+            "an `(int | None)` field holding 0 is not None; it is tag-and-payload, "
+            "so the zero payload must not read as the absent tag"
+        );
+        assert n(1) == 41 , "the same control with a non-aliasing payload";
+    }
+    def check_every_optional_erased_slot_answer_agrees_with_sv {
+        eng = _compile(FIXTURE);
+
+        sv = _sv_module(FIXTURE);
+        for name in ALL_FNS {
+            na_fn = _get(eng, name);
+            sv_fn = getattr(sv, name);
+            for flag in FLAGS {
+                assert na_fn(flag) == sv_fn(flag) , (
+                    f"{name}({flag}): native {na_fn(flag)} != sv {sv_fn(flag)}"
+                );
+            }
+        }
+    }
+    run_cases(
+        [
+            (
+                "constructing and assigning the same slot agree",
+                check_constructing_and_assigning_the_same_slot_agree
+            ),
+            (
+                "an untouched optional slot is None, and so is an explicit one",
+                check_an_untouched_optional_slot_is_none_and_so_is_an
+            ),
+            (
+                "the option crosses a return type and a parameter annotation",
+                check_the_option_crosses_a_return_type_and_a_parameter
+            ),
+            (
+                "the non-generic control still answers for the payload zero",
+                check_the_non_generic_control_still_answers_for_the_pa
+            ),
+            (
+                "every optional erased-slot answer agrees with sv",
+                check_every_optional_erased_slot_answer_agrees_with_sv
+            )
+        ]
+    );
 }
 
 
@@ -200,49 +295,6 @@ test "the option reads off `self` inside a method" {
     f = _get(_compile(FIXTURE), "method_num");
     assert f(1) == 21 , "`self.cell.value.num` through a holder's method";
     assert f(0) == -1 , "the unset holder takes the else arm";
-}
-
-
-test "a store over a constructor-set slot is what the next read sees" {
-    f = _get(_compile(FIXTURE), "overwrite_num");
-    assert f(1) == 61 , "the assigned Leaf, not the constructed one";
-    assert f(0) == 1 , "no assignment: the constructed Leaf";
-}
-
-
-test "the option crosses a return type and a parameter annotation" {
-    eng = _compile(FIXTURE);
-    r = _get(eng, "returned_num");
-    p = _get(eng, "param_num");
-    assert r(0) == 141 , "70 + 71 through the returned Ctx";
-    assert p(0) == 86 , "80 + 6 through the annotated parameter";
-}
-
-
-test "the non-generic control still answers for the payload zero" {
-    eng = _compile(FIXTURE);
-    z = _get(eng, "nongen_zero");
-    n = _get(eng, "nongen_num");
-    assert z(0) == 0 , (
-        "an `(int | None)` field holding 0 is not None; it is tag-and-payload, "
-        "so the zero payload must not read as the absent tag"
-    );
-    assert n(1) == 41 , "the same control with a non-aliasing payload";
-}
-
-
-test "every optional erased-slot answer agrees with sv" {
-    eng = _compile(FIXTURE);
-    sv = _sv_module(FIXTURE);
-    for name in ALL_FNS {
-        na_fn = _get(eng, name);
-        sv_fn = getattr(sv, name);
-        for flag in FLAGS {
-            assert na_fn(flag) == sv_fn(flag) , (
-                f"{name}({flag}): native {na_fn(flag)} != sv {sv_fn(flag)}"
-            );
-        }
-    }
 }
 
 
@@ -338,72 +390,160 @@ test "an unboxable type argument is refused, naming the instantiation" {
 }
 
 
-test "a bare `T` slot at a scalar type argument boxes too" {
-    # Before boxing this did not merely answer wrongly: the scalar sat in a
-    # pointer slot and the read dereferenced it, so the binary segfaulted.
-    f = _lowered_fn(
-        "scalar_bare",
-        "obj Plain[T] {\n"
-        "    has value: T,\n"
-        "        tag: int = 3;\n"
-        "}\n"
-        "def get(k: int) -> int {\n"
-        "    d = Plain[int](value=k);\n"
-        "    return d.value + d.tag;\n"
-        "}\n",
-        "get"
+test "a bare `T` slot at a scalar type argument boxes too, and related cases" {
+    def check_a_bare_t_slot_at_a_scalar_type_argument_boxes_to {
+        # Before boxing this did not merely answer wrongly: the scalar sat in a
+        # pointer slot and the read dereferenced it, so the binary segfaulted.
+        f = _lowered_fn(
+            "scalar_bare",
+            "obj Plain[T] {\n"
+            "    has value: T,\n"
+            "        tag: int = 3;\n"
+            "}\n"
+            "def get(k: int) -> int {\n"
+            "    d = Plain[int](value=k);\n"
+            "    return d.value + d.tag;\n"
+            "}\n",
+            "get"
+        );
+        assert f(9) == 12;
+        assert f(0) == 3;
+    }
+
+    def check_an_inferred_scalar_type_argument_boxes_the_same {
+        # No subscript at the call site: the checker solves `T` from the
+        # argument, and the box follows the argument's own representation.
+        f = _lowered_fn(
+            "scalar_inferred",
+            "obj Ctx[T] {\n"
+            "    has value: (T | None) = None;\n"
+            "}\n"
+            "def go(k: int) -> int {\n"
+            "    c = Ctx(value=k);\n"
+            "    if c.value is not None {\n"
+            "        return c.value;\n"
+            "    }\n"
+            "    return -1;\n"
+            "}\n",
+            "go"
+        );
+        assert f(5) == 5;
+        assert f(0) == 0;
+    }
+    run_cases(
+        [
+            (
+                "a bare `T` slot at a scalar type argument boxes too",
+                check_a_bare_t_slot_at_a_scalar_type_argument_boxes_to
+            ),
+            (
+                "an inferred scalar type argument boxes the same as a written one",
+                check_an_inferred_scalar_type_argument_boxes_the_same
+            )
+        ]
     );
-    assert f(9) == 12;
-    assert f(0) == 3;
 }
 
 
-test "an inferred scalar type argument boxes the same as a written one" {
-    # No subscript at the call site: the checker solves `T` from the
-    # argument, and the box follows the argument's own representation.
-    f = _lowered_fn(
-        "scalar_inferred",
-        "obj Ctx[T] {\n"
-        "    has value: (T | None) = None;\n"
-        "}\n"
-        "def go(k: int) -> int {\n"
-        "    c = Ctx(value=k);\n"
-        "    if c.value is not None {\n"
-        "        return c.value;\n"
-        "    }\n"
-        "    return -1;\n"
-        "}\n",
-        "go"
-    );
-    assert f(5) == 5;
-    assert f(0) == 0;
-}
+test "an inferred archetype type argument still lowers, and related cases" {
+    def check_an_inferred_archetype_type_argument_still_lowers {
+        (prog, ir) = _compile_src(
+            "ref_inferred",
+            "obj Leaf {\n"
+            "    has num: int = 0;\n"
+            "}\n"
+            "obj Ctx[T] {\n"
+            "    has value: (T | None) = None;\n"
+            "}\n"
+            "def go() -> int {\n"
+            "    c = Ctx(value=Leaf(num=5));\n"
+            "    if c.value is not None {\n"
+            "        return c.value.num;\n"
+            "    }\n"
+            "    return -1;\n"
+            "}\n"
+        );
+        assert not prog.errors_had , (
+            f"an inferred reference type argument must lower: "
+            f"{[str(e) for e in prog.errors_had]}"
+        );
+        assert ir.gen.native_layout is not None , "whole-module native compile aborted";
+        assert "go" in ir.gen.native_layout.functions , (
+            "the gate must not refuse an inferred type argument that is sound"
+        );
+    }
 
+    def check_a_multi_parameter_erased_slot_still_lowers_when {
+        (prog, ir) = _compile_src(
+            "multi_tv_ref",
+            "obj Leaf {\n"
+            "    has num: int = 0;\n"
+            "}\n"
+            "obj Other {\n"
+            "    has num: int = 0;\n"
+            "}\n"
+            "obj Choice[T, U] {\n"
+            "    has value: (T | U | None) = None,\n"
+            "        tag: int = 0;\n"
+            "}\n"
+            "def go() -> int {\n"
+            "    c = Choice[Leaf, Other](value=Leaf(num=7), tag=1);\n"
+            "    if c.value is not None {\n"
+            "        return c.tag;\n"
+            "    }\n"
+            "    return -1;\n"
+            "}\n"
+        );
+        assert not prog.errors_had , (
+            f"two reference type arguments are both sound and must lower: "
+            f"{[str(e) for e in prog.errors_had]}"
+        );
+        assert ir.gen.native_layout is not None , "whole-module native compile aborted";
+        assert "go" in ir.gen.native_layout.functions , (
+            "the widened check must not refuse a slot whose parameters are all "
+            "references"
+        );
+    }
 
-test "an inferred archetype type argument still lowers" {
-    (prog, ir) = _compile_src(
-        "ref_inferred",
-        "obj Leaf {\n"
-        "    has num: int = 0;\n"
-        "}\n"
-        "obj Ctx[T] {\n"
-        "    has value: (T | None) = None;\n"
-        "}\n"
-        "def go() -> int {\n"
-        "    c = Ctx(value=Leaf(num=5));\n"
-        "    if c.value is not None {\n"
-        "        return c.value.num;\n"
-        "    }\n"
-        "    return -1;\n"
-        "}\n"
-    );
-    assert not prog.errors_had , (
-        f"an inferred reference type argument must lower: "
-        f"{[str(e) for e in prog.errors_had]}"
-    );
-    assert ir.gen.native_layout is not None , "whole-module native compile aborted";
-    assert "go" in ir.gen.native_layout.functions , (
-        "the gate must not refuse an inferred type argument that is sound"
+    def check_an_archetype_type_argument_is_still_accepted_for {
+        (prog, ir) = _compile_src(
+            "ref_bare",
+            "obj Leaf {\n"
+            "    has num: int = 0;\n"
+            "}\n"
+            "obj Plain[T] {\n"
+            "    has value: T,\n"
+            "        tag: int = 3;\n"
+            "}\n"
+            "def get() -> int {\n"
+            "    d = Plain[Leaf](value=Leaf(num=9));\n"
+            "    return d.value.num + d.tag;\n"
+            "}\n"
+        );
+        assert not prog.errors_had , (
+            f"a reference type argument is the sound case and must lower: "
+            f"{[str(e) for e in prog.errors_had]}"
+        );
+        assert ir.gen.native_layout is not None , "whole-module native compile aborted";
+        assert "get" in ir.gen.native_layout.functions , (
+            "the gate must not refuse the erasure that is actually sound"
+        );
+    }
+    run_cases(
+        [
+            (
+                "an inferred archetype type argument still lowers",
+                check_an_inferred_archetype_type_argument_still_lowers
+            ),
+            (
+                "a multi-parameter erased slot still lowers when every argument is a reference",
+                check_a_multi_parameter_erased_slot_still_lowers_when
+            ),
+            (
+                "an archetype type argument is still accepted for a bare `T` slot",
+                check_an_archetype_type_argument_is_still_accepted_for
+            )
+        ]
     );
 }
 
@@ -430,65 +570,6 @@ test "every type parameter an erased slot can hold is boxed, not just the first"
         "go"
     );
     assert f(0) == 1 , "a boxed 0 in the second parameter read as None";
-}
-
-
-test "a multi-parameter erased slot still lowers when every argument is a reference" {
-    (prog, ir) = _compile_src(
-        "multi_tv_ref",
-        "obj Leaf {\n"
-        "    has num: int = 0;\n"
-        "}\n"
-        "obj Other {\n"
-        "    has num: int = 0;\n"
-        "}\n"
-        "obj Choice[T, U] {\n"
-        "    has value: (T | U | None) = None,\n"
-        "        tag: int = 0;\n"
-        "}\n"
-        "def go() -> int {\n"
-        "    c = Choice[Leaf, Other](value=Leaf(num=7), tag=1);\n"
-        "    if c.value is not None {\n"
-        "        return c.tag;\n"
-        "    }\n"
-        "    return -1;\n"
-        "}\n"
-    );
-    assert not prog.errors_had , (
-        f"two reference type arguments are both sound and must lower: "
-        f"{[str(e) for e in prog.errors_had]}"
-    );
-    assert ir.gen.native_layout is not None , "whole-module native compile aborted";
-    assert "go" in ir.gen.native_layout.functions , (
-        "the widened check must not refuse a slot whose parameters are all "
-        "references"
-    );
-}
-
-
-test "an archetype type argument is still accepted for a bare `T` slot" {
-    (prog, ir) = _compile_src(
-        "ref_bare",
-        "obj Leaf {\n"
-        "    has num: int = 0;\n"
-        "}\n"
-        "obj Plain[T] {\n"
-        "    has value: T,\n"
-        "        tag: int = 3;\n"
-        "}\n"
-        "def get() -> int {\n"
-        "    d = Plain[Leaf](value=Leaf(num=9));\n"
-        "    return d.value.num + d.tag;\n"
-        "}\n"
-    );
-    assert not prog.errors_had , (
-        f"a reference type argument is the sound case and must lower: "
-        f"{[str(e) for e in prog.errors_had]}"
-    );
-    assert ir.gen.native_layout is not None , "whole-module native compile aborted";
-    assert "get" in ir.gen.native_layout.functions , (
-        "the gate must not refuse the erasure that is actually sound"
-    );
 }
 
 

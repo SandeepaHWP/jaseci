@@ -12,7 +12,7 @@ import shutil;
 import tempfile;
 import from pathlib { Path }
 import time;
-import from tests.support { JAC_ROOT }
+import from tests.support { JAC_ROOT, run_cases }
 import jaclang;
 import from jaclang { JacRuntime as Jac }
 import from jaclang { JacRuntimeInterface }
@@ -53,33 +53,42 @@ test "modules correct" {
         in str(Jac.loaded_modules).replace("\\\\", "/");
 }
 
-test "jac py import" {
-    fixture_file = os.path.join(LANG_FIXTURES, "jp_importer.jac");
-    captured_output = io.StringIO();
-    sys.stdout = captured_output;
-    execution.run(fixture_file);
-    sys.stdout = sys.__stdout__;
-    stdout_value = captured_output.getvalue();
-    assert "Hello World!" in stdout_value;
-    assert (
-        "{SomeObj(a=10): 'check'} [MyObj(apple=5, banana=7), MyObj(apple=5, banana=7)]"
-        in stdout_value
+test "jac py import cases" {
+    def check_jac_py_import {
+        fixture_file = os.path.join(LANG_FIXTURES, "jp_importer.jac");
+        captured_output = io.StringIO();
+        sys.stdout = captured_output;
+        execution.run(fixture_file);
+        sys.stdout = sys.__stdout__;
+        stdout_value = captured_output.getvalue();
+        assert "Hello World!" in stdout_value;
+        assert (
+            "{SomeObj(a=10): 'check'} [MyObj(apple=5, banana=7), MyObj(apple=5, banana=7)]"
+            in stdout_value
+        );
+    }
+
+    def check_jac_py_import_auto {
+        fixture_file = os.path.join(LANG_FIXTURES, "jp_importer_auto.jac");
+        captured_output = io.StringIO();
+        sys.stdout = captured_output;
+        execution.run(fixture_file);
+        sys.stdout = sys.__stdout__;
+        stdout_value = captured_output.getvalue();
+        assert "Hello World!" in stdout_value;
+        assert (
+            "{SomeObj(a=10): 'check'} [MyObj(apple=5, banana=7), MyObj(apple=5, banana=7)]"
+            in stdout_value
+        );
+    }
+    run_cases(
+        [
+            ("jac py import", check_jac_py_import),
+            ("jac py import auto", check_jac_py_import_auto)
+        ]
     );
 }
 
-test "jac py import auto" {
-    fixture_file = os.path.join(LANG_FIXTURES, "jp_importer_auto.jac");
-    captured_output = io.StringIO();
-    sys.stdout = captured_output;
-    execution.run(fixture_file);
-    sys.stdout = sys.__stdout__;
-    stdout_value = captured_output.getvalue();
-    assert "Hello World!" in stdout_value;
-    assert (
-        "{SomeObj(a=10): 'check'} [MyObj(apple=5, banana=7), MyObj(apple=5, banana=7)]"
-        in stdout_value
-    );
-}
 
 test "import with jacpath" {
     jacpath_dir = tempfile.TemporaryDirectory();
@@ -113,26 +122,35 @@ test "import with jacpath" {
     }
 }
 
-test "importer with submodule jac" {
-    captured_output = io.StringIO();
-    sys.stdout = captured_output;
-    execution.run(os.path.join(FIXTURES, "pkg_import_main.jac"));
-    sys.stdout = sys.__stdout__;
-    stdout_value = captured_output.getvalue();
-    assert "Helper function called" in stdout_value;
-    assert "Tool function executed" in stdout_value;
+test "importer with submodule cases" {
+    def check_importer_with_submodule_jac {
+        captured_output = io.StringIO();
+        sys.stdout = captured_output;
+        execution.run(os.path.join(FIXTURES, "pkg_import_main.jac"));
+        sys.stdout = sys.__stdout__;
+        stdout_value = captured_output.getvalue();
+        assert "Helper function called" in stdout_value;
+        assert "Tool function executed" in stdout_value;
+    }
+
+    def check_importer_with_submodule_py {
+        captured_output = io.StringIO();
+        sys.stdout = captured_output;
+        execution.run(os.path.join(FIXTURES, "pkg_import_main_py.jac"));
+        sys.stdout = sys.__stdout__;
+        stdout_value = captured_output.getvalue();
+        assert "Helper function called" in stdout_value;
+        assert "Tool function executed" in stdout_value;
+        assert "pkg_import_lib_py.glob_var_lib" in stdout_value;
+    }
+    run_cases(
+        [
+            ("importer with submodule jac", check_importer_with_submodule_jac),
+            ("importer with submodule py", check_importer_with_submodule_py)
+        ]
+    );
 }
 
-test "importer with submodule py" {
-    captured_output = io.StringIO();
-    sys.stdout = captured_output;
-    execution.run(os.path.join(FIXTURES, "pkg_import_main_py.jac"));
-    sys.stdout = sys.__stdout__;
-    stdout_value = captured_output.getvalue();
-    assert "Helper function called" in stdout_value;
-    assert "Tool function executed" in stdout_value;
-    assert "pkg_import_lib_py.glob_var_lib" in stdout_value;
-}
 
 test "python dash m jac module" {
     with tempfile.TemporaryDirectory() as tmpdir {
@@ -964,65 +982,81 @@ test "release compile closure honors no unit eviction" {
     }
 }
 
-test "release compile closure keeps synthesized types with their catalog until a full release" {
-    prog = JacProgram();
-    ev1 = prog.get_type_evaluator();
-    ls1 = ev1.prefetch.literal_string_class;
-    assert ls1 is not None;
-    prog.release_compile_closure();
-    assert prog.type_evaluator is None;
-    ev2 = prog.get_type_evaluator();
-    ls2 = ev2.prefetch.literal_string_class;
-    assert ls2 is not None;
-    assert ev1 is not ev2;
-    assert ls1.shared is ls2.shared , (
-        "the session catalog and its hydrated types serve the next evaluator"
-    );
-    prog.release_compile_closure(retain_stubs=False);
-    ev3 = prog.get_type_evaluator();
-    ls3 = ev3.prefetch.literal_string_class;
-    assert ls3 is not None and ls3.shared is not ls2.shared , (
-        "a full release drops the catalog, so its types are hydrated again"
-    );
-}
+test "release compile closure keeps synthesized types with their catalog until a full release, and related cases" {
+    def check_release_compile_closure_keeps_synthesized_types {
+        prog = JacProgram();
+        ev1 = prog.get_type_evaluator();
+        ls1 = ev1.prefetch.literal_string_class;
+        assert ls1 is not None;
+        prog.release_compile_closure();
+        assert prog.type_evaluator is None;
+        ev2 = prog.get_type_evaluator();
+        ls2 = ev2.prefetch.literal_string_class;
+        assert ls2 is not None;
+        assert ev1 is not ev2;
+        assert ls1.shared is ls2.shared , (
+            "the session catalog and its hydrated types serve the next evaluator"
+        );
+        prog.release_compile_closure(retain_stubs=False);
+        ev3 = prog.get_type_evaluator();
+        ls3 = ev3.prefetch.literal_string_class;
+        assert ls3 is not None and ls3.shared is not ls2.shared , (
+            "a full release drops the catalog, so its types are hydrated again"
+        );
+    }
 
-test "internal get_bytecode evicts unit AST after compile" {
-    # Cold bootstrap used to retain every jaclang module AST in
-    # the self-host program hub. After the outermost successful compile+cache
-    # write, non-stub ASTs must leave the hub so peak RSS stays near one import
-    # closure (+ warm typeshed), not the union of every module ever compiled.
-    compiler = JacCompiler();
-    prog = JacProgram();
-    # Two small, already-shipped jaclang modules (always under jaclang_root →
-    # resolve to the self-host program). Force a fresh compile so we exercise the
-    # post-compile eviction path rather than a disk-cache hit.
-    samples = [
-        os.path.join(compiler.selfhost.jaclang_root(), "compiler", "driver", "log.jac"),
-        os.path.join(
-            compiler.selfhost.jaclang_root(), "compiler", "frontend", "constant.jac"
-        )
-    ];
-    for p in samples {
-        assert os.path.isfile(p) , f"missing fixture {p}";
-    }
-    import from jaclang.compiler.driver.jir { set_cache_mode }
-    set_cache_mode(rebuild=True);
-    try {
+    def check_internal_get_bytecode_evicts_unit_ast_after_comp {
+        # Cold bootstrap used to retain every jaclang module AST in
+        # the self-host program hub. After the outermost successful compile+cache
+        # write, non-stub ASTs must leave the hub so peak RSS stays near one import
+        # closure (+ warm typeshed), not the union of every module ever compiled.
+        compiler = JacCompiler();
+        prog = JacProgram();
+        # Two small, already-shipped jaclang modules (always under jaclang_root →
+        # resolve to the self-host program). Force a fresh compile so we exercise the
+        # post-compile eviction path rather than a disk-cache hit.
+        samples = [
+            os.path.join(
+                compiler.selfhost.jaclang_root(), "compiler", "driver", "log.jac"
+            ),
+            os.path.join(
+                compiler.selfhost.jaclang_root(), "compiler", "frontend", "constant.jac"
+            )
+        ];
         for p in samples {
-            code = compiler.get_bytecode(p, prog);
-            assert code is not None , f"compile failed for {p}";
-            hub = compiler.selfhost.program.mod.hub;
-            leftover_jac = [
-                k
-                for k in hub.keys()
-                if not k.endswith(".pyi")
-            ];
-            assert len(leftover_jac) == 0 , (
-                f"expected non-stub ASTs cleared after outermost get_bytecode of {p}; "
-                f"hub still has {leftover_jac[:8]}"
-            );
+            assert os.path.isfile(p) , f"missing fixture {p}";
         }
-    } finally {
-        set_cache_mode(rebuild=False);
+        import from jaclang.compiler.driver.jir { set_cache_mode }
+        set_cache_mode(rebuild=True);
+        try {
+            for p in samples {
+                code = compiler.get_bytecode(p, prog);
+                assert code is not None , f"compile failed for {p}";
+                hub = compiler.selfhost.program.mod.hub;
+                leftover_jac = [
+                    k
+                    for k in hub.keys()
+                    if not k.endswith(".pyi")
+                ];
+                assert len(leftover_jac) == 0 , (
+                    f"expected non-stub ASTs cleared after outermost get_bytecode of {p}; "
+                    f"hub still has {leftover_jac[:8]}"
+                );
+            }
+        } finally {
+            set_cache_mode(rebuild=False);
+        }
     }
+    run_cases(
+        [
+            (
+                "release compile closure keeps synthesized types with their catalog until a full release",
+                check_release_compile_closure_keeps_synthesized_types
+            ),
+            (
+                "internal get_bytecode evicts unit AST after compile",
+                check_internal_get_bytecode_evicts_unit_ast_after_comp
+            )
+        ]
+    );
 }

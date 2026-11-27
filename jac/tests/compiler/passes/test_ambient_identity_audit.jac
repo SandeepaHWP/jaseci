@@ -58,7 +58,7 @@ Audit verdicts this file pins (2026-08-18):
   demotion map the migration blast radius rests on.
 """
 
-import from tests.support { by_source_name }
+import from tests.support { by_source_name, run_cases }
 import os;
 import tempfile;
 import jaclang.compiler.frontend.unitree as uni;
@@ -261,268 +261,330 @@ test "audit_callable" {
     assert not deltas , "\n".join(deltas);
 }
 
-test "audit_sequence" {
-    deltas = audit_name(
-        "Sequence",
-        ABC_MODS,
-        (
-            "def probe(xs: Sequence[int]) -> int {\n"
-            + "    return 0;\n"
-            + "}\n"
-            + "with entry {\n"
-            + "    probe([1, 2]);\n"
-            + "    probe({\"a\": 1});\n"
-            + "}\n"
-        ),
-        ["probe"]
+test "audit_sequence, and related cases" {
+    def check_audit_sequence {
+        deltas = audit_name(
+            "Sequence",
+            ABC_MODS,
+            (
+                "def probe(xs: Sequence[int]) -> int {\n"
+                + "    return 0;\n"
+                + "}\n"
+                + "with entry {\n"
+                + "    probe([1, 2]);\n"
+                + "    probe({\"a\": 1});\n"
+                + "}\n"
+            ),
+            ["probe"]
+        );
+        flush_report();
+        assert not deltas , "\n".join(deltas);
+    }
+
+    def check_audit_iterable {
+        deltas = audit_name(
+            "Iterable",
+            ABC_MODS,
+            (
+                "def probe(xs: Iterable[int]) -> int {\n"
+                + "    return 0;\n"
+                + "}\n"
+                + "with entry {\n"
+                + "    probe([1, 2]);\n"
+                + "    probe(42);\n"
+                + "}\n"
+            ),
+            ["probe"]
+        );
+        flush_report();
+        assert not deltas , "\n".join(deltas);
+    }
+
+    def check_audit_iterator {
+        deltas = audit_name(
+            "Iterator",
+            ABC_MODS,
+            (
+                "def probe(xs: Iterator[int]) -> int {\n"
+                + "    return 0;\n"
+                + "}\n"
+                + "with entry {\n"
+                + "    probe(iter([1, 2]));\n"
+                + "    probe([1, 2]);\n"
+                + "}\n"
+            ),
+            ["probe"]
+        );
+        flush_report();
+        assert not deltas , "\n".join(deltas);
+    }
+
+    def check_audit_mapping {
+        deltas = audit_name(
+            "Mapping",
+            ABC_MODS,
+            (
+                "def probe(m: Mapping[str, int]) -> int {\n"
+                + "    return 0;\n"
+                + "}\n"
+                + "with entry {\n"
+                + "    probe({\"a\": 1});\n"
+                + "    probe([1]);\n"
+                + "}\n"
+            ),
+            ["probe"]
+        );
+        flush_report();
+        assert not deltas , "\n".join(deltas);
+    }
+
+    def check_audit_mutable_mapping {
+        deltas = audit_name(
+            "MutableMapping",
+            ABC_MODS,
+            (
+                "def probe(m: MutableMapping[str, int]) -> int {\n"
+                + "    return 0;\n"
+                + "}\n"
+                + "with entry {\n"
+                + "    probe({\"a\": 1});\n"
+                + "    probe(\"x\");\n"
+                + "}\n"
+            ),
+            ["probe"]
+        );
+        flush_report();
+        assert not deltas , "\n".join(deltas);
+    }
+
+    def check_audit_mutable_sequence {
+        deltas = audit_name(
+            "MutableSequence",
+            ABC_MODS,
+            (
+                "def probe(xs: MutableSequence[int]) -> int {\n"
+                + "    return 0;\n"
+                + "}\n"
+                + "with entry {\n"
+                + "    probe([1, 2]);\n"
+                + "    probe((1, 2));\n"
+                + "}\n"
+            ),
+            ["probe"]
+        );
+        flush_report();
+        assert not deltas , "\n".join(deltas);
+    }
+    run_cases(
+        [
+            ("audit_sequence", check_audit_sequence),
+            ("audit_iterable", check_audit_iterable),
+            ("audit_iterator", check_audit_iterator),
+            ("audit_mapping", check_audit_mapping),
+            ("audit_mutable_mapping", check_audit_mutable_mapping),
+            ("audit_mutable_sequence", check_audit_mutable_sequence)
+        ]
     );
-    flush_report();
-    assert not deltas , "\n".join(deltas);
 }
 
-test "audit_iterable" {
-    deltas = audit_name(
-        "Iterable",
-        ABC_MODS,
-        (
-            "def probe(xs: Iterable[int]) -> int {\n"
-            + "    return 0;\n"
-            + "}\n"
-            + "with entry {\n"
-            + "    probe([1, 2]);\n"
-            + "    probe(42);\n"
-            + "}\n"
-        ),
-        ["probe"]
+
+test "audit_awaitable, and related cases" {
+    def check_audit_awaitable {
+        deltas = audit_name(
+            "Awaitable",
+            ABC_MODS,
+            (
+                "def probe(a: Awaitable[int]) -> int {\n"
+                + "    return 0;\n"
+                + "}\n"
+                + "with entry {\n"
+                + "    probe(5);\n"
+                + "}\n"
+            ),
+            ["probe"]
+        );
+        flush_report();
+        assert not deltas , "\n".join(deltas);
+    }
+
+    def check_audit_coroutine {
+        deltas = audit_name(
+            "Coroutine",
+            ABC_MODS,
+            (
+                "def probe(c: Coroutine[any, any, int]) -> int {\n"
+                + "    return 0;\n"
+                + "}\n"
+                + "with entry {\n"
+                + "    probe(5);\n"
+                + "}\n"
+            ),
+            ["probe"]
+        );
+        flush_report();
+        assert not deltas , "\n".join(deltas);
+    }
+
+    def check_audit_async_iterable {
+        deltas = audit_name(
+            "AsyncIterable",
+            ABC_MODS,
+            (
+                "def probe(a: AsyncIterable[int]) -> int {\n"
+                + "    return 0;\n"
+                + "}\n"
+                + "with entry {\n"
+                + "    probe([1]);\n"
+                + "}\n"
+            ),
+            ["probe"]
+        );
+        flush_report();
+        assert not deltas , "\n".join(deltas);
+    }
+
+    def check_audit_async_iterator {
+        deltas = audit_name(
+            "AsyncIterator",
+            ABC_MODS,
+            (
+                "def probe(a: AsyncIterator[int]) -> int {\n"
+                + "    return 0;\n"
+                + "}\n"
+                + "with entry {\n"
+                + "    probe([1]);\n"
+                + "}\n"
+            ),
+            ["probe"]
+        );
+        flush_report();
+        assert not deltas , "\n".join(deltas);
+    }
+    run_cases(
+        [
+            ("audit_awaitable", check_audit_awaitable),
+            ("audit_coroutine", check_audit_coroutine),
+            ("audit_async_iterable", check_audit_async_iterable),
+            ("audit_async_iterator", check_audit_async_iterator)
+        ]
     );
-    flush_report();
-    assert not deltas , "\n".join(deltas);
 }
 
-test "audit_iterator" {
-    deltas = audit_name(
-        "Iterator",
-        ABC_MODS,
-        (
-            "def probe(xs: Iterator[int]) -> int {\n"
-            + "    return 0;\n"
-            + "}\n"
-            + "with entry {\n"
-            + "    probe(iter([1, 2]));\n"
-            + "    probe([1, 2]);\n"
-            + "}\n"
-        ),
-        ["probe"]
+
+test "audit_annotated, and related cases" {
+    def check_audit_annotated {
+        deltas = audit_name(
+            "Annotated",
+            TYPING_MODS,
+            (
+                "glob good: Annotated[int, \"meta\"] = 5;\n"
+                + "def probe(x: Annotated[str, \"m2\"]) -> str {\n"
+                + "    return x;\n"
+                + "}\n"
+                + "with entry {\n"
+                + "    probe(\"ok\");\n"
+                + "    probe(3);\n"
+                + "}\n"
+            ),
+            ["good", "probe"]
+        );
+        flush_report();
+        assert not deltas , "\n".join(deltas);
+    }
+
+    def check_audit_typevar {
+        deltas = audit_name(
+            "TypeVar",
+            TYPING_MODS,
+            (
+                "glob T = TypeVar(\"T\");\n"
+                + "def ident(x: T) -> T {\n"
+                + "    return x;\n"
+                + "}\n"
+                + "with entry {\n"
+                + "    a: int = ident(5);\n"
+                + "    b: str = ident(7);\n"
+                + "}\n"
+            ),
+            ["T", "ident"]
+        );
+        flush_report();
+        assert not deltas , "\n".join(deltas);
+    }
+    run_cases(
+        [
+            ("audit_annotated", check_audit_annotated),
+            ("audit_typevar", check_audit_typevar)
+        ]
     );
-    flush_report();
-    assert not deltas , "\n".join(deltas);
 }
 
-test "audit_mapping" {
-    deltas = audit_name(
-        "Mapping",
-        ABC_MODS,
-        (
-            "def probe(m: Mapping[str, int]) -> int {\n"
-            + "    return 0;\n"
-            + "}\n"
-            + "with entry {\n"
-            + "    probe({\"a\": 1});\n"
-            + "    probe([1]);\n"
-            + "}\n"
-        ),
-        ["probe"]
+test "audit_classvar, and related cases" {
+    def check_audit_classvar {
+        deltas = audit_name(
+            "ClassVar",
+            TYPING_MODS,
+            (
+                "obj Holder {\n"
+                + "    has count: ClassVar[int] = 0;\n"
+                + "}\n"
+                + "with entry {\n"
+                + "    ok: int = Holder.count;\n"
+                + "    no: str = Holder.count;\n"
+                + "}\n"
+            ),
+            ["Holder::count"]
+        );
+        flush_report();
+        assert not deltas , "\n".join(deltas);
+    }
+
+    def check_audit_generic {
+        deltas = audit_name(
+            "Generic",
+            TYPING_MODS,
+            (
+                "glob T = TypeVar(\"T\");\n"
+                + "class Box(Generic[T]) {\n"
+                + "    has item: T | None = None;\n"
+                + "}\n"
+                + "def probe(b: Box[int]) -> int {\n"
+                + "    return 0;\n"
+                + "}\n"
+            ),
+            ["probe"]
+        );
+        flush_report();
+        assert not deltas , "\n".join(deltas);
+    }
+
+    def check_audit_literal {
+        deltas = audit_name(
+            "Literal",
+            TYPING_MODS,
+            (
+                "def probe(mode: Literal[\"r\", \"w\"]) -> str {\n"
+                + "    return mode;\n"
+                + "}\n"
+                + "with entry {\n"
+                + "    probe(\"r\");\n"
+                + "    probe(\"x\");\n"
+                + "}\n"
+            ),
+            ["probe"]
+        );
+        flush_report();
+        assert not deltas , "\n".join(deltas);
+    }
+    run_cases(
+        [
+            ("audit_classvar", check_audit_classvar),
+            ("audit_generic", check_audit_generic),
+            ("audit_literal", check_audit_literal)
+        ]
     );
-    flush_report();
-    assert not deltas , "\n".join(deltas);
 }
 
-test "audit_mutable_mapping" {
-    deltas = audit_name(
-        "MutableMapping",
-        ABC_MODS,
-        (
-            "def probe(m: MutableMapping[str, int]) -> int {\n"
-            + "    return 0;\n"
-            + "}\n"
-            + "with entry {\n"
-            + "    probe({\"a\": 1});\n"
-            + "    probe(\"x\");\n"
-            + "}\n"
-        ),
-        ["probe"]
-    );
-    flush_report();
-    assert not deltas , "\n".join(deltas);
-}
-
-test "audit_mutable_sequence" {
-    deltas = audit_name(
-        "MutableSequence",
-        ABC_MODS,
-        (
-            "def probe(xs: MutableSequence[int]) -> int {\n"
-            + "    return 0;\n"
-            + "}\n"
-            + "with entry {\n"
-            + "    probe([1, 2]);\n"
-            + "    probe((1, 2));\n"
-            + "}\n"
-        ),
-        ["probe"]
-    );
-    flush_report();
-    assert not deltas , "\n".join(deltas);
-}
-
-test "audit_awaitable" {
-    deltas = audit_name(
-        "Awaitable",
-        ABC_MODS,
-        (
-            "def probe(a: Awaitable[int]) -> int {\n"
-            + "    return 0;\n"
-            + "}\n"
-            + "with entry {\n"
-            + "    probe(5);\n"
-            + "}\n"
-        ),
-        ["probe"]
-    );
-    flush_report();
-    assert not deltas , "\n".join(deltas);
-}
-
-test "audit_coroutine" {
-    deltas = audit_name(
-        "Coroutine",
-        ABC_MODS,
-        (
-            "def probe(c: Coroutine[any, any, int]) -> int {\n"
-            + "    return 0;\n"
-            + "}\n"
-            + "with entry {\n"
-            + "    probe(5);\n"
-            + "}\n"
-        ),
-        ["probe"]
-    );
-    flush_report();
-    assert not deltas , "\n".join(deltas);
-}
-
-test "audit_async_iterable" {
-    deltas = audit_name(
-        "AsyncIterable",
-        ABC_MODS,
-        (
-            "def probe(a: AsyncIterable[int]) -> int {\n"
-            + "    return 0;\n"
-            + "}\n"
-            + "with entry {\n"
-            + "    probe([1]);\n"
-            + "}\n"
-        ),
-        ["probe"]
-    );
-    flush_report();
-    assert not deltas , "\n".join(deltas);
-}
-
-test "audit_async_iterator" {
-    deltas = audit_name(
-        "AsyncIterator",
-        ABC_MODS,
-        (
-            "def probe(a: AsyncIterator[int]) -> int {\n"
-            + "    return 0;\n"
-            + "}\n"
-            + "with entry {\n"
-            + "    probe([1]);\n"
-            + "}\n"
-        ),
-        ["probe"]
-    );
-    flush_report();
-    assert not deltas , "\n".join(deltas);
-}
-
-test "audit_annotated" {
-    deltas = audit_name(
-        "Annotated",
-        TYPING_MODS,
-        (
-            "glob good: Annotated[int, \"meta\"] = 5;\n"
-            + "def probe(x: Annotated[str, \"m2\"]) -> str {\n"
-            + "    return x;\n"
-            + "}\n"
-            + "with entry {\n"
-            + "    probe(\"ok\");\n"
-            + "    probe(3);\n"
-            + "}\n"
-        ),
-        ["good", "probe"]
-    );
-    flush_report();
-    assert not deltas , "\n".join(deltas);
-}
-
-test "audit_classvar" {
-    deltas = audit_name(
-        "ClassVar",
-        TYPING_MODS,
-        (
-            "obj Holder {\n"
-            + "    has count: ClassVar[int] = 0;\n"
-            + "}\n"
-            + "with entry {\n"
-            + "    ok: int = Holder.count;\n"
-            + "    no: str = Holder.count;\n"
-            + "}\n"
-        ),
-        ["Holder::count"]
-    );
-    flush_report();
-    assert not deltas , "\n".join(deltas);
-}
-
-test "audit_generic" {
-    deltas = audit_name(
-        "Generic",
-        TYPING_MODS,
-        (
-            "glob T = TypeVar(\"T\");\n"
-            + "class Box(Generic[T]) {\n"
-            + "    has item: T | None = None;\n"
-            + "}\n"
-            + "def probe(b: Box[int]) -> int {\n"
-            + "    return 0;\n"
-            + "}\n"
-        ),
-        ["probe"]
-    );
-    flush_report();
-    assert not deltas , "\n".join(deltas);
-}
-
-test "audit_literal" {
-    deltas = audit_name(
-        "Literal",
-        TYPING_MODS,
-        (
-            "def probe(mode: Literal[\"r\", \"w\"]) -> str {\n"
-            + "    return mode;\n"
-            + "}\n"
-            + "with entry {\n"
-            + "    probe(\"r\");\n"
-            + "    probe(\"x\");\n"
-            + "}\n"
-        ),
-        ["probe"]
-    );
-    flush_report();
-    assert not deltas , "\n".join(deltas);
-}
 
 test "audit_protocol" {
     deltas = audit_name(
@@ -553,53 +615,71 @@ test "audit_protocol" {
     assert not deltas , "\n".join(deltas);
 }
 
-test "audit_typevar" {
-    deltas = audit_name(
-        "TypeVar",
-        TYPING_MODS,
-        (
-            "glob T = TypeVar(\"T\");\n"
-            + "def ident(x: T) -> T {\n"
-            + "    return x;\n"
-            + "}\n"
-            + "with entry {\n"
-            + "    a: int = ident(5);\n"
-            + "    b: str = ident(7);\n"
-            + "}\n"
-        ),
-        ["T", "ident"]
-    );
-    flush_report();
-    assert not deltas , "\n".join(deltas);
-}
 
-test "audit_optional_pep604" {
-    deltas = audit_pep604(
-        "Optional",
-        (
-            "def probe(x: Optional[int]) -> int {\n"
-            + "    return 0;\n"
-            + "}\n"
-            + "with entry {\n"
-            + "    probe(5);\n"
-            + "    probe(None);\n"
-            + "    probe(\"s\");\n"
-            + "}\n"
-        ),
-        (
-            "def probe(x: int | None) -> int {\n"
-            + "    return 0;\n"
-            + "}\n"
-            + "with entry {\n"
-            + "    probe(5);\n"
-            + "    probe(None);\n"
-            + "    probe(\"s\");\n"
-            + "}\n"
-        ),
-        ["probe"]
+test "audit_optional_pep604, and related cases" {
+    def check_audit_optional_pep604 {
+        deltas = audit_pep604(
+            "Optional",
+            (
+                "def probe(x: Optional[int]) -> int {\n"
+                + "    return 0;\n"
+                + "}\n"
+                + "with entry {\n"
+                + "    probe(5);\n"
+                + "    probe(None);\n"
+                + "    probe(\"s\");\n"
+                + "}\n"
+            ),
+            (
+                "def probe(x: int | None) -> int {\n"
+                + "    return 0;\n"
+                + "}\n"
+                + "with entry {\n"
+                + "    probe(5);\n"
+                + "    probe(None);\n"
+                + "    probe(\"s\");\n"
+                + "}\n"
+            ),
+            ["probe"]
+        );
+        flush_report();
+        assert not deltas , "\n".join(deltas);
+    }
+
+    def check_audit_union_pep604 {
+        deltas = audit_pep604(
+            "Union",
+            (
+                "def probe(x: Union[int, str]) -> int {\n"
+                + "    return 0;\n"
+                + "}\n"
+                + "with entry {\n"
+                + "    probe(5);\n"
+                + "    probe(\"s\");\n"
+                + "    probe([1]);\n"
+                + "}\n"
+            ),
+            (
+                "def probe(x: int | str) -> int {\n"
+                + "    return 0;\n"
+                + "}\n"
+                + "with entry {\n"
+                + "    probe(5);\n"
+                + "    probe(\"s\");\n"
+                + "    probe([1]);\n"
+                + "}\n"
+            ),
+            ["probe"]
+        );
+        flush_report();
+        assert not deltas , "\n".join(deltas);
+    }
+    run_cases(
+        [
+            ("audit_optional_pep604", check_audit_optional_pep604),
+            ("audit_union_pep604", check_audit_union_pep604)
+        ]
     );
-    flush_report();
-    assert not deltas , "\n".join(deltas);
 }
 
 test "typing_import_flips_native_placement" {
@@ -734,33 +814,4 @@ test "optional_layout_signal" {
         + str(typed_codes)
     );
     assert not native_codes , "Optional Jac objects have a supported native layout";
-}
-
-test "audit_union_pep604" {
-    deltas = audit_pep604(
-        "Union",
-        (
-            "def probe(x: Union[int, str]) -> int {\n"
-            + "    return 0;\n"
-            + "}\n"
-            + "with entry {\n"
-            + "    probe(5);\n"
-            + "    probe(\"s\");\n"
-            + "    probe([1]);\n"
-            + "}\n"
-        ),
-        (
-            "def probe(x: int | str) -> int {\n"
-            + "    return 0;\n"
-            + "}\n"
-            + "with entry {\n"
-            + "    probe(5);\n"
-            + "    probe(\"s\");\n"
-            + "    probe([1]);\n"
-            + "}\n"
-        ),
-        ["probe"]
-    );
-    flush_report();
-    assert not deltas , "\n".join(deltas);
 }

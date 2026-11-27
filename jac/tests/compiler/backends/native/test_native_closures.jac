@@ -22,7 +22,8 @@ import from tests.support {
     get_func,
     has_error_code,
     native_force_opts,
-    native_str_func
+    native_str_func,
+    run_cases
 }
 import jaclang;
 
@@ -83,11 +84,80 @@ def compute(value: int) -> int {
     assert call(93) == 100;
 }
 
-test "closure: nested def reads an enclosing param" {
-    (eng, _) = compile_native("closures.jac");
-    f = get_func(eng, "scaled", ctypes.c_int64, ctypes.c_int64, ctypes.c_int64);
-    assert f(4, 5) == 20;
-    assert f(0, 9) == 0;
+test "closures.jac cases" {
+    def check_closure_nested_def_reads_an_enclosing_param {
+        (eng, _) = compile_native("closures.jac");
+
+        f = get_func(eng, "scaled", ctypes.c_int64, ctypes.c_int64, ctypes.c_int64);
+        assert f(4, 5) == 20;
+        assert f(0, 9) == 0;
+    }
+
+    def check_closure_read_captures_are_late_bound_py_backend {
+        (eng, _) = compile_native("closures.jac");
+
+        f = get_func(eng, "late_bound", ctypes.c_int64, ctypes.c_int64, ctypes.c_int64);
+        # r1 = 10 + a (before rebind), r2 = 10 + b (after rebind).
+        assert f(2, 7) == 12017;
+    }
+
+    def check_closure_rebound_capture_writes_through_to_the_en {
+        (eng, _) = compile_native("closures.jac");
+
+        f = get_func(eng, "rebind_out", ctypes.c_int64, ctypes.c_int64);
+        # total = 0; bump(5) twice writes through: total == 10.
+        assert f(5) == 10;
+    }
+
+    def check_closure_rc_pointer_capture_str_reads_without_dou {
+        (eng, _) = compile_native("closures.jac");
+
+        f = native_str_func(eng, "str_capture", ctypes.c_int64, ctypes.c_char_p);
+        assert f(b"abcd") == 8;
+    }
+
+    def check_closure_capturing_lambda_in_the_same_frame_keeps {
+        (eng, _) = compile_native("closures.jac");
+
+        f = get_func(eng, "lam_parity", ctypes.c_int64, ctypes.c_int64);
+        assert f(6) == 18;
+    }
+
+    def check_closure_self_recursive_nested_def_forwards_its_o {
+        (eng, _) = compile_native("closures.jac");
+
+        f = get_func(eng, "recursive_capture", ctypes.c_int64, ctypes.c_int64);
+        # depth increments through the shared slot on every recursion level.
+        assert f(3) == 4;
+    }
+    run_cases(
+        [
+            (
+                "closure: nested def reads an enclosing param",
+                check_closure_nested_def_reads_an_enclosing_param
+            ),
+            (
+                "closure: read captures are late-bound (py backend parity)",
+                check_closure_read_captures_are_late_bound_py_backend
+            ),
+            (
+                "closure: rebound capture writes through to the enclosing frame",
+                check_closure_rebound_capture_writes_through_to_the_en
+            ),
+            (
+                "closure: RC pointer capture (str) reads without double release",
+                check_closure_rc_pointer_capture_str_reads_without_dou
+            ),
+            (
+                "closure: capturing lambda in the same frame keeps working",
+                check_closure_capturing_lambda_in_the_same_frame_keeps
+            ),
+            (
+                "closure: self-recursive nested def forwards its own captures",
+                check_closure_self_recursive_nested_def_forwards_its_o
+            )
+        ]
+    );
 }
 
 test "closure: immediately invoked lambdas infer reference returns" {
@@ -109,10 +179,11 @@ def compute(value: int) -> int {
     assert call(37) == 37;
 }
 
-test "closure: nested method helpers retain the receiver and outer parameters" {
-    (prog, module) = compile_na_inline_ir(
-        "method_receiver",
-        """
+test "closure: nested method helpers retain the receiver and outer parameters, and related cases" {
+    def check_closure_nested_method_helpers_retain_the_receive {
+        (prog, module) = compile_na_inline_ir(
+            "method_receiver",
+            """
 obj Counter {
     has value: int = 10;
     def add(amount: int = 1) -> int {
@@ -142,12 +213,50 @@ def probe -> int {
     return item.compute("double") + item.compute("single") + derived.inherited();
 }
 """
+        );
+        assert not prog.errors_had , [e.pretty_print() for e in prog.errors_had];
+        issues = native_lowering_issues(str(module.gen.llvm_ir));
+        assert not issues , "\n".join(issue.detail for issue in issues);
+        call = get_func(module.gen.native_engine, "probe", ctypes.c_int64);
+        assert call() == 50;
+    }
+
+    def check_closure_split_method_implementations_capture_the {
+        (prog, module) = compile_na_inline_ir(
+            "impl_receiver",
+            """
+obj Factory {
+    has value: int = 30;
+    def callback(label: str) -> Callable[[], int];
+}
+impl Factory.callback {
+    def read -> int { return self.value + len(label); }
+    return read;
+}
+def probe -> int {
+    callback = Factory().callback("scope");
+    return callback();
+}
+"""
+        );
+        assert not prog.errors_had , [e.pretty_print() for e in prog.errors_had];
+        issues = native_lowering_issues(str(module.gen.llvm_ir));
+        assert not issues , "\n".join(issue.detail for issue in issues);
+        call = get_func(module.gen.native_engine, "probe", ctypes.c_int64);
+        assert call() == 35;
+    }
+    run_cases(
+        [
+            (
+                "closure: nested method helpers retain the receiver and outer parameters",
+                check_closure_nested_method_helpers_retain_the_receive
+            ),
+            (
+                "closure: split method implementations capture their declaration scope",
+                check_closure_split_method_implementations_capture_the
+            )
+        ]
     );
-    assert not prog.errors_had , [e.pretty_print() for e in prog.errors_had];
-    issues = native_lowering_issues(str(module.gen.llvm_ir));
-    assert not issues , "\n".join(issue.detail for issue in issues);
-    call = get_func(module.gen.native_engine, "probe", ctypes.c_int64);
-    assert call() == 50;
 }
 
 test "closure: an escaped receiver stays alive until the closure is released" {
@@ -181,237 +290,276 @@ def drops -> int { return dropped; }
     assert drops() - before == 1;
 }
 
-test "closure: split method implementations capture their declaration scope" {
-    (prog, module) = compile_na_inline_ir(
-        "impl_receiver",
-        """
-obj Factory {
-    has value: int = 30;
-    def callback(label: str) -> Callable[[], int];
-}
-impl Factory.callback {
-    def read -> int { return self.value + len(label); }
-    return read;
-}
-def probe -> int {
-    callback = Factory().callback("scope");
-    return callback();
-}
-"""
-    );
-    assert not prog.errors_had , [e.pretty_print() for e in prog.errors_had];
-    issues = native_lowering_issues(str(module.gen.llvm_ir));
-    assert not issues , "\n".join(issue.detail for issue in issues);
-    call = get_func(module.gen.native_engine, "probe", ctypes.c_int64);
-    assert call() == 35;
-}
 
-test "closure: read captures are late-bound (py backend parity)" {
-    (eng, _) = compile_native("closures.jac");
-    f = get_func(eng, "late_bound", ctypes.c_int64, ctypes.c_int64, ctypes.c_int64);
-    # r1 = 10 + a (before rebind), r2 = 10 + b (after rebind).
-    assert f(2, 7) == 12017;
-}
+test "closure escape: cases on closures_escape.jac" {
+    def check_closure_escape_counter_factory_returns_a_live_cl {
+        (eng, _) = compile_native("closures_escape.jac");
 
-test "closure: rebound capture writes through to the enclosing frame" {
-    (eng, _) = compile_native("closures.jac");
-    f = get_func(eng, "rebind_out", ctypes.c_int64, ctypes.c_int64);
-    # total = 0; bump(5) twice writes through: total == 10.
-    assert f(5) == 10;
-}
+        f = get_func(eng, "use_counter", ctypes.c_int64);
+        assert f() == 3;
+    }
 
-test "closure: RC pointer capture (str) reads without double release" {
-    (eng, _) = compile_native("closures.jac");
-    f = native_str_func(eng, "str_capture", ctypes.c_int64, ctypes.c_char_p);
-    assert f(b"abcd") == 8;
-}
+    def check_closure_escape_two_factory_closures_have_indepen {
+        (eng, _) = compile_native("closures_escape.jac");
 
-test "closure: capturing lambda in the same frame keeps working" {
-    (eng, _) = compile_native("closures.jac");
-    f = get_func(eng, "lam_parity", ctypes.c_int64, ctypes.c_int64);
-    assert f(6) == 18;
-}
+        f = get_func(eng, "two_counters_independent", ctypes.c_int64);
+        assert f() == 32;
+    }
 
-test "closure: self-recursive nested def forwards its own captures" {
-    (eng, _) = compile_native("closures.jac");
-    f = get_func(eng, "recursive_capture", ctypes.c_int64, ctypes.c_int64);
-    # depth increments through the shared slot on every recursion level.
-    assert f(3) == 4;
-}
+    def check_closure_escape_closure_passed_as_argument_writes {
+        (eng, _) = compile_native("closures_escape.jac");
 
-test "closure escape: counter factory returns a live closure" {
-    (eng, _) = compile_native("closures_escape.jac");
-    f = get_func(eng, "use_counter", ctypes.c_int64);
-    assert f() == 3;
-}
+        f = get_func(eng, "pass_closure", ctypes.c_int64, ctypes.c_int64);
+        assert f(10) == 16016;
+    }
 
-test "closure escape: two factory closures have independent cells" {
-    (eng, _) = compile_native("closures_escape.jac");
-    f = get_func(eng, "two_counters_independent", ctypes.c_int64);
-    assert f() == 32;
-}
+    def check_closure_escape_closure_stored_in_a_list_and_call {
+        (eng, _) = compile_native("closures_escape.jac");
 
-test "closure escape: closure passed as argument writes through" {
-    (eng, _) = compile_native("closures_escape.jac");
-    f = get_func(eng, "pass_closure", ctypes.c_int64, ctypes.c_int64);
-    assert f(10) == 16016;
-}
+        f = get_func(
+            eng, "stored_in_list", ctypes.c_int64, ctypes.c_int64, ctypes.c_int64
+        );
+        assert f(40, 2) == 42;
+    }
 
-test "closure escape: closure stored in a list and called later" {
-    (eng, _) = compile_native("closures_escape.jac");
-    f = get_func(eng, "stored_in_list", ctypes.c_int64, ctypes.c_int64, ctypes.c_int64);
-    assert f(40, 2) == 42;
-}
+    def check_closure_escape_two_closures_share_one_rebound_ce {
+        (eng, _) = compile_native("closures_escape.jac");
 
-test "closure escape: two closures share one rebound cell" {
-    (eng, _) = compile_native("closures_escape.jac");
-    f = get_func(eng, "shared_cell", ctypes.c_int64);
-    assert f() == 1;
-}
+        f = get_func(eng, "shared_cell", ctypes.c_int64);
+        assert f() == 1;
+    }
 
-test "closure escape: env keeps an RC capture alive after the frame dies" {
-    (eng, _) = compile_native("closures_escape.jac");
-    f = get_func(eng, "use_greeter", ctypes.c_int64);
-    assert f() == 8;
-}
+    def check_closure_escape_env_keeps_an_rc_capture_alive_aft {
+        (eng, _) = compile_native("closures_escape.jac");
 
-test "closure escape: capturing lambda escapes as a value" {
-    (eng, _) = compile_native("closures_escape.jac");
-    f = get_func(eng, "lambda_escape", ctypes.c_int64, ctypes.c_int64);
-    assert f(7) == 124;
-    g = get_func(eng, "use_adder", ctypes.c_int64);
-    assert g() == 23;
-}
+        f = get_func(eng, "use_greeter", ctypes.c_int64);
+        assert f() == 8;
+    }
 
-test "closure escape: capture borrowed from an outer frame stays rejected" {
-    (prog, ir) = compile_na_inline_ir(
-        "transitive_escape",
-        "def outer(y: int) -> Callable[[], int] {\n"
-        "    def mid -> Callable[[], int] {\n"
-        "        def inner -> int { return y; }\n"
-        "        return inner;\n"
-        "    }\n"
-        "    return mid();\n"
-        "}\n"
-    );
-    assert not prog.errors_had , (
-        f"the outer-frame capture refusal is owned by outer(), which must "
-        f"demote to a seam, got: {[str(e) for e in prog.errors_had]}"
-    );
-    assert ir.gen.native_layout is not None , "whole-module native compile aborted";
-    assert "outer" not in ir.gen.native_layout.functions , (
-        "a closure escaping with an outer-frame capture must demote its "
-        "function out of the native layout, never lower wrongly"
+    def check_closure_escape_capturing_lambda_escapes_as_a_val {
+        (eng, _) = compile_native("closures_escape.jac");
+
+        f = get_func(eng, "lambda_escape", ctypes.c_int64, ctypes.c_int64);
+        assert f(7) == 124;
+        g = get_func(eng, "use_adder", ctypes.c_int64);
+        assert g() == 23;
+    }
+    run_cases(
+        [
+            (
+                "closure escape: counter factory returns a live closure",
+                check_closure_escape_counter_factory_returns_a_live_cl
+            ),
+            (
+                "closure escape: two factory closures have independent cells",
+                check_closure_escape_two_factory_closures_have_indepen
+            ),
+            (
+                "closure escape: closure passed as argument writes through",
+                check_closure_escape_closure_passed_as_argument_writes
+            ),
+            (
+                "closure escape: closure stored in a list and called later",
+                check_closure_escape_closure_stored_in_a_list_and_call
+            ),
+            (
+                "closure escape: two closures share one rebound cell",
+                check_closure_escape_two_closures_share_one_rebound_ce
+            ),
+            (
+                "closure escape: env keeps an RC capture alive after the frame dies",
+                check_closure_escape_env_keeps_an_rc_capture_alive_aft
+            ),
+            (
+                "closure escape: capturing lambda escapes as a value",
+                check_closure_escape_capturing_lambda_escapes_as_a_val
+            )
+        ]
     );
 }
 
-test "closure escape: calling a closure through an any-typed value stays rejected" {
-    (prog, ir) = compile_na_inline_ir(
-        "any_closure_call",
-        "def outer(y: int) -> int {\n"
-        "    def inner(x: int) -> int { return x * y; }\n"
-        "    f: any = inner;\n"
-        "    return f(3);\n"
-        "}\n"
-    );
-    assert not prog.errors_had , (
-        f"the any-typed closure call refusal is owned by outer(), which must "
-        f"demote to a seam, got: {[str(e) for e in prog.errors_had]}"
-    );
-    assert ir.gen.native_layout is not None , "whole-module native compile aborted";
-    assert "outer" not in ir.gen.native_layout.functions , (
-        "an any-typed closure call site must demote its function out of the "
-        "native layout, never lower wrongly"
+
+test "closure escape: cases" {
+    def check_closure_escape_capture_borrowed_from_an_outer_fr {
+        (prog, ir) = compile_na_inline_ir(
+            "transitive_escape",
+            "def outer(y: int) -> Callable[[], int] {\n"
+            "    def mid -> Callable[[], int] {\n"
+            "        def inner -> int { return y; }\n"
+            "        return inner;\n"
+            "    }\n"
+            "    return mid();\n"
+            "}\n"
+        );
+        assert not prog.errors_had , (
+            f"the outer-frame capture refusal is owned by outer(), which must "
+            f"demote to a seam, got: {[str(e) for e in prog.errors_had]}"
+        );
+        assert ir.gen.native_layout is not None , "whole-module native compile aborted";
+        assert "outer" not in ir.gen.native_layout.functions , (
+            "a closure escaping with an outer-frame capture must demote its "
+            "function out of the native layout, never lower wrongly"
+        );
+    }
+
+    def check_closure_escape_calling_a_closure_through_an_any {
+        (prog, ir) = compile_na_inline_ir(
+            "any_closure_call",
+            "def outer(y: int) -> int {\n"
+            "    def inner(x: int) -> int { return x * y; }\n"
+            "    f: any = inner;\n"
+            "    return f(3);\n"
+            "}\n"
+        );
+        assert not prog.errors_had , (
+            f"the any-typed closure call refusal is owned by outer(), which must "
+            f"demote to a seam, got: {[str(e) for e in prog.errors_had]}"
+        );
+        assert ir.gen.native_layout is not None , "whole-module native compile aborted";
+        assert "outer" not in ir.gen.native_layout.functions , (
+            "an any-typed closure call site must demote its function out of the "
+            "native layout, never lower wrongly"
+        );
+    }
+    run_cases(
+        [
+            (
+                "closure escape: capture borrowed from an outer frame stays rejected",
+                check_closure_escape_capture_borrowed_from_an_outer_fr
+            ),
+            (
+                "closure escape: calling a closure through an any-typed value stays rejected",
+                check_closure_escape_calling_a_closure_through_an_any
+            )
+        ]
     );
 }
 
-test "native getattr alias calls resolve a literal module member" {
-    (prog, ir) = compile_na_inline_ir(
-        "getattr_native_alias",
-        "import math;\n"
-        "def compute -> int {\n"
-        "    f = getattr(math, \"sqrt\");\n"
-        "    return int(f(81.0)) + int(f(16.0));\n"
-        "}\n"
+
+test "native getattr alias calls resolve a literal module member, and related cases" {
+    def check_native_getattr_alias_calls_resolve_a_literal_mod {
+        (prog, ir) = compile_na_inline_ir(
+            "getattr_native_alias",
+            "import math;\n"
+            "def compute -> int {\n"
+            "    f = getattr(math, \"sqrt\");\n"
+            "    return int(f(81.0)) + int(f(16.0));\n"
+            "}\n"
+        );
+        assert not prog.errors_had , [e.pretty_print() for e in prog.errors_had];
+        assert "compute" in ir.gen.native_layout.functions;
+        f = get_func(ir.gen.native_engine, "compute", ctypes.c_int64);
+        result = f();
+        assert result == 13 , f"native alias calls returned {result}";
+    }
+
+    def check_native_alias_from_an_ordinary_module_call_is_not {
+        (prog, ir) = compile_na_inline_ir(
+            "getattr_alias_module_call",
+            "import na_alias_factory_lib;\n"
+            "def compute -> int {\n"
+            "    f = na_alias_factory_lib.make_doubler();\n"
+            "    return f(21);\n"
+            "}\n"
+        );
+        assert not prog.errors_had , [e.pretty_print() for e in prog.errors_had];
+        assert "compute" in ir.gen.native_layout.functions;
+        f = get_func(ir.gen.native_engine, "compute", ctypes.c_int64);
+        result = f();
+        assert result == 42 , f"factory-produced callable returned {result}";
+    }
+    run_cases(
+        [
+            (
+                "native getattr alias calls resolve a literal module member",
+                check_native_getattr_alias_calls_resolve_a_literal_mod
+            ),
+            (
+                "native alias from an ordinary module call is not specialized",
+                check_native_alias_from_an_ordinary_module_call_is_not
+            )
+        ]
     );
-    assert not prog.errors_had , [e.pretty_print() for e in prog.errors_had];
-    assert "compute" in ir.gen.native_layout.functions;
-    f = get_func(ir.gen.native_engine, "compute", ctypes.c_int64);
-    result = f();
-    assert result == 13 , f"native alias calls returned {result}";
 }
 
-test "native getattr with a dynamic member stays outside the native layout" {
-    (prog, ir) = compile_na_inline_ir(
-        "getattr_dynamic_member",
-        "import math;\n"
-        "def compute(field: str) -> int {\n"
-        "    f = getattr(math, field);\n"
-        "    return int(f(81.0));\n"
-        "}\n"
+test "native getattr cases" {
+    def check_native_getattr_with_a_dynamic_member_stays_outsi {
+        (prog, ir) = compile_na_inline_ir(
+            "getattr_dynamic_member",
+            "import math;\n"
+            "def compute(field: str) -> int {\n"
+            "    f = getattr(math, field);\n"
+            "    return int(f(81.0));\n"
+            "}\n"
+        );
+        assert not prog.errors_had , [e.pretty_print() for e in prog.errors_had];
+        assert ir.gen.native_layout is not None;
+        assert "compute" not in ir.gen.native_layout.functions;
+    }
+
+    def check_native_getattr_shadowed_by_a_parameter_is_not_sp {
+        (prog, ir) = compile_na_inline_ir(
+            "getattr_shadowed_parameter",
+            "import math;\n"
+            "def compute(getattr: any) -> int {\n"
+            "    f = getattr(math, \"sqrt\");\n"
+            "    return int(f(81.0));\n"
+            "}\n"
+        );
+        assert not prog.errors_had , [e.pretty_print() for e in prog.errors_had];
+        assert ir.gen.native_layout is not None;
+        assert "compute" not in ir.gen.native_layout.functions;
+    }
+
+    def check_native_getattr_alias_read_in_call_arguments_stay {
+        (prog, ir) = compile_na_inline_ir(
+            "getattr_alias_argument_read",
+            "import math;\n"
+            "def compute -> int {\n"
+            "    f = getattr(math, \"sqrt\");\n"
+            "    return int(f(81.0 if f else 16.0));\n"
+            "}\n"
+        );
+        assert not prog.errors_had , [e.pretty_print() for e in prog.errors_had];
+        assert ir.gen.native_layout is not None;
+        assert "compute" not in ir.gen.native_layout.functions;
+    }
+
+    def check_native_getattr_alias_used_as_a_value_stays_outsi {
+        (prog, ir) = compile_na_inline_ir(
+            "getattr_alias_escape",
+            "import math;\n"
+            "def compute -> any {\n"
+            "    f = getattr(math, \"sqrt\");\n"
+            "    return f;\n"
+            "}\n"
+        );
+        assert not prog.errors_had , [e.pretty_print() for e in prog.errors_had];
+        assert ir.gen.native_layout is not None;
+        assert "compute" not in ir.gen.native_layout.functions;
+    }
+    run_cases(
+        [
+            (
+                "native getattr with a dynamic member stays outside the native layout",
+                check_native_getattr_with_a_dynamic_member_stays_outsi
+            ),
+            (
+                "native getattr shadowed by a parameter is not specialized",
+                check_native_getattr_shadowed_by_a_parameter_is_not_sp
+            ),
+            (
+                "native getattr alias read in call arguments stays outside native layout",
+                check_native_getattr_alias_read_in_call_arguments_stay
+            ),
+            (
+                "native getattr alias used as a value stays outside native layout",
+                check_native_getattr_alias_used_as_a_value_stays_outsi
+            )
+        ]
     );
-    assert not prog.errors_had , [e.pretty_print() for e in prog.errors_had];
-    assert ir.gen.native_layout is not None;
-    assert "compute" not in ir.gen.native_layout.functions;
 }
 
-test "native getattr shadowed by a parameter is not specialized" {
-    (prog, ir) = compile_na_inline_ir(
-        "getattr_shadowed_parameter",
-        "import math;\n"
-        "def compute(getattr: any) -> int {\n"
-        "    f = getattr(math, \"sqrt\");\n"
-        "    return int(f(81.0));\n"
-        "}\n"
-    );
-    assert not prog.errors_had , [e.pretty_print() for e in prog.errors_had];
-    assert ir.gen.native_layout is not None;
-    assert "compute" not in ir.gen.native_layout.functions;
-}
-
-test "native getattr alias read in call arguments stays outside native layout" {
-    (prog, ir) = compile_na_inline_ir(
-        "getattr_alias_argument_read",
-        "import math;\n"
-        "def compute -> int {\n"
-        "    f = getattr(math, \"sqrt\");\n"
-        "    return int(f(81.0 if f else 16.0));\n"
-        "}\n"
-    );
-    assert not prog.errors_had , [e.pretty_print() for e in prog.errors_had];
-    assert ir.gen.native_layout is not None;
-    assert "compute" not in ir.gen.native_layout.functions;
-}
-
-test "native alias from an ordinary module call is not specialized" {
-    (prog, ir) = compile_na_inline_ir(
-        "getattr_alias_module_call",
-        "import na_alias_factory_lib;\n"
-        "def compute -> int {\n"
-        "    f = na_alias_factory_lib.make_doubler();\n"
-        "    return f(21);\n"
-        "}\n"
-    );
-    assert not prog.errors_had , [e.pretty_print() for e in prog.errors_had];
-    assert "compute" in ir.gen.native_layout.functions;
-    f = get_func(ir.gen.native_engine, "compute", ctypes.c_int64);
-    result = f();
-    assert result == 42 , f"factory-produced callable returned {result}";
-}
-
-test "native getattr alias used as a value stays outside native layout" {
-    (prog, ir) = compile_na_inline_ir(
-        "getattr_alias_escape",
-        "import math;\n"
-        "def compute -> any {\n"
-        "    f = getattr(math, \"sqrt\");\n"
-        "    return f;\n"
-        "}\n"
-    );
-    assert not prog.errors_had , [e.pretty_print() for e in prog.errors_had];
-    assert ir.gen.native_layout is not None;
-    assert "compute" not in ir.gen.native_layout.functions;
-}
 
 test "closure: a void lambda over a statement call returns void" {
     (prog, ir) = compile_na_inline_ir(
@@ -595,10 +743,11 @@ def outer -> int {
     );
 }
 
-test "typed callable: a bound method converts to a closure over its receiver" {
-    (prog, ir) = compile_na_inline_ir(
-        "bound_method_value",
-        """
+test "typed callable: cases" {
+    def check_typed_callable_a_bound_method_converts_to_a_clos {
+        (prog, ir) = compile_na_inline_ir(
+            "bound_method_value",
+            """
 glob dropped: int = 0;
 obj Counter {
     has n: int = 0;
@@ -652,68 +801,38 @@ def compares -> int {
 }
 def drops -> int { return dropped; }
 """
-    );
-    assert not prog.errors_had , [e.pretty_print() for e in prog.errors_had];
-    for fn in ["bound_local", "through_field", "overridden", "escaped", "compares"] {
-        assert fn in ir.gen.native_layout.functions , f"{fn} demoted";
+        );
+        assert not prog.errors_had , [e.pretty_print() for e in prog.errors_had];
+        for fn in [
+            "bound_local",
+            "through_field",
+            "overridden",
+            "escaped",
+            "compares"
+        ] {
+            assert fn in ir.gen.native_layout.functions , f"{fn} demoted";
+        }
+        eng = ir.gen.native_engine;
+        assert get_func(eng, "bound_local", ctypes.c_int64)() == 5;
+        assert get_func(eng, "through_field", ctypes.c_int64)() == 12;
+        assert get_func(eng, "overridden", ctypes.c_int64)() == 10 , (
+            "a bound method must dispatch on the receiver's runtime class"
+        );
+        assert get_func(eng, "compares", ctypes.c_int64)() == 11 , (
+            "bound methods compare equal by receiver and method, as in Python"
+        );
+        drops = get_func(eng, "drops", ctypes.c_int64);
+        before = drops();
+        assert get_func(eng, "escaped", ctypes.c_int64)() == 103;
+        assert drops() - before == 1 , (
+            "the closure must keep its receiver alive and release it exactly once"
+        );
     }
-    eng = ir.gen.native_engine;
-    assert get_func(eng, "bound_local", ctypes.c_int64)() == 5;
-    assert get_func(eng, "through_field", ctypes.c_int64)() == 12;
-    assert get_func(eng, "overridden", ctypes.c_int64)() == 10 , (
-        "a bound method must dispatch on the receiver's runtime class"
-    );
-    assert get_func(eng, "compares", ctypes.c_int64)() == 11 , (
-        "bound methods compare equal by receiver and method, as in Python"
-    );
-    drops = get_func(eng, "drops", ctypes.c_int64);
-    before = drops();
-    assert get_func(eng, "escaped", ctypes.c_int64)() == 103;
-    assert drops() - before == 1 , (
-        "the closure must keep its receiver alive and release it exactly once"
-    );
-}
 
-test "typed callable: each new function value keeps its own identity" {
-    (prog, ir) = compile_na_inline_ir(
-        "fresh_function_identity",
-        """
-def make -> Callable[[int], int] {
-    def inner(x: int) -> int { return x + 1; }
-    return inner;
-}
-def make_lam -> Callable[[int], int] {
-    return lambda (x: int) -> int { x + 2; };
-}
-def plain(x: int) -> int { return x; }
-def identities -> int {
-    a = make();
-    b = make();
-    l1 = make_lam();
-    l2 = make_lam();
-    p: Callable[[int], int] = plain;
-    q: Callable[[int], int] = plain;
-    r = 0;
-    if a != b { r += 1; }
-    if a == a { r += 10; }
-    if l1 != l2 { r += 100; }
-    if p == q { r += 1000; }
-    return r * 10 + a(1) - l1(1) + 1;
-}
-"""
-    );
-    assert not prog.errors_had , [e.pretty_print() for e in prog.errors_had];
-    assert "identities" in ir.gen.native_layout.functions , "identities demoted";
-    got = get_func(ir.gen.native_engine, "identities", ctypes.c_int64)();
-    assert got == 11110 , (
-        f"separate function objects compare unequal, wraps of one function equal: {got}"
-    );
-}
-
-test "typed callable: reads of one function object compare equal" {
-    (prog, ir) = compile_na_inline_ir(
-        "same_function_identity",
-        """
+    def check_typed_callable_reads_of_one_function_object_comp {
+        (prog, ir) = compile_na_inline_ir(
+            "same_function_identity",
+            """
 def reads -> int {
     def inner(x: int) -> int { return x + 1; }
     a: Callable[[int], int] = inner;
@@ -771,68 +890,23 @@ def churn -> int {
     return n;
 }
 """
-    );
-    assert not prog.errors_had , [e.pretty_print() for e in prog.errors_had];
-    eng = ir.gen.native_engine;
-    assert get_func(eng, "reads", ctypes.c_int64)() == 11;
-    assert get_func(eng, "callback_removal", ctypes.c_int64)() == 1;
-    assert get_func(eng, "in_branches", ctypes.c_int64, ctypes.c_bool)(True) == 1;
-    assert get_func(eng, "in_branches", ctypes.c_int64, ctypes.c_bool)(False) == 1;
-    assert get_func(eng, "per_execution", ctypes.c_int64)() == 21 , (
-        "each execution of a def is a new function, read consistently within it"
-    );
-    assert get_func(eng, "churn", ctypes.c_int64)() == 100000;
-}
-
-test "typed callable: a method read through different static types compares equal" {
-    (prog, ir) = compile_na_inline_ir(
-        "bound_method_cross_type",
-        """
-obj Base {
-    has n: int = 0;
-    def bump(amt: int) -> int {
-        self.n += amt;
-        return self.n;
+        );
+        assert not prog.errors_had , [e.pretty_print() for e in prog.errors_had];
+        eng = ir.gen.native_engine;
+        assert get_func(eng, "reads", ctypes.c_int64)() == 11;
+        assert get_func(eng, "callback_removal", ctypes.c_int64)() == 1;
+        assert get_func(eng, "in_branches", ctypes.c_int64, ctypes.c_bool)(True) == 1;
+        assert get_func(eng, "in_branches", ctypes.c_int64, ctypes.c_bool)(False) == 1;
+        assert get_func(eng, "per_execution", ctypes.c_int64)() == 21 , (
+            "each execution of a def is a new function, read consistently within it"
+        );
+        assert get_func(eng, "churn", ctypes.c_int64)() == 100000;
     }
-    def other(amt: int) -> int { return amt; }
-}
-obj Mid(Base) {}
-obj Twice(Base) {
-    override def bump(amt: int) -> int {
-        self.n += amt * 2;
-        return self.n;
-    }
-}
-def same_mid(b: Base, m: Mid) -> bool { return b.bump == m.bump; }
-def same_twice(b: Base, t: Twice) -> bool { return b.bump == t.bump; }
-def through_base(b: Base) -> int {
-    f: Callable[[int], int] = b.bump;
-    return f(3);
-}
-def cross -> int {
-    m = Mid();
-    t = Twice();
-    r = 0;
-    if same_mid(m, m) { r += 1; }
-    if same_twice(t, t) { r += 10; }
-    if not same_mid(Mid(), m) { r += 100; }
-    if m.bump != m.other { r += 1000; }
-    return r * 10 + through_base(t);
-}
-"""
-    );
-    assert not prog.errors_had , [e.pretty_print() for e in prog.errors_had];
-    assert "cross" in ir.gen.native_layout.functions , "cross demoted";
-    got = get_func(ir.gen.native_engine, "cross", ctypes.c_int64)();
-    assert got == 11116 , (
-        f"one method on one receiver compares equal through any static type: {got}"
-    );
-}
 
-test "typed callable: a raising call releases the callable it saved" {
-    (prog, ir) = compile_na_inline_ir(
-        "optional_callable_raise_release",
-        """
+    def check_typed_callable_a_raising_call_releases_the_calla {
+        (prog, ir) = compile_na_inline_ir(
+            "optional_callable_raise_release",
+            """
 glob dropped: int = 0;
 obj Counter {
     has n: int = 0;
@@ -890,89 +964,261 @@ def caught_in_frame -> int {
 }
 def drops -> int { return dropped; }
 """
-    );
-    assert not prog.errors_had , [e.pretty_print() for e in prog.errors_had];
-    for fn in ["raised_in_callee", "raised_in_arg", "caught_in_frame"] {
-        assert fn in ir.gen.native_layout.functions , f"{fn} demoted";
+        );
+        assert not prog.errors_had , [e.pretty_print() for e in prog.errors_had];
+        for fn in ["raised_in_callee", "raised_in_arg", "caught_in_frame"] {
+            assert fn in ir.gen.native_layout.functions , f"{fn} demoted";
+        }
+        eng = ir.gen.native_engine;
+        drops = get_func(eng, "drops", ctypes.c_int64);
+        before = drops();
+        assert get_func(eng, "raised_in_callee", ctypes.c_int64)() - before == 1 , (
+            "a callback that raises must not keep its receiver alive"
+        );
+        before = drops();
+        assert get_func(eng, "raised_in_arg", ctypes.c_int64)() - before == 1 , (
+            "an argument that raises must not keep the callback's receiver alive"
+        );
+        before = drops();
+        assert get_func(eng, "caught_in_frame", ctypes.c_int64)() == 3;
+        assert drops() - before == 1 , (
+            "a raise caught in the calling frame must release the callback once"
+        );
     }
-    eng = ir.gen.native_engine;
-    drops = get_func(eng, "drops", ctypes.c_int64);
-    before = drops();
-    assert get_func(eng, "raised_in_callee", ctypes.c_int64)() - before == 1 , (
-        "a callback that raises must not keep its receiver alive"
+    run_cases(
+        [
+            (
+                "typed callable: a bound method converts to a closure over its receiver",
+                check_typed_callable_a_bound_method_converts_to_a_clos
+            ),
+            (
+                "typed callable: reads of one function object compare equal",
+                check_typed_callable_reads_of_one_function_object_comp
+            ),
+            (
+                "typed callable: a raising call releases the callable it saved",
+                check_typed_callable_a_raising_call_releases_the_calla
+            )
+        ]
     );
-    before = drops();
-    assert get_func(eng, "raised_in_arg", ctypes.c_int64)() - before == 1 , (
-        "an argument that raises must not keep the callback's receiver alive"
+}
+
+test "typed callable: function value cases" {
+    def check_typed_callable_each_new_function_value_keeps_its {
+        (prog, ir) = compile_na_inline_ir(
+            "fresh_function_identity",
+            """
+def make -> Callable[[int], int] {
+    def inner(x: int) -> int { return x + 1; }
+    return inner;
+}
+def make_lam -> Callable[[int], int] {
+    return lambda (x: int) -> int { x + 2; };
+}
+def plain(x: int) -> int { return x; }
+def identities -> int {
+    a = make();
+    b = make();
+    l1 = make_lam();
+    l2 = make_lam();
+    p: Callable[[int], int] = plain;
+    q: Callable[[int], int] = plain;
+    r = 0;
+    if a != b { r += 1; }
+    if a == a { r += 10; }
+    if l1 != l2 { r += 100; }
+    if p == q { r += 1000; }
+    return r * 10 + a(1) - l1(1) + 1;
+}
+"""
+        );
+        assert not prog.errors_had , [e.pretty_print() for e in prog.errors_had];
+        assert "identities" in ir.gen.native_layout.functions , "identities demoted";
+        got = get_func(ir.gen.native_engine, "identities", ctypes.c_int64)();
+        assert got == 11110 , (
+            f"separate function objects compare unequal, wraps of one function equal: {got}"
+        );
+    }
+
+    def check_typed_callable_a_method_read_through_different_s {
+        (prog, ir) = compile_na_inline_ir(
+            "bound_method_cross_type",
+            """
+obj Base {
+    has n: int = 0;
+    def bump(amt: int) -> int {
+        self.n += amt;
+        return self.n;
+    }
+    def other(amt: int) -> int { return amt; }
+}
+obj Mid(Base) {}
+obj Twice(Base) {
+    override def bump(amt: int) -> int {
+        self.n += amt * 2;
+        return self.n;
+    }
+}
+def same_mid(b: Base, m: Mid) -> bool { return b.bump == m.bump; }
+def same_twice(b: Base, t: Twice) -> bool { return b.bump == t.bump; }
+def through_base(b: Base) -> int {
+    f: Callable[[int], int] = b.bump;
+    return f(3);
+}
+def cross -> int {
+    m = Mid();
+    t = Twice();
+    r = 0;
+    if same_mid(m, m) { r += 1; }
+    if same_twice(t, t) { r += 10; }
+    if not same_mid(Mid(), m) { r += 100; }
+    if m.bump != m.other { r += 1000; }
+    return r * 10 + through_base(t);
+}
+"""
+        );
+        assert not prog.errors_had , [e.pretty_print() for e in prog.errors_had];
+        assert "cross" in ir.gen.native_layout.functions , "cross demoted";
+        got = get_func(ir.gen.native_engine, "cross", ctypes.c_int64)();
+        assert got == 11116 , (
+            f"one method on one receiver compares equal through any static type: {got}"
+        );
+    }
+    run_cases(
+        [
+            (
+                "typed callable: each new function value keeps its own identity",
+                check_typed_callable_each_new_function_value_keeps_its
+            ),
+            (
+                "typed callable: a method read through different static types compares equal",
+                check_typed_callable_a_method_read_through_different_s
+            )
+        ]
     );
-    before = drops();
-    assert get_func(eng, "caught_in_frame", ctypes.c_int64)() == 3;
-    assert drops() - before == 1 , (
-        "a raise caught in the calling frame must release the callback once"
+}
+
+
+test "closures_adapters.jac cases" {
+    def check_adapter_map_with_a_capturing_lambda_callback {
+        (eng, _) = compile_native("closures_adapters.jac");
+
+        f = get_func(eng, "scale_all", ctypes.c_int64, ctypes.c_int64);
+        assert f(3) == 18 , "3+6+9";
+        assert f(0) == 0;
+    }
+
+    def check_adapter_filter_with_a_capturing_lambda_predicate {
+        (eng, _) = compile_native("closures_adapters.jac");
+
+        f = get_func(eng, "keep_over", ctypes.c_int64, ctypes.c_int64);
+        assert f(4) == 14 , "5+9";
+        assert f(0) == 18 , "1+5+9+3";
+    }
+
+    def check_adapter_stored_closure_value_drives_map {
+        (eng, _) = compile_native("closures_adapters.jac");
+
+        f = get_func(eng, "map_stored_closure", ctypes.c_int64, ctypes.c_int64);
+        assert f(7) == 44 , "(10+7)+(20+7)";
+    }
+
+    def check_adapter_named_nested_closure_passed_to_map_by_na {
+        (eng, _) = compile_native("closures_adapters.jac");
+
+        f = get_func(eng, "map_named_capture", ctypes.c_int64, ctypes.c_int64);
+        assert f(10) == 50 , "20+30";
+    }
+
+    def check_adapter_capturing_filter_chained_into_capturing {
+        (eng, _) = compile_native("closures_adapters.jac");
+
+        f = get_func(
+            eng, "filter_then_map", ctypes.c_int64, ctypes.c_int64, ctypes.c_int64
+        );
+        assert f(3, 2) == 14 , "(3+4)*2";
+    }
+    run_cases(
+        [
+            (
+                "adapter: map with a capturing lambda callback",
+                check_adapter_map_with_a_capturing_lambda_callback
+            ),
+            (
+                "adapter: filter with a capturing lambda predicate",
+                check_adapter_filter_with_a_capturing_lambda_predicate
+            ),
+            (
+                "adapter: stored closure value drives map",
+                check_adapter_stored_closure_value_drives_map
+            ),
+            (
+                "adapter: named nested closure passed to map by name",
+                check_adapter_named_nested_closure_passed_to_map_by_na
+            ),
+            (
+                "adapter: capturing filter chained into capturing map",
+                check_adapter_capturing_filter_chained_into_capturing
+            )
+        ]
     );
 }
 
-test "adapter: map with a capturing lambda callback" {
-    (eng, _) = compile_native("closures_adapters.jac");
-    f = get_func(eng, "scale_all", ctypes.c_int64, ctypes.c_int64);
-    assert f(3) == 18 , "3+6+9";
-    assert f(0) == 0;
-}
 
-test "adapter: filter with a capturing lambda predicate" {
-    (eng, _) = compile_native("closures_adapters.jac");
-    f = get_func(eng, "keep_over", ctypes.c_int64, ctypes.c_int64);
-    assert f(4) == 14 , "5+9";
-    assert f(0) == 18 , "1+5+9+3";
-}
+test "frame scan: cases on closures_frames.jac" {
+    def check_frame_scan_closure_escaping_an_event_method_fram {
+        (eng, _) = compile_native("closures_frames.jac");
 
-test "adapter: stored closure value drives map" {
-    (eng, _) = compile_native("closures_adapters.jac");
-    f = get_func(eng, "map_stored_closure", ctypes.c_int64, ctypes.c_int64);
-    assert f(7) == 44 , "(10+7)+(20+7)";
-}
+        f = get_func(eng, "event_frame_escape", ctypes.c_int64, ctypes.c_int64);
+        assert f(3) == 30 , "here.val captured, f(10) = 10*3";
+    }
 
-test "adapter: named nested closure passed to map by name" {
-    (eng, _) = compile_native("closures_adapters.jac");
-    f = get_func(eng, "map_named_capture", ctypes.c_int64, ctypes.c_int64);
-    assert f(10) == 50 , "20+30";
-}
+    def check_frame_scan_closure_escaping_a_no_signature_metho {
+        (eng, _) = compile_native("closures_frames.jac");
 
-test "adapter: capturing filter chained into capturing map" {
-    (eng, _) = compile_native("closures_adapters.jac");
-    f = get_func(
-        eng, "filter_then_map", ctypes.c_int64, ctypes.c_int64, ctypes.c_int64
+        f = get_func(eng, "nosig_frame_escape", ctypes.c_int64, ctypes.c_int64);
+        assert f(9) == 109 , "base captured, f(100) = 100+9";
+    }
+
+    def check_frame_scan_lambda_escaping_a_global_initializer {
+        (eng, _) = compile_native("closures_frames.jac");
+
+        entry_fn = get_func(eng, "jac_entry", None);
+        entry_fn();
+        f = get_func(eng, "globinit_lambda", ctypes.c_int64, ctypes.c_int64);
+        assert f(5) == 15;
+    }
+
+    def check_frame_scan_lambda_escaping_the_module_entry_fram {
+        (eng, _) = compile_native("closures_frames.jac");
+
+        entry_fn = get_func(eng, "jac_entry", None);
+        entry_fn();
+        f = get_func(eng, "entry_frame_escape", ctypes.c_int64);
+        assert f() == 8 , "entry-frame lambda called through the list, f(1) = 1+7";
+    }
+    run_cases(
+        [
+            (
+                "frame scan: closure escaping an event-method frame",
+                check_frame_scan_closure_escaping_an_event_method_fram
+            ),
+            (
+                "frame scan: closure escaping a no-signature method frame",
+                check_frame_scan_closure_escaping_a_no_signature_metho
+            ),
+            (
+                "frame scan: lambda escaping a global initializer",
+                check_frame_scan_lambda_escaping_a_global_initializer
+            ),
+            (
+                "frame scan: lambda escaping the module entry frame",
+                check_frame_scan_lambda_escaping_the_module_entry_fram
+            )
+        ]
     );
-    assert f(3, 2) == 14 , "(3+4)*2";
 }
 
-test "frame scan: closure escaping an event-method frame" {
-    (eng, _) = compile_native("closures_frames.jac");
-    f = get_func(eng, "event_frame_escape", ctypes.c_int64, ctypes.c_int64);
-    assert f(3) == 30 , "here.val captured, f(10) = 10*3";
-}
-
-test "frame scan: closure escaping a no-signature method frame" {
-    (eng, _) = compile_native("closures_frames.jac");
-    f = get_func(eng, "nosig_frame_escape", ctypes.c_int64, ctypes.c_int64);
-    assert f(9) == 109 , "base captured, f(100) = 100+9";
-}
-
-test "frame scan: lambda escaping a global initializer" {
-    (eng, _) = compile_native("closures_frames.jac");
-    entry_fn = get_func(eng, "jac_entry", None);
-    entry_fn();
-    f = get_func(eng, "globinit_lambda", ctypes.c_int64, ctypes.c_int64);
-    assert f(5) == 15;
-}
-
-test "frame scan: lambda escaping the module entry frame" {
-    (eng, _) = compile_native("closures_frames.jac");
-    entry_fn = get_func(eng, "jac_entry", None);
-    entry_fn();
-    f = get_func(eng, "entry_frame_escape", ctypes.c_int64);
-    assert f() == 8 , "entry-frame lambda called through the list, f(1) = 1+7";
-}
 
 test "entry lambda reading an entry-assigned name lowers as a global read" {
     # Python treats `with entry` assignments as module globals; the native

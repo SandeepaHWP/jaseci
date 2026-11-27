@@ -17,7 +17,7 @@ import from jaclang.compiler.driver.compile_options {
 }
 import subprocess;
 import tempfile;
-import from tests.support { jac_command, TESTS_DIR }
+import from tests.support { jac_command, TESTS_DIR, run_cases }
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.driver.compile_options { CompileOptions }
 import from jaclang.compiler.passes.rc_facts_pass { loop_body_locals }
@@ -57,15 +57,34 @@ test "unrooted spawn desugars to one anonymous open" {
     );
 }
 
-test "root contact declines the inference" {
-    ir = _compile_mod("anon_region_rooted.jac");
-    assert not ir.get_all_sub_nodes(uni.OpenStmt) , ir.get_all_sub_nodes(uni.OpenStmt);
+test "root contact declines the inference, and related cases" {
+    def check_root_contact_declines_the_inference {
+        ir = _compile_mod("anon_region_rooted.jac");
+        assert not ir.get_all_sub_nodes(uni.OpenStmt) , ir.get_all_sub_nodes(
+            uni.OpenStmt
+        );
+    }
+
+    def check_escaping_member_declines_the_inference {
+        ir = _compile_mod("anon_region_escape.jac");
+        assert not ir.get_all_sub_nodes(uni.OpenStmt) , ir.get_all_sub_nodes(
+            uni.OpenStmt
+        );
+    }
+    run_cases(
+        [
+            (
+                "root contact declines the inference",
+                check_root_contact_declines_the_inference
+            ),
+            (
+                "escaping member declines the inference",
+                check_escaping_member_declines_the_inference
+            )
+        ]
+    );
 }
 
-test "escaping member declines the inference" {
-    ir = _compile_mod("anon_region_escape.jac");
-    assert not ir.get_all_sub_nodes(uni.OpenStmt) , ir.get_all_sub_nodes(uni.OpenStmt);
-}
 
 test "inferred region drops LIFO at close in every gc mode" {
     with tempfile.TemporaryDirectory() as tmp {

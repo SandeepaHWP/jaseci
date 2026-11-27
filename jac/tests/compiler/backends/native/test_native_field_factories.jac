@@ -1,20 +1,35 @@
 import ctypes;
 import jaclang.compiler.frontend.unitree as uni;
-import from tests.support { compile_native, get_func }
+import from tests.support { compile_native, get_func, run_cases }
 
-test "native field factories use ordinary calls and fresh values per instance" {
-    (engine, _) = compile_native("native_field_factories.jac");
-    probe = get_func(engine, "probe", ctypes.c_bool);
-    assert probe();
-    assert probe();
+test "native field factories use ordinary calls and fresh values per instance, and related cases" {
+    def check_native_field_factories_use_ordinary_calls_and_fr {
+        (engine, _) = compile_native("native_field_factories.jac");
+        probe = get_func(engine, "probe", ctypes.c_bool);
+        assert probe();
+        assert probe();
+    }
+
+    def check_field_helpers_preserve_deferred_and_keyword_only {
+        (engine, _) = compile_native("native_object_field_descriptors.jac");
+        probe = get_func(engine, "probe", ctypes.c_bool);
+        assert probe();
+        assert probe();
+    }
+    run_cases(
+        [
+            (
+                "native field factories use ordinary calls and fresh values per instance",
+                check_native_field_factories_use_ordinary_calls_and_fr
+            ),
+            (
+                "field helpers preserve deferred and keyword-only constructor slots",
+                check_field_helpers_preserve_deferred_and_keyword_only
+            )
+        ]
+    );
 }
 
-test "field helpers preserve deferred and keyword-only constructor slots" {
-    (engine, _) = compile_native("native_object_field_descriptors.jac");
-    probe = get_func(engine, "probe", ctypes.c_bool);
-    assert probe();
-    assert probe();
-}
 
 test "synthetic pipe calls preserve the source graph after lowering" {
     # A synthetic call left linked to its operands only goes away at a cycle

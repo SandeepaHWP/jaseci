@@ -32,7 +32,8 @@ import from tests.support {
     TESTS_DIR,
     native_force_opts,
     python_run,
-    compile_native_ir
+    compile_native_ir,
+    run_cases
 }
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.passes.layout_pass { get_layout_registry }
@@ -102,30 +103,45 @@ test "the enum-constructor fixture lowers with no seam" {
 }
 
 
-test "the call validates against every declared member" {
-    ir = compile_native_ir("enum_ctor.jac");
-    text = str(ir.gen.llvm_ir);
-    for member in ("Null", "Instantiable", "Instance", "Ambiguous") {
-        assert f"ec.Flags.{member}" in text , (
-            f"'{member}' is missing from the validation table, so a value it "
-            f"carries would be rejected"
+test "enum_ctor.jac cases" {
+    def check_the_call_validates_against_every_declared_member {
+        ir = compile_native_ir("enum_ctor.jac");
+
+        text = str(ir.gen.llvm_ir);
+        for member in ("Null", "Instantiable", "Instance", "Ambiguous") {
+            assert f"ec.Flags.{member}" in text , (
+                f"'{member}' is missing from the validation table, so a value it "
+                f"carries would be rejected"
+            );
+        }
+        assert "raise.ValueError" in text , (
+            "the call lowered to the identity; an undeclared value would pass "
+            "through as a member"
         );
     }
-    assert "raise.ValueError" in text , (
-        "the call lowered to the identity; an undeclared value would pass "
-        "through as a member"
+
+    def check_the_declared_enum_spelling_validates_the_same_wa {
+        ir = compile_native_ir("enum_ctor.jac");
+
+        text = str(ir.gen.llvm_ir);
+        for member in ("LOW", "MID", "HIGH") {
+            assert f"ec.Level.{member}" in text , (
+                f"'{member}' is missing from the declared enum's table"
+            );
+        }
+    }
+    run_cases(
+        [
+            (
+                "the call validates against every declared member",
+                check_the_call_validates_against_every_declared_member
+            ),
+            (
+                "the declared-enum spelling validates the same way",
+                check_the_declared_enum_spelling_validates_the_same_wa
+            )
+        ]
     );
-}
-
-
-test "the declared-enum spelling validates the same way" {
-    ir = compile_native_ir("enum_ctor.jac");
-    text = str(ir.gen.llvm_ir);
-    for member in ("LOW", "MID", "HIGH") {
-        assert f"ec.Level.{member}" in text , (
-            f"'{member}' is missing from the declared enum's table"
-        );
-    }
 }
 
 
@@ -137,13 +153,37 @@ test "declared and undeclared values answer as CPython does" {
 }
 
 
-test "a noninteger input to an integer enum refuses by name" {
-    seams = seam_report("xmod_demote_dyn_lib.jac");
-    assert "enum constructor 'Hue'" in seams , (
-        f"the floating-point input lowered silently:\n{seams}"
-    );
-    assert "from_code" in seams , (
-        f"the refusal did not demote the callable that owns it:\n{seams}"
+test "a noninteger input to an integer enum refuses by name, and related cases" {
+    def check_a_noninteger_input_to_an_integer_enum_refuses_by {
+        seams = seam_report("xmod_demote_dyn_lib.jac");
+        assert "enum constructor 'Hue'" in seams , (
+            f"the floating-point input lowered silently:\n{seams}"
+        );
+        assert "from_code" in seams , (
+            f"the refusal did not demote the callable that owns it:\n{seams}"
+        );
+    }
+
+    def check_a_non_integer_argument_or_a_computed_enum_target {
+        seams = seam_report("enum_ctor_bad_arg.jac");
+        assert "enum constructor 'Level'" in seams , (
+            f"a float argument was coerced into the member table:\n{seams}"
+        );
+        assert "demoting picked" in seams , (
+            f"the member lookup skipped evaluating its target:\n{seams}"
+        );
+    }
+    run_cases(
+        [
+            (
+                "a noninteger input to an integer enum refuses by name",
+                check_a_noninteger_input_to_an_integer_enum_refuses_by
+            ),
+            (
+                "a non-integer argument or a computed enum target refuses",
+                check_a_non_integer_argument_or_a_computed_enum_target
+            )
+        ]
     );
 }
 
@@ -171,17 +211,6 @@ test "a same-named local function is not read as the enum" {
     assert sv == ["6", "12"] , f"server lane printed {sv}";
     na = na_lines("enum_ctor_shadow_main.jac");
     assert na == sv , f"native {na} != server {sv}";
-}
-
-
-test "a non-integer argument or a computed enum target refuses" {
-    seams = seam_report("enum_ctor_bad_arg.jac");
-    assert "enum constructor 'Level'" in seams , (
-        f"a float argument was coerced into the member table:\n{seams}"
-    );
-    assert "demoting picked" in seams , (
-        f"the member lookup skipped evaluating its target:\n{seams}"
-    );
 }
 
 

@@ -4,7 +4,7 @@ from a fresh slice leaked one buffer per field (about 48 bytes a call).
 The fixture unpacks three million temporaries in each form; peak RSS has to
 stay flat instead of growing by ~150 MB."""
 
-import from tests.support { jac_command }
+import from tests.support { jac_command, run_cases }
 import os;
 import re;
 import subprocess;
@@ -57,26 +57,48 @@ def _run(mode: str) -> tuple[int, str] {
     return (rss, proc.stdout.strip());
 }
 
-test "unpack releases a temporary slice" {
-    (rss, out) = _run("u16");
-    assert out == "u16 1539000000" , out;
-    assert 0 <= rss < 40 , f"peak RSS {rss} MB";
-}
+test "unpack releases a temporary slice, and related cases" {
+    def check_unpack_releases_a_temporary_slice {
+        (rss, out) = _run("u16");
+        assert out == "u16 1539000000" , out;
+        assert 0 <= rss < 40 , f"peak RSS {rss} MB";
+    }
 
-test "unpack of a float releases a temporary slice" {
-    (rss, out) = _run("f32");
-    assert out == "f32 3000000" , out;
-    assert 0 <= rss < 40 , f"peak RSS {rss} MB";
-}
+    def check_unpack_of_a_float_releases_a_temporary_slice {
+        (rss, out) = _run("f32");
+        assert out == "f32 3000000" , out;
+        assert 0 <= rss < 40 , f"peak RSS {rss} MB";
+    }
 
-test "unpack_from releases a temporary slice" {
-    (rss, out) = _run("from");
-    assert out == "from 3081000000" , out;
-    assert 0 <= rss < 40 , f"peak RSS {rss} MB";
-}
+    def check_unpack_from_releases_a_temporary_slice {
+        (rss, out) = _run("from");
+        assert out == "from 3081000000" , out;
+        assert 0 <= rss < 40 , f"peak RSS {rss} MB";
+    }
 
-test "unpack releases a temporary bytearray" {
-    (rss, out) = _run("bytearray");
-    assert out == "bytearray 1539000000" , out;
-    assert 0 <= rss < 40 , f"peak RSS {rss} MB";
+    def check_unpack_releases_a_temporary_bytearray {
+        (rss, out) = _run("bytearray");
+        assert out == "bytearray 1539000000" , out;
+        assert 0 <= rss < 40 , f"peak RSS {rss} MB";
+    }
+    run_cases(
+        [
+            (
+                "unpack releases a temporary slice",
+                check_unpack_releases_a_temporary_slice
+            ),
+            (
+                "unpack of a float releases a temporary slice",
+                check_unpack_of_a_float_releases_a_temporary_slice
+            ),
+            (
+                "unpack_from releases a temporary slice",
+                check_unpack_from_releases_a_temporary_slice
+            ),
+            (
+                "unpack releases a temporary bytearray",
+                check_unpack_releases_a_temporary_bytearray
+            )
+        ]
+    );
 }

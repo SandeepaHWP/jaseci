@@ -12,7 +12,7 @@ pair of mutually-importing services that close an app cycle.
 import from jaclang.compiler.backends.py.codegen_shim { generated_python }
 import os;
 import re;
-import from tests.support { JAC_ROOT }
+import from tests.support { JAC_ROOT, run_cases }
 import jaclang.compiler.frontend.unitree as uni;
 import from jaclang.compiler.driver.boundary_classify {
     CrossAppKind,
@@ -70,39 +70,53 @@ def codes(prog: JacProgram) -> list[str] {
     ];
 }
 
-test "same-app import is LOCAL" {
-    (prog, mod) = compile_fixture(fixture("web", "main.jac"));
-    imp = import_of(mod, "helpers");
-    assert classify_cross_app_import(imp, None) == CrossAppKind.LOCAL;
-    assert not imp.is_service_import;
-    assert not import_crosses_apps(imp);
-    assert import_provider_app(imp) is None;
+test "main.jac cases" {
+    def check_same_app_import_is_local {
+        (prog, mod) = compile_fixture(fixture("web", "main.jac"));
+
+        imp = import_of(mod, "helpers");
+        assert classify_cross_app_import(imp, None) == CrossAppKind.LOCAL;
+        assert not imp.is_service_import;
+        assert not import_crosses_apps(imp);
+        assert import_provider_app(imp) is None;
+    }
+
+    def check_server_context_import_of_another_serving_app_is {
+        (prog, mod) = compile_fixture(fixture("web", "main.jac"));
+
+        imp = import_of(mod, "social_app");
+        assert classify_cross_app_import(imp, None) == CrossAppKind.SERVICE_BRIDGE;
+        assert imp.is_service_import , (
+            "Import.is_service_import is the SERVICE_BRIDGE verdict"
+        );
+        assert import_provider_app(imp) == "social";
+        assert import_provider_route(imp) == "/api/social";
+        assert not is_client_boundary_import(imp);
+        manifest = mod.gen.interop_manifest;
+        assert ("web", "social") in manifest.app_edges , (
+            f"consumer->provider edge must be recorded; got {manifest.app_edges}"
+        );
+        assert manifest.provider_routes.get("social") == "/api/social";
+        greet = manifest.bindings.get("greet");
+        assert greet is not None and greet.provider_app == "social";
+        walker_binding = manifest.bindings.get("Greet");
+        assert walker_binding is not None and walker_binding.kind == "walker" , (
+            "an exposed (:protect) walker bridges like a :pub one"
+        );
+        assert "E5106" not in codes(prog) , f"{[str(e) for e in prog.errors_had]}";
+        assert "E5104" not in codes(prog);
+    }
+    run_cases(
+        [
+            ("same-app import is LOCAL", check_same_app_import_is_local),
+            (
+                "server-context import of another serving app is SERVICE_BRIDGE",
+                check_server_context_import_of_another_serving_app_is
+            )
+        ]
+    );
 }
 
-test "server-context import of another serving app is SERVICE_BRIDGE" {
-    (prog, mod) = compile_fixture(fixture("web", "main.jac"));
-    imp = import_of(mod, "social_app");
-    assert classify_cross_app_import(imp, None) == CrossAppKind.SERVICE_BRIDGE;
-    assert imp.is_service_import , (
-        "Import.is_service_import is the SERVICE_BRIDGE verdict"
-    );
-    assert import_provider_app(imp) == "social";
-    assert import_provider_route(imp) == "/api/social";
-    assert not is_client_boundary_import(imp);
-    manifest = mod.gen.interop_manifest;
-    assert ("web", "social") in manifest.app_edges , (
-        f"consumer->provider edge must be recorded; got {manifest.app_edges}"
-    );
-    assert manifest.provider_routes.get("social") == "/api/social";
-    greet = manifest.bindings.get("greet");
-    assert greet is not None and greet.provider_app == "social";
-    walker_binding = manifest.bindings.get("Greet");
-    assert walker_binding is not None and walker_binding.kind == "walker" , (
-        "an exposed (:protect) walker bridges like a :pub one"
-    );
-    assert "E5106" not in codes(prog) , f"{[str(e) for e in prog.errors_had]}";
-    assert "E5104" not in codes(prog);
-}
 
 test "bridging to a private element of another app is E5106" {
     cases = [

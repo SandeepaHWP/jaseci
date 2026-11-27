@@ -41,7 +41,13 @@ import from jaclang.compiler.driver.na_coverage { na_coverage_begin, na_coverage
 import from jaclang.compiler.frontend.parser { parse as rd_parse }
 import from jaclang.compiler.placement.placement { scan_native_blockers }
 import from jaclang.compiler.driver.program { JacProgram }
-import from tests.support { TESTS_DIR, by_source_name, native_address, source_spelled }
+import from tests.support {
+    TESTS_DIR,
+    by_source_name,
+    native_address,
+    source_spelled,
+    run_cases
+}
 
 glob FIXTURES = os.path.join(
          TESTS_DIR, "compiler", "backends", "native", "fixtures"
@@ -134,11 +140,33 @@ def _seams_of(coverage: dict[str, any], fixture: str) -> list[str] {
 }
 
 
-test "a from-imported Python base is classified, not waved through" {
-    assert _rejected_imports("from_import_retained_base.jac") == ["threading"] , (
-        "the capability gate read the `from` import's items and found no "
-        "module to classify, so an unlowerable Python base reached codegen "
-        "unchallenged"
+test "a from-imported Python base is classified, not waved through, and related cases" {
+    def check_a_from_imported_python_base_is_classified_not_wa {
+        assert _rejected_imports("from_import_retained_base.jac") == ["threading"] , (
+            "the capability gate read the `from` import's items and found no "
+            "module to classify, so an unlowerable Python base reached codegen "
+            "unchallenged"
+        );
+    }
+
+    def check_a_non_erasable_name_from_a_compile_time_module_s {
+        assert _rejected_imports("from_import_abc_mixed.jac") == ["abc"] , (
+            "the compile-time vocabulary is per name, not per module: `ABC` "
+            "erases and `abstractmethod` does not, so listing both must refuse "
+            "exactly as it does at placement"
+        );
+    }
+    run_cases(
+        [
+            (
+                "a from-imported Python base is classified, not waved through",
+                check_a_from_imported_python_base_is_classified_not_wa
+            ),
+            (
+                "a non-erasable name from a compile-time module still refuses",
+                check_a_non_erasable_name_from_a_compile_time_module_s
+            )
+        ]
     );
 }
 
@@ -163,21 +191,48 @@ test "the from-imported Python base refuses instead of lowering" {
 }
 
 
-test "the inferred-placement verdict on that import is unchanged" {
-    assert _scan_verdict(_module_with("import from threading { Event }"))
-        == "unresolved import 'threading'" , (
-        "`scan_native_blockers` already refused this import through "
-        "`imp.from_loc`; closing the forced-native hole must not move the "
-        "inferred path at all"
-    );
-}
+test "the inferred-placement verdict on that import is unchanged, and related cases" {
+    def check_the_inferred_placement_verdict_on_that_import_is {
+        assert _scan_verdict(_module_with("import from threading { Event }"))
+            == "unresolved import 'threading'" , (
+            "`scan_native_blockers` already refused this import through "
+            "`imp.from_loc`; closing the forced-native hole must not move the "
+            "inferred path at all"
+        );
+    }
 
+    def check_a_typealias_import_no_longer_blocks_native_place {
+        assert _scan_verdict(_module_with("import from typing { TypeAlias }"))
+            == "OK" , (
+            "native glob lowering already skips a `TypeAlias` assignment as a "
+            "compile-time declaration; the import in front of it was all that "
+            "still demoted the module"
+        );
+    }
 
-test "a non-erasable name from a compile-time module still refuses" {
-    assert _rejected_imports("from_import_abc_mixed.jac") == ["abc"] , (
-        "the compile-time vocabulary is per name, not per module: `ABC` "
-        "erases and `abstractmethod` does not, so listing both must refuse "
-        "exactly as it does at placement"
+    def check_a_mixed_typing_import_is_still_judged_per_name {
+        assert _scan_verdict(_module_with("import from typing { ClassVar, Optional }"))
+            == "unresolved import 'typing'" , (
+            "the compile-time vocabulary is per name: adding `ClassVar` to it must "
+            "not wave through a `typing` import that also binds a name with no "
+            "compile-time reading"
+        );
+    }
+    run_cases(
+        [
+            (
+                "the inferred-placement verdict on that import is unchanged",
+                check_the_inferred_placement_verdict_on_that_import_is
+            ),
+            (
+                "a TypeAlias import no longer blocks native placement",
+                check_a_typealias_import_no_longer_blocks_native_place
+            ),
+            (
+                "a mixed typing import is still judged per name",
+                check_a_mixed_typing_import_is_still_judged_per_name
+            )
+        ]
     );
 }
 
@@ -193,15 +248,6 @@ test "compile-time from-imports stay compile-time" {
             f"native lane erases: {fixture}"
         );
     }
-}
-
-
-test "a TypeAlias import no longer blocks native placement" {
-    assert _scan_verdict(_module_with("import from typing { TypeAlias }")) == "OK" , (
-        "native glob lowering already skips a `TypeAlias` assignment as a "
-        "compile-time declaration; the import in front of it was all that "
-        "still demoted the module"
-    );
 }
 
 
@@ -221,16 +267,6 @@ test "a ClassVar import no longer blocks native placement" {
         "it is annotation-only, like `TypeAlias`, and the native lane already "
         "erases it. The import in front of it was all that still refused the "
         "module at placement"
-    );
-}
-
-
-test "a mixed typing import is still judged per name" {
-    assert _scan_verdict(_module_with("import from typing { ClassVar, Optional }"))
-        == "unresolved import 'typing'" , (
-        "the compile-time vocabulary is per name: adding `ClassVar` to it must "
-        "not wave through a `typing` import that also binds a name with no "
-        "compile-time reading"
     );
 }
 

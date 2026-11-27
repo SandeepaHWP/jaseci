@@ -14,6 +14,8 @@ are alternatives, not additions, and merging those would break construction.
 
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.compiler.driver.compile_options { CompileOptions }
+import from tests.support { run_cases }
+
 
 def check_src(src: str) -> list[str] {
     prog = JacProgram();
@@ -23,16 +25,39 @@ def check_src(src: str) -> list[str] {
     return [str(e) for e in prog.errors_had];
 }
 
-test "a class object exposes members its metaclass declares" {
-    src = "import enum;\n"
-        + "class Color(enum.Enum) {\n"
-        + "    RED = 1;\n"
-        + "}\n"
-        + "def probe -> None {\n"
-        + "    assert Color.__members__ is not None;\n"
-        + "}\n";
-    errs = check_src(src);
-    assert not errs , f"metaclass member invisible on class object: {errs}";
+test "a class object exposes members its metaclass declares, and related cases" {
+    def check_a_class_object_exposes_members_its_metaclass_dec {
+        src = "import enum;\n"
+            + "class Color(enum.Enum) {\n"
+            + "    RED = 1;\n"
+            + "}\n"
+            + "def probe -> None {\n"
+            + "    assert Color.__members__ is not None;\n"
+            + "}\n";
+        errs = check_src(src);
+        assert not errs , f"metaclass member invisible on class object: {errs}";
+    }
+
+    def check_version_gated_alternatives_do_not_merge_into_an {
+        src = "import from pathlib { Path }\n"
+            + "def probe(base: str) -> Path {\n"
+            + "    return Path(base) / 'sub';\n"
+            + "}\n";
+        errs = check_src(src);
+        assert not errs , f"gated constructor alternatives broke construction: {errs}";
+    }
+    run_cases(
+        [
+            (
+                "a class object exposes members its metaclass declares",
+                check_a_class_object_exposes_members_its_metaclass_dec
+            ),
+            (
+                "version-gated alternatives do not merge into an overload set",
+                check_version_gated_alternatives_do_not_merge_into_an
+            )
+        ]
+    );
 }
 
 test "a re-exported function retains every source stub overload" {
@@ -58,14 +83,6 @@ test "a re-exported function retains every source stub overload" {
     }
 }
 
-test "version-gated alternatives do not merge into an overload set" {
-    src = "import from pathlib { Path }\n"
-        + "def probe(base: str) -> Path {\n"
-        + "    return Path(base) / 'sub';\n"
-        + "}\n";
-    errs = check_src(src);
-    assert not errs , f"gated constructor alternatives broke construction: {errs}";
-}
 
 test "a local member does not evaluate shadowed conditional alternatives" {
     import from pathlib { Path }

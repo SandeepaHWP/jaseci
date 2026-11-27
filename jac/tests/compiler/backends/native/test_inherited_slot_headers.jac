@@ -29,7 +29,7 @@ identifies the header decision rather than the override as the cause.
 
 import os;
 import ctypes;
-import from tests.support { TESTS_DIR }
+import from tests.support { TESTS_DIR, run_cases }
 import from tests.support { by_source_name, compile_native, get_func, source_spelled }
 import from jaclang.compiler.driver.compile_options { CompileOptions }
 import from jaclang.compiler.driver.na_coverage { na_coverage_begin, na_coverage_end }
@@ -82,61 +82,92 @@ test "an abstract interface keeps its dispatch header across imported subclasses
     assert storage.field_index["values"] == child.field_index["values"];
 }
 
-test "separately compiled abstract dispatch and inherited fields execute together" {
-    (engine, _) = compile_native("abstract_slot_child.jac");
-    function = get_func(engine, "run_abstract_slots", ctypes.c_int64);
-    assert function() == 17;
-}
+test "abstract_slot_child.jac cases" {
+    def check_separately_compiled_abstract_dispatch_and_inheri {
+        (engine, _) = compile_native("abstract_slot_child.jac");
 
-test "an imported dispatcher invokes implementations absent from its own module" {
-    (engine, _) = compile_native("abstract_slot_child.jac");
-    function = get_func(engine, "run_imported_abstract_dispatch", ctypes.c_int64);
-    assert function() == 23;
-}
+        function = get_func(engine, "run_abstract_slots", ctypes.c_int64);
+        assert function() == 17;
+    }
 
+    def check_an_imported_dispatcher_invokes_implementations_a {
+        (engine, _) = compile_native("abstract_slot_child.jac");
 
-test "a child of an imported base carries the same header its base does" {
-    (ir, _coverage) = _compile(CHILD);
-    reg = ir.gen.layout_registry;
-    assert reg is not None , "no layout registry was built";
-    base = by_source_name(reg.layouts).get("SlotBase");
-    child = by_source_name(reg.layouts).get("SlotChild");
-    assert base is not None and child is not None , (
-        f"both layouts must be present, got: {sorted(by_source_name(reg.layouts))}"
-    );
-    assert base.vtable_ptr_slot == child.vtable_ptr_slot , (
-        f"the header slots must agree or no slot assignment satisfies both: "
-        f"base vtable_ptr_slot={base.vtable_ptr_slot}, "
-        f"child vtable_ptr_slot={child.vtable_ptr_slot}"
-    );
-    assert base.has_vtable and child.has_vtable , (
-        "SlotBase declares a method a module it never sees may override, and "
-        "SlotChild does, so a call through a SlotBase reference must dispatch: "
-        "both carry the vtable"
+        function = get_func(engine, "run_imported_abstract_dispatch", ctypes.c_int64);
+        assert function() == 23;
+    }
+    run_cases(
+        [
+            (
+                "separately compiled abstract dispatch and inherited fields execute together",
+                check_separately_compiled_abstract_dispatch_and_inheri
+            ),
+            (
+                "an imported dispatcher invokes implementations absent from its own module",
+                check_an_imported_dispatcher_invokes_implementations_a
+            )
+        ]
     );
 }
 
 
-test "the child adopts the base's slot assignment verbatim" {
-    (ir, _coverage) = _compile(CHILD);
-    reg = ir.gen.layout_registry;
-    base = by_source_name(reg.layouts).get("SlotBase");
-    child = by_source_name(reg.layouts).get("SlotChild");
-    for finfo in base.fields {
-        assert finfo.name in child.field_index , (
-            f"the child's layout is missing the inherited field "
-            f"'{finfo.name}' -- declined adoption leaves it out entirely: "
-            f"{sorted(child.field_index)}"
+test "a child of an imported base carries the same header its base does, and related cases" {
+    def check_a_child_of_an_imported_base_carries_the_same_hea {
+        (ir, _coverage) = _compile(CHILD);
+
+        reg = ir.gen.layout_registry;
+        assert reg is not None , "no layout registry was built";
+        base = by_source_name(reg.layouts).get("SlotBase");
+        child = by_source_name(reg.layouts).get("SlotChild");
+        assert base is not None and child is not None , (
+            f"both layouts must be present, got: {sorted(by_source_name(reg.layouts))}"
         );
-        assert child.field_index[finfo.name] == finfo.index , (
-            f"inherited field '{finfo.name}' sits at {child.field_index[
-                finfo.name
-            ]} in the child and {finfo.index} in the base that declared it; "
-            f"the two units would read the object at different offsets"
+        assert base.vtable_ptr_slot == child.vtable_ptr_slot , (
+            f"the header slots must agree or no slot assignment satisfies both: "
+            f"base vtable_ptr_slot={base.vtable_ptr_slot}, "
+            f"child vtable_ptr_slot={child.vtable_ptr_slot}"
+        );
+        assert base.has_vtable and child.has_vtable , (
+            "SlotBase declares a method a module it never sees may override, and "
+            "SlotChild does, so a call through a SlotBase reference must dispatch: "
+            "both carry the vtable"
         );
     }
-    assert "own_field" in child.field_index , (
-        "the child's own field must still be placed after the adopted ones"
+
+    def check_the_child_adopts_the_base_s_slot_assignment_verb {
+        (ir, _coverage) = _compile(CHILD);
+
+        reg = ir.gen.layout_registry;
+        base = by_source_name(reg.layouts).get("SlotBase");
+        child = by_source_name(reg.layouts).get("SlotChild");
+        for finfo in base.fields {
+            assert finfo.name in child.field_index , (
+                f"the child's layout is missing the inherited field "
+                f"'{finfo.name}' -- declined adoption leaves it out entirely: "
+                f"{sorted(child.field_index)}"
+            );
+            assert child.field_index[finfo.name] == finfo.index , (
+                f"inherited field '{finfo.name}' sits at {child.field_index[
+                    finfo.name
+                ]} in the child and {finfo.index} in the base that declared it; "
+                f"the two units would read the object at different offsets"
+            );
+        }
+        assert "own_field" in child.field_index , (
+            "the child's own field must still be placed after the adopted ones"
+        );
+    }
+    run_cases(
+        [
+            (
+                "a child of an imported base carries the same header its base does",
+                check_a_child_of_an_imported_base_carries_the_same_hea
+            ),
+            (
+                "the child adopts the base's slot assignment verbatim",
+                check_the_child_adopts_the_base_s_slot_assignment_verb
+            )
+        ]
     );
 }
 

@@ -16,6 +16,8 @@ import jaclang;
 import from jaclang.compiler.driver.compile_options { CompileOptions }
 import from jaclang.compiler.driver.program { JacProgram }
 import from jaclang.runtime.runtime { JacRuntime }
+import from tests.support { run_cases }
+
 
 glob JACLANG_DIR: str = os.path.dirname(os.path.realpath(str(jaclang.__file__))),
      HYDRATION_TARGET: str = "server/serving/openapi.jac",
@@ -158,23 +160,37 @@ test "variadic tuple annotations resolve ellipsis on cold and warm checks" {
 }
 
 
-test "bundled app dependencies retain their compilation context" {
-    compiler = JacRuntime.get_compiler();
-    program = JacProgram();
-    app_source = _tree_path('scale/admin/ui/constants/users.jac');
-    assert compiler.selfhost.resolve(app_source, program) is program;
-    compiler_source = _tree_path('compiler/driver/pipeline.jac');
-    assert compiler.selfhost.resolve(compiler_source, program)
-        is compiler.selfhost.program;
-}
+test "bundled app dependencies retain their compilation context, and related cases" {
+    def check_bundled_app_dependencies_retain_their_compilatio {
+        compiler = JacRuntime.get_compiler();
+        program = JacProgram();
+        app_source = _tree_path('scale/admin/ui/constants/users.jac');
+        assert compiler.selfhost.resolve(app_source, program) is program;
+        compiler_source = _tree_path('compiler/driver/pipeline.jac');
+        assert compiler.selfhost.resolve(compiler_source, program)
+            is compiler.selfhost.program;
+    }
 
-test "executing a compiler-tree module leaves the program's own context unclaimed" {
-    compiler = JacRuntime.get_compiler();
-    program = JacProgram();
-    compiler.get_native_interop_setup(
-        _tree_path('compiler/driver/pipeline.jac'), program
+    def check_executing_a_compiler_tree_module_leaves_the_prog {
+        compiler = JacRuntime.get_compiler();
+        program = JacProgram();
+        compiler.get_native_interop_setup(
+            _tree_path('compiler/driver/pipeline.jac'), program
+        );
+        compiler.get_native_layout(_tree_path('compiler/driver/pipeline.jac'), program);
+        assert not program.context_key;
+        assert not program.contexts;
+    }
+    run_cases(
+        [
+            (
+                "bundled app dependencies retain their compilation context",
+                check_bundled_app_dependencies_retain_their_compilatio
+            ),
+            (
+                "executing a compiler-tree module leaves the program's own context unclaimed",
+                check_executing_a_compiler_tree_module_leaves_the_prog
+            )
+        ]
     );
-    compiler.get_native_layout(_tree_path('compiler/driver/pipeline.jac'), program);
-    assert not program.context_key;
-    assert not program.contexts;
 }

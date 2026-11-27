@@ -9,7 +9,13 @@ shape it would take on the `sv` pathway.
 
 import ctypes;
 import os;
-import from tests.support { TESTS_DIR, compile_native, get_func, native_force_opts }
+import from tests.support {
+    TESTS_DIR,
+    compile_native,
+    get_func,
+    native_force_opts,
+    run_cases
+}
 
 glob FIXTURES = os.path.join(
          TESTS_DIR, "compiler", "backends", "native", "fixtures"
@@ -44,59 +50,102 @@ def capture_stdout(fn: object) -> bytes {
     return data;
 }
 
-# --- str(obj) ---
-test "str(obj) dispatches to __str__" {
-    (eng, _) = compile_native("obj_str.jac");
-    f = get_func(eng, "obj_str", ctypes.c_char_p);
-    assert f() == b"hello";
-}
+test "obj_str.jac cases" {
+    # --- str(obj) ---
+    def check_str_obj_dispatches_to_str {
+        (eng, _) = compile_native("obj_str.jac");
 
-test "str(obj) with a computed (f-string) __str__" {
-    (eng, _) = compile_native("obj_str.jac");
-    f = get_func(eng, "obj_str_computed", ctypes.c_char_p);
-    assert f() == b"Q(42)";
-}
+        f = get_func(eng, "obj_str", ctypes.c_char_p);
+        assert f() == b"hello";
+    }
 
-# --- f"{obj}" ---
-test "f-string interpolates obj via __str__" {
-    (eng, _) = compile_native("obj_str.jac");
-    f = get_func(eng, "obj_in_fstring", ctypes.c_char_p);
-    assert f() == b"[world]";
-}
+    def check_str_obj_with_a_computed_f_string_str {
+        (eng, _) = compile_native("obj_str.jac");
 
-# --- default repr fallback (no __str__) ---
-test "str(obj) without __str__ writes the object's fields, as the Python tier does" {
-    (eng, _) = compile_native("obj_str.jac");
-    f = get_func(eng, "obj_default_repr", ctypes.c_char_p);
-    got = f();
-    assert got == b"Plain(x=7)" , f"got: {got!r}";
-}
+        f = get_func(eng, "obj_str_computed", ctypes.c_char_p);
+        assert f() == b"Q(42)";
+    }
 
-# --- polymorphism (vtable dispatch through a base-typed receiver) ---
-test "str(obj) resolves the runtime subclass __str__" {
-    (eng, _) = compile_native("obj_str.jac");
-    f = get_func(eng, "poly_str", ctypes.c_char_p);
-    assert f() == b"Dog:rex";
-}
+    # --- f"{obj}" ---
+    def check_f_string_interpolates_obj_via_str {
+        (eng, _) = compile_native("obj_str.jac");
 
-test "str(obj) on a base instance uses the base __str__" {
-    (eng, _) = compile_native("obj_str.jac");
-    f = get_func(eng, "base_str", ctypes.c_char_p);
-    assert f() == b"Animal:generic";
-}
+        f = get_func(eng, "obj_in_fstring", ctypes.c_char_p);
+        assert f() == b"[world]";
+    }
 
-# --- null receiver (T | None) ---
-test "str(obj) on a null (None) struct pointer renders \"None\", not a crash" {
-    (eng, _) = compile_native("obj_str.jac");
-    f = get_func(eng, "maybe_str", ctypes.c_char_p, ctypes.c_int64);
-    assert f(1) == b"set";
-    assert f(0) == b"None";
-}
+    # --- default repr fallback (no __str__) ---
+    def check_str_obj_without_str_writes_the_object_s_fields_a {
+        (eng, _) = compile_native("obj_str.jac");
 
-# --- print(obj) ---
-test "print(obj) writes __str__ to stdout" {
-    (eng, _) = compile_native("obj_str.jac");
-    `entry = get_func(eng, "jac_entry", None);
-    got = capture_stdout(`entry);
-    assert got == b"printed\n" , got;
+        f = get_func(eng, "obj_default_repr", ctypes.c_char_p);
+        got = f();
+        assert got == b"Plain(x=7)" , f"got: {got!r}";
+    }
+
+    # --- polymorphism (vtable dispatch through a base-typed receiver) ---
+    def check_str_obj_resolves_the_runtime_subclass_str {
+        (eng, _) = compile_native("obj_str.jac");
+
+        f = get_func(eng, "poly_str", ctypes.c_char_p);
+        assert f() == b"Dog:rex";
+    }
+
+    def check_str_obj_on_a_base_instance_uses_the_base_str {
+        (eng, _) = compile_native("obj_str.jac");
+
+        f = get_func(eng, "base_str", ctypes.c_char_p);
+        assert f() == b"Animal:generic";
+    }
+
+    # --- null receiver (T | None) ---
+    def check_str_obj_on_a_null_none_struct_pointer_renders_no {
+        (eng, _) = compile_native("obj_str.jac");
+
+        f = get_func(eng, "maybe_str", ctypes.c_char_p, ctypes.c_int64);
+        assert f(1) == b"set";
+        assert f(0) == b"None";
+    }
+
+    # --- print(obj) ---
+    def check_print_obj_writes_str_to_stdout {
+        (eng, _) = compile_native("obj_str.jac");
+
+        `entry = get_func(eng, "jac_entry", None);
+        got = capture_stdout(`entry);
+        assert got == b"printed\n" , got;
+    }
+    run_cases(
+        [
+            ("str(obj) dispatches to __str__", check_str_obj_dispatches_to_str),
+            (
+                "str(obj) with a computed (f-string) __str__",
+                check_str_obj_with_a_computed_f_string_str
+            ),
+            (
+                "f-string interpolates obj via __str__",
+                check_f_string_interpolates_obj_via_str
+            ),
+            (
+                "str(obj) without __str__ writes the object's fields, as the Python tier does",
+                check_str_obj_without_str_writes_the_object_s_fields_a
+            ),
+            (
+                "str(obj) resolves the runtime subclass __str__",
+                check_str_obj_resolves_the_runtime_subclass_str
+            ),
+            (
+                "str(obj) on a base instance uses the base __str__",
+                check_str_obj_on_a_base_instance_uses_the_base_str
+            ),
+            (
+                "str(obj) on a null (None) struct pointer renders \"None\", not a crash",
+                check_str_obj_on_a_null_none_struct_pointer_renders_no
+            ),
+            (
+                "print(obj) writes __str__ to stdout",
+                check_print_obj_writes_str_to_stdout
+            )
+        ]
+    );
 }

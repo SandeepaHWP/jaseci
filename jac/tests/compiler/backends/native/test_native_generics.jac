@@ -14,7 +14,8 @@ import from tests.support {
     get_func,
     has_error_code,
     native_address,
-    native_force_opts
+    native_force_opts,
+    run_cases
 }
 import jaclang;
 
@@ -113,37 +114,61 @@ def compile_na_inline(label: str, code: str) -> JacProgram {
     return prog;
 }
 
-test "mono: identity specializes at int, float, and str" {
-    (eng, _) = compile_native("generics_mono.jac");
-    fi = get_func(eng, "use_identity_int", ctypes.c_int64, ctypes.c_int64);
-    assert fi(7) == 7;
-    fs = get_sfunc(eng, "use_identity_str_len", ctypes.c_int64, ctypes.c_char_p);
-    assert fs(b"abcd") == 4;
-    ff = get_func(eng, "use_identity_float", ctypes.c_double, ctypes.c_double);
-    assert ff(2.5) == 2.5;
-    fk = get_func(eng, "use_identity_kw", ctypes.c_int64, ctypes.c_int64);
-    assert fk(9) == 9 , "keyword-supplied argument binds the type param";
+test "generics_mono.jac cases" {
+    def check_mono_identity_specializes_at_int_float_and_str {
+        (eng, _) = compile_native("generics_mono.jac");
+
+        fi = get_func(eng, "use_identity_int", ctypes.c_int64, ctypes.c_int64);
+        assert fi(7) == 7;
+        fs = get_sfunc(eng, "use_identity_str_len", ctypes.c_int64, ctypes.c_char_p);
+        assert fs(b"abcd") == 4;
+        ff = get_func(eng, "use_identity_float", ctypes.c_double, ctypes.c_double);
+        assert ff(2.5) == 2.5;
+        fk = get_func(eng, "use_identity_kw", ctypes.c_int64, ctypes.c_int64);
+        assert fk(9) == 9 , "keyword-supplied argument binds the type param";
+    }
+
+    def check_mono_one_body_different_lowerings_per_instantiat {
+        (eng, _) = compile_native("generics_mono.jac");
+
+        ti = get_func(
+            eng, "use_tail_int", ctypes.c_int64, ctypes.c_int64, ctypes.c_int64
+        );
+        assert ti(3, 9) == 9 , "i64 element load at int";
+        ts = get_sfunc(
+            eng, "use_tail_str_len", ctypes.c_int64, ctypes.c_char_p, ctypes.c_char_p
+        );
+        assert ts(b"ab", b"wxyz") == 4 , "pointer element load at str";
+    }
+
+    def check_mono_container_type_params_solve_through_list_t {
+        (eng, _) = compile_native("generics_mono.jac");
+
+        f = get_func(eng, "use_first", ctypes.c_int64, ctypes.c_int64, ctypes.c_int64);
+        assert f(5, 9) == 5;
+        g = get_sfunc(
+            eng, "use_first_str_len", ctypes.c_int64, ctypes.c_char_p, ctypes.c_char_p
+        );
+        assert g(b"hello", b"xy") == 5;
+    }
+    run_cases(
+        [
+            (
+                "mono: identity specializes at int, float, and str",
+                check_mono_identity_specializes_at_int_float_and_str
+            ),
+            (
+                "mono: one body, different lowerings per instantiation",
+                check_mono_one_body_different_lowerings_per_instantiat
+            ),
+            (
+                "mono: container type params solve through list[T]",
+                check_mono_container_type_params_solve_through_list_t
+            )
+        ]
+    );
 }
 
-test "mono: one body, different lowerings per instantiation" {
-    (eng, _) = compile_native("generics_mono.jac");
-    ti = get_func(eng, "use_tail_int", ctypes.c_int64, ctypes.c_int64, ctypes.c_int64);
-    assert ti(3, 9) == 9 , "i64 element load at int";
-    ts = get_sfunc(
-        eng, "use_tail_str_len", ctypes.c_int64, ctypes.c_char_p, ctypes.c_char_p
-    );
-    assert ts(b"ab", b"wxyz") == 4 , "pointer element load at str";
-}
-
-test "mono: container type params solve through list[T]" {
-    (eng, _) = compile_native("generics_mono.jac");
-    f = get_func(eng, "use_first", ctypes.c_int64, ctypes.c_int64, ctypes.c_int64);
-    assert f(5, 9) == 5;
-    g = get_sfunc(
-        eng, "use_first_str_len", ctypes.c_int64, ctypes.c_char_p, ctypes.c_char_p
-    );
-    assert g(b"hello", b"xy") == 5;
-}
 
 test "mono: an uncalled generic def emits no code and no error" {
     (eng, ir) = compile_native("generics_mono.jac");
@@ -217,25 +242,45 @@ test "mono: generic method on an archetype stamps per call site" {
     );
 }
 
-test "iter flow: generator through a monomorphized Iterator[T] param" {
-    # #7626 B4: JacIter is type-erased, so iterator values pass through
-    # monomorphized signatures; the element type resolves per site.
-    (eng, _) = compile_native("iter_generic.jac");
-    f = get_func(eng, "use_take2", ctypes.c_int64);
-    assert f() == 1 , "take2(gen_nums(5)) == [0, 1]";
+test "iter flow: cases on iter_generic.jac" {
+    def check_iter_flow_generator_through_a_monomorphized_iter {
+        (eng, _) = compile_native("iter_generic.jac");
+
+        f = get_func(eng, "use_take2", ctypes.c_int64);
+        assert f() == 1 , "take2(gen_nums(5)) == [0, 1]";
+    }
+
+    def check_iter_flow_iterator_stored_in_a_container_and_dra {
+        (eng, _) = compile_native("iter_generic.jac");
+
+        f = get_func(eng, "stored_iter", ctypes.c_int64);
+        assert f() == 3 , "0+1+2 through the stored iterator";
+    }
+
+    def check_iter_flow_lazy_adapter_over_a_passed_in_iterator {
+        (eng, _) = compile_native("iter_generic.jac");
+
+        f = get_func(eng, "use_adapter", ctypes.c_int64);
+        assert f() == 6 , "map(+1) over gen_nums(3): 1+2+3";
+    }
+    run_cases(
+        [
+            (
+                "iter flow: generator through a monomorphized Iterator[T] param",
+                check_iter_flow_generator_through_a_monomorphized_iter
+            ),
+            (
+                "iter flow: iterator stored in a container and drained later",
+                check_iter_flow_iterator_stored_in_a_container_and_dra
+            ),
+            (
+                "iter flow: lazy adapter over a passed-in iterator param",
+                check_iter_flow_lazy_adapter_over_a_passed_in_iterator
+            )
+        ]
+    );
 }
 
-test "iter flow: iterator stored in a container and drained later" {
-    (eng, _) = compile_native("iter_generic.jac");
-    f = get_func(eng, "stored_iter", ctypes.c_int64);
-    assert f() == 3 , "0+1+2 through the stored iterator";
-}
-
-test "iter flow: lazy adapter over a passed-in iterator param" {
-    (eng, _) = compile_native("iter_generic.jac");
-    f = get_func(eng, "use_adapter", ctypes.c_int64);
-    assert f() == 6 , "map(+1) over gen_nums(3): 1+2+3";
-}
 
 test "mono as-value: concrete Callable annotation stamps the template (#7626 A5)" {
     (eng, _) = compile_native("generics_as_value.jac");

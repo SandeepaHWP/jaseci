@@ -16,7 +16,8 @@ import from tests.support {
     compile_native,
     get_func,
     native_force_opts,
-    source_spelled
+    source_spelled,
+    run_cases
 }
 
 import from jaclang.compiler.driver.program { JacProgram }
@@ -41,48 +42,90 @@ test "isinstance against an imported class lowers natively" {
     assert "Circle.__vtable" in llvm_ir , "the imported Circle vtable is not referenced at all";
 }
 
-test "imported base class matches through the imported MRO" {
-    (eng, _) = compile_native("xmod_isinstance_main.jac");
-    f = get_func(eng, "chk_base", ctypes.c_int64, ctypes.c_int64);
-    assert f(0) == 1 , "Circle must match its imported base Shape";
-    assert f(1) == 1 , "Square must match its imported base Shape";
-    assert f(2) == 0 , "an unrelated imported hierarchy must not match Shape";
-    assert f(3) == 0 , "an int must not match an imported archetype";
+test "xmod_isinstance_main.jac cases" {
+    def check_imported_base_class_matches_through_the_imported {
+        (eng, _) = compile_native("xmod_isinstance_main.jac");
+
+        f = get_func(eng, "chk_base", ctypes.c_int64, ctypes.c_int64);
+        assert f(0) == 1 , "Circle must match its imported base Shape";
+        assert f(1) == 1 , "Square must match its imported base Shape";
+        assert f(2) == 0 , "an unrelated imported hierarchy must not match Shape";
+        assert f(3) == 0 , "an int must not match an imported archetype";
+    }
+
+    def check_imported_leaf_class_does_not_match_a_sibling {
+        (eng, _) = compile_native("xmod_isinstance_main.jac");
+
+        f = get_func(eng, "chk_leaf", ctypes.c_int64, ctypes.c_int64);
+        assert f(0) == 1 , "Circle must match Circle";
+        assert f(1) == 0 , "Square must not match its sibling Circle";
+    }
+
+    def check_statically_typed_operand_of_an_imported_class_ma {
+        (eng, _) = compile_native("xmod_isinstance_main.jac");
+
+        f = get_func(eng, "chk_typed", ctypes.c_int64);
+        assert f() == 1 , "a Circle-typed local must match the imported base Shape";
+    }
+
+    def check_objects_built_by_the_defining_module_carry_the_s {
+        (eng, _) = compile_native("xmod_isinstance_main.jac");
+
+        f = get_func(eng, "chk_lib_built", ctypes.c_int64, ctypes.c_int64);
+        assert f(0) == 1 , "a Circle built inside the library must match Circle here";
+        assert f(1) == 0 , "a Square built inside the library must not match Circle";
+    }
+    run_cases(
+        [
+            (
+                "imported base class matches through the imported MRO",
+                check_imported_base_class_matches_through_the_imported
+            ),
+            (
+                "imported leaf class does not match a sibling",
+                check_imported_leaf_class_does_not_match_a_sibling
+            ),
+            (
+                "statically typed operand of an imported class matches its base",
+                check_statically_typed_operand_of_an_imported_class_ma
+            ),
+            (
+                "objects built by the defining module carry the same vtable",
+                check_objects_built_by_the_defining_module_carry_the_s
+            )
+        ]
+    );
 }
 
-test "imported leaf class does not match a sibling" {
-    (eng, _) = compile_native("xmod_isinstance_main.jac");
-    f = get_func(eng, "chk_leaf", ctypes.c_int64, ctypes.c_int64);
-    assert f(0) == 1 , "Circle must match Circle";
-    assert f(1) == 0 , "Square must not match its sibling Circle";
+
+test "isinstance against a module-qualified imported class, and related cases" {
+    def check_isinstance_against_a_module_qualified_imported_c {
+        (eng, _) = compile_native("xmod_isinstance_qualified_main.jac");
+        f = get_func(eng, "chk_qualified", ctypes.c_int64, ctypes.c_int64);
+        got = [f(k) for k in range(3)];
+        assert got == [1, 1, 0] , f"lib.Circle/lib.Square must match lib.Shape, got {got}";
+    }
+
+    def check_class_patterns_match_archetypes_an_imported_modu {
+        (eng, _) = compile_native("xmod_match_main.jac");
+        f = get_func(eng, "shape_kind", ctypes.c_int64, ctypes.c_int64);
+        got = [f(k) for k in range(3)];
+        assert got == [1, 2, 0] , f"imported class patterns matched {got}";
+    }
+    run_cases(
+        [
+            (
+                "isinstance against a module-qualified imported class",
+                check_isinstance_against_a_module_qualified_imported_c
+            ),
+            (
+                "class patterns match archetypes an imported module defines",
+                check_class_patterns_match_archetypes_an_imported_modu
+            )
+        ]
+    );
 }
 
-test "statically typed operand of an imported class matches its base" {
-    (eng, _) = compile_native("xmod_isinstance_main.jac");
-    f = get_func(eng, "chk_typed", ctypes.c_int64);
-    assert f() == 1 , "a Circle-typed local must match the imported base Shape";
-}
-
-test "objects built by the defining module carry the same vtable" {
-    (eng, _) = compile_native("xmod_isinstance_main.jac");
-    f = get_func(eng, "chk_lib_built", ctypes.c_int64, ctypes.c_int64);
-    assert f(0) == 1 , "a Circle built inside the library must match Circle here";
-    assert f(1) == 0 , "a Square built inside the library must not match Circle";
-}
-
-test "isinstance against a module-qualified imported class" {
-    (eng, _) = compile_native("xmod_isinstance_qualified_main.jac");
-    f = get_func(eng, "chk_qualified", ctypes.c_int64, ctypes.c_int64);
-    got = [f(k) for k in range(3)];
-    assert got == [1, 1, 0] , f"lib.Circle/lib.Square must match lib.Shape, got {got}";
-}
-
-test "class patterns match archetypes an imported module defines" {
-    (eng, _) = compile_native("xmod_match_main.jac");
-    f = get_func(eng, "shape_kind", ctypes.c_int64, ctypes.c_int64);
-    got = [f(k) for k in range(3)];
-    assert got == [1, 2, 0] , f"imported class patterns matched {got}";
-}
 
 """A subclass defined in a module the checking module never imports.
 

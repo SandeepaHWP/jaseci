@@ -27,6 +27,8 @@ import from jaclang.compiler.frontend.diagnostics {
 }
 
 import from jaclang.compiler.driver.program { JacProgram }
+import from tests.support { run_cases }
+
 
 glob PROBE_ERR = DiagnosticInfo(
          code="E9901",
@@ -69,118 +71,159 @@ def _parse(prog: JacProgram, source: str) -> uni.Module {
     return prog.parse_str(source, "<alert_delivery_test>");
 }
 
-test "emission accumulates pass-locally and never touches the program mid-run" {
-    prog = JacProgram();
-    mod = _parse(prog, "with entry { x = 1; }");
-    inst = run_pass(ProbeEmitPass, mod, prog);
-    assert inst.mid_run_prog_errors == 0 , (
-        f"emit reached the program ledger mid-pass: "
-        f"{inst.mid_run_prog_errors} error(s) visible during transform"
-    );
-    assert inst.mid_run_prog_warnings == 0 , (
-        "emit reached the program warning ledger mid-pass"
-    );
-    assert inst.mid_run_local_errors == 2 , (
-        f"pass-local accumulation broken: {inst.mid_run_local_errors} != 2"
-    );
-    assert inst.emit_results == [True, True, True] , (
-        f"un-suppressed emits must report True: {inst.emit_results}"
-    );
-}
-
-test "delivery lands alerts on the program in emission order" {
-    prog = JacProgram();
-    mod = _parse(prog, "with entry { x = 1; }");
-    run_pass(ProbeEmitPass, mod, prog);
-    msgs = [a.msg for a in prog.errors_had];
-    assert msgs == ["probe error first", "probe error third"] , (
-        f"delivered errors out of order or missing: {msgs}"
-    );
-    warn_msgs = [a.msg for a in prog.warnings_had];
-    assert warn_msgs == ["probe warning second"] , (
-        f"delivered warnings wrong: {warn_msgs}"
-    );
-    assert prog.errors_had[0].code is PROBE_ERR , (
-        "delivered Alert lost its DiagnosticInfo identity"
-    );
-}
-
-test "a policy stamped on the pass suppresses at emit time" {
-    prog = JacProgram();
-    mod = _parse(prog, "with entry { x = 1; }");
-    policy = DiagnosticPolicy(suppress_codes=["E9901"]);
-    inst = run_pass(ProbeEmitPass, mod, prog, policy=policy);
-    assert inst.emit_results == [False, True, False] , (
-        f"suppressed emits must report False: {inst.emit_results}"
-    );
-    assert not inst.ctx.errors_had , (
-        "suppressed alerts must not accumulate on the pass"
-    );
-    assert not prog.errors_had , (
-        f"suppressed alerts leaked into delivery: {[str(a) for a in prog.errors_had]}"
-    );
-    assert [a.msg for a in prog.warnings_had] == ["probe warning second"];
-}
-
-test "an unstamped pass accumulates everything and delivery suppresses" {
-    prog = JacProgram();
-    mod = _parse(prog, "with entry { x = 1; }");
-    inst = run_walker(ProbeEmitPass, module=mod, prog=prog);
-    assert len(inst.ctx.errors_had) == 2 , (
-        "a policy-free pass must accumulate every emission"
-    );
-    assert not prog.errors_had , ("standalone execution must not deliver by itself");
-    deliver_alerts(
-        inst.ctx.errors_had,
-        inst.ctx.warnings_had,
-        prog,
-        DiagnosticPolicy(suppress_codes=["E9901"])
-    );
-    assert not prog.errors_had , (
-        f"delivery-time suppression failed: {[str(a) for a in prog.errors_had]}"
-    );
-    assert [a.msg for a in prog.warnings_had] == ["probe warning second"];
-}
-
-test "inline jac:ignore suppression holds through the policy object" {
-    prog = JacProgram();
-    mod = _parse(prog, "with entry {\n    x = 1;  # jac:ignore[E1030]\n}\n");
-    policy = DiagnosticPolicy();
-    assert policy.is_suppressed(E1030, mod.loc) is False , (
-        "module-level loc (line 1) must not inherit the line-2 ignore"
-    );
-    target: uni.Assignment | None = None;
-    for nd in mod.get_all_sub_nodes(uni.Assignment) {
-        target = nd;
+test "emission accumulates pass-locally and never touches the program mid-run, and related cases" {
+    def check_emission_accumulates_pass_locally_and_never_touc {
+        prog = JacProgram();
+        mod = _parse(prog, "with entry { x = 1; }");
+        inst = run_pass(ProbeEmitPass, mod, prog);
+        assert inst.mid_run_prog_errors == 0 , (
+            f"emit reached the program ledger mid-pass: "
+            f"{inst.mid_run_prog_errors} error(s) visible during transform"
+        );
+        assert inst.mid_run_prog_warnings == 0 , (
+            "emit reached the program warning ledger mid-pass"
+        );
+        assert inst.mid_run_local_errors == 2 , (
+            f"pass-local accumulation broken: {inst.mid_run_local_errors} != 2"
+        );
+        assert inst.emit_results == [True, True, True] , (
+            f"un-suppressed emits must report True: {inst.emit_results}"
+        );
     }
-    assert target is not None;
-    assert policy.is_suppressed(E1030, target.loc) , (
-        "a jac:ignore[E1030] comment on the alert line must suppress E1030"
-    );
-    assert policy.is_suppressed(PROBE_ERR, target.loc) is False , (
-        "an unrelated code must not be suppressed by the E1030 ignore"
+
+    def check_delivery_lands_alerts_on_the_program_in_emission {
+        prog = JacProgram();
+        mod = _parse(prog, "with entry { x = 1; }");
+        run_pass(ProbeEmitPass, mod, prog);
+        msgs = [a.msg for a in prog.errors_had];
+        assert msgs == ["probe error first", "probe error third"] , (
+            f"delivered errors out of order or missing: {msgs}"
+        );
+        warn_msgs = [a.msg for a in prog.warnings_had];
+        assert warn_msgs == ["probe warning second"] , (
+            f"delivered warnings wrong: {warn_msgs}"
+        );
+        assert prog.errors_had[0].code is PROBE_ERR , (
+            "delivered Alert lost its DiagnosticInfo identity"
+        );
+    }
+
+    def check_a_policy_stamped_on_the_pass_suppresses_at_emit {
+        prog = JacProgram();
+        mod = _parse(prog, "with entry { x = 1; }");
+        policy = DiagnosticPolicy(suppress_codes=["E9901"]);
+        inst = run_pass(ProbeEmitPass, mod, prog, policy=policy);
+        assert inst.emit_results == [False, True, False] , (
+            f"suppressed emits must report False: {inst.emit_results}"
+        );
+        assert not inst.ctx.errors_had , (
+            "suppressed alerts must not accumulate on the pass"
+        );
+        assert not prog.errors_had , (
+            f"suppressed alerts leaked into delivery: {[
+                str(a) for a in prog.errors_had
+            ]}"
+        );
+        assert [a.msg for a in prog.warnings_had] == ["probe warning second"];
+    }
+
+    def check_an_unstamped_pass_accumulates_everything_and_del {
+        prog = JacProgram();
+        mod = _parse(prog, "with entry { x = 1; }");
+        inst = run_walker(ProbeEmitPass, module=mod, prog=prog);
+        assert len(inst.ctx.errors_had) == 2 , (
+            "a policy-free pass must accumulate every emission"
+        );
+        assert not prog.errors_had , (
+            "standalone execution must not deliver by itself"
+        );
+        deliver_alerts(
+            inst.ctx.errors_had,
+            inst.ctx.warnings_had,
+            prog,
+            DiagnosticPolicy(suppress_codes=["E9901"])
+        );
+        assert not prog.errors_had , (
+            f"delivery-time suppression failed: {[str(a) for a in prog.errors_had]}"
+        );
+        assert [a.msg for a in prog.warnings_had] == ["probe warning second"];
+    }
+    run_cases(
+        [
+            (
+                "emission accumulates pass-locally and never touches the program mid-run",
+                check_emission_accumulates_pass_locally_and_never_touc
+            ),
+            (
+                "delivery lands alerts on the program in emission order",
+                check_delivery_lands_alerts_on_the_program_in_emission
+            ),
+            (
+                "a policy stamped on the pass suppresses at emit time",
+                check_a_policy_stamped_on_the_pass_suppresses_at_emit
+            ),
+            (
+                "an unstamped pass accumulates everything and delivery suppresses",
+                check_an_unstamped_pass_accumulates_everything_and_del
+            )
+        ]
     );
 }
 
-test "ice records its E9001 and still raises through the driver" {
-    prog = JacProgram();
-    mod = _parse(prog, "with entry { x = 1; }");
-    blew_up = False;
-    try {
-        run_pass(ProbeIcePass, mod, prog);
-    } except RuntimeError as e {
-        blew_up = True;
-        assert "ProbeIcePass" in str(e);
-        assert "probe detonation" in str(e);
+
+test "inline jac:ignore suppression holds through the policy object, and related cases" {
+    def check_inline_jac_ignore_suppression_holds_through_the {
+        prog = JacProgram();
+        mod = _parse(prog, "with entry {\n    x = 1;  # jac:ignore[E1030]\n}\n");
+        policy = DiagnosticPolicy();
+        assert policy.is_suppressed(E1030, mod.loc) is False , (
+            "module-level loc (line 1) must not inherit the line-2 ignore"
+        );
+        target: uni.Assignment | None = None;
+        for nd in mod.get_all_sub_nodes(uni.Assignment) {
+            target = nd;
+        }
+        assert target is not None;
+        assert policy.is_suppressed(E1030, target.loc) , (
+            "a jac:ignore[E1030] comment on the alert line must suppress E1030"
+        );
+        assert policy.is_suppressed(PROBE_ERR, target.loc) is False , (
+            "an unrelated code must not be suppressed by the E1030 ignore"
+        );
     }
-    assert blew_up , "CompileContext.ice must still raise";
-    codes = [
-        a.code.code
-        for a in prog.errors_had
-        if a.code is not None
-    ];
-    assert "E9001" in codes , (
-        f"the ICE alert was lost when the constructor raised: "
-        f"{[str(a) for a in prog.errors_had]}"
+
+    def check_ice_records_its_e9001_and_still_raises_through_t {
+        prog = JacProgram();
+        mod = _parse(prog, "with entry { x = 1; }");
+        blew_up = False;
+        try {
+            run_pass(ProbeIcePass, mod, prog);
+        } except RuntimeError as e {
+            blew_up = True;
+            assert "ProbeIcePass" in str(e);
+            assert "probe detonation" in str(e);
+        }
+        assert blew_up , "CompileContext.ice must still raise";
+        codes = [
+            a.code.code
+            for a in prog.errors_had
+            if a.code is not None
+        ];
+        assert "E9001" in codes , (
+            f"the ICE alert was lost when the constructor raised: "
+            f"{[str(a) for a in prog.errors_had]}"
+        );
+    }
+    run_cases(
+        [
+            (
+                "inline jac:ignore suppression holds through the policy object",
+                check_inline_jac_ignore_suppression_holds_through_the
+            ),
+            (
+                "ice records its E9001 and still raises through the driver",
+                check_ice_records_its_e9001_and_still_raises_through_t
+            )
+        ]
     );
 }

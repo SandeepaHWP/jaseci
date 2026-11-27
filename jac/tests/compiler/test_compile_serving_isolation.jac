@@ -23,7 +23,7 @@ import os;
 import subprocess;
 import sys;
 import from pathlib { Path }
-import from tests.support { JAC_ROOT }
+import from tests.support { JAC_ROOT, run_cases }
 
 glob FIXTURES = str(Path(__file__).parent / "fixtures"),
      _PROBE_SCRIPT = """
@@ -72,12 +72,26 @@ def _check_probe(fixture: str) -> tuple[int, str] {
 }
 
 
-test "type-graph traversal wakes no serving module" {
-    (code, out) = _check_probe("transient_enum_probe.jac");
-    assert code == 0 , out;
-}
+test "type-graph traversal wakes no serving module, and related cases" {
+    def check_type_graph_traversal_wakes_no_serving_module {
+        (code, out) = _check_probe("transient_enum_probe.jac");
+        assert code == 0 , out;
+    }
 
-test "import resolution wakes no serving module" {
-    (code, out) = _check_probe("serving_import_probe.jac");
-    assert code == 0 , out;
+    def check_import_resolution_wakes_no_serving_module {
+        (code, out) = _check_probe("serving_import_probe.jac");
+        assert code == 0 , out;
+    }
+    run_cases(
+        [
+            (
+                "type-graph traversal wakes no serving module",
+                check_type_graph_traversal_wakes_no_serving_module
+            ),
+            (
+                "import resolution wakes no serving module",
+                check_import_resolution_wakes_no_serving_module
+            )
+        ]
+    );
 }
